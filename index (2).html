@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111827">
+<title>AI Merchant OS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--ink:#172033;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--good:#059669;--warn:#d97706;--bad:#dc2626}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+.app{display:flex;min-height:100vh}.side{width:230px;background:#111827;color:white;padding:22px 14px;position:sticky;top:0;height:100vh}.brand{font-weight:800;font-size:20px;margin:4px 10px 24px}.brand span{color:#60a5fa}.nav button{width:100%;border:0;background:transparent;color:#d1d5db;text-align:left;padding:12px 12px;border-radius:10px;margin:2px 0;cursor:pointer;font-size:14px}.nav button.active,.nav button:hover{background:#1f2937;color:#fff}.main{flex:1;padding:24px;max-width:1300px;margin:auto;width:100%}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:20px}.top h1{font-size:26px;margin:0}.sub{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px;box-shadow:0 1px 2px #00000008}.metric{font-size:25px;font-weight:800;margin-top:7px}.label{font-size:12px;color:var(--muted)}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.section{margin-top:18px}.section h2{font-size:16px;margin:0 0 10px}.two{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.list{display:flex;flex-direction:column;gap:10px}.row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}.pill{font-size:11px;padding:4px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}.btn{border:0;background:var(--accent);color:#fff;padding:10px 14px;border-radius:9px;font-weight:700;cursor:pointer}.btn.secondary{background:#eef2ff;color:#1d4ed8}.btn.danger{background:#fee2e2;color:#b91c1c}.btn.small{padding:7px 10px;font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.view{display:none}.view.active{display:block}.table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{text-align:left;padding:11px;border-bottom:1px solid var(--line)}input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:white;color:var(--ink)}label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.chat{height:430px;display:flex;flex-direction:column}.messages{flex:1;overflow:auto;padding:6px}.msg{max-width:85%;padding:11px 13px;border-radius:12px;margin:8px 0;line-height:1.45;font-size:13px}.ai{background:#eef2ff}.me{background:#e5e7eb;margin-left:auto}.chatbar{display:flex;gap:8px;margin-top:10px}.chatbar input{flex:1}.empty{padding:25px;text-align:center;color:var(--muted)}.notice{padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:#1e40af}.hero{background:linear-gradient(135deg,#111827,#1d4ed8);color:white;border-radius:16px;padding:22px;margin-bottom:16px}.hero h2{margin:0 0 6px;font-size:20px}.hero p{margin:0;color:#dbeafe;font-size:13px}.footer{font-size:11px;color:var(--muted);margin-top:20px;text-align:center}
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.auth-card{width:100%;max-width:360px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px;box-shadow:0 4px 20px #0000000f}.auth-card label{margin-top:10px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.side{width:190px}.formgrid{grid-template-columns:1fr 1fr}}
+@media(max-width:650px){.app{display:block}.side{position:static;width:100%;height:auto;padding:10px}.brand{margin:5px 8px 10px}.nav{display:flex;overflow:auto}.nav button{white-space:nowrap;width:auto}.main{padding:14px}.grid{grid-template-columns:1fr 1fr}.formgrid{grid-template-columns:1fr}.top h1{font-size:21px}}
+</style>
+</head>
+<body>
+
+<div id="authScreen" class="auth-wrap">
+  <div class="auth-card">
+    <div class="brand">AI <span>Merchant OS</span></div>
+    <p class="sub">Sign in to sync your business data across devices.</p>
+    <label>Email</label><input id="authEmail" type="email" autocomplete="email">
+    <label>Password</label><input id="authPassword" type="password" autocomplete="current-password">
+    <div class="actions" style="margin-top:14px">
+      <button class="btn" onclick="handleSignIn()">Sign in</button>
+      <button class="btn secondary" onclick="handleSignUp()">Create account</button>
+    </div>
+    <div id="authStatus" class="sub" style="margin-top:10px"></div>
+  </div>
+</div>
+
+<div class="app" id="appRoot" style="display:none">
+<aside class="side">
+  <div class="brand">AI <span>Merchant OS</span></div>
+  <div class="nav">
+    <button class="active" data-view="dashboard">⌂ Dashboard</button>
+    <button data-view="sales">＋ Record Sale</button>
+    <button data-view="inventory">▦ Inventory</button>
+    <button data-view="expenses">◉ Expenses</button>
+    <button data-view="advisor">✦ AI Advisor</button>
+    <button data-view="settings">⚙ Settings</button>
+  </div>
+</aside>
+<main class="main">
+<section id="dashboard" class="view active">
+  <div class="top"><div><h1>Good morning, <span id="merchantName">Merchant</span> 👋</h1><div class="sub" id="today"></div></div><button class="btn" onclick="show('sales')">+ Record sale</button></div>
+  <div class="hero"><h2>Your business knows itself.</h2><p>Record sales and expenses, keep inventory current, and ask the AI what to do next. Synced live to your account.</p></div>
+  <div class="grid" id="metrics"></div>
+  <div class="two section">
+    <div class="card"><h2>Recent activity</h2><div id="recent"></div></div>
+    <div class="card"><h2>AI priorities</h2><div id="priorities" class="list"></div></div>
+  </div>
+</section>
+
+<section id="sales" class="view">
+  <div class="top"><div><h1>Record a sale</h1><div class="sub">Every sale updates revenue and inventory.</div></div></div>
+  <div class="card">
+    <div class="formgrid">
+      <div><label>Product</label><select id="saleProduct"></select></div>
+      <div><label>Quantity</label><input id="saleQty" type="number" min="1" value="1"></div>
+      <div><label>Selling price / unit (RWF)</label><input id="salePrice" type="number" min="0"></div>
+    </div>
+    <div class="actions" style="margin-top:14px"><button class="btn" onclick="recordSale()">Record sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
+    <div id="voiceStatus" class="sub" style="margin-top:8px"></div>
+  </div>
+  <div class="card section"><h2>Sales history</h2><div id="salesTable"></div></div>
+</section>
+
+<section id="inventory" class="view">
+  <div class="top"><div><h1>Inventory</h1><div class="sub">Track stock and see what needs attention.</div></div><button class="btn" onclick="toggleAddProduct()">+ Add product</button></div>
+  <div id="addProduct" class="card" style="display:none">
+    <div class="formgrid">
+      <div><label>Product name</label><input id="pName"></div>
+      <div><label>Category</label><select id="pCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option></select></div>
+      <div><label>Cost / unit (RWF)</label><input id="pCost" type="number"></div>
+      <div><label>Selling price / unit (RWF)</label><input id="pSell" type="number"></div>
+      <div><label>Current stock</label><input id="pStock" type="number"></div>
+      <div><label>Reorder level</label><input id="pReorder" type="number"></div>
+    </div>
+    <div class="actions" style="margin-top:14px"><button id="prodFormBtn" class="btn" onclick="saveProduct()">Save product</button><button id="prodCancelBtn" class="btn secondary" style="display:none" onclick="cancelProductEdit()">Cancel</button></div>
+  </div>
+  <div class="card section"><div id="inventoryTable"></div></div>
+  <div class="card section"><h2>Revenue by category</h2><div id="categoryTable"></div></div>
+</section>
+
+<section id="expenses" class="view">
+  <div class="top"><div><h1>Expenses</h1><div class="sub">Keep business expenses separate from sales.</div></div></div>
+  <div class="card">
+    <div class="formgrid">
+      <div><label>Description</label><input id="eDesc" placeholder="Transport"></div>
+      <div><label>Amount (RWF)</label><input id="eAmt" type="number"></div>
+      <div><label>Category</label><select id="eCat"><option>Transport</option><option>Rent</option><option>Utilities</option><option>Supplies</option><option>Other</option></select></div>
+    </div>
+    <div class="actions" style="margin-top:14px"><button class="btn" onclick="addExpense()">Add expense</button></div>
+  </div>
+  <div class="card section"><h2>Expense history</h2><div id="expenseTable"></div></div>
+</section>
+
+<section id="advisor" class="view">
+  <div class="top"><div><h1>AI Business Advisor</h1><div class="sub">Ask questions about the business data recorded in this app.</div></div></div>
+  <div class="card chat">
+    <div class="notice" id="advisorNotice">Connecting to the AI advisor…</div>
+    <div id="messages" class="messages">
+      <div class="msg ai">Hello! I'm your business advisor. Ask me: <b>How am I doing?</b>, <b>What should I restock?</b>, <b>Which products make the most profit?</b>, or <b>How much did I sell?</b></div>
+    </div>
+    <div class="chatbar"><input id="question" placeholder="Ask your business..." onkeydown="if(event.key==='Enter')askAI()"><button class="btn" onclick="askAI()">Ask</button></div>
+  </div>
+</section>
+
+<section id="settings" class="view">
+  <div class="top"><div><h1>Merchant settings</h1><div class="sub">Your data is stored in your Supabase account, synced across devices.</div></div></div>
+  <div class="card">
+    <div class="formgrid">
+      <div><label>Business / merchant name</label><input id="setName"></div>
+      <div><label>Primary category</label><select id="setCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option></select></div>
+      <div><label>Currency</label><input value="RWF" disabled></div>
+    </div>
+    <div class="actions" style="margin-top:14px">
+      <button class="btn" onclick="saveSettings()">Save</button>
+      <button class="btn secondary" onclick="exportData()">⬇ Export data (backup)</button>
+      <label class="btn secondary" style="cursor:pointer;display:inline-block">⬆ Import data<input type="file" accept="application/json" style="display:none" onchange="importData(this)"></label>
+      <button class="btn secondary" onclick="seedDemoData()">＋ Add sample products</button>
+      <button class="btn danger" onclick="signOut()">Sign out</button>
+    </div>
+    <div class="sub" style="margin-top:10px">Deleted products stay in your sales history but disappear from the inventory list and sale form.</div>
+  </div>
+  <div class="footer">AI Merchant OS • Supabase + OpenAI backend • Not a financial or lending decision engine.</div>
+</section>
+</main>
+</div>
+
+<script>
+// ── Supabase config ──────────────────────────────────────────────────────
+// Paste your own project's values here (Project Settings → API in Supabase).
+const SUPABASE_URL = 'https://bhtodxjhgucgwarpaqzy.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_zRtqPyHL9Gqjck1hoAZibQ_KD9TiazY';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function money(n){return 'RWF '+Math.round(n||0).toLocaleString()}
+
+let session=null;
+let state={merchant:null,products:[],sales:[],expenses:[]};
+let editingProductId=null;
+let advisorAvailable=null; // null=unknown, true/false once tested
+
+// ── Auth ─────────────────────────────────────────────────────────────────
+async function handleSignUp(){
+  const email=authEmail.value.trim(),password=authPassword.value;
+  if(!email||!password)return authStatus.textContent='Enter an email and password.';
+  authStatus.textContent='Creating account…';
+  const {error}=await sb.auth.signUp({email,password});
+  if(error)return authStatus.textContent=error.message;
+  authStatus.textContent='Account created. If email confirmation is on, check your inbox, then sign in.';
+}
+async function handleSignIn(){
+  const email=authEmail.value.trim(),password=authPassword.value;
+  if(!email||!password)return authStatus.textContent='Enter an email and password.';
+  authStatus.textContent='Signing in…';
+  const {data,error}=await sb.auth.signInWithPassword({email,password});
+  if(error)return authStatus.textContent=error.message;
+  await onAuthed(data.session);
+}
+async function signOut(){await sb.auth.signOut();location.reload()}
+async function onAuthed(sess){
+  session=sess;
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('appRoot').style.display='';
+  await ensureMerchant();
+  await loadAll();
+  render();
+  checkAdvisor();
+}
+async function ensureMerchant(){
+  let {data,error}=await sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle();
+  if(error){alert('Could not load your business profile: '+error.message);return}
+  if(!data){
+    const {data:created,error:cErr}=await sb.from('merchants').insert({user_id:session.user.id,name:'My Business',category:'Food & Grocery'}).select().single();
+    if(cErr){alert('Could not create your business profile: '+cErr.message);return}
+    data=created;
+  }
+  state.merchant=data;
+}
+
+// ── Data loading ─────────────────────────────────────────────────────────
+async function loadAll(){
+  const mId=state.merchant.id;
+  const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr}]=await Promise.all([
+    sb.from('products').select('*').eq('merchant_id',mId).order('created_at'),
+    sb.from('sales').select('*').eq('merchant_id',mId).order('created_at'),
+    sb.from('expenses').select('*').eq('merchant_id',mId).order('created_at')
+  ]);
+  if(pErr||sErr||eErr){alert('Could not load your data: '+(pErr||sErr||eErr).message);return}
+  state.products=products||[];
+  state.sales=sales||[];
+  state.expenses=expenses||[];
+}
+function product(id){return state.products.find(p=>p.id===id)}
+function activeProducts(){return state.products.filter(p=>!p.deleted)}
+function revenue(){return state.sales.reduce((s,x)=>s+x.qty*x.price,0)}
+function cogs(){return state.sales.reduce((s,x)=>s+x.qty*(x.cost??0),0)}
+function totalExpenses(){return state.expenses.reduce((s,x)=>s+x.amount,0)}
+function profit(){return revenue()-cogs()-totalExpenses()}
+function categoryBreakdown(){
+  let map={};
+  state.sales.forEach(s=>{const p=product(s.product_id);const cat=p?p.cat:(s.product_name_snapshot?'Other':null);if(!cat)return;map[cat]=map[cat]||{revenue:0,profit:0};map[cat].revenue+=s.qty*s.price;map[cat].profit+=s.qty*(s.price-(s.cost??0))});
+  return Object.entries(map).map(([cat,v])=>({cat,...v})).sort((a,b)=>b.revenue-a.revenue);
+}
+function bestProducts(){
+  return state.products.map(p=>{
+    const ps=state.sales.filter(s=>s.product_id===p.id);
+    const rev=ps.reduce((x,s)=>x+s.qty*s.price,0);
+    const prof=ps.reduce((x,s)=>x+s.qty*(s.price-(s.cost??0)),0);
+    return {...p,rev,profit:prof};
+  }).sort((a,b)=>b.rev-a.rev);
+}
+
+// ── Navigation / render ──────────────────────────────────────────────────
+function show(v){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));render()}
+document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
+
+function render(){
+  if(!state.merchant)return;
+  document.getElementById('merchantName').textContent=state.merchant.name;
+  document.getElementById('today').textContent=new Date().toLocaleDateString('en-RW',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  let low=activeProducts().filter(p=>p.stock<=p.reorder).length;
+  document.getElementById('metrics').innerHTML=[
+    ['Total revenue',money(revenue()),''],
+    ['Estimated profit',money(profit()),profit()>=0?'good':'bad'],
+    ['Transactions',state.sales.length,''],
+    ['Low-stock items',low,low?'warn':'good']
+  ].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]}">${x[1]}</div></div>`).join('');
+  document.getElementById('recent').innerHTML=state.sales.slice().reverse().slice(0,7).map(s=>{const p=product(s.product_id);return `<div class="row"><div><b>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</b><div class="sub">${s.qty} × ${money(s.price)}</div></div><b>${money(s.qty*s.price)}</b></div>`}).join('')||'<div class="empty">No sales yet.</div>';
+  let lowNames=activeProducts().filter(p=>p.stock<=p.reorder).map(p=>esc(p.name));
+  let best=bestProducts()[0];
+  document.getElementById('priorities').innerHTML=[
+    low?`<div>📦 <b>Restock:</b> ${lowNames.slice(0,3).join(', ')}${low>3?'…':''}</div>`:'<div>✅ Stock levels look healthy.</div>',
+    (best&&best.rev>0)?`<div>🔥 <b>Best revenue product:</b> ${esc(best.name)}</div>`:'',
+    profit()>=0?`<div>💰 <b>Estimated profit:</b> ${money(profit())}</div>`:`<div>⚠️ <b>Estimated loss:</b> ${money(Math.abs(profit()))}</div>`
+  ].filter(Boolean).join('');
+  fillSelects();renderSales();renderInventory();renderExpenses();
+  document.getElementById('setName').value=state.merchant.name;
+  document.getElementById('setCat').value=state.merchant.category;
+}
+function fillSelects(){
+  document.getElementById('saleProduct').innerHTML=activeProducts().map(p=>`<option value="${p.id}">${esc(p.name)} (stock ${p.stock})</option>`).join('');
+  const p=product(document.getElementById('saleProduct').value);
+  if(p)document.getElementById('salePrice').value=p.sell;
+}
+document.getElementById('saleProduct').onchange=()=>{const p=product(document.getElementById('saleProduct').value);document.getElementById('salePrice').value=p?p.sell:''}
+
+// ── Sales ────────────────────────────────────────────────────────────────
+async function recordSale(){
+  const id=document.getElementById('saleProduct').value,q=+document.getElementById('saleQty').value,price=+document.getElementById('salePrice').value;
+  const p=product(id);
+  if(!p||q<1||price<0)return alert('Enter valid sale details.');
+  if(q>p.stock)return alert('Not enough stock.');
+  const newStock=p.stock-q;
+  const {error:upErr}=await sb.from('products').update({stock:newStock}).eq('id',p.id);
+  if(upErr)return alert('Could not update stock: '+upErr.message);
+  const {data:saleRow,error:sErr}=await sb.from('sales').insert({merchant_id:state.merchant.id,product_id:p.id,product_name_snapshot:p.name,qty:q,price,cost:p.cost}).select().single();
+  if(sErr){await sb.from('products').update({stock:p.stock}).eq('id',p.id);return alert('Could not record sale: '+sErr.message)}
+  p.stock=newStock;
+  state.sales.push(saleRow);
+  render();
+  alert('Sale recorded.');
+}
+async function voidSale(id){
+  const s=state.sales.find(x=>x.id===id);
+  if(!s)return;
+  if(!confirm('Void this sale? Its stock will be added back to inventory.'))return;
+  const p=product(s.product_id);
+  if(p){
+    const newStock=p.stock+s.qty;
+    const {error:upErr}=await sb.from('products').update({stock:newStock}).eq('id',p.id);
+    if(upErr)return alert(upErr.message);
+    p.stock=newStock;
+  }
+  const {error:delErr}=await sb.from('sales').delete().eq('id',id);
+  if(delErr)return alert(delErr.message);
+  state.sales=state.sales.filter(x=>x.id!==id);
+  render();
+}
+function renderSales(){document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.slice().reverse().map(s=>{const p=product(s.product_id);return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
+
+// ── Products ─────────────────────────────────────────────────────────────
+function clearProductForm(){pName.value=pCost.value=pSell.value=pStock.value=pReorder.value='';pCat.value='Food & Grocery';editingProductId=null;document.getElementById('prodFormBtn').textContent='Save product';document.getElementById('prodCancelBtn').style.display='none'}
+function toggleAddProduct(){const x=document.getElementById('addProduct');const willShow=x.style.display==='none'||x.style.display==='';x.style.display=willShow?'block':'none';if(willShow)clearProductForm()}
+function editProduct(id){const p=product(id);if(!p)return;document.getElementById('addProduct').style.display='block';pName.value=p.name;pCat.value=p.cat;pCost.value=p.cost;pSell.value=p.sell;pStock.value=p.stock;pReorder.value=p.reorder;editingProductId=id;document.getElementById('prodFormBtn').textContent='Update product';document.getElementById('prodCancelBtn').style.display='inline-block';window.scrollTo(0,0)}
+function cancelProductEdit(){document.getElementById('addProduct').style.display='none';clearProductForm()}
+async function saveProduct(){
+  const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value;
+  if(!name||!cost||!sell)return alert('Complete product details.');
+  if(editingProductId){
+    const {data,error}=await sb.from('products').update({name,cat,cost,sell,stock:stock||0,reorder:reorder||0}).eq('id',editingProductId).select().single();
+    if(error)return alert(error.message);
+    const idx=state.products.findIndex(p=>p.id===editingProductId);
+    state.products[idx]=data;
+  }else{
+    const {data,error}=await sb.from('products').insert({merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0}).select().single();
+    if(error)return alert(error.message);
+    state.products.push(data);
+  }
+  document.getElementById('addProduct').style.display='none';
+  clearProductForm();
+  render();
+}
+async function deleteProduct(id){
+  const p=product(id);if(!p)return;
+  if(!confirm(`Delete "${p.name}"? Past sales stay in your history, but you won't be able to sell it again.`))return;
+  const {error}=await sb.from('products').update({deleted:true}).eq('id',id);
+  if(error)return alert(error.message);
+  p.deleted=true;
+  render();
+}
+function renderInventory(){
+  const list=activeProducts();
+  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions"><button class="btn small secondary" onclick="editProduct('${p.id}')">Edit</button><button class="btn small danger" onclick="deleteProduct('${p.id}')">Delete</button></div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
+  renderCategory();
+}
+function renderCategory(){const rows=categoryBreakdown();document.getElementById('categoryTable').innerHTML=rows.length?`<table class="table"><tr><th>Category</th><th>Revenue</th><th>Est. profit</th></tr>${rows.map(r=>`<tr><td>${esc(r.cat)}</td><td>${money(r.revenue)}</td><td>${money(r.profit)}</td></tr>`).join('')}</table>`:'<div class="empty">No sales yet.</div>'}
+
+// ── Expenses ─────────────────────────────────────────────────────────────
+async function addExpense(){
+  const description=eDesc.value.trim(),amount=+eAmt.value,cat=eCat.value;
+  if(!description||!amount)return alert('Complete expense details.');
+  const {data,error}=await sb.from('expenses').insert({merchant_id:state.merchant.id,description,amount,cat}).select().single();
+  if(error)return alert(error.message);
+  state.expenses.push(data);
+  eDesc.value=eAmt.value='';
+  render();
+}
+async function deleteExpense(id){
+  if(!confirm('Delete this expense?'))return;
+  const {error}=await sb.from('expenses').delete().eq('id',id);
+  if(error)return alert(error.message);
+  state.expenses=state.expenses.filter(x=>x.id!==id);
+  render();
+}
+function renderExpenses(){document.getElementById('expenseTable').innerHTML=state.expenses.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${state.expenses.slice().reverse().map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses recorded.</div>'}
+
+// ── Settings ─────────────────────────────────────────────────────────────
+async function saveSettings(){
+  const name=document.getElementById('setName').value||'Merchant',category=document.getElementById('setCat').value;
+  const {error}=await sb.from('merchants').update({name,category}).eq('id',state.merchant.id);
+  if(error)return alert(error.message);
+  state.merchant.name=name;state.merchant.category=category;
+  render();
+  alert('Settings saved.');
+}
+async function seedDemoData(){
+  if(!confirm('Add sample products so you can test the app? This will not remove existing data.'))return;
+  const items=[
+    {name:'Vaseline 250ml',cat:'Cosmetics & Beauty',cost:1800,sell:2500,stock:18,reorder:8},
+    {name:'Lipstick',cat:'Cosmetics & Beauty',cost:2200,sell:3500,stock:6,reorder:8},
+    {name:'Body Lotion',cat:'Cosmetics & Beauty',cost:3500,sell:5000,stock:12,reorder:5},
+    {name:'Phone Case',cat:'Phone Accessories',cost:1800,sell:3000,stock:15,reorder:5},
+    {name:'Rice 5kg',cat:'Food & Grocery',cost:6500,sell:8000,stock:9,reorder:4},
+    {name:'T-Shirt',cat:'Clothing & Shoes',cost:7000,sell:11000,stock:7,reorder:3}
+  ];
+  for(const it of items){
+    const {data,error}=await sb.from('products').insert({merchant_id:state.merchant.id,...it}).select().single();
+    if(!error)state.products.push(data);
+  }
+  render();
+  alert('Sample products added.');
+}
+
+// ── Backup / restore ─────────────────────────────────────────────────────
+function exportData(){
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`ai-merchant-os-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  URL.revokeObjectURL(url);
+}
+async function importData(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    try{
+      const parsed=JSON.parse(e.target.result);
+      if(!parsed.products||!parsed.sales||!parsed.expenses)throw new Error('bad shape');
+      if(!confirm('This will replace all products, sales and expenses in your account with the imported backup. Continue?'))return;
+      const mId=state.merchant.id;
+      await sb.from('sales').delete().eq('merchant_id',mId);
+      await sb.from('expenses').delete().eq('merchant_id',mId);
+      await sb.from('products').delete().eq('merchant_id',mId);
+      const prodMap={};
+      for(const p of parsed.products){
+        const {data,error}=await sb.from('products').insert({merchant_id:mId,name:p.name,cat:p.cat,cost:p.cost,sell:p.sell,stock:p.stock,reorder:p.reorder,deleted:!!p.deleted}).select().single();
+        if(!error)prodMap[p.id]=data.id;
+      }
+      for(const s of parsed.sales){
+        await sb.from('sales').insert({merchant_id:mId,product_id:prodMap[s.product_id||s.product]||null,product_name_snapshot:s.product_name_snapshot||null,qty:s.qty,price:s.price,cost:s.cost||0});
+      }
+      for(const ex of parsed.expenses){
+        await sb.from('expenses').insert({merchant_id:mId,description:ex.description||ex.desc,amount:ex.amount||ex.amt,cat:ex.cat});
+      }
+      await loadAll();render();alert('Data imported.');
+    }catch(err){alert('That file does not look like a valid AI Merchant OS backup.')}
+  };
+  reader.readAsText(file);input.value='';
+}
+
+// ── AI Advisor ───────────────────────────────────────────────────────────
+async function checkAdvisor(){
+  const notice=document.getElementById('advisorNotice');
+  try{
+    const {error}=await sb.functions.invoke('advisor',{body:{question:'ping',context:{}}});
+    advisorAvailable=!error;
+  }catch(e){advisorAvailable=false}
+  notice.textContent=advisorAvailable
+    ?'Connected to the OpenAI-powered advisor.'
+    :'AI advisor function not reachable yet — using offline calculations. Deploy the "advisor" edge function and set OPENAI_API_KEY to enable live AI answers.';
+}
+async function askAI(){
+  const q=document.getElementById('question').value.trim();if(!q)return;
+  const box=document.getElementById('messages');
+  box.innerHTML+=`<div class="msg me">${esc(q)}</div>`;
+  document.getElementById('question').value='';
+  const thinkingId='think-'+Date.now();
+  box.innerHTML+=`<div class="msg ai" id="${thinkingId}">Thinking…</div>`;
+  box.scrollTop=box.scrollHeight;
+  const context={
+    revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
+    salesCount:state.sales.length,
+    merchantName:state.merchant.name,merchantCategory:state.merchant.category,
+    lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
+    topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit}))
+  };
+  let answered=false;
+  if(advisorAvailable!==false){
+    try{
+      const {data,error}=await sb.functions.invoke('advisor',{body:{question:q,context}});
+      if(!error&&data?.answer){
+        document.getElementById(thinkingId).innerHTML=esc(data.answer).replace(/\n/g,'<br>');
+        answered=true;advisorAvailable=true;
+      }
+    }catch(err){/* fall through to offline */}
+  }
+  if(!answered){
+    document.getElementById(thinkingId).innerHTML=offlineAnswer(q)+'<div class="sub" style="margin-top:6px">(Offline calculation — the AI advisor function is not reachable.)</div>';
+  }
+  box.scrollTop=box.scrollHeight;
+}
+function offlineAnswer(q){
+  q=q.toLowerCase();
+  const low=activeProducts().filter(p=>p.stock<=p.reorder),best=bestProducts()[0],rev=revenue(),pr=profit();
+  if(q.includes('restock')||q.includes('stock')){if(!low.length)return 'Your current stock levels are above the reorder thresholds.';return `I would prioritize <b>${low.map(p=>esc(p.name)).join(', ')}</b>.`}
+  if(q.includes('best')||q.includes('top')||(q.includes('product')&&(q.includes('sell')||q.includes('perform')))){const top=bestProducts().slice(0,3).filter(p=>p.rev>0);if(!top.length)return 'Not enough sales recorded yet to rank products.';return 'Based on recorded revenue: '+top.map((p,i)=>`<br>${i+1}. <b>${esc(p.name)}</b> — ${money(p.rev)} revenue, ${money(p.profit)} estimated profit`).join('')}
+  if(q.includes('profit')||q.includes('doing')||q.includes('make'))return `Your estimated profit is <b>${money(pr)}</b>. Revenue is <b>${money(rev)}</b>, estimated cost of goods is <b>${money(cogs())}</b>, and expenses are <b>${money(totalExpenses())}</b>.`;
+  if(q.includes('sale')||q.includes('sell'))return `You have recorded <b>${state.sales.length}</b> transactions totaling <b>${money(rev)}</b>. Best product so far: <b>${best&&best.rev>0?esc(best.name):'not enough data'}</b>.`;
+  return `I can currently analyze <b>sales, inventory, revenue, expenses and estimated profit</b>. Try: "How am I doing?", "What should I restock?", "Which product sells best?" or "How much profit did I make?"`;
+}
+
+// ── Voice entry ──────────────────────────────────────────────────────────
+function startVoice(){
+  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!S){document.getElementById('voiceStatus').textContent='Voice input is not supported in this browser. Try Chrome.';return}
+  const r=new S();r.lang='en-US';
+  r.onstart=()=>voiceStatus.textContent='Listening… try "3 vaseline at 2500".';
+  r.onresult=e=>{const t=e.results[0][0].transcript;voiceStatus.textContent='Heard: "'+t+'". ';parseVoiceSale(t)};
+  r.onerror=()=>voiceStatus.textContent='Voice capture failed. You can type the sale instead.';
+  r.start();
+}
+function parseVoiceSale(t){
+  const m=t.toLowerCase().match(/(\d+)\s+(.+?)(?:\s+at\s+(\d+))?$/);
+  if(!m){voiceStatus.textContent+='Could not parse a quantity and product — please fill the form manually.';return}
+  const qty=+m[1],name=m[2].trim(),price=m[3]?+m[3]:null;
+  const list=activeProducts();
+  const match=list.find(p=>p.name.toLowerCase()===name)||list.find(p=>p.name.toLowerCase().includes(name)||name.includes(p.name.toLowerCase()));
+  if(!match){voiceStatus.textContent+=`No product matched "${name}" — please select it and check the quantity manually.`;return}
+  document.getElementById('saleProduct').value=match.id;
+  document.getElementById('saleQty').value=qty;
+  document.getElementById('salePrice').value=price??match.sell;
+  voiceStatus.textContent+=`Filled in: ${qty} × ${match.name}${price?` at ${money(price)}`:''}. Review and click Record sale.`;
+}
+
+// ── Boot ─────────────────────────────────────────────────────────────────
+(async function boot(){
+  const {data:{session:existing}}=await sb.auth.getSession();
+  if(existing)await onAuthed(existing);
+  sb.auth.onAuthStateChange((event,sess)=>{if(event==='SIGNED_OUT')location.reload()});
+})();
+</script>
+</body>
+</html>
