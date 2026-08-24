@@ -105,7 +105,8 @@
     <div id="messages" class="messages">
       <div class="msg ai">Hello! I'm your business advisor. Ask me: <b>How am I doing?</b>, <b>What should I restock?</b>, <b>Which products make the most profit?</b>, or <b>How much did I sell?</b></div>
     </div>
-    <div class="chatbar"><input id="question" placeholder="Ask your business..." onkeydown="if(event.key==='Enter')askAI()"><button class="btn" onclick="askAI()">Ask</button></div>
+    <div class="chatbar"><input id="question" placeholder="Ask your business..." onkeydown="if(event.key==='Enter')askAI()"><button class="btn secondary" onclick="startAdvisorVoice()" title="Ask by voice">🎙</button><button class="btn" onclick="askAI()">Ask</button></div>
+    <div id="advisorVoiceStatus" class="sub" style="margin-top:6px"></div>
   </div>
 </section>
 
@@ -477,6 +478,23 @@ function parseVoiceSale(t){
   document.getElementById('saleQty').value=qty;
   document.getElementById('salePrice').value=price??match.sell;
   voiceStatus.textContent+=`Filled in: ${qty} × ${match.name}${price?` at ${money(price)}`:''}. Review and click Record sale.`;
+}
+
+function startAdvisorVoice(){
+  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const status=document.getElementById('advisorVoiceStatus');
+  if(!S){status.textContent='Voice input is not supported in this browser. Try Chrome.';return}
+  const r=new S();r.lang='en-US';
+  r.onstart=()=>status.textContent='Listening…';
+  r.onresult=e=>{
+    const t=e.results[0][0].transcript;
+    status.textContent='Heard: "'+t+'"';
+    document.getElementById('question').value=t;
+    askAI();
+  };
+  r.onerror=()=>status.textContent='Voice capture failed. You can type your question instead.';
+  r.onend=()=>{if(status.textContent==='Listening…')status.textContent=''};
+  r.start();
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
