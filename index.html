@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827">
-<title>AI Merchant OS</title>
+<title>AI Business OS</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--ink:#172033;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--good:#059669;--warn:#d97706;--bad:#dc2626}
@@ -19,7 +19,7 @@
 
 <div id="authScreen" class="auth-wrap">
   <div class="auth-card">
-    <div class="brand">AI <span>Merchant OS</span></div>
+    <div class="brand">AI <span>Business OS</span></div>
     <p class="sub">Sign in to sync your business data across devices.</p>
     <label>Email</label><input id="authEmail" type="email" autocomplete="email">
     <label>Password</label><input id="authPassword" type="password" autocomplete="current-password">
@@ -33,7 +33,7 @@
 
 <div class="app" id="appRoot" style="display:none">
 <aside class="side">
-  <div class="brand">AI <span>Merchant OS</span></div>
+  <div class="brand">AI <span>Business OS</span></div>
   <div class="nav">
     <button class="active" data-view="dashboard">⌂ Dashboard</button>
     <button data-view="sales">＋ Record Sale</button>
@@ -79,7 +79,14 @@
       <div><label>Current stock</label><input id="pStock" type="number"></div>
       <div><label>Reorder level</label><input id="pReorder" type="number"></div>
     </div>
-    <div class="actions" style="margin-top:14px"><button id="prodFormBtn" class="btn" onclick="saveProduct()">Save product</button><button id="prodCancelBtn" class="btn secondary" style="display:none" onclick="cancelProductEdit()">Cancel</button></div>
+    <div class="actions" style="margin-top:14px">
+      <button id="prodFormBtn" class="btn" onclick="saveProduct()">Save product</button>
+      <button id="prodCancelBtn" class="btn secondary" style="display:none" onclick="cancelProductEdit()">Cancel</button>
+      <label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center" title="Attach a product photo or supplier screenshot">📷 Photo<input type="file" accept="image/*" style="display:none" onchange="handleProductImage(this)"></label>
+      <button class="btn secondary" onclick="startProductVoice()" title="Speak the product details">🎙 Voice</button>
+    </div>
+    <div id="productImagePreview" style="display:none;margin-top:10px"><img id="productImageThumb" style="max-height:100px;border-radius:8px;border:1px solid var(--line)"><button class="btn small danger" style="margin-left:8px" onclick="clearProductImage()">Remove photo</button></div>
+    <div id="productVoiceStatus" class="sub" style="margin-top:8px"></div>
   </div>
   <div class="card section"><div id="inventoryTable"></div></div>
   <div class="card section"><h2>Revenue by category</h2><div id="categoryTable"></div></div>
@@ -105,7 +112,8 @@
     <div id="messages" class="messages">
       <div class="msg ai">Hello! I'm your business advisor. Ask me: <b>How am I doing?</b>, <b>What should I restock?</b>, <b>Which products make the most profit?</b>, or <b>How much did I sell?</b></div>
     </div>
-    <div class="chatbar"><input id="question" placeholder="Ask your business..." onkeydown="if(event.key==='Enter')askAI()"><button class="btn secondary" onclick="startAdvisorVoice()" title="Ask by voice">🎙</button><button class="btn" onclick="askAI()">Ask</button></div>
+    <div class="chatbar"><input id="question" placeholder="Ask your business..." onkeydown="if(event.key==='Enter')askAI()"><label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center" title="Attach a photo">📷<input type="file" accept="image/*" style="display:none" onchange="handleAdvisorImage(this)"></label><button class="btn secondary" onclick="startAdvisorVoice()" title="Ask by voice">🎙</button><button class="btn secondary" onclick="askAI(true)" title="Search the web for a current-info answer">🔍</button><button class="btn" onclick="askAI()">Ask</button></div>
+    <div id="advisorImagePreview" style="display:none;margin-top:8px"><img id="advisorImageThumb" style="max-height:80px;border-radius:8px;border:1px solid var(--line)"><button class="btn small danger" style="margin-left:8px" onclick="clearAdvisorImage()">Remove photo</button></div>
     <div id="advisorVoiceStatus" class="sub" style="margin-top:6px"></div>
   </div>
 </section>
@@ -127,7 +135,7 @@
     </div>
     <div class="sub" style="margin-top:10px">Deleted products stay in your sales history but disappear from the inventory list and sale form.</div>
   </div>
-  <div class="footer">AI Merchant OS • Supabase + OpenAI backend • Not a financial or lending decision engine.</div>
+  <div class="footer">AI Business OS • Supabase + Groq backend • Not a financial or lending decision engine.</div>
 </section>
 </main>
 </div>
@@ -287,7 +295,73 @@ async function voidSale(id){
 function renderSales(){document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.slice().reverse().map(s=>{const p=product(s.product_id);return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
 
 // ── Products ─────────────────────────────────────────────────────────────
-function clearProductForm(){pName.value=pCost.value=pSell.value=pStock.value=pReorder.value='';pCat.value='Food & Grocery';editingProductId=null;document.getElementById('prodFormBtn').textContent='Save product';document.getElementById('prodCancelBtn').style.display='none'}
+let pendingProductImage=null; // {dataUrl, mimeType, file}
+function clearProductForm(){pName.value=pCost.value=pSell.value=pStock.value=pReorder.value='';pCat.value='Food & Grocery';editingProductId=null;document.getElementById('prodFormBtn').textContent='Save product';document.getElementById('prodCancelBtn').style.display='none';clearProductImage();document.getElementById('productVoiceStatus').textContent=''}
+function clearProductImage(){pendingProductImage=null;document.getElementById('productImagePreview').style.display='none';document.getElementById('productImageThumb').src=''}
+async function handleProductImage(input){
+  const file=input.files[0];if(!file)return;
+  if(!file.type.startsWith('image/')){alert('Please choose an image file.');input.value='';return}
+  if(file.size>4*1024*1024){alert('Please choose an image under 4MB.');input.value='';return}
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    pendingProductImage={dataUrl:e.target.result,mimeType:file.type,file};
+    document.getElementById('productImageThumb').src=e.target.result;
+    document.getElementById('productImagePreview').style.display='block';
+    const status=document.getElementById('productVoiceStatus');
+    status.textContent='Reading photo…';
+    if(advisorAvailable===false){status.textContent='Photo attached. (AI reading is offline — fill the form manually.)';return}
+    try{
+      const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'extract',image:e.target.result}});
+      if(error||!data){status.textContent='Photo attached. Could not read details automatically — fill the form manually.';return}
+      if(data.error){status.textContent=data.error;return}
+      const f=data.fields||{};
+      if(f.name)pName.value=f.name;
+      if(f.category&&[...pCat.options].some(o=>o.value===f.category))pCat.value=f.category;
+      if(f.cost!=null)pCost.value=f.cost;
+      if(f.sell!=null)pSell.value=f.sell;
+      if(f.stock!=null)pStock.value=f.stock;
+      if(f.reorder!=null)pReorder.value=f.reorder;
+      status.textContent='Filled in from the photo — please review before saving.';
+    }catch(err){status.textContent='Photo attached. Could not read details automatically — fill the form manually.'}
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+async function uploadProductImage(productId){
+  if(!pendingProductImage)return null;
+  const ext=(pendingProductImage.file.name.split('.').pop()||'jpg').toLowerCase();
+  const path=`${session.user.id}/${productId}-${Date.now()}.${ext}`;
+  const {error}=await sb.storage.from('product-images').upload(path,pendingProductImage.file,{upsert:true});
+  if(error){alert('Photo saved locally but failed to upload: '+error.message);return null}
+  const {data}=sb.storage.from('product-images').getPublicUrl(path);
+  return data?.publicUrl||null;
+}
+function startProductVoice(){
+  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const status=document.getElementById('productVoiceStatus');
+  if(!S){status.textContent='Voice input is not supported in this browser. Try Chrome.';return}
+  const r=new S();r.lang='en-US';
+  r.onstart=()=>status.textContent='Listening… try "Vaseline 250ml cost 1800 sell 2500 stock 18 reorder 8".';
+  r.onresult=e=>{const t=e.results[0][0].transcript;status.textContent='Heard: "'+t+'". ';parseVoiceProduct(t)};
+  r.onerror=()=>status.textContent='Voice capture failed. You can type the details instead.';
+  r.start();
+}
+function parseVoiceProduct(t){
+  const status=document.getElementById('productVoiceStatus');
+  let text=t.toLowerCase();
+  const grab=(re)=>{const m=text.match(re);if(m){text=text.replace(m[0],' ')}return m?+m[1]:null};
+  const cost=grab(/cost\s+(\d+)/);
+  const sell=grab(/(?:sell|price|selling)\s+(?:for\s+|at\s+)?(\d+)/);
+  const stock=grab(/stock\s+(\d+)/);
+  const reorder=grab(/reorder\s+(?:at\s+)?(\d+)/);
+  const name=text.replace(/\s+/g,' ').trim();
+  if(name)pName.value=t.slice(0,t.toLowerCase().indexOf(name)+name.length).trim()||name;
+  if(cost!=null)pCost.value=cost;
+  if(sell!=null)pSell.value=sell;
+  if(stock!=null)pStock.value=stock;
+  if(reorder!=null)pReorder.value=reorder;
+  status.textContent+=`Filled in what I could hear — please check the name and numbers before saving.`;
+}
 function toggleAddProduct(){const x=document.getElementById('addProduct');const willShow=x.style.display==='none'||x.style.display==='';x.style.display=willShow?'block':'none';if(willShow)clearProductForm()}
 function editProduct(id){const p=product(id);if(!p)return;document.getElementById('addProduct').style.display='block';pName.value=p.name;pCat.value=p.cat;pCost.value=p.cost;pSell.value=p.sell;pStock.value=p.stock;pReorder.value=p.reorder;editingProductId=id;document.getElementById('prodFormBtn').textContent='Update product';document.getElementById('prodCancelBtn').style.display='inline-block';window.scrollTo(0,0)}
 function cancelProductEdit(){document.getElementById('addProduct').style.display='none';clearProductForm()}
@@ -295,13 +369,23 @@ async function saveProduct(){
   const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value;
   if(!name||!cost||!sell)return alert('Complete product details.');
   if(editingProductId){
-    const {data,error}=await sb.from('products').update({name,cat,cost,sell,stock:stock||0,reorder:reorder||0}).eq('id',editingProductId).select().single();
+    const imageUrl=pendingProductImage?await uploadProductImage(editingProductId):undefined;
+    const patch={name,cat,cost,sell,stock:stock||0,reorder:reorder||0};
+    if(imageUrl)patch.image_url=imageUrl;
+    const {data,error}=await sb.from('products').update(patch).eq('id',editingProductId).select().single();
     if(error)return alert(error.message);
     const idx=state.products.findIndex(p=>p.id===editingProductId);
     state.products[idx]=data;
   }else{
     const {data,error}=await sb.from('products').insert({merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0}).select().single();
     if(error)return alert(error.message);
+    if(pendingProductImage){
+      const imageUrl=await uploadProductImage(data.id);
+      if(imageUrl){
+        const {data:updated,error:updErr}=await sb.from('products').update({image_url:imageUrl}).eq('id',data.id).select().single();
+        if(!updErr)data.image_url=updated.image_url;
+      }
+    }
     state.products.push(data);
   }
   document.getElementById('addProduct').style.display='none';
@@ -318,7 +402,7 @@ async function deleteProduct(id){
 }
 function renderInventory(){
   const list=activeProducts();
-  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td><b>${esc(p.name)}</b></td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions"><button class="btn small secondary" onclick="editProduct('${p.id}')">Edit</button><button class="btn small danger" onclick="deleteProduct('${p.id}')">Delete</button></div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
+  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions"><button class="btn small secondary" onclick="editProduct('${p.id}')">Edit</button><button class="btn small danger" onclick="deleteProduct('${p.id}')">Delete</button></div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
   renderCategory();
 }
 function renderCategory(){const rows=categoryBreakdown();document.getElementById('categoryTable').innerHTML=rows.length?`<table class="table"><tr><th>Category</th><th>Revenue</th><th>Est. profit</th></tr>${rows.map(r=>`<tr><td>${esc(r.cat)}</td><td>${money(r.revenue)}</td><td>${money(r.profit)}</td></tr>`).join('')}</table>`:'<div class="empty">No sales yet.</div>'}
@@ -401,9 +485,29 @@ async function importData(input){
         await sb.from('expenses').insert({merchant_id:mId,description:ex.description||ex.desc,amount:ex.amount||ex.amt,cat:ex.cat});
       }
       await loadAll();render();alert('Data imported.');
-    }catch(err){alert('That file does not look like a valid AI Merchant OS backup.')}
+    }catch(err){alert('That file does not look like a valid AI Business OS backup.')}
   };
   reader.readAsText(file);input.value='';
+}
+
+let attachedImage=null; // {dataUrl, mimeType}
+function handleAdvisorImage(input){
+  const file=input.files[0];if(!file)return;
+  if(!file.type.startsWith('image/')){alert('Please choose an image file.');input.value='';return}
+  if(file.size>4*1024*1024){alert('Please choose an image under 4MB.');input.value='';return}
+  const reader=new FileReader();
+  reader.onload=e=>{
+    attachedImage={dataUrl:e.target.result,mimeType:file.type};
+    document.getElementById('advisorImageThumb').src=e.target.result;
+    document.getElementById('advisorImagePreview').style.display='block';
+  };
+  reader.readAsDataURL(file);
+  input.value='';
+}
+function clearAdvisorImage(){
+  attachedImage=null;
+  document.getElementById('advisorImagePreview').style.display='none';
+  document.getElementById('advisorImageThumb').src='';
 }
 
 // ── AI Advisor ───────────────────────────────────────────────────────────
@@ -414,16 +518,20 @@ async function checkAdvisor(){
     advisorAvailable=!error;
   }catch(e){advisorAvailable=false}
   notice.textContent=advisorAvailable
-    ?'Connected to the OpenAI-powered advisor.'
-    :'AI advisor function not reachable yet — using offline calculations. Deploy the "advisor" edge function and set OPENAI_API_KEY to enable live AI answers.';
+    ?'Connected to the AI advisor.'
+    :'AI advisor function not reachable yet — using offline calculations. Deploy the "advisor" edge function and set GROQ_API_KEY to enable live AI answers.';
 }
-async function askAI(){
-  const q=document.getElementById('question').value.trim();if(!q)return;
+async function askAI(webSearch){
+  const q=document.getElementById('question').value.trim();
+  const img=webSearch?null:attachedImage;
+  if(!q&&!img)return;
+  if(webSearch&&!q){alert('Type a question first, then tap 🔍 to search the web for it.');return}
   const box=document.getElementById('messages');
-  box.innerHTML+=`<div class="msg me">${esc(q)}</div>`;
+  box.innerHTML+=`<div class="msg me">${q?esc(q):'<i>(photo attached)</i>'}${img?`<div style="margin-top:6px"><img src="${img.dataUrl}" style="max-height:120px;border-radius:8px"></div>`:''}${webSearch?' <span class="sub">(web search)</span>':''}</div>`;
   document.getElementById('question').value='';
+  clearAdvisorImage();
   const thinkingId='think-'+Date.now();
-  box.innerHTML+=`<div class="msg ai" id="${thinkingId}">Thinking…</div>`;
+  box.innerHTML+=`<div class="msg ai" id="${thinkingId}">${webSearch?'Searching the web…':'Thinking…'}</div>`;
   box.scrollTop=box.scrollHeight;
   const context={
     revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
@@ -435,7 +543,10 @@ async function askAI(){
   let answered=false;
   if(advisorAvailable!==false){
     try{
-      const {data,error}=await sb.functions.invoke('advisor',{body:{question:q,context}});
+      const body=webSearch
+        ?{mode:'search',question:q}
+        :{question:q||'What do you see in this photo, and does it relate to my business?',context,image:img?img.dataUrl:null};
+      const {data,error}=await sb.functions.invoke('advisor',{body});
       if(!error&&data?.answer){
         document.getElementById(thinkingId).innerHTML=esc(data.answer).replace(/\n/g,'<br>');
         answered=true;advisorAvailable=true;
@@ -443,7 +554,9 @@ async function askAI(){
     }catch(err){/* fall through to offline */}
   }
   if(!answered){
-    document.getElementById(thinkingId).innerHTML=offlineAnswer(q)+'<div class="sub" style="margin-top:6px">(Offline calculation — the AI advisor function is not reachable.)</div>';
+    document.getElementById(thinkingId).innerHTML=webSearch
+      ?'Web search isn\'t reachable right now — check the advisor function is deployed and try again.'
+      :(img?'I can\'t read photos while offline — ':'')+offlineAnswer(q||'how am I doing')+'<div class="sub" style="margin-top:6px">(Offline calculation — the AI advisor function is not reachable.)</div>';
   }
   box.scrollTop=box.scrollHeight;
 }
