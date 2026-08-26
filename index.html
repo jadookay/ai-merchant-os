@@ -6,6 +6,15 @@
 <meta name="theme-color" content="#111827">
 <title>AI Business OS</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<script type="module">
+  import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.mjs';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.worker.min.mjs';
+  window.pdfjsLib = pdfjsLib;
+</script>
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--ink:#172033;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--good:#059669;--warn:#d97706;--bad:#dc2626}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
@@ -78,18 +87,46 @@
       <div><label>Selling price / unit (RWF)</label><input id="pSell" type="number"></div>
       <div><label>Current stock</label><input id="pStock" type="number"></div>
       <div><label>Reorder level</label><input id="pReorder" type="number"></div>
+      <div><label>Barcode (optional)</label><input id="pBarcode" placeholder="Scanned automatically, or type manually"></div>
+      <div><label>Expiration date (optional)</label><input id="pExpiry" type="date"></div>
     </div>
     <div class="actions" style="margin-top:14px">
       <button id="prodFormBtn" class="btn" onclick="saveProduct()">Save product</button>
       <button id="prodCancelBtn" class="btn secondary" style="display:none" onclick="cancelProductEdit()">Cancel</button>
-      <label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center" title="Attach a product photo or supplier screenshot">📷 Photo<input type="file" accept="image/*" style="display:none" onchange="handleProductImage(this)"></label>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center" title="Take a photo with your camera">📷 Take Photo<input type="file" accept="image/*" capture="environment" style="display:none" onchange="handleProductImage(this)"></label>
+      <label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center" title="Upload a photo from your device">🖼 Upload Photo<input type="file" accept="image/*" style="display:none" onchange="handleProductImage(this)"></label>
+      <button class="btn secondary" onclick="startBarcodeScan()" title="Scan a barcode with your camera">📊 Scan Barcode</button>
+      <button class="btn secondary" onclick="generateProductImage()" title="Have AI create a stock-style image">🎨 Generate Image</button>
       <button class="btn secondary" onclick="startProductVoice()" title="Speak the product details">🎙 Voice</button>
     </div>
     <div id="productImagePreview" style="display:none;margin-top:10px"><img id="productImageThumb" style="max-height:100px;border-radius:8px;border:1px solid var(--line)"><button class="btn small danger" style="margin-left:8px" onclick="clearProductImage()">Remove photo</button></div>
     <div id="productVoiceStatus" class="sub" style="margin-top:8px"></div>
   </div>
+
+  <div id="barcodeScanOverlay" style="display:none;position:fixed;inset:0;background:#000000cc;z-index:999;align-items:center;justify-content:center;flex-direction:column">
+    <video id="barcodeVideo" style="max-width:92vw;max-height:60vh;border-radius:12px;background:#111"></video>
+    <div id="barcodeStatus" style="color:white;margin-top:14px;font-size:14px;text-align:center;padding:0 20px">Point your camera at the barcode…</div>
+    <button class="btn danger" style="margin-top:16px" onclick="stopBarcodeScan()">Cancel</button>
+  </div>
   <div class="card section"><div id="inventoryTable"></div></div>
   <div class="card section"><h2>Revenue by category</h2><div id="categoryTable"></div></div>
+  <div class="card section">
+    <h2>Import / Export</h2>
+    <div class="sub" style="margin-bottom:10px">Export your inventory to share or back up. Import a spreadsheet, PDF, or a photo of a stock list — the AI reads and organizes it, and merges anything matching a product you already have instead of duplicating it.</div>
+    <div class="actions">
+      <button class="btn secondary" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn secondary" onclick="exportExcel()">⬇ Excel</button>
+      <button class="btn secondary" onclick="exportWord()">⬇ Word</button>
+      <button class="btn secondary" onclick="exportPDF()">⬇ PDF</button>
+    </div>
+    <div class="actions" style="margin-top:10px">
+      <label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center">⬆ Import file (CSV / Excel / PDF)<input type="file" accept=".csv,.xlsx,.xls,.pdf" style="display:none" onchange="handleImportFile(this)"></label>
+      <label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center">📷 Import photo of a list<input type="file" accept="image/*" style="display:none" onchange="handleImportFile(this)"></label>
+    </div>
+    <div id="importStatus" class="sub" style="margin-top:10px"></div>
+  </div>
 </section>
 
 <section id="expenses" class="view">
@@ -296,7 +333,7 @@ function renderSales(){document.getElementById('salesTable').innerHTML=state.sal
 
 // ── Products ─────────────────────────────────────────────────────────────
 let pendingProductImage=null; // {dataUrl, mimeType, file}
-function clearProductForm(){pName.value=pCost.value=pSell.value=pStock.value=pReorder.value='';pCat.value='Food & Grocery';editingProductId=null;document.getElementById('prodFormBtn').textContent='Save product';document.getElementById('prodCancelBtn').style.display='none';clearProductImage();document.getElementById('productVoiceStatus').textContent=''}
+function clearProductForm(){pName.value=pCost.value=pSell.value=pStock.value=pReorder.value=pBarcode.value=pExpiry.value='';pCat.value='Food & Grocery';editingProductId=null;document.getElementById('prodFormBtn').textContent='Save product';document.getElementById('prodCancelBtn').style.display='none';clearProductImage();document.getElementById('productVoiceStatus').textContent=''}
 function clearProductImage(){pendingProductImage=null;document.getElementById('productImagePreview').style.display='none';document.getElementById('productImageThumb').src=''}
 async function handleProductImage(input){
   const file=input.files[0];if(!file)return;
@@ -336,6 +373,86 @@ async function uploadProductImage(productId){
   const {data}=sb.storage.from('product-images').getPublicUrl(path);
   return data?.publicUrl||null;
 }
+
+// ── Barcode scanning ─────────────────────────────────────────────────────
+let barcodeReader=null;
+let barcodeStream=null;
+async function startBarcodeScan(){
+  const overlay=document.getElementById('barcodeScanOverlay');
+  const status=document.getElementById('barcodeStatus');
+  const video=document.getElementById('barcodeVideo');
+  if(!window.ZXingBrowser&&!window.ZXing){alert('Barcode scanning library did not load. Check your connection and try again.');return}
+  overlay.style.display='flex';
+  status.textContent='Point your camera at the barcode…';
+  try{
+    const ZXingLib=window.ZXingBrowser||window.ZXing;
+    barcodeReader=new ZXingLib.BrowserMultiFormatReader();
+    const result=await barcodeReader.decodeOnceFromVideoDevice(undefined,video);
+    const code=result.getText();
+    status.textContent=`Captured: ${code}. Looking it up…`;
+    await handleBarcodeResult(code);
+  }catch(err){
+    if(overlay.style.display!=='none'){status.textContent='Could not access the camera, or scanning was cancelled.'}
+  }
+}
+function stopBarcodeScan(){
+  document.getElementById('barcodeScanOverlay').style.display='none';
+  try{barcodeReader&&barcodeReader.reset()}catch(e){}
+  barcodeReader=null;
+}
+async function handleBarcodeResult(code){
+  const status=document.getElementById('productVoiceStatus');
+  try{
+    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'barcode',barcode:code}});
+    stopBarcodeScan();
+    document.getElementById('addProduct').style.display='block';
+    pBarcode.value=code;
+    if(error||!data){status.textContent=`Barcode ${code} captured, but the lookup service is unreachable — please fill the rest in manually.`;return}
+    if(data.found&&data.fields){
+      const f=data.fields;
+      if(f.name)pName.value=f.name;
+      if(f.category)pCat.value=f.category;
+      if(f.sell!=null)pSell.value=f.sell;
+      if(f.cost!=null)pCost.value=f.cost;
+      status.textContent=`Found via ${data.source}: filled in what we could — please review price, stock and reorder level.`;
+    }else{
+      status.textContent=`Barcode ${code} captured, but no product info was found for it — please fill in the rest manually. It's saved with the product either way.`;
+    }
+  }catch(err){
+    stopBarcodeScan();
+    document.getElementById('addProduct').style.display='block';
+    pBarcode.value=code;
+    document.getElementById('productVoiceStatus').textContent=`Barcode ${code} captured, but the lookup failed — please fill in manually.`;
+  }
+}
+
+// ── AI-generated product image ──────────────────────────────────────────
+async function generateProductImage(){
+  const name=pName.value.trim();
+  const cat=pCat.value;
+  if(!name){alert('Type a product name first so the AI knows what to generate.');return}
+  const status=document.getElementById('productVoiceStatus');
+  status.textContent='Generating an image…';
+  try{
+    const prompt=`professional e-commerce product photo of ${name}, category ${cat}, clean white background, studio lighting, centered, no text, no watermark`;
+    const url=`https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=600&height=600&nologo=true`;
+    const res=await fetch(url);
+    if(!res.ok)throw new Error('Image generation failed');
+    const blob=await res.blob();
+    const file=new File([blob],`generated-${Date.now()}.jpg`,{type:blob.type||'image/jpeg'});
+    pendingProductImage={file};
+    const reader=new FileReader();
+    reader.onload=e=>{
+      document.getElementById('productImageThumb').src=e.target.result;
+      document.getElementById('productImagePreview').style.display='block';
+    };
+    reader.readAsDataURL(file);
+    status.textContent='AI image generated — review it, then save the product to keep it.';
+  }catch(err){
+    status.textContent='Could not generate an image right now. Try again, or use a real photo instead.';
+  }
+}
+
 function startProductVoice(){
   const S=window.SpeechRecognition||window.webkitSpeechRecognition;
   const status=document.getElementById('productVoiceStatus');
@@ -363,21 +480,21 @@ function parseVoiceProduct(t){
   status.textContent+=`Filled in what I could hear — please check the name and numbers before saving.`;
 }
 function toggleAddProduct(){const x=document.getElementById('addProduct');const willShow=x.style.display==='none'||x.style.display==='';x.style.display=willShow?'block':'none';if(willShow)clearProductForm()}
-function editProduct(id){const p=product(id);if(!p)return;document.getElementById('addProduct').style.display='block';pName.value=p.name;pCat.value=p.cat;pCost.value=p.cost;pSell.value=p.sell;pStock.value=p.stock;pReorder.value=p.reorder;editingProductId=id;document.getElementById('prodFormBtn').textContent='Update product';document.getElementById('prodCancelBtn').style.display='inline-block';window.scrollTo(0,0)}
+function editProduct(id){const p=product(id);if(!p)return;document.getElementById('addProduct').style.display='block';pName.value=p.name;pCat.value=p.cat;pCost.value=p.cost;pSell.value=p.sell;pStock.value=p.stock;pReorder.value=p.reorder;pBarcode.value=p.barcode||'';pExpiry.value=p.expiry_date||'';editingProductId=id;document.getElementById('prodFormBtn').textContent='Update product';document.getElementById('prodCancelBtn').style.display='inline-block';window.scrollTo(0,0)}
 function cancelProductEdit(){document.getElementById('addProduct').style.display='none';clearProductForm()}
 async function saveProduct(){
-  const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value;
+  const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value,barcode=pBarcode.value.trim()||null,expiry_date=pExpiry.value||null;
   if(!name||!cost||!sell)return alert('Complete product details.');
   if(editingProductId){
     const imageUrl=pendingProductImage?await uploadProductImage(editingProductId):undefined;
-    const patch={name,cat,cost,sell,stock:stock||0,reorder:reorder||0};
+    const patch={name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date};
     if(imageUrl)patch.image_url=imageUrl;
     const {data,error}=await sb.from('products').update(patch).eq('id',editingProductId).select().single();
     if(error)return alert(error.message);
     const idx=state.products.findIndex(p=>p.id===editingProductId);
     state.products[idx]=data;
   }else{
-    const {data,error}=await sb.from('products').insert({merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0}).select().single();
+    const {data,error}=await sb.from('products').insert({merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date}).select().single();
     if(error)return alert(error.message);
     if(pendingProductImage){
       const imageUrl=await uploadProductImage(data.id);
@@ -400,12 +517,153 @@ async function deleteProduct(id){
   p.deleted=true;
   render();
 }
+function expiryPill(p){
+  if(!p.expiry_date)return '';
+  const days=Math.ceil((new Date(p.expiry_date)-new Date())/86400000);
+  if(days<0)return `<br><span class="pill" style="background:#fef2f2;color:#b91c1c">Expired ${p.expiry_date}</span>`;
+  if(days<=30)return `<br><span class="pill" style="background:#fffbeb;color:#b45309">Expires in ${days}d</span>`;
+  return `<br><span class="sub">Exp: ${p.expiry_date}</span>`;
+}
 function renderInventory(){
   const list=activeProducts();
-  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b></td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions"><button class="btn small secondary" onclick="editProduct('${p.id}')">Edit</button><button class="btn small danger" onclick="deleteProduct('${p.id}')">Delete</button></div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
+  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions"><button class="btn small secondary" onclick="editProduct('${p.id}')">Edit</button><button class="btn small danger" onclick="deleteProduct('${p.id}')">Delete</button></div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
   renderCategory();
 }
 function renderCategory(){const rows=categoryBreakdown();document.getElementById('categoryTable').innerHTML=rows.length?`<table class="table"><tr><th>Category</th><th>Revenue</th><th>Est. profit</th></tr>${rows.map(r=>`<tr><td>${esc(r.cat)}</td><td>${money(r.revenue)}</td><td>${money(r.profit)}</td></tr>`).join('')}</table>`:'<div class="empty">No sales yet.</div>'}
+
+// ── Export ───────────────────────────────────────────────────────────────
+const EXPORT_HEADERS=['Name','Category','Cost','Sell Price','Stock','Reorder Level','Barcode','Expiry Date'];
+function exportRows(){return activeProducts().map(p=>[p.name,p.cat,p.cost,p.sell,p.stock,p.reorder,p.barcode||'',p.expiry_date||''])}
+function downloadBlob(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url)}
+function exportCSV(){
+  const rows=[EXPORT_HEADERS,...exportRows()];
+  const csv=rows.map(r=>r.map(v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(',')).join('\n');
+  downloadBlob(new Blob([csv],{type:'text/csv'}),`inventory-${new Date().toISOString().slice(0,10)}.csv`);
+}
+function exportExcel(){
+  if(!window.XLSX){alert('Excel export library did not load. Check your connection and try again.');return}
+  const rows=[EXPORT_HEADERS,...exportRows()];
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Inventory');
+  XLSX.writeFile(wb,`inventory-${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+function exportWord(){
+  const rows=exportRows();
+  const html=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="utf-8"><title>Inventory</title></head>
+  <body><h2>${esc(state.merchant.name)} — Inventory</h2><table border="1" cellpadding="4" style="border-collapse:collapse">
+  <tr>${EXPORT_HEADERS.map(h=>`<th>${esc(h)}</th>`).join('')}</tr>
+  ${rows.map(r=>`<tr>${r.map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}
+  </table></body></html>`;
+  downloadBlob(new Blob(['\ufeff',html],{type:'application/msword'}),`inventory-${new Date().toISOString().slice(0,10)}.doc`);
+}
+function exportPDF(){
+  if(!window.jspdf){alert('PDF export library did not load. Check your connection and try again.');return}
+  const doc=new window.jspdf.jsPDF();
+  doc.setFontSize(14);
+  doc.text(`${state.merchant.name} — Inventory`,14,15);
+  doc.autoTable({startY:22,head:[EXPORT_HEADERS],body:exportRows(),styles:{fontSize:8}});
+  doc.save(`inventory-${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+// ── Import ───────────────────────────────────────────────────────────────
+async function handleImportFile(input){
+  const file=input.files[0];if(!file)return;
+  const status=document.getElementById('importStatus');
+  status.textContent='Reading file…';
+  try{
+    let items=[];
+    if(file.type.startsWith('image/')){
+      const dataUrl=await fileToDataUrl(file);
+      items=await extractBatchFromImage(dataUrl,status);
+    }else if(file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')){
+      if(!window.pdfjsLib){status.textContent='PDF reading library did not load. Check your connection and try again.';input.value='';return}
+      status.textContent='Rendering PDF page…';
+      const buf=await file.arrayBuffer();
+      const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
+      const page=await pdf.getPage(1);
+      const viewport=page.getViewport({scale:2});
+      const canvas=document.createElement('canvas');
+      canvas.width=viewport.width;canvas.height=viewport.height;
+      await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+      const dataUrl=canvas.toDataURL('image/jpeg',0.9);
+      items=await extractBatchFromImage(dataUrl,status);
+      if(pdf.numPages>1)status.textContent+=` (Note: only the first of ${pdf.numPages} pages was read — import the rest separately if needed.)`;
+    }else{
+      if(!window.XLSX){status.textContent='Spreadsheet reading library did not load. Check your connection and try again.';input.value='';return}
+      status.textContent='Reading spreadsheet…';
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:'array',cellDates:true});
+      const sheet=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(sheet,{defval:null,raw:true});
+      items=await organizeImportRows(rows,status);
+    }
+    if(!items||!items.length){
+      status.textContent=(status.textContent||'')+' No usable product rows were found in that file.';
+      input.value='';return;
+    }
+    await mergeImportedProducts(items,status);
+  }catch(err){
+    status.textContent='Could not read that file. Try a clearer photo, or a standard CSV/Excel export.';
+  }
+  input.value='';
+}
+function fileToDataUrl(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file)})}
+async function extractBatchFromImage(dataUrl,status){
+  status.textContent='AI is reading the product list from the photo…';
+  const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'extract_batch',image:dataUrl}});
+  if(error||!data?.items){status.textContent='Could not read a product list from that photo. Try a clearer, well-lit shot.';return []}
+  return data.items;
+}
+async function organizeImportRows(rows,status){
+  if(!rows.length)return [];
+  const cleanRows=rows.map(row=>{
+    const out={};
+    for(const k in row){
+      let v=row[k];
+      if(typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T/.test(v))v=v.slice(0,10);
+      out[k]=v;
+    }
+    return out;
+  });
+  status.textContent=`AI is organizing ${cleanRows.length} row(s) into your inventory format…`;
+  const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'organize_import',rows:cleanRows.slice(0,300)}});
+  if(error||!data?.items){status.textContent='Could not interpret that spreadsheet\'s columns automatically.';return []}
+  return data.items;
+}
+async function mergeImportedProducts(items,status){
+  let added=0,merged=0,skipped=0;
+  for(const raw of items){
+    const name=(raw.name||'').trim();
+    if(!name){skipped++;continue}
+    const existing=activeProducts().find(p=>p.name.trim().toLowerCase()===name.toLowerCase());
+    const incomingStock=Number(raw.stock)||0;
+    if(existing){
+      const patch={stock:existing.stock+incomingStock};
+      if(!existing.cost&&raw.cost!=null)patch.cost=Number(raw.cost)||0;
+      if(!existing.sell&&raw.sell!=null)patch.sell=Number(raw.sell)||0;
+      if(!existing.reorder&&raw.reorder!=null)patch.reorder=Number(raw.reorder)||0;
+      if(!existing.barcode&&raw.barcode)patch.barcode=String(raw.barcode);
+      if(!existing.expiry_date&&raw.expiry_date)patch.expiry_date=raw.expiry_date;
+      const {data,error}=await sb.from('products').update(patch).eq('id',existing.id).select().single();
+      if(!error){const idx=state.products.findIndex(p=>p.id===existing.id);state.products[idx]=data;merged++}else skipped++;
+    }else{
+      const {data,error}=await sb.from('products').insert({
+        merchant_id:state.merchant.id,name,
+        cat:PRODUCT_CATEGORIES_LIST.includes(raw.category)?raw.category:'Food & Grocery',
+        cost:Number(raw.cost)||0,sell:Number(raw.sell)||0,
+        stock:incomingStock,reorder:Number(raw.reorder)||0,
+        barcode:raw.barcode?String(raw.barcode):null,
+        expiry_date:raw.expiry_date||null
+      }).select().single();
+      if(!error){state.products.push(data);added++}else skipped++;
+    }
+  }
+  render();
+  status.textContent=`Import done: ${added} new product(s) added, ${merged} merged into existing stock${skipped?`, ${skipped} skipped`:''}. Review prices/categories in Inventory — imported items may need a quick check.`;
+}
+const PRODUCT_CATEGORIES_LIST=["Food & Grocery","Cosmetics & Beauty","Clothing & Shoes","Phone Accessories"];
 
 // ── Expenses ─────────────────────────────────────────────────────────────
 async function addExpense(){
