@@ -6,7 +6,6 @@
 <meta name="theme-color" content="#111827">
 <title>AI Business OS</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://unpkg.com/@zxing/library@0.21.3/umd/index.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -49,6 +48,7 @@
     <button data-view="inventory">▦ Inventory</button>
     <button data-view="expenses">◉ Expenses</button>
     <button data-view="advisor">✦ AI Advisor</button>
+    <button data-view="shericeri">🎙️ Shericeri</button>
     <button data-view="settings">⚙ Settings</button>
   </div>
 </aside>
@@ -106,7 +106,7 @@
   </div>
 
   <div id="barcodeScanOverlay" style="display:none;position:fixed;inset:0;background:#000000cc;z-index:999;align-items:center;justify-content:center;flex-direction:column">
-    <video id="barcodeVideo" style="max-width:92vw;max-height:60vh;border-radius:12px;background:#111"></video>
+    <video id="barcodeVideo" playsinline muted autoplay style="max-width:92vw;max-height:60vh;border-radius:12px;background:#111"></video>
     <div id="barcodeStatus" style="color:white;margin-top:14px;font-size:14px;text-align:center;padding:0 20px">Point your camera at the barcode…</div>
     <button class="btn danger" style="margin-top:16px" onclick="stopBarcodeScan()">Cancel</button>
   </div>
@@ -152,6 +152,28 @@
     <div class="chatbar"><input id="question" placeholder="Ask your business..." onkeydown="if(event.key==='Enter')askAI()"><label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center" title="Attach a photo">📷<input type="file" accept="image/*" style="display:none" onchange="handleAdvisorImage(this)"></label><button class="btn secondary" onclick="startAdvisorVoice()" title="Ask by voice">🎙</button><button class="btn secondary" onclick="askAI(true)" title="Search the web for a current-info answer">🔍</button><button class="btn" onclick="askAI()">Ask</button></div>
     <div id="advisorImagePreview" style="display:none;margin-top:8px"><img id="advisorImageThumb" style="max-height:80px;border-radius:8px;border:1px solid var(--line)"><button class="btn small danger" style="margin-left:8px" onclick="clearAdvisorImage()">Remove photo</button></div>
     <div id="advisorVoiceStatus" class="sub" style="margin-top:6px"></div>
+  </div>
+</section>
+
+<section id="shericeri" class="view">
+  <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
+  <div class="notice" id="shericeriNotice">Connecting…</div>
+  <div class="card" style="text-align:center;padding:28px 17px">
+    <div class="actions" style="justify-content:center;margin-bottom:16px">
+      <select id="shericeriLang" style="width:auto;display:inline-block">
+        <option value="en-US">English</option>
+        <option value="fr-FR">Français</option>
+      </select>
+      <button id="shericeriSearchToggle" class="btn secondary" onclick="toggleShericeriSearch()" title="Ground answers in live web search instead of your business data">🔍 Web search: off</button>
+    </div>
+    <button id="shericeriTalkBtn" class="btn" style="width:120px;height:120px;border-radius:50%;font-size:36px;line-height:1" onclick="toggleShericeri()">🎙️</button>
+    <div id="shericeriStatus" class="sub" style="margin-top:16px">Tap to start talking with Shericeri.</div>
+    <div class="sub" style="margin-top:8px">Voice works in English and French. She reads/writes Kinyarwanda in the transcript, but can't yet hear or speak it aloud.</div>
+  </div>
+  <div class="card section chat">
+    <div id="shericeriMessages" class="messages">
+      <div class="msg ai">Sherry-Cherry, at your service — finance, accounting, business intelligence, and the occasional bad pun. Tap the mic and let's talk.</div>
+    </div>
   </div>
 </section>
 
@@ -358,6 +380,8 @@ async function handleProductImage(input){
       if(f.sell!=null)pSell.value=f.sell;
       if(f.stock!=null)pStock.value=f.stock;
       if(f.reorder!=null)pReorder.value=f.reorder;
+      if(f.expiry_date)pExpiry.value=f.expiry_date;
+      if(f.barcode&&!pBarcode.value)pBarcode.value=f.barcode;
       status.textContent='Filled in from the photo — please review before saving.';
     }catch(err){status.textContent='Photo attached. Could not read details automatically — fill the form manually.'}
   };
@@ -374,31 +398,52 @@ async function uploadProductImage(productId){
   return data?.publicUrl||null;
 }
 
-// ── Barcode scanning ─────────────────────────────────────────────────────
-let barcodeReader=null;
+// ── Barcode scanning (native browser API — no external library) ───────────
 let barcodeStream=null;
+let barcodeScanning=false;
 async function startBarcodeScan(){
   const overlay=document.getElementById('barcodeScanOverlay');
   const status=document.getElementById('barcodeStatus');
   const video=document.getElementById('barcodeVideo');
-  if(!window.ZXingBrowser&&!window.ZXing){alert('Barcode scanning library did not load. Check your connection and try again.');return}
+  if(!('BarcodeDetector' in window)){
+    alert('Live barcode scanning isn\'t supported in this browser. Try Chrome or Edge, or type the barcode number in manually.');
+    return;
+  }
   overlay.style.display='flex';
-  status.textContent='Point your camera at the barcode…';
+  status.textContent='Requesting camera access…';
   try{
-    const ZXingLib=window.ZXingBrowser||window.ZXing;
-    barcodeReader=new ZXingLib.BrowserMultiFormatReader();
-    const result=await barcodeReader.decodeOnceFromVideoDevice(undefined,video);
-    const code=result.getText();
-    status.textContent=`Captured: ${code}. Looking it up…`;
-    await handleBarcodeResult(code);
+    barcodeStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    video.srcObject=barcodeStream;
+    await video.play();
+    status.textContent='Point your camera at the barcode…';
+    const detector=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','qr_code']});
+    barcodeScanning=true;
+    while(barcodeScanning){
+      try{
+        const codes=await detector.detect(video);
+        if(codes.length){
+          const code=codes[0].rawValue;
+          status.textContent=`Captured: ${code}. Looking it up…`;
+          barcodeScanning=false;
+          stopCameraStream();
+          await handleBarcodeResult(code);
+          return;
+        }
+      }catch(detectErr){/* keep trying on transient per-frame errors */}
+      await new Promise(r=>setTimeout(r,300));
+    }
   }catch(err){
-    if(overlay.style.display!=='none'){status.textContent='Could not access the camera, or scanning was cancelled.'}
+    status.textContent='Could not access the camera. Check camera permission for this site, or type the barcode in manually.';
+    stopCameraStream();
   }
 }
+function stopCameraStream(){
+  if(barcodeStream){barcodeStream.getTracks().forEach(t=>t.stop());barcodeStream=null}
+}
 function stopBarcodeScan(){
+  barcodeScanning=false;
+  stopCameraStream();
   document.getElementById('barcodeScanOverlay').style.display='none';
-  try{barcodeReader&&barcodeReader.reset()}catch(e){}
-  barcodeReader=null;
 }
 async function handleBarcodeResult(code){
   const status=document.getElementById('productVoiceStatus');
@@ -771,6 +816,7 @@ function clearAdvisorImage(){
 // ── AI Advisor ───────────────────────────────────────────────────────────
 async function checkAdvisor(){
   const notice=document.getElementById('advisorNotice');
+  const sNotice=document.getElementById('shericeriNotice');
   try{
     const {error}=await sb.functions.invoke('advisor',{body:{question:'ping',context:{}}});
     advisorAvailable=!error;
@@ -778,6 +824,9 @@ async function checkAdvisor(){
   notice.textContent=advisorAvailable
     ?'Connected to the AI advisor.'
     :'AI advisor function not reachable yet — using offline calculations. Deploy the "advisor" edge function and set GROQ_API_KEY to enable live AI answers.';
+  if(sNotice)sNotice.textContent=advisorAvailable
+    ?'Shericeri is connected and ready to talk.'
+    :'Shericeri isn\'t reachable yet — same fix as the AI Advisor: deploy the "advisor" function and set GROQ_API_KEY.';
 }
 async function askAI(webSearch){
   const q=document.getElementById('question').value.trim();
@@ -866,6 +915,119 @@ function startAdvisorVoice(){
   r.onerror=()=>status.textContent='Voice capture failed. You can type your question instead.';
   r.onend=()=>{if(status.textContent==='Listening…')status.textContent=''};
   r.start();
+}
+
+// ── Shericeri: tap-to-talk voice assistant ─────────────────────────────────
+let shericeriActive=false;
+let shericeriRecognition=null;
+let shericeriSearchOn=false;
+let shericeriVoicesReady=false;
+
+function toggleShericeriSearch(){
+  shericeriSearchOn=!shericeriSearchOn;
+  document.getElementById('shericeriSearchToggle').textContent=shericeriSearchOn?'🔍 Web search: on':'🔍 Web search: off';
+}
+
+function ensureVoicesLoaded(){
+  return new Promise(resolve=>{
+    if(shericeriVoicesReady||!window.speechSynthesis){resolve();return}
+    const voices=speechSynthesis.getVoices();
+    if(voices.length){shericeriVoicesReady=true;resolve();return}
+    speechSynthesis.onvoiceschanged=()=>{shericeriVoicesReady=true;resolve()};
+    setTimeout(resolve,1200); // fallback in case the event never fires on this browser
+  });
+}
+function pickVoice(lang){
+  const voices=window.speechSynthesis?speechSynthesis.getVoices():[];
+  const short=lang.slice(0,2);
+  return voices.find(v=>v.lang===lang)||voices.find(v=>v.lang.startsWith(short))||null;
+}
+
+function toggleShericeri(){
+  if(shericeriActive){stopShericeri()}else{startShericeriLoop()}
+}
+async function startShericeriLoop(){
+  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const status=document.getElementById('shericeriStatus');
+  const btn=document.getElementById('shericeriTalkBtn');
+  if(!S){status.textContent='Voice input is not supported in this browser. Try Chrome.';return}
+  await ensureVoicesLoaded();
+  shericeriActive=true;
+  btn.textContent='⏹️';
+  btn.style.background='#dc2626';
+  shericeriListenOnce();
+}
+function stopShericeri(){
+  shericeriActive=false;
+  const btn=document.getElementById('shericeriTalkBtn');
+  btn.textContent='🎙️';
+  btn.style.background='';
+  document.getElementById('shericeriStatus').textContent='Tap to start talking with Shericeri.';
+  try{shericeriRecognition&&shericeriRecognition.stop()}catch(e){}
+  if(window.speechSynthesis)speechSynthesis.cancel();
+}
+function shericeriListenOnce(){
+  if(!shericeriActive)return;
+  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
+  const status=document.getElementById('shericeriStatus');
+  const lang=document.getElementById('shericeriLang').value;
+  shericeriRecognition=new S();
+  shericeriRecognition.lang=lang;
+  shericeriRecognition.onstart=()=>{if(shericeriActive)status.textContent='Listening…'};
+  shericeriRecognition.onresult=e=>{
+    if(!shericeriActive)return;
+    const t=e.results[0][0].transcript;
+    shericeriRespond(t);
+  };
+  shericeriRecognition.onerror=()=>{
+    if(shericeriActive){status.textContent='Didn\'t catch that — tap the mic again, or say it once more.';}
+  };
+  shericeriRecognition.onend=()=>{
+    // If nothing was recognized and we're still active with no response in flight, just go quiet
+    // (avoids an infinite tight loop on repeated silence/errors).
+  };
+  try{shericeriRecognition.start()}catch(e){}
+}
+async function shericeriRespond(transcript){
+  if(!shericeriActive)return;
+  const box=document.getElementById('shericeriMessages');
+  const status=document.getElementById('shericeriStatus');
+  box.innerHTML+=`<div class="msg me">${esc(transcript)}</div>`;
+  box.scrollTop=box.scrollHeight;
+  status.textContent='Shericeri is thinking…';
+  const context={
+    revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
+    salesCount:state.sales.length,
+    merchantName:state.merchant.name,merchantCategory:state.merchant.category,
+    lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
+    topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit}))
+  };
+  let answer="I'm having trouble connecting right now — check the connection and try again.";
+  try{
+    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'shericeri',question:transcript,context,webSearch:shericeriSearchOn}});
+    if(!error&&data?.answer)answer=data.answer;
+  }catch(err){/* keep fallback message */}
+  box.innerHTML+=`<div class="msg ai">${esc(answer)}</div>`;
+  box.scrollTop=box.scrollHeight;
+  speakShericeri(answer);
+}
+function speakShericeri(text){
+  const status=document.getElementById('shericeriStatus');
+  if(!window.speechSynthesis){
+    status.textContent='(Text-to-speech not supported in this browser — reading only.)';
+    if(shericeriActive)setTimeout(shericeriListenOnce,600);
+    return;
+  }
+  status.textContent='Shericeri is speaking…';
+  const lang=document.getElementById('shericeriLang').value;
+  const utt=new SpeechSynthesisUtterance(text);
+  utt.lang=lang;
+  const voice=pickVoice(lang);
+  if(voice)utt.voice=voice;
+  utt.onend=()=>{if(shericeriActive)shericeriListenOnce()};
+  utt.onerror=()=>{if(shericeriActive)shericeriListenOnce()};
+  speechSynthesis.cancel();
+  speechSynthesis.speak(utt);
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
