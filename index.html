@@ -950,10 +950,24 @@ function startAdvisorVoice(){
 }
 
 // ── Shericeri: tap-to-talk voice assistant ─────────────────────────────────
+// Listening uses the device microphone directly (getUserMedia + MediaRecorder),
+// with our own volume monitoring to detect when you've stopped talking, then
+// sends the clip to Groq Whisper for transcription — this replaces the
+// browser's built-in SpeechRecognition, which was unreliable at low volume
+// and inconsistent across devices. Speaking (text-to-speech) is unchanged.
 let shericeriActive=false;
-let shericeriRecognition=null;
 let shericeriSearchOn=false;
 let shericeriVoicesReady=false;
+let shericeriMicStream=null;
+let shericeriAudioCtx=null;
+let shericeriAnalyser=null;
+let shericeriRecorder=null;
+let shericeriVadTimer=null;
+
+const SHERI_SPEECH_THRESHOLD=14;   // avg frequency-bin magnitude (0-255) counted as "someone is talking"
+const SHERI_SILENCE_STOP_MS=1100;  // how long a pause must last before we consider the turn finished
+const SHERI_NO_SPEECH_TIMEOUT_MS=7000; // give up (no AI call) if nothing at all is heard in this window
+const SHERI_MAX_RECORD_MS=20000;   // hard safety cap per turn
 
 function toggleShericeriSearch(){
   shericeriSearchOn=!shericeriSearchOn;
@@ -972,7 +986,20 @@ function ensureVoicesLoaded(){
 function pickVoice(lang){
   const voices=window.speechSynthesis?speechSynthesis.getVoices():[];
   const short=lang.slice(0,2);
-  return voices.find(v=>v.lang===lang)||voices.find(v=>v.lang.startsWith(short))||null;
+  const candidates=voices.filter(v=>v.lang===lang||v.lang.startsWith(short));
+  if(!candidates.length)return null;
+  // Prefer names that typically indicate a higher-quality, more natural voice
+  // over a device's default/compact one. This varies by OS and browser, so
+  // it's a best-effort preference, not a guarantee — voice quality itself is
+  // controlled by the browser/OS, not by this app.
+  const qualityRank=v=>{
+    const n=v.name.toLowerCase();
+    if(/neural|natural|premium|enhanced|studio/.test(n))return 0;
+    if(/google/.test(n))return 1;
+    if(v.localService===false)return 2; // cloud-backed voices are usually better than compact on-device ones
+    return 3;
+  };
+  return candidates.sort((a,b)=>qualityRank(a)-qualityRank(b))[0];
 }
 
 function setSheriStatus(text){
@@ -996,18 +1023,37 @@ function hideSheriHero(){
 }
 function launchShericeri(){toggleShericeri()}
 function stopShericeriHero(){stopShericeri()}
+function currentShericeriLang(){
+  const heroLang=document.getElementById('sheriHeroLang');
+  const pageLang=document.getElementById('shericeriLang');
+  return (heroLang&&heroLang.offsetParent!==null?heroLang.value:null)||(pageLang?pageLang.value:'en-US');
+}
 
 function toggleShericeri(){
   if(shericeriActive){stopShericeri()}else{startShericeriLoop()}
 }
 async function startShericeriLoop(){
-  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
-  const btn=document.getElementById('shericeriTalkBtn');
-  if(!S){setSheriStatus('Voice input is not supported in this browser. Try Chrome.');return}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){
+    setSheriStatus('Voice input is not supported in this browser. Try Chrome.');
+    return;
+  }
   showSheriHero();
-  setSheriStatus('Waking up…');
+  setSheriStatus('Requesting microphone access…');
   await ensureVoicesLoaded();
+  try{
+    shericeriMicStream=await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(err){
+    setSheriStatus('Could not access the microphone. Check mic permission for this site.');
+    hideSheriHero();
+    return;
+  }
+  shericeriAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  const source=shericeriAudioCtx.createMediaStreamSource(shericeriMicStream);
+  shericeriAnalyser=shericeriAudioCtx.createAnalyser();
+  shericeriAnalyser.fftSize=256;
+  source.connect(shericeriAnalyser);
   shericeriActive=true;
+  const btn=document.getElementById('shericeriTalkBtn');
   if(btn){btn.textContent='⏹️';btn.style.background='#dc2626'}
   shericeriListenOnce();
 }
@@ -1016,37 +1062,204 @@ function stopShericeri(){
   const btn=document.getElementById('shericeriTalkBtn');
   if(btn){btn.textContent='🎙️';btn.style.background=''}
   setSheriStatus('Tap to start talking with Shericeri.');
-  try{shericeriRecognition&&shericeriRecognition.stop()}catch(e){}
-  if(window.speechSynthesis)speechSynthesis.cancel();
+  clearInterval(shericeriVadTimer);
+  try{shericeriRecorder&&shericeriRecorder.state!=='inactive'&&shericeriRecorder.stop()}catch(e){}
+  if(shericeriMicStream){shericeriMicStream.getTracks().forEach(t=>t.stop());shericeriMicStream=null}
+  if(shericeriAudioCtx){try{shericeriAudioCtx.close()}catch(e){}shericeriAudioCtx=null}
+  sheriResetSpeechState();
+  shericeriHistory=[]; // each tap-to-talk session starts with a clean memory
   hideSheriHero();
 }
 function shericeriListenOnce(){
-  if(!shericeriActive)return;
-  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
-  const heroLang=document.getElementById('sheriHeroLang');
-  const pageLang=document.getElementById('shericeriLang');
-  const lang=(heroLang&&heroLang.offsetParent!==null?heroLang.value:null)||(pageLang?pageLang.value:'en-US');
-  shericeriRecognition=new S();
-  shericeriRecognition.lang=lang;
-  shericeriRecognition.onstart=()=>{if(shericeriActive){setSheriStatus('Listening…');document.getElementById('sheriHero').classList.add('listening')}};
-  shericeriRecognition.onresult=e=>{
-    if(!shericeriActive)return;
-    const t=e.results[0][0].transcript;
-    shericeriRespond(t);
-  };
-  shericeriRecognition.onerror=()=>{
-    if(shericeriActive){setSheriStatus('Didn\'t catch that — tap the mic again, or say it once more.');}
-  };
-  shericeriRecognition.onend=()=>{
+  if(!shericeriActive||!shericeriMicStream)return;
+  const chunks=[];
+  let mimeType='audio/webm';
+  for(const t of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus']){
+    if(window.MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t)){mimeType=t;break}
+  }
+  try{
+    shericeriRecorder=new MediaRecorder(shericeriMicStream,{mimeType});
+  }catch(e){
+    shericeriRecorder=new MediaRecorder(shericeriMicStream);
+  }
+  shericeriRecorder.ondataavailable=e=>{if(e.data&&e.data.size>0)chunks.push(e.data)};
+  shericeriRecorder.onstop=async()=>{
     document.getElementById('sheriHero').classList.remove('listening');
+    if(!shericeriActive)return;
+    const blob=new Blob(chunks,{type:mimeType});
+    await shericeriTranscribeAndRespond(blob,mimeType);
   };
-  try{shericeriRecognition.start()}catch(e){}
+
+  setSheriStatus('Listening…');
+  document.getElementById('sheriHero').classList.add('listening');
+  shericeriRecorder.start();
+
+  const startTime=Date.now();
+  let hasSpoken=false;
+  let silenceStart=null;
+  const data=new Uint8Array(shericeriAnalyser.frequencyBinCount);
+  clearInterval(shericeriVadTimer);
+  shericeriVadTimer=setInterval(()=>{
+    if(!shericeriActive||!shericeriRecorder||shericeriRecorder.state==='inactive'){clearInterval(shericeriVadTimer);return}
+    shericeriAnalyser.getByteFrequencyData(data);
+    let sum=0;for(let i=0;i<data.length;i++)sum+=data[i];
+    const avg=sum/data.length;
+    const now=Date.now();
+    if(avg>SHERI_SPEECH_THRESHOLD){
+      hasSpoken=true;
+      silenceStart=null;
+    }else if(hasSpoken){
+      if(silenceStart===null)silenceStart=now;
+      else if(now-silenceStart>=SHERI_SILENCE_STOP_MS){
+        clearInterval(shericeriVadTimer);
+        try{shericeriRecorder.stop()}catch(e){}
+        return;
+      }
+    }else if(now-startTime>=SHERI_NO_SPEECH_TIMEOUT_MS){
+      clearInterval(shericeriVadTimer);
+      try{shericeriRecorder.stop()}catch(e){}
+      // shericeriTranscribeAndRespond will see a near-empty clip and skip the AI call.
+      return;
+    }
+    if(now-startTime>=SHERI_MAX_RECORD_MS){
+      clearInterval(shericeriVadTimer);
+      try{shericeriRecorder.stop()}catch(e){}
+    }
+  },100);
 }
+function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)})}
+async function shericeriTranscribeAndRespond(blob,mimeType){
+  if(blob.size<800){
+    // Effectively silent clip (mic picked up nothing meaningful) — don't
+    // waste a Whisper call, just prompt and keep listening.
+    setSheriStatus('Didn\'t quite catch that — try speaking a bit louder or closer to the mic.');
+    setTimeout(()=>{if(shericeriActive)shericeriListenOnce()},400);
+    return;
+  }
+  setSheriStatus('Shericeri is listening back…');
+  let transcript='';
+  try{
+    const dataUrl=await blobToDataUrl(blob);
+    const lang=currentShericeriLang().slice(0,2);
+    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang}});
+    if(!error&&data?.transcript)transcript=data.transcript.trim();
+  }catch(err){/* transcript stays empty, handled below */}
+  if(!shericeriActive)return;
+  if(transcript.length<2){
+    setSheriStatus('Didn\'t quite catch that — try speaking a bit louder or closer to the mic.');
+    setTimeout(()=>{if(shericeriActive)shericeriListenOnce()},400);
+    return;
+  }
+  shericeriRespond(transcript);
+}
+// ── Fast lane: answer common questions instantly from local data, no AI call ─
+// Big latency win for the questions that don't need an LLM at all.
+function sheriFastLane(q){
+  q=q.toLowerCase();
+  const low=activeProducts().filter(p=>p.stock<=p.reorder);
+  const best=bestProducts()[0];
+  const rev=revenue(),pr=profit();
+  if(/restock|low stock|what should i stock|ongera/.test(q)){
+    if(!low.length)return 'Stock levels look healthy across the board, darling — nothing urgent to restock.';
+    return `Top priority: ${low.slice(0,3).map(p=>p.name).join(', ')}. Get on that.`;
+  }
+  if(/best.?sell|best product|top product|sells? best/.test(q)){
+    if(!best||!best.rev)return 'Not enough sales recorded yet to crown a winner.';
+    return `${best.name} is your star right now — ${money(best.rev)} in revenue.`;
+  }
+  if(/how much (did i|have i) (sell|sold)|sales today|total sales|revenue/.test(q)){
+    return `You've sold ${money(rev)} so far, across ${state.sales.length} transactions.`;
+  }
+  if(/how (am i doing|is my business)|profit|nunguka/.test(q)){
+    return pr>=0?`You're sitting at ${money(pr)} in estimated profit. Not bad at all.`:`You're at a loss of ${money(Math.abs(pr))} right now — let's turn that around.`;
+  }
+  if(/how many (transactions|sales)/.test(q)){
+    return `${state.sales.length} transactions recorded so far.`;
+  }
+  return null;
+}
+
+// ── Conversation memory ──────────────────────────────────────────────────
+let shericeriHistory=[]; // [{role:'user'|'assistant',content}], capped, cleared each time the conversation ends
+const SHERI_HISTORY_MAX=8; // last 4 exchanges
+function sheriPushHistory(role,content){
+  shericeriHistory.push({role,content});
+  if(shericeriHistory.length>SHERI_HISTORY_MAX)shericeriHistory=shericeriHistory.slice(-SHERI_HISTORY_MAX);
+}
+
+// ── Speaking queue: lets her start talking on the first finished sentence
+// while the rest of a streamed reply is still arriving ──────────────────
+let sheriSpeakQueue=[];
+let sheriIsSpeaking=false;
+let sheriStreamActive=false; // true while more streamed text chunks may still arrive
+function sheriResetSpeechState(){
+  sheriSpeakQueue=[];
+  sheriIsSpeaking=false;
+  sheriStreamActive=false;
+  if(window.speechSynthesis)speechSynthesis.cancel();
+}
+function sheriEnqueueSpeech(text){
+  text=(text||'').trim();
+  if(!text)return;
+  if(!window.speechSynthesis){
+    setSheriStatus('(Text-to-speech not supported in this browser — reading only.)');
+    if(!sheriStreamActive&&shericeriActive)shericeriListenOnce(); // keep the conversation going without voice output
+    return;
+  }
+  sheriSpeakQueue.push(text);
+  sheriDrainSpeakQueue();
+}
+function sheriDrainSpeakQueue(){
+  if(sheriIsSpeaking)return;
+  if(!sheriSpeakQueue.length){
+    if(!sheriStreamActive&&shericeriActive)shericeriListenOnce(); // truly done — nothing left to say or await
+    return;
+  }
+  const next=sheriSpeakQueue.shift();
+  sheriIsSpeaking=true;
+  setSheriStatus('Shericeri is speaking…');
+  const lang=currentShericeriLang();
+  const utt=new SpeechSynthesisUtterance(next);
+  utt.lang=lang;
+  utt.rate=1.03;
+  utt.pitch=1;
+  const voice=pickVoice(lang);
+  if(voice)utt.voice=voice;
+  utt.onend=()=>{sheriIsSpeaking=false;sheriDrainSpeakQueue()};
+  utt.onerror=()=>{sheriIsSpeaking=false;sheriDrainSpeakQueue()};
+  speechSynthesis.speak(utt);
+}
+// Splits a growing text buffer into complete sentences plus a leftover tail
+// that's still being written — used to feed the speak queue progressively.
+function sheriSplitCompleteSentences(buffer){
+  const matches=[...buffer.matchAll(/[^.!?]*[.!?]+(?=\s|$)/g)];
+  if(!matches.length)return{complete:[],remainder:buffer};
+  const last=matches[matches.length-1];
+  const endIdx=last.index+last[0].length;
+  const completeText=buffer.slice(0,endIdx);
+  const remainder=buffer.slice(endIdx);
+  const complete=(completeText.match(/[^.!?]*[.!?]+/g)||[]).map(s=>s.trim()).filter(Boolean);
+  return{complete,remainder};
+}
+
 async function shericeriRespond(transcript){
   if(!shericeriActive)return;
   const box=document.getElementById('shericeriMessages');
   document.getElementById('sheriHero').classList.remove('listening');
   if(box){box.innerHTML+=`<div class="msg me">${esc(transcript)}</div>`;box.scrollTop=box.scrollHeight}
+
+  // Fast lane: answer instantly from local data, skip the AI entirely.
+  const fast=sheriFastLane(transcript);
+  if(fast){
+    if(box){box.innerHTML+=`<div class="msg ai">${esc(fast)}</div>`;box.scrollTop=box.scrollHeight}
+    sheriPushHistory('user',transcript);
+    sheriPushHistory('assistant',fast);
+    sheriResetSpeechState();
+    sheriStreamActive=false;
+    sheriEnqueueSpeech(fast);
+    return;
+  }
+
   setSheriStatus('Shericeri is thinking…');
   const context={
     revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
@@ -1055,32 +1268,59 @@ async function shericeriRespond(transcript){
     lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
     topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit}))
   };
-  let answer="I'm having trouble connecting right now — check the connection and try again.";
+
+  sheriResetSpeechState();
+  sheriStreamActive=true;
+  let fullAnswer='',buffer='',gotAnyChunk=false;
+  let streamingEl=null;
+
   try{
-    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'shericeri',question:transcript,context,webSearch:shericeriSearchOn}});
-    if(!error&&data?.answer)answer=data.answer;
-  }catch(err){/* keep fallback message */}
-  if(box){box.innerHTML+=`<div class="msg ai">${esc(answer)}</div>`;box.scrollTop=box.scrollHeight}
-  speakShericeri(answer);
-}
-function speakShericeri(text){
-  if(!window.speechSynthesis){
-    setSheriStatus('(Text-to-speech not supported in this browser — reading only.)');
-    if(shericeriActive)setTimeout(shericeriListenOnce,600);
-    return;
+    const res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+session.access_token},
+      body:JSON.stringify({mode:'shericeri',question:transcript,context,webSearch:shericeriSearchOn,history:shericeriHistory})
+    });
+    if(!res.ok||!res.body)throw new Error('stream request failed: '+res.status);
+    const reader=res.body.getReader();
+    const decoder=new TextDecoder();
+    while(true){
+      const {done,value}=await reader.read();
+      if(done)break;
+      const chunkText=decoder.decode(value,{stream:true});
+      if(!chunkText)continue;
+      gotAnyChunk=true;
+      buffer+=chunkText;
+      fullAnswer+=chunkText;
+      if(box){
+        if(!streamingEl){
+          const div=document.createElement('div');
+          div.className='msg ai';
+          box.appendChild(div);
+          streamingEl=div;
+        }
+        streamingEl.textContent=fullAnswer;
+        box.scrollTop=box.scrollHeight;
+      }
+      const{complete,remainder}=sheriSplitCompleteSentences(buffer);
+      complete.forEach(s=>sheriEnqueueSpeech(s));
+      buffer=remainder;
+    }
+  }catch(err){
+    gotAnyChunk=false;
   }
-  setSheriStatus('Shericeri is speaking…');
-  const heroLang=document.getElementById('sheriHeroLang');
-  const pageLang=document.getElementById('shericeriLang');
-  const lang=(heroLang&&heroLang.offsetParent!==null?heroLang.value:null)||(pageLang?pageLang.value:'en-US');
-  const utt=new SpeechSynthesisUtterance(text);
-  utt.lang=lang;
-  const voice=pickVoice(lang);
-  if(voice)utt.voice=voice;
-  utt.onend=()=>{if(shericeriActive)shericeriListenOnce()};
-  utt.onerror=()=>{if(shericeriActive)shericeriListenOnce()};
-  speechSynthesis.cancel();
-  speechSynthesis.speak(utt);
+
+  sheriStreamActive=false;
+  if(buffer.trim())sheriEnqueueSpeech(buffer.trim());
+
+  if(!gotAnyChunk){
+    const fallback="I'm having trouble connecting right now — check the connection and try again.";
+    if(box){box.innerHTML+=`<div class="msg ai">${esc(fallback)}</div>`;box.scrollTop=box.scrollHeight}
+    sheriEnqueueSpeech(fallback);
+  }else{
+    sheriPushHistory('user',transcript);
+    sheriPushHistory('assistant',fullAnswer.trim());
+  }
+  sheriDrainSpeakQueue(); // in case nothing was ever enqueued mid-stream (e.g. no punctuation until the very end)
 }
 
 // ── Boot ─────────────────────────────────────────────────────────────────
