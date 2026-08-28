@@ -186,12 +186,26 @@
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
   <div class="notice" id="shericeriNotice">Connecting…</div>
   <div class="card" style="text-align:center;padding:28px 17px">
+    <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
+      <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
+      <div class="sub" style="margin-bottom:10px">This temporary test isolates microphone, recording, Whisper, AI and speaker output. It does not change your business data.</div>
+      <div id="sheriDiagStatus" style="font-size:13px;line-height:1.6">Ready.</div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn small secondary" onclick="sheriDiagSpeaker()">🔊 Test speaker</button>
+        <button class="btn small secondary" onclick="sheriDiagRecord()">🎙 Record test</button>
+        <button class="btn small secondary" onclick="sheriDiagStop()">⏹ Stop</button>
+        <button class="btn small secondary" onclick="sheriDiagPlay()">▶ Play recording</button>
+        <button class="btn small" onclick="sheriDiagTranscribe()">📝 Test Whisper</button>
+        <button class="btn small danger" onclick="sheriDiagClear()">Clear</button>
+      </div>
+    </div>
     <div class="actions" style="justify-content:center;margin-bottom:16px">
       <select id="shericeriLang" style="width:auto;display:inline-block">
         <option value="en-US">English</option>
         <option value="fr-FR">Français</option>
       </select>
       <button id="shericeriSearchToggle" class="btn secondary" onclick="toggleShericeriSearch()" title="Ground answers in live web search instead of your business data">🔍 Web search: off</button>
+      <button class="btn secondary" onclick="toggleShericeriDiagnostic()" title="Temporarily diagnose the voice pipeline">🔧 Voice diagnostic</button>
     </div>
     <button id="shericeriTalkBtn" class="btn" style="width:120px;height:120px;border-radius:50%;font-size:36px;line-height:1" onclick="toggleShericeri()">🎙️</button>
     <div id="shericeriStatus" class="sub" style="margin-top:16px">Tap to start talking with Shericeri.</div>
@@ -997,6 +1011,92 @@ function startAdvisorVoice(){
 }
 
 // ── Shericeri: tap-to-talk voice assistant ─────────────────────────────────
+// ── Temporary Shericeri voice diagnostics ─────────────────────────────────
+let sheriDiagStream=null;
+let sheriDiagRecorder=null;
+let sheriDiagChunks=[];
+let sheriDiagBlob=null;
+let sheriDiagMime='audio/webm';
+
+function toggleShericeriDiagnostic(){
+  const el=document.getElementById('sheriDiagnostic');
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+function sheriDiagSet(text){
+  const el=document.getElementById('sheriDiagStatus');
+  if(el)el.innerHTML=text;
+}
+async function sheriDiagSpeaker(){
+  sheriDiagSet('🔊 <b>Speaker:</b> testing…');
+  try{
+    if(!window.speechSynthesis||!window.SpeechSynthesisUtterance)throw new Error('Speech synthesis is not supported');
+    await ensureVoicesLoaded();
+    speechSynthesis.cancel();
+    const lang=currentShericeriLang();
+    const utt=new SpeechSynthesisUtterance('Hello Jean. This is Shericeri. Your speaker test is working.');
+    utt.lang=lang;utt.rate=1.0;utt.pitch=1;
+    const voice=pickVoice(lang);if(voice)utt.voice=voice;
+    utt.onstart=()=>sheriDiagSet('🔊 <b>Speaker:</b> speaking now…');
+    utt.onend=()=>sheriDiagSet('🔊 <b>Speaker:</b> ✅ speech finished. If you heard nothing, the problem is TTS/device output, not Whisper.');
+    utt.onerror=e=>sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
+    speechSynthesis.speak(utt);
+  }catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
+}
+async function sheriDiagRecord(){
+  try{
+    if(sheriDiagRecorder&&sheriDiagRecorder.state!=='inactive')return;
+    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error('MediaRecorder/getUserMedia unavailable');
+    sheriDiagChunks=[];sheriDiagBlob=null;
+    sheriDiagMime='audio/webm';
+    for(const t of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus']){
+      if(window.MediaRecorder.isTypeSupported?.(t)){sheriDiagMime=t;break}
+    }
+    sheriDiagStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    sheriDiagRecorder=new MediaRecorder(sheriDiagStream,{mimeType:sheriDiagMime});
+    sheriDiagRecorder.ondataavailable=e=>{if(e.data?.size)sheriDiagChunks.push(e.data)};
+    sheriDiagRecorder.onstop=()=>{
+      sheriDiagBlob=new Blob(sheriDiagChunks,{type:sheriDiagMime});
+      const settings=sheriDiagStream?.getAudioTracks?.()[0]?.getSettings?.()||{};
+      sheriDiagSet(`🎙 <b>Microphone:</b> ✅ recorded <b>${(sheriDiagBlob.size/1024).toFixed(1)} KB</b><br>Format: ${esc(sheriDiagMime)}<br>Mic: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s).<br>Next: tap <b>▶ Play recording</b>, then <b>📝 Test Whisper</b>.`);
+      sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
+    };
+    sheriDiagRecorder.onerror=e=>sheriDiagSet('🎙 <b>Microphone:</b> ❌ '+esc(e.error?.message||'recording error'));
+    sheriDiagRecorder.start(250);
+    sheriDiagSet('🎙 <b>Microphone:</b> 🔴 recording… Speak normally for 3–5 seconds, then tap <b>Stop</b>.');
+  }catch(e){
+    sheriDiagSet('🎙 <b>Microphone:</b> ❌ '+esc(e.message||String(e)));
+    sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
+  }
+}
+function sheriDiagStop(){
+  if(sheriDiagRecorder&&sheriDiagRecorder.state!=='inactive')sheriDiagRecorder.stop();
+  else sheriDiagSet('⏹ <b>Stop:</b> nothing is recording.');
+}
+function sheriDiagPlay(){
+  if(!sheriDiagBlob){sheriDiagSet('▶ <b>Playback:</b> ❌ no recording yet. Record something first.');return}
+  const url=URL.createObjectURL(sheriDiagBlob);
+  const audio=new Audio(url);
+  audio.onended=()=>URL.revokeObjectURL(url);
+  audio.onerror=()=>{URL.revokeObjectURL(url);sheriDiagSet('▶ <b>Playback:</b> ❌ browser could not play the recording.');};
+  audio.play().then(()=>sheriDiagSet('▶ <b>Playback:</b> 🔊 playing your recording…')).catch(e=>sheriDiagSet('▶ <b>Playback:</b> ❌ '+esc(e.message||String(e))));
+}
+async function sheriDiagTranscribe(){
+  if(!sheriDiagBlob){sheriDiagSet('📝 <b>Whisper:</b> ❌ no recording yet. Record something first.');return}
+  sheriDiagSet('📝 <b>Whisper:</b> sending '+(sheriDiagBlob.size/1024).toFixed(1)+' KB to the transcription service…');
+  const started=performance.now();
+  try{
+    const dataUrl=await blobToDataUrl(sheriDiagBlob);
+    const lang=currentShericeriLang().slice(0,2);
+    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang,diagnostic:true}});
+    const ms=Math.round(performance.now()-started);
+    if(error)throw new Error(error.message||String(error));
+    const transcript=(data?.transcript||'').trim();
+    if(transcript)sheriDiagSet(`📝 <b>Whisper:</b> ✅ ${ms} ms<br><b>Heard:</b> “${esc(transcript)}”<br>That means microphone → recording → backend → Whisper is working.`);
+    else sheriDiagSet(`📝 <b>Whisper:</b> ⚠️ ${ms} ms — returned an empty transcript.<br>This is the exact failure we need to investigate.`);
+  }catch(e){sheriDiagSet('📝 <b>Whisper:</b> ❌ '+esc(e.message||String(e)));}
+}
+function sheriDiagClear(){sheriDiagBlob=null;sheriDiagChunks=[];sheriDiagSet('Ready.');}
+
 // Listening uses the device microphone directly (getUserMedia + MediaRecorder),
 // with our own volume monitoring to detect when you've stopped talking, then
 // sends the clip to Groq Whisper for transcription — this replaces the
