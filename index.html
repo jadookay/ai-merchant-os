@@ -1012,7 +1012,7 @@ let shericeriRecorder=null;
 let shericeriVadTimer=null;
 
 const SHERI_SPEECH_THRESHOLD=14;   // avg frequency-bin magnitude (0-255) counted as "someone is talking"
-const SHERI_SILENCE_STOP_MS=1100;  // how long a pause must last before we consider the turn finished
+const SHERI_SILENCE_STOP_MS=800;  // how long a pause must last before we consider the turn finished (was 1100 — shaved off guaranteed dead time on every turn)
 const SHERI_NO_SPEECH_TIMEOUT_MS=7000; // give up (no AI call) if nothing at all is heard in this window
 const SHERI_MAX_RECORD_MS=20000;   // hard safety cap per turn
 
@@ -1176,19 +1176,21 @@ function shericeriListenOnce(){
 }
 function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)})}
 async function shericeriTranscribeAndRespond(blob,mimeType){
+  const tRecordingStopped=performance.now();
   if(blob.size<800){
-    // Effectively silent clip (mic picked up nothing meaningful) — don't
-    // waste a Whisper call, just prompt and keep listening.
     setSheriStatus('Didn\'t quite catch that — try speaking a bit louder or closer to the mic.');
     setTimeout(()=>{if(shericeriActive)shericeriListenOnce()},400);
     return;
   }
   setSheriStatus('Shericeri is listening back…');
   let transcript='';
+  const tTranscribeSent=performance.now();
   try{
     const dataUrl=await blobToDataUrl(blob);
     const lang=currentShericeriLang().slice(0,2);
     const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang}});
+    const tTranscribeReceived=performance.now();
+    console.log(`[Sheri timing] recording→transcribe-sent: ${(tTranscribeSent-tRecordingStopped).toFixed(0)}ms | transcribe round-trip: ${(tTranscribeReceived-tTranscribeSent).toFixed(0)}ms`);
     if(error){
       console.error('Shericeri transcribe error:',error,data);
       if(error.context&&typeof error.context.text==='function'){
@@ -1207,7 +1209,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
     setTimeout(()=>{if(shericeriActive)shericeriListenOnce()},400);
     return;
   }
-  shericeriRespond(transcript);
+  shericeriRespond(transcript,tRecordingStopped);
 }
 // ── Fast lane: answer common questions instantly from local data, no AI call ─
 // Big latency win for the questions that don't need an LLM at all.
@@ -1299,8 +1301,9 @@ function sheriSplitCompleteSentences(buffer){
   return{complete,remainder};
 }
 
-async function shericeriRespond(transcript){
+async function shericeriRespond(transcript,tStart){
   if(!shericeriActive)return;
+  tStart=tStart||performance.now();
   const box=document.getElementById('shericeriMessages');
   document.getElementById('sheriHero').classList.remove('listening');
   if(box){box.innerHTML+=`<div class="msg me">${esc(transcript)}</div>`;box.scrollTop=box.scrollHeight}
@@ -1308,6 +1311,7 @@ async function shericeriRespond(transcript){
   // Fast lane: answer instantly from local data, skip the AI entirely.
   const fast=sheriFastLane(transcript);
   if(fast){
+    console.log(`[Sheri timing] FAST LANE — total from recording-stopped to speaking: ${(performance.now()-tStart).toFixed(0)}ms`);
     if(box){box.innerHTML+=`<div class="msg ai">${esc(fast)}</div>`;box.scrollTop=box.scrollHeight}
     sheriPushHistory('user',transcript);
     sheriPushHistory('assistant',fast);
@@ -1330,6 +1334,8 @@ async function shericeriRespond(transcript){
   sheriStreamActive=true;
   let fullAnswer='',buffer='',gotAnyChunk=false;
   let streamingEl=null;
+  const tAiSent=performance.now();
+  let tFirstChunk=null,tFirstSpeech=null;
 
   try{
     const res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
@@ -1345,6 +1351,7 @@ async function shericeriRespond(transcript){
       if(done)break;
       const chunkText=decoder.decode(value,{stream:true});
       if(!chunkText)continue;
+      if(!tFirstChunk){tFirstChunk=performance.now();console.log(`[Sheri timing] AI request→first chunk: ${(tFirstChunk-tAiSent).toFixed(0)}ms`);}
       gotAnyChunk=true;
       buffer+=chunkText;
       fullAnswer+=chunkText;
@@ -1359,6 +1366,7 @@ async function shericeriRespond(transcript){
         box.scrollTop=box.scrollHeight;
       }
       const{complete,remainder}=sheriSplitCompleteSentences(buffer);
+      if(complete.length&&!tFirstSpeech){tFirstSpeech=performance.now();console.log(`[Sheri timing] TOTAL recording-stopped→first sentence queued to speak: ${(tFirstSpeech-tStart).toFixed(0)}ms`);}
       complete.forEach(s=>sheriEnqueueSpeech(s));
       buffer=remainder;
     }
