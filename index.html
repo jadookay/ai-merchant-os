@@ -1385,11 +1385,13 @@ function sheriPushHistory(role,content){
 // while the rest of a streamed reply is still arriving ──────────────────
 let sheriSpeakQueue=[];
 let sheriIsSpeaking=false;
-let sheriStreamActive=false; // true while more streamed text chunks may still arrive
+let sheriStreamActive=false;
+let sheriTurnFailed=false; // prevents infrastructure/TTS failures from auto-restarting the microphone // true while more streamed text chunks may still arrive
 function sheriResetSpeechState(){
   sheriSpeakQueue=[];
   sheriIsSpeaking=false;
   sheriStreamActive=false;
+  sheriTurnFailed=false;
   if(window.speechSynthesis)speechSynthesis.cancel();
 }
 function sheriEnqueueSpeech(text){
@@ -1397,7 +1399,7 @@ function sheriEnqueueSpeech(text){
   if(!text)return;
   if(!window.speechSynthesis){
     setSheriStatus('(Text-to-speech not supported in this browser — reading only.)');
-    if(!sheriStreamActive&&shericeriActive)shericeriListenOnce(); // keep the conversation going without voice output
+    if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed)shericeriListenOnce(); // keep going only on a healthy turn
     return;
   }
   sheriSpeakQueue.push(text);
@@ -1406,7 +1408,7 @@ function sheriEnqueueSpeech(text){
 function sheriDrainSpeakQueue(){
   if(sheriIsSpeaking)return;
   if(!sheriSpeakQueue.length){
-    if(!sheriStreamActive&&shericeriActive)shericeriListenOnce(); // truly done — nothing left to say or await
+    if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed)shericeriListenOnce(); // truly done — never auto-listen after a failed turn
     return;
   }
   const next=sheriSpeakQueue.shift();
@@ -1429,8 +1431,16 @@ function sheriDrainSpeakQueue(){
   };
   utt.onstart=()=>{started=true;if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','STARTED')};
   utt.onend=finish;
-  utt.onerror=e=>{if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e?.error||'unknown'));sheriIsSpeaking=false;sheriDrainSpeakQueue()};
-  const speakNow=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e.message||String(e)));sheriIsSpeaking=false;sheriDrainSpeakQueue()}};
+  utt.onerror=e=>{
+    if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e?.error||'unknown'));
+    sheriIsSpeaking=false;
+    sheriTurnFailed=true;
+    sheriSpeakQueue=[];
+    sheriStreamActive=false;
+    setSheriStatus('Shericeri could not play that response. Tap to try again.');
+    if(window.speechSynthesis)try{speechSynthesis.cancel()}catch(_){}
+  };
+  const speakNow=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e.message||String(e)));sheriIsSpeaking=false;sheriTurnFailed=true;sheriSpeakQueue=[];sheriStreamActive=false;setSheriStatus('Shericeri could not play that response. Tap to try again.')}};
   if(isAndroid)setTimeout(speakNow,90);else speakNow();
 }
 // Splits a growing text buffer into complete sentences plus a leftover tail
@@ -1548,16 +1558,31 @@ async function shericeriRespond(transcript){
       buffer=remainder;
     }
   }catch(err){
-    gotAnyChunk=false;
+    console.error('[Sheri advisor] stream failed:',err);
+    // IMPORTANT: preserve gotAnyChunk. A mid-stream failure is not the same as
+    // receiving no answer at all; keep and speak whatever Groq already sent.
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Advisor error',String(err?.message||err).slice(0,180));
+    sheriTurnFailed=true;
   }
 
   sheriStreamActive=false;
   if(buffer.trim())sheriEnqueueSpeech(buffer.trim());
 
   if(!gotAnyChunk){
-    const fallback="I'm having trouble connecting right now — check the connection and try again.";
+    const fallback="I'm having trouble connecting right now — please try again in a moment.";
     if(box){box.innerHTML+=`<div class="msg ai">${esc(fallback)}</div>`;box.scrollTop=box.scrollHeight}
-    sheriEnqueueSpeech(fallback);
+    sheriTurnFailed=true;
+    sheriSpeakQueue=[];
+    // Speak the failure once, but NEVER feed it back into the microphone.
+    if(window.speechSynthesis){
+      const errUtt=new SpeechSynthesisUtterance(fallback);
+      errUtt.lang=currentShericeriLang();
+      errUtt.rate=1.03;
+      errUtt.onstart=()=>{if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR FALLBACK STARTED')};
+      errUtt.onend=()=>{if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR FALLBACK ENDED')};
+      errUtt.onerror=e=>{if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR FALLBACK: '+(e?.error||'unknown'))};
+      try{speechSynthesis.cancel();setTimeout(()=>{try{speechSynthesis.resume();speechSynthesis.speak(errUtt)}catch(_){}},90)}catch(_){}
+    }
   }else{
     sheriPushHistory('user',transcript);
     sheriPushHistory('assistant',fullAnswer.trim());
