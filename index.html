@@ -186,12 +186,26 @@
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
   <div class="notice" id="shericeriNotice">Connecting…</div>
   <div class="card" style="text-align:center;padding:28px 17px">
+    <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
+      <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
+      <div class="sub" style="margin-bottom:10px">This temporary test isolates microphone, recording, Whisper, AI and speaker output. It does not change your business data.</div>
+      <div id="sheriDiagStatus" style="font-size:13px;line-height:1.6">Ready.</div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn small secondary" onclick="sheriDiagSpeaker()">🔊 Test speaker</button>
+        <button class="btn small secondary" onclick="sheriDiagRecord()">🎙 Record test</button>
+        <button class="btn small secondary" onclick="sheriDiagStop()">⏹ Stop</button>
+        <button class="btn small secondary" onclick="sheriDiagPlay()">▶ Play recording</button>
+        <button class="btn small" onclick="sheriDiagTranscribe()">📝 Test Whisper</button>
+        <button class="btn small danger" onclick="sheriDiagClear()">Clear</button>
+      </div>
+    </div>
     <div class="actions" style="justify-content:center;margin-bottom:16px">
       <select id="shericeriLang" style="width:auto;display:inline-block">
         <option value="en-US">English</option>
         <option value="fr-FR">Français</option>
       </select>
       <button id="shericeriSearchToggle" class="btn secondary" onclick="toggleShericeriSearch()" title="Ground answers in live web search instead of your business data">🔍 Web search: off</button>
+      <button class="btn secondary" onclick="toggleShericeriDiagnostic()" title="Temporarily diagnose the voice pipeline">🔧 Voice diagnostic</button>
     </div>
     <button id="shericeriTalkBtn" class="btn" style="width:120px;height:120px;border-radius:50%;font-size:36px;line-height:1" onclick="toggleShericeri()">🎙️</button>
     <div id="shericeriStatus" class="sub" style="margin-top:16px">Tap to start talking with Shericeri.</div>
@@ -997,6 +1011,92 @@ function startAdvisorVoice(){
 }
 
 // ── Shericeri: tap-to-talk voice assistant ─────────────────────────────────
+// ── Temporary Shericeri voice diagnostics ─────────────────────────────────
+let sheriDiagStream=null;
+let sheriDiagRecorder=null;
+let sheriDiagChunks=[];
+let sheriDiagBlob=null;
+let sheriDiagMime='audio/webm';
+
+function toggleShericeriDiagnostic(){
+  const el=document.getElementById('sheriDiagnostic');
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
+}
+function sheriDiagSet(text){
+  const el=document.getElementById('sheriDiagStatus');
+  if(el)el.innerHTML=text;
+}
+async function sheriDiagSpeaker(){
+  sheriDiagSet('🔊 <b>Speaker:</b> testing…');
+  try{
+    if(!window.speechSynthesis||!window.SpeechSynthesisUtterance)throw new Error('Speech synthesis is not supported');
+    await ensureVoicesLoaded();
+    speechSynthesis.cancel();
+    const lang=currentShericeriLang();
+    const utt=new SpeechSynthesisUtterance('Hello Jean. This is Shericeri. Your speaker test is working.');
+    utt.lang=lang;utt.rate=1.0;utt.pitch=1;
+    const voice=pickVoice(lang);if(voice)utt.voice=voice;
+    utt.onstart=()=>sheriDiagSet('🔊 <b>Speaker:</b> speaking now…');
+    utt.onend=()=>sheriDiagSet('🔊 <b>Speaker:</b> ✅ speech finished. If you heard nothing, the problem is TTS/device output, not Whisper.');
+    utt.onerror=e=>sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
+    speechSynthesis.speak(utt);
+  }catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
+}
+async function sheriDiagRecord(){
+  try{
+    if(sheriDiagRecorder&&sheriDiagRecorder.state!=='inactive')return;
+    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error('MediaRecorder/getUserMedia unavailable');
+    sheriDiagChunks=[];sheriDiagBlob=null;
+    sheriDiagMime='audio/webm';
+    for(const t of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus']){
+      if(window.MediaRecorder.isTypeSupported?.(t)){sheriDiagMime=t;break}
+    }
+    sheriDiagStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    sheriDiagRecorder=new MediaRecorder(sheriDiagStream,{mimeType:sheriDiagMime});
+    sheriDiagRecorder.ondataavailable=e=>{if(e.data?.size)sheriDiagChunks.push(e.data)};
+    sheriDiagRecorder.onstop=()=>{
+      sheriDiagBlob=new Blob(sheriDiagChunks,{type:sheriDiagMime});
+      const settings=sheriDiagStream?.getAudioTracks?.()[0]?.getSettings?.()||{};
+      sheriDiagSet(`🎙 <b>Microphone:</b> ✅ recorded <b>${(sheriDiagBlob.size/1024).toFixed(1)} KB</b><br>Format: ${esc(sheriDiagMime)}<br>Mic: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s).<br>Next: tap <b>▶ Play recording</b>, then <b>📝 Test Whisper</b>.`);
+      sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
+    };
+    sheriDiagRecorder.onerror=e=>sheriDiagSet('🎙 <b>Microphone:</b> ❌ '+esc(e.error?.message||'recording error'));
+    sheriDiagRecorder.start(250);
+    sheriDiagSet('🎙 <b>Microphone:</b> 🔴 recording… Speak normally for 3–5 seconds, then tap <b>Stop</b>.');
+  }catch(e){
+    sheriDiagSet('🎙 <b>Microphone:</b> ❌ '+esc(e.message||String(e)));
+    sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
+  }
+}
+function sheriDiagStop(){
+  if(sheriDiagRecorder&&sheriDiagRecorder.state!=='inactive')sheriDiagRecorder.stop();
+  else sheriDiagSet('⏹ <b>Stop:</b> nothing is recording.');
+}
+function sheriDiagPlay(){
+  if(!sheriDiagBlob){sheriDiagSet('▶ <b>Playback:</b> ❌ no recording yet. Record something first.');return}
+  const url=URL.createObjectURL(sheriDiagBlob);
+  const audio=new Audio(url);
+  audio.onended=()=>URL.revokeObjectURL(url);
+  audio.onerror=()=>{URL.revokeObjectURL(url);sheriDiagSet('▶ <b>Playback:</b> ❌ browser could not play the recording.');};
+  audio.play().then(()=>sheriDiagSet('▶ <b>Playback:</b> 🔊 playing your recording…')).catch(e=>sheriDiagSet('▶ <b>Playback:</b> ❌ '+esc(e.message||String(e))));
+}
+async function sheriDiagTranscribe(){
+  if(!sheriDiagBlob){sheriDiagSet('📝 <b>Whisper:</b> ❌ no recording yet. Record something first.');return}
+  sheriDiagSet('📝 <b>Whisper:</b> sending '+(sheriDiagBlob.size/1024).toFixed(1)+' KB to the transcription service…');
+  const started=performance.now();
+  try{
+    const dataUrl=await blobToDataUrl(sheriDiagBlob);
+    const lang=currentShericeriLang().slice(0,2);
+    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang,diagnostic:true}});
+    const ms=Math.round(performance.now()-started);
+    if(error)throw new Error(error.message||String(error));
+    const transcript=(data?.transcript||'').trim();
+    if(transcript)sheriDiagSet(`📝 <b>Whisper:</b> ✅ ${ms} ms<br><b>Heard:</b> “${esc(transcript)}”<br>That means microphone → recording → backend → Whisper is working.`);
+    else sheriDiagSet(`📝 <b>Whisper:</b> ⚠️ ${ms} ms — returned an empty transcript.<br>This is the exact failure we need to investigate.`);
+  }catch(e){sheriDiagSet('📝 <b>Whisper:</b> ❌ '+esc(e.message||String(e)));}
+}
+function sheriDiagClear(){sheriDiagBlob=null;sheriDiagChunks=[];sheriDiagSet('Ready.');}
+
 // Listening uses the device microphone directly (getUserMedia + MediaRecorder),
 // with our own volume monitoring to detect when you've stopped talking, then
 // sends the clip to Groq Whisper for transcription — this replaces the
@@ -1012,7 +1112,7 @@ let shericeriRecorder=null;
 let shericeriVadTimer=null;
 
 const SHERI_SPEECH_THRESHOLD=14;   // avg frequency-bin magnitude (0-255) counted as "someone is talking"
-const SHERI_SILENCE_STOP_MS=800;  // how long a pause must last before we consider the turn finished (was 1100 — shaved off guaranteed dead time on every turn)
+const SHERI_SILENCE_STOP_MS=1100;  // how long a pause must last before we consider the turn finished
 const SHERI_NO_SPEECH_TIMEOUT_MS=7000; // give up (no AI call) if nothing at all is heard in this window
 const SHERI_MAX_RECORD_MS=20000;   // hard safety cap per turn
 
@@ -1176,31 +1276,20 @@ function shericeriListenOnce(){
 }
 function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)})}
 async function shericeriTranscribeAndRespond(blob,mimeType){
-  const tRecordingStopped=performance.now();
   if(blob.size<800){
+    // Effectively silent clip (mic picked up nothing meaningful) — don't
+    // waste a Whisper call, just prompt and keep listening.
     setSheriStatus('Didn\'t quite catch that — try speaking a bit louder or closer to the mic.');
     setTimeout(()=>{if(shericeriActive)shericeriListenOnce()},400);
     return;
   }
   setSheriStatus('Shericeri is listening back…');
   let transcript='';
-  const tTranscribeSent=performance.now();
   try{
     const dataUrl=await blobToDataUrl(blob);
     const lang=currentShericeriLang().slice(0,2);
     const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang}});
-    const tTranscribeReceived=performance.now();
-    console.log(`[Sheri timing] recording→transcribe-sent: ${(tTranscribeSent-tRecordingStopped).toFixed(0)}ms | transcribe round-trip: ${(tTranscribeReceived-tTranscribeSent).toFixed(0)}ms`);
-    if(error){
-      console.error('Shericeri transcribe error:',error,data);
-      if(error.context&&typeof error.context.text==='function'){
-        try{
-          const status=error.context.status;
-          const bodyText=await error.context.clone().text();
-          console.error('Shericeri transcribe error DETAILS — status:',status,'body:',bodyText);
-        }catch(readErr){console.error('Could not read error response body:',readErr);}
-      }
-    }
+    if(error){console.error('Shericeri transcribe error:',error,data);}
     if(!error&&data?.transcript)transcript=data.transcript.trim();
   }catch(err){console.error('Shericeri transcribe exception:',err);}
   if(!shericeriActive)return;
@@ -1209,7 +1298,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
     setTimeout(()=>{if(shericeriActive)shericeriListenOnce()},400);
     return;
   }
-  shericeriRespond(transcript,tRecordingStopped);
+  shericeriRespond(transcript);
 }
 // ── Fast lane: answer common questions instantly from local data, no AI call ─
 // Big latency win for the questions that don't need an LLM at all.
@@ -1301,9 +1390,8 @@ function sheriSplitCompleteSentences(buffer){
   return{complete,remainder};
 }
 
-async function shericeriRespond(transcript,tStart){
+async function shericeriRespond(transcript){
   if(!shericeriActive)return;
-  tStart=tStart||performance.now();
   const box=document.getElementById('shericeriMessages');
   document.getElementById('sheriHero').classList.remove('listening');
   if(box){box.innerHTML+=`<div class="msg me">${esc(transcript)}</div>`;box.scrollTop=box.scrollHeight}
@@ -1311,7 +1399,6 @@ async function shericeriRespond(transcript,tStart){
   // Fast lane: answer instantly from local data, skip the AI entirely.
   const fast=sheriFastLane(transcript);
   if(fast){
-    console.log(`[Sheri timing] FAST LANE — total from recording-stopped to speaking: ${(performance.now()-tStart).toFixed(0)}ms`);
     if(box){box.innerHTML+=`<div class="msg ai">${esc(fast)}</div>`;box.scrollTop=box.scrollHeight}
     sheriPushHistory('user',transcript);
     sheriPushHistory('assistant',fast);
@@ -1334,16 +1421,49 @@ async function shericeriRespond(transcript,tStart){
   sheriStreamActive=true;
   let fullAnswer='',buffer='',gotAnyChunk=false;
   let streamingEl=null;
-  const tAiSent=performance.now();
-  let tFirstChunk=null,tFirstSpeech=null;
 
   try{
-    const res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+    // Get the freshest Supabase session immediately before the streaming call.
+    // sb.functions.invoke() can refresh an expired access token automatically,
+    // but this raw fetch cannot. That was causing intermittent 401s in Shericeri.
+    let currentSession=session;
+    try{
+      const {data:{session:freshSession}}=await sb.auth.getSession();
+      if(freshSession) currentSession=freshSession;
+      if(!currentSession?.access_token){
+        const {data:{session:refreshedSession},error:refreshError}=await sb.auth.refreshSession();
+        if(refreshError||!refreshedSession?.access_token) throw refreshError||new Error('No valid Supabase session');
+        currentSession=refreshedSession;
+        session=refreshedSession;
+      }
+    }catch(authErr){
+      console.error('[Sheri auth] Could not obtain a fresh session:',authErr);
+      throw new Error('Shericeri session expired — please sign in again.');
+    }
+    const advisorStart=performance.now();
+    let res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
       method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+session.access_token},
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},
       body:JSON.stringify({mode:'shericeri',question:transcript,context,webSearch:shericeriSearchOn,history:shericeriHistory})
     });
-    if(!res.ok||!res.body)throw new Error('stream request failed: '+res.status);
+    // If the gateway rejects the token once, refresh the session and retry exactly once.
+    if(res.status===401){
+      console.warn('[Sheri auth] Advisor returned 401; refreshing session and retrying once.');
+      const {data:{session:refreshedSession},error:refreshError}=await sb.auth.refreshSession();
+      if(refreshError||!refreshedSession?.access_token) throw refreshError||new Error('Session refresh failed after 401');
+      session=refreshedSession;
+      res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+refreshedSession.access_token},
+        body:JSON.stringify({mode:'shericeri',question:transcript,context,webSearch:shericeriSearchOn,history:shericeriHistory})
+      });
+    }
+    console.log(`[Sheri timing] advisor HTTP ${res.status}: ${(performance.now()-advisorStart).toFixed(0)}ms`);
+    if(!res.ok||!res.body){
+      let detail='';
+      try{detail=(await res.text()).slice(0,800)}catch(_){}
+      throw new Error(`stream request failed: ${res.status}${detail?' — '+detail:''}`);
+    }
     const reader=res.body.getReader();
     const decoder=new TextDecoder();
     while(true){
@@ -1351,7 +1471,6 @@ async function shericeriRespond(transcript,tStart){
       if(done)break;
       const chunkText=decoder.decode(value,{stream:true});
       if(!chunkText)continue;
-      if(!tFirstChunk){tFirstChunk=performance.now();console.log(`[Sheri timing] AI request→first chunk: ${(tFirstChunk-tAiSent).toFixed(0)}ms`);}
       gotAnyChunk=true;
       buffer+=chunkText;
       fullAnswer+=chunkText;
@@ -1366,7 +1485,6 @@ async function shericeriRespond(transcript,tStart){
         box.scrollTop=box.scrollHeight;
       }
       const{complete,remainder}=sheriSplitCompleteSentences(buffer);
-      if(complete.length&&!tFirstSpeech){tFirstSpeech=performance.now();console.log(`[Sheri timing] TOTAL recording-stopped→first sentence queued to speak: ${(tFirstSpeech-tStart).toFixed(0)}ms`);}
       complete.forEach(s=>sheriEnqueueSpeech(s));
       buffer=remainder;
     }
@@ -1392,7 +1510,7 @@ async function shericeriRespond(transcript,tStart){
 (async function boot(){
   const {data:{session:existing}}=await sb.auth.getSession();
   if(existing)await onAuthed(existing);
-  sb.auth.onAuthStateChange((event,sess)=>{if(event==='SIGNED_OUT')location.reload()});
+  sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_OUT')location.reload()});
 })();
 </script>
 </body>
