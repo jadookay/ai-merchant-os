@@ -1035,11 +1035,16 @@ async function sheriDiagSpeaker(){
     const lang=currentShericeriLang();
     const utt=new SpeechSynthesisUtterance('Hello Jean. This is Shericeri. Your speaker test is working.');
     utt.lang=lang;utt.rate=1.0;utt.pitch=1;
-    const voice=pickVoice(lang);if(voice)utt.voice=voice;
-    utt.onstart=()=>sheriDiagSet('🔊 <b>Speaker:</b> speaking now…');
-    utt.onend=()=>sheriDiagSet('🔊 <b>Speaker:</b> ✅ speech finished. If you heard nothing, the problem is TTS/device output, not Whisper.');
+    const isAndroid=/Android/i.test(navigator.userAgent||'');
+    const voices=speechSynthesis.getVoices();
+    const voice=isAndroid?null:pickVoice(lang);
+    if(voice)utt.voice=voice;
+    sheriDiagSet(`🔊 <b>Speaker:</b> queued — ${voices.length} voices; ${isAndroid?'Android default voice':(voice?esc(voice.name):'browser default voice')}`);
+    utt.onstart=()=>sheriDiagSet(`🔊 <b>Speaker:</b> ✅ onstart — ${isAndroid?'Android default voice':(voice?esc(voice.name):'browser default voice')}`);
+    utt.onend=()=>sheriDiagSet('🔊 <b>Speaker:</b> ✅ onend. If you heard nothing, report this screenshot.');
     utt.onerror=e=>sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
-    speechSynthesis.speak(utt);
+    const speakTest=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)))}};
+    if(isAndroid)setTimeout(speakTest,90);else speakTest();
   }catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
 }
 async function sheriDiagRecord(){
@@ -1149,34 +1154,6 @@ function pickVoice(lang){
   return candidates.sort((a,b)=>qualityRank(a)-qualityRank(b))[0];
 }
 
-let sheriDiagEl=null;
-function sheriDiagEnsure(){
-  if(sheriDiagEl)return sheriDiagEl;
-  const d=document.createElement('div');
-  d.id='sheriPhoneDiag';
-  d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
-  document.body.appendChild(d);
-  d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
-  sheriDiagEl=d;
-  return d;
-}
-function sheriDiagShow(){sheriDiagEnsure().style.display='block'}
-function sheriDiagSet(label,value){
-  const d=sheriDiagEnsure(), rows=d.querySelector('#sheriDiagRows');
-  let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));
-  if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}
-  row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>';
-  sheriDiagShow();
-}
-function sheriDiagReset(){
-  const d=sheriDiagEnsure(), rows=d.querySelector('#sheriDiagRows');
-  rows.innerHTML=''; sheriDiagShow();
-  sheriDiagSet('Browser',navigator.userAgent.includes('Android')?'Android':'Other');
-  sheriDiagSet('TTS available',!!window.speechSynthesis);
-  sheriDiagSet('MediaRecorder',!!window.MediaRecorder);
-}
-
 function setSheriStatus(text){
   const a=document.getElementById('shericeriStatus');
   const b=document.getElementById('sheriHeroStatus');
@@ -1213,15 +1190,11 @@ async function startShericeriLoop(){
     return;
   }
   showSheriHero();
-  sheriDiagReset();
-  sheriDiagSet('Microphone request','starting');
   setSheriStatus('Requesting microphone access…');
   await ensureVoicesLoaded();
   try{
-    shericeriMicStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-    sheriDiagSet('Microphone','granted');
+    shericeriMicStream=await navigator.mediaDevices.getUserMedia({audio:true});
   }catch(err){
-    sheriDiagSet('Microphone','FAILED: '+(err?.name||err?.message||err));
     setSheriStatus('Could not access the microphone. Check mic permission for this site.');
     hideSheriHero();
     return;
@@ -1266,15 +1239,12 @@ function shericeriListenOnce(){
     document.getElementById('sheriHero').classList.remove('listening');
     if(!shericeriActive)return;
     const blob=new Blob(chunks,{type:mimeType});
-    sheriDiagSet('Recording','stopped — '+(blob.size/1024).toFixed(1)+' KB');
-    sheriDiagSet('Audio type',blob.type||mimeType);
     await shericeriTranscribeAndRespond(blob,mimeType);
   };
 
   setSheriStatus('Listening…');
   document.getElementById('sheriHero').classList.add('listening');
   shericeriRecorder.start();
-  sheriDiagSet('Recording','started ('+mimeType+')');
 
   const startTime=Date.now();
   let hasSpoken=false;
@@ -1321,17 +1291,11 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   setSheriStatus('Shericeri is listening back…');
   let transcript='';
   try{
-    const encodeStart=performance.now();
     const dataUrl=await blobToDataUrl(blob);
-    sheriDiagSet('Encode',Math.round(performance.now()-encodeStart)+' ms');
     const lang=currentShericeriLang().slice(0,2);
-    const transcribeStart=performance.now();
     const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang}});
-    sheriDiagSet('Whisper HTTP',error?'ERROR':'OK');
-    sheriDiagSet('Whisper round-trip',Math.round(performance.now()-transcribeStart)+' ms');
     if(error){console.error('Shericeri transcribe error:',error,data);}
-    if(!error&&data?.transcript){transcript=data.transcript.trim(); sheriDiagSet('Transcript',transcript||'(empty)')}
-    else if(error){sheriDiagSet('Whisper error',error.message||'non-2xx');}
+    if(!error&&data?.transcript)transcript=data.transcript.trim();
   }catch(err){console.error('Shericeri transcribe exception:',err);}
   if(!shericeriActive)return;
   if(transcript.length<2){
@@ -1381,10 +1345,14 @@ function sheriPushHistory(role,content){
 let sheriSpeakQueue=[];
 let sheriIsSpeaking=false;
 let sheriStreamActive=false; // true while more streamed text chunks may still arrive
+let sheriTtsGeneration=0;
+let sheriTtsKeepAlive=null;
 function sheriResetSpeechState(){
   sheriSpeakQueue=[];
   sheriIsSpeaking=false;
   sheriStreamActive=false;
+  sheriTtsGeneration++;
+  if(sheriTtsKeepAlive){clearInterval(sheriTtsKeepAlive);sheriTtsKeepAlive=null}
   if(window.speechSynthesis)speechSynthesis.cancel();
 }
 function sheriEnqueueSpeech(text){
@@ -1392,7 +1360,7 @@ function sheriEnqueueSpeech(text){
   if(!text)return;
   if(!window.speechSynthesis){
     setSheriStatus('(Text-to-speech not supported in this browser — reading only.)');
-    if(!sheriStreamActive&&shericeriActive)shericeriListenOnce(); // keep the conversation going without voice output
+    if(!sheriStreamActive&&shericeriActive)shericeriListenOnce();
     return;
   }
   sheriSpeakQueue.push(text);
@@ -1401,24 +1369,62 @@ function sheriEnqueueSpeech(text){
 function sheriDrainSpeakQueue(){
   if(sheriIsSpeaking)return;
   if(!sheriSpeakQueue.length){
-    if(!sheriStreamActive&&shericeriActive)shericeriListenOnce(); // truly done — nothing left to say or await
+    if(!sheriStreamActive&&shericeriActive)shericeriListenOnce();
     return;
   }
   const next=sheriSpeakQueue.shift();
+  const generation=++sheriTtsGeneration;
   sheriIsSpeaking=true;
   setSheriStatus('Shericeri is speaking…');
-  sheriDiagSet('TTS','starting');
+  if(typeof sheriDiagSet==='function')sheriDiagSet('🔊 <b>TTS:</b> preparing speech…');
+
   const lang=currentShericeriLang();
   const utt=new SpeechSynthesisUtterance(next);
   utt.lang=lang;
   utt.rate=1.03;
   utt.pitch=1;
-  const voice=pickVoice(lang);
+
+  // Android Chrome can expose several remote/device voices that report
+  // onend without producing audible output. For Android, let Chrome choose
+  // its own default voice; this is the same path that works for normal
+  // browser speech and avoids forcing a problematic voice.
+  const isAndroid=/Android/i.test(navigator.userAgent||'');
+  const voice=isAndroid?null:pickVoice(lang);
   if(voice)utt.voice=voice;
-  utt.onstart=()=>sheriDiagSet('TTS','STARTED');
-  utt.onend=()=>{sheriDiagSet('TTS','ended');sheriIsSpeaking=false;sheriDrainSpeakQueue()};
-  utt.onerror=(e)=>{sheriDiagSet('TTS','ERROR: '+(e?.error||'unknown'));sheriIsSpeaking=false;sheriDrainSpeakQueue()};
-  speechSynthesis.speak(utt);
+
+  let started=false;
+  const finish=()=>{
+    if(generation!==sheriTtsGeneration)return;
+    sheriIsSpeaking=false;
+    if(sheriTtsKeepAlive){clearInterval(sheriTtsKeepAlive);sheriTtsKeepAlive=null}
+    if(typeof sheriDiagSet==='function')sheriDiagSet(started?'🔊 <b>TTS:</b> ✅ ended':'🔊 <b>TTS:</b> ⚠️ ended without onstart');
+    sheriDrainSpeakQueue();
+  };
+  utt.onstart=()=>{
+    started=true;
+    if(typeof sheriDiagSet==='function')sheriDiagSet(`🔊 <b>TTS:</b> STARTED (${isAndroid?'Android default voice':'selected voice'})`);
+    // Some Android Chrome builds pause long utterances unexpectedly.
+    sheriTtsKeepAlive=setInterval(()=>{try{if(speechSynthesis.speaking)speechSynthesis.resume()}catch(_){}} ,5000);
+  };
+  utt.onend=finish;
+  utt.onerror=e=>{
+    if(generation!==sheriTtsGeneration)return;
+    if(sheriTtsKeepAlive){clearInterval(sheriTtsKeepAlive);sheriTtsKeepAlive=null}
+    if(typeof sheriDiagSet==='function')sheriDiagSet('🔊 <b>TTS:</b> ❌ '+esc(e?.error||'speech synthesis error'));
+    sheriIsSpeaking=false;
+    sheriDrainSpeakQueue();
+  };
+
+  // Important Android workaround: after cancel(), wait briefly before speak().
+  // Calling speak() in the same task can be silently swallowed on some Chrome builds.
+  const speakNow=()=>{
+    try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){
+      if(typeof sheriDiagSet==='function')sheriDiagSet('🔊 <b>TTS:</b> ❌ '+esc(e.message||String(e)));
+      sheriIsSpeaking=false;
+      sheriDrainSpeakQueue();
+    }
+  };
+  if(isAndroid)setTimeout(speakNow,90);else speakNow();
 }
 // Splits a growing text buffer into complete sentences plus a leftover tail
 // that's still being written — used to feed the speak queue progressively.
@@ -1501,10 +1507,7 @@ async function shericeriRespond(transcript){
         body:JSON.stringify({mode:'shericeri',question:transcript,context,webSearch:shericeriSearchOn,history:shericeriHistory})
       });
     }
-    const advisorMs=Math.round(performance.now()-advisorStart);
-    sheriDiagSet('Advisor HTTP',res.status+(res.ok?' OK':' FAILED'));
-    sheriDiagSet('Advisor round-trip',advisorMs+' ms');
-    console.log(`[Sheri timing] advisor HTTP ${res.status}: ${advisorMs}ms`);
+    console.log(`[Sheri timing] advisor HTTP ${res.status}: ${(performance.now()-advisorStart).toFixed(0)}ms`);
     if(!res.ok||!res.body){
       let detail='';
       try{detail=(await res.text()).slice(0,800)}catch(_){}
