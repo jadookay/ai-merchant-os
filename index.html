@@ -98,7 +98,7 @@
   <div id="addProduct" class="card" style="display:none">
     <div class="formgrid">
       <div><label>Product name</label><input id="pName"></div>
-      <div><label>Category</label><select id="pCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option></select></div>
+      <div><label>Category</label><select id="pCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div>
       <div><label>Cost / unit (RWF)</label><input id="pCost" type="number"></div>
       <div><label>Selling price / unit (RWF)</label><input id="pSell" type="number"></div>
       <div><label>Current stock</label><input id="pStock" type="number"></div>
@@ -125,6 +125,17 @@
     <video id="barcodeVideo" playsinline muted autoplay style="max-width:92vw;max-height:60vh;border-radius:12px;background:#111"></video>
     <div id="barcodeStatus" style="color:white;margin-top:14px;font-size:14px;text-align:center;padding:0 20px">Point your camera at the barcode…</div>
     <button class="btn danger" style="margin-top:16px" onclick="stopBarcodeScan()">Cancel</button>
+  </div>
+  <div id="importPreviewOverlay" style="display:none;position:fixed;inset:0;background:#000000cc;z-index:999;align-items:center;justify-content:center;padding:20px">
+    <div class="card" style="max-width:480px;width:100%;max-height:85vh;display:flex;flex-direction:column">
+      <h2 style="margin-top:0">Review before importing</h2>
+      <div class="sub" style="margin-bottom:10px">Nothing has been saved yet. Check this looks right, then confirm.</div>
+      <div id="importPreviewList" style="overflow-y:auto;flex:1;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:8px 0"></div>
+      <div class="actions" style="margin-top:14px;justify-content:flex-end">
+        <button class="btn secondary" onclick="cancelImportPreview()">Cancel</button>
+        <button class="btn" onclick="confirmImportPreview()">Confirm import</button>
+      </div>
+    </div>
   </div>
   <div class="card section"><div id="inventoryTable"></div></div>
   <div class="card section"><h2>Revenue by category</h2><div id="categoryTable"></div></div>
@@ -198,7 +209,7 @@
   <div class="card">
     <div class="formgrid">
       <div><label>Business / merchant name</label><input id="setName"></div>
-      <div><label>Primary category</label><select id="setCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option></select></div>
+      <div><label>Primary category</label><select id="setCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div>
       <div><label>Currency</label><input value="RWF" disabled></div>
     </div>
     <div class="actions" style="margin-top:14px">
@@ -680,7 +691,7 @@ async function handleImportFile(input){
       status.textContent=(status.textContent||'')+' No usable product rows were found in that file.';
       input.value='';return;
     }
-    await mergeImportedProducts(items,status);
+    showImportPreview(items,status);
   }catch(err){
     status.textContent='Could not read that file. Try a clearer photo, or a standard CSV/Excel export.';
   }
@@ -709,6 +720,42 @@ async function organizeImportRows(rows,status){
   if(error||!data?.items){status.textContent='Could not interpret that spreadsheet\'s columns automatically.';return []}
   return data.items;
 }
+let pendingImportItems=null;
+let pendingImportStatusEl=null;
+function showImportPreview(items,status){
+  pendingImportItems=items;
+  pendingImportStatusEl=status;
+  const existing=activeProducts();
+  const rows=items.map(it=>{
+    const name=(it.name||'').trim();
+    const match=name?existing.find(p=>p.name.trim().toLowerCase()===name.toLowerCase()):null;
+    const stock=Number(it.stock)||0;
+    const tag=!name
+      ?'<span class="pill" style="background:#fef2f2;color:#b91c1c">Skipped — no name</span>'
+      :match
+        ?`<span class="pill" style="background:#eef2ff;color:#3730a3">Merge → +${stock} stock (now ${match.stock+stock})</span>`
+        :'<span class="pill" style="background:#f0fdf4;color:#15803d">New product</span>';
+    const details=[it.category,it.cost!=null?money(it.cost)+' cost':null,it.sell!=null?money(it.sell)+' sell':null,stock?stock+' stock':null,it.expiry_date?'exp '+it.expiry_date:null]
+      .filter(Boolean).map(esc).join(' · ');
+    return `<div class="row"><div><b>${esc(name||'(unnamed row)')}</b><div class="sub">${details||'no details read'}</div></div>${tag}</div>`;
+  }).join('');
+  const newCount=items.filter(it=>it.name&&!existing.find(p=>p.name.trim().toLowerCase()===it.name.trim().toLowerCase())).length;
+  const mergeCount=items.filter(it=>it.name&&existing.find(p=>p.name.trim().toLowerCase()===it.name.trim().toLowerCase())).length;
+  document.getElementById('importPreviewList').innerHTML=
+    `<div class="sub" style="margin-bottom:8px">${newCount} new, ${mergeCount} will merge into existing stock.</div>${rows}`;
+  document.getElementById('importPreviewOverlay').style.display='flex';
+}
+async function confirmImportPreview(){
+  const items=pendingImportItems,status=pendingImportStatusEl;
+  document.getElementById('importPreviewOverlay').style.display='none';
+  pendingImportItems=null;pendingImportStatusEl=null;
+  if(items&&status)await mergeImportedProducts(items,status);
+}
+function cancelImportPreview(){
+  document.getElementById('importPreviewOverlay').style.display='none';
+  if(pendingImportStatusEl)pendingImportStatusEl.textContent='Import cancelled — nothing was changed.';
+  pendingImportItems=null;pendingImportStatusEl=null;
+}
 async function mergeImportedProducts(items,status){
   let added=0,merged=0,skipped=0;
   for(const raw of items){
@@ -728,7 +775,7 @@ async function mergeImportedProducts(items,status){
     }else{
       const {data,error}=await sb.from('products').insert({
         merchant_id:state.merchant.id,name,
-        cat:PRODUCT_CATEGORIES_LIST.includes(raw.category)?raw.category:'Food & Grocery',
+        cat:PRODUCT_CATEGORIES_LIST.includes(raw.category)?raw.category:'Other',
         cost:Number(raw.cost)||0,sell:Number(raw.sell)||0,
         stock:incomingStock,reorder:Number(raw.reorder)||0,
         barcode:raw.barcode?String(raw.barcode):null,
@@ -740,7 +787,7 @@ async function mergeImportedProducts(items,status){
   render();
   status.textContent=`Import done: ${added} new product(s) added, ${merged} merged into existing stock${skipped?`, ${skipped} skipped`:''}. Review prices/categories in Inventory — imported items may need a quick check.`;
 }
-const PRODUCT_CATEGORIES_LIST=["Food & Grocery","Cosmetics & Beauty","Clothing & Shoes","Phone Accessories"];
+const PRODUCT_CATEGORIES_LIST=["Food & Grocery","Cosmetics & Beauty","Clothing & Shoes","Phone Accessories","Other"];
 
 // ── Expenses ─────────────────────────────────────────────────────────────
 async function addExpense(){
