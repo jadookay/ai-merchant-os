@@ -1189,8 +1189,9 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
     const dataUrl=await blobToDataUrl(blob);
     const lang=currentShericeriLang().slice(0,2);
     const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang}});
+    if(error){console.error('Shericeri transcribe error:',error,data);}
     if(!error&&data?.transcript)transcript=data.transcript.trim();
-  }catch(err){/* transcript stays empty, handled below */}
+  }catch(err){console.error('Shericeri transcribe exception:',err);}
   if(!shericeriActive)return;
   if(transcript.length<2){
     setSheriStatus('Didn\'t quite catch that — try speaking a bit louder or closer to the mic.');
