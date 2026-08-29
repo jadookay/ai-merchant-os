@@ -1526,6 +1526,18 @@ async function shericeriRespond(transcript){
     }
     const advisorMs=Math.round(performance.now()-advisorStart);
     sheriDiagSet('Advisor HTTP',res.status+(res.ok?' OK':' FAILED'));
+    if(res.ok){
+      const usedModel=res.headers.get('X-Sheri-Model');
+      const usedRoute=res.headers.get('X-Sheri-Route');
+      const remainingRequests=res.headers.get('X-Sheri-Rate-Remaining-Requests');
+      const remainingTokens=res.headers.get('X-Sheri-Rate-Remaining-Tokens');
+      const resetRequests=res.headers.get('X-Sheri-Rate-Reset-Requests');
+      if(usedModel)sheriDiagSet('Advisor model',usedModel);
+      if(usedRoute)sheriDiagSet('Advisor route',usedRoute);
+      if(remainingRequests)sheriDiagSet('Model RPD remaining',remainingRequests);
+      if(remainingTokens)sheriDiagSet('Model TPM remaining',remainingTokens);
+      if(resetRequests)sheriDiagSet('Model RPD reset',resetRequests);
+    }
     sheriDiagSet('Advisor round-trip',advisorMs+' ms');
     console.log(`[Sheri timing] advisor HTTP ${res.status}: ${advisorMs}ms`);
     if(!res.ok||!res.body){
