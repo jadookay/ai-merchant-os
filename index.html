@@ -1065,15 +1065,17 @@ async function sheriDiagRecord(){
     sheriDiagRecorder.ondataavailable=e=>{if(e.data?.size)sheriDiagChunks.push(e.data)};
     sheriDiagRecorder.onstop=()=>{
       sheriDiagBlob=new Blob(sheriDiagChunks,{type:sheriDiagMime});
-    sheriDiagSet('Recording bytes',sheriDiagBlob.size+' bytes');
-    sheriDiagSet('Recording MIME',sheriDiagBlob.type||sheriDiagMime||'unknown');
-    if((sheriDiagBlob.type||'').toLowerCase().startsWith('audio/webm')){
+      sheriDiagSet('Recording bytes',sheriDiagBlob.size+' bytes');
+      sheriDiagSet('Recording MIME',sheriDiagBlob.type||sheriDiagMime||'unknown');
       sheriDiagBlob.arrayBuffer().then(buf=>{
         const b=new Uint8Array(buf);
-        const valid=b.length>=4&&b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3;
-        sheriDiagSet('WebM signature',valid?'VALID (EBML)':'INVALID');
-      }).catch(()=>sheriDiagSet('WebM signature','CHECK FAILED'));
-    }
+        const first=Array.from(b.slice(0,16)).map(n=>n.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+        sheriDiagSet('Recording first bytes',first||'(empty)');
+        if((sheriDiagBlob.type||sheriDiagMime||'').toLowerCase().startsWith('audio/webm')){
+          const valid=b.length>=4&&b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3;
+          sheriDiagSet('WebM signature',valid?'VALID (EBML)':'INVALID');
+        }
+      }).catch(e=>sheriDiagSet('Recording byte check','FAILED: '+String(e)));
       const settings=sheriDiagStream?.getAudioTracks?.()[0]?.getSettings?.()||{};
       sheriDiagSet(`🎙 <b>Microphone:</b> ✅ recorded <b>${(sheriDiagBlob.size/1024).toFixed(1)} KB</b><br>Format: ${esc(sheriDiagMime)}<br>Mic: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s).<br>Next: tap <b>▶ Play recording</b>, then <b>📝 Test Whisper</b>.`);
       sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
@@ -1671,6 +1673,8 @@ async function shericeriRespond(transcript){
   if(existing)await onAuthed(existing);
   sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_OUT')location.reload()});
 })();
+
+function sheriDiagAudioIntegrity(body){try{if(!body||typeof body!=='object')return;if(body.first_bytes)sheriDiagSet('Whisper first bytes',String(body.first_bytes));if(body.webm_signature)sheriDiagSet('Whisper WebM signature',String(body.webm_signature));if(body.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(body.audio_bytes));if(body.audio_mime)sheriDiagSet('Whisper audio MIME',String(body.audio_mime));}catch(_){}}
 </script>
 </body>
 </html>
