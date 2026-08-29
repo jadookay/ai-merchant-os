@@ -199,7 +199,7 @@
         <button class="btn small secondary" onclick="sheriDiagRecord()">🎙 Record test</button>
         <button class="btn small secondary" onclick="sheriDiagStop()">⏹ Stop</button>
         <button class="btn small secondary" onclick="sheriDiagPlay()">▶ Play recording</button>
-        <button class="btn small" onclick="sheriDiagTranscribe()">📝 Test Whisper</button>
+        <button class="btn small" onclick="sheriDiagTranscribe()">🧪 Test Audio Transport</button>
         <button class="btn small danger" onclick="sheriDiagClear()">Clear</button>
       </div>
     </div>
@@ -1077,7 +1077,7 @@ async function sheriDiagRecord(){
         }
       }).catch(e=>sheriDiagSet('Recording byte check','FAILED: '+String(e)));
       const settings=sheriDiagStream?.getAudioTracks?.()[0]?.getSettings?.()||{};
-      sheriDiagSet(`🎙 <b>Microphone:</b> ✅ recorded <b>${(sheriDiagBlob.size/1024).toFixed(1)} KB</b><br>Format: ${esc(sheriDiagMime)}<br>Mic: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s).<br>Next: tap <b>▶ Play recording</b>, then <b>📝 Test Whisper</b>.`);
+      sheriDiagSet(`🎙 <b>Microphone:</b> ✅ recorded <b>${(sheriDiagBlob.size/1024).toFixed(1)} KB</b><br>Format: ${esc(sheriDiagMime)}<br>Mic: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s).<br>Next: tap <b>▶ Play recording</b>, then <b>🧪 Test Audio Transport</b>.`);
       sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
     };
     sheriDiagRecorder.onerror=e=>sheriDiagSet('🎙 <b>Microphone:</b> ❌ '+esc(e.error?.message||'recording error'));
@@ -1107,13 +1107,20 @@ async function sheriDiagTranscribe(){
   try{
     const dataUrl=await blobToDataUrl(sheriDiagBlob);
     const lang=currentShericeriLang().slice(0,2);
-    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang,diagnostic:true}});
+    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'audio_probe',audio:dataUrl,diagnostic:true}});
     const ms=Math.round(performance.now()-started);
     if(error)throw new Error(error.message||String(error));
-    const transcript=(data?.transcript||'').trim();
-    if(transcript)sheriDiagSet(`📝 <b>Whisper:</b> ✅ ${ms} ms<br><b>Heard:</b> “${esc(transcript)}”<br>That means microphone → recording → backend → Whisper is working.`);
-    else sheriDiagSet(`📝 <b>Whisper:</b> ⚠️ ${ms} ms — returned an empty transcript.<br>This is the exact failure we need to investigate.`);
-  }catch(e){sheriDiagSet('📝 <b>Whisper:</b> ❌ '+esc(e.message||String(e)));}
+    if(error)throw new Error(error.message||String(error));
+    sheriDiagSet(
+      `🧪 <b>Audio probe:</b> ✅ ${ms} ms<br>`+
+      `<b>Bytes received by advisor:</b> ${esc(String(data?.audio_bytes??'?'))}<br>`+
+      `<b>Original MIME:</b> ${esc(String(data?.audio_mime??'?'))}<br>`+
+      `<b>Normalized MIME:</b> ${esc(String(data?.normalized_mime??'?'))}<br>`+
+      `<b>First bytes:</b> ${esc(String(data?.first_bytes??'(none)'))}<br>`+
+      `<b>WebM signature:</b> ${esc(String(data?.webm_signature??'N/A'))}<br>`+
+      `<b>Groq called:</b> NO — this is an isolated transport test.`
+    );
+  }catch(e){sheriDiagSet('🧪 <b>Audio probe:</b> ❌ '+esc(e.message||String(e)));}
 }
 function sheriDiagClear(){sheriDiagBlob=null;sheriDiagChunks=[];sheriDiagSet('Ready.');}
 
