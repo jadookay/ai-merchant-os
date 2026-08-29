@@ -1065,6 +1065,15 @@ async function sheriDiagRecord(){
     sheriDiagRecorder.ondataavailable=e=>{if(e.data?.size)sheriDiagChunks.push(e.data)};
     sheriDiagRecorder.onstop=()=>{
       sheriDiagBlob=new Blob(sheriDiagChunks,{type:sheriDiagMime});
+    sheriDiagSet('Recording bytes',sheriDiagBlob.size+' bytes');
+    sheriDiagSet('Recording MIME',sheriDiagBlob.type||sheriDiagMime||'unknown');
+    if((sheriDiagBlob.type||'').toLowerCase().startsWith('audio/webm')){
+      sheriDiagBlob.arrayBuffer().then(buf=>{
+        const b=new Uint8Array(buf);
+        const valid=b.length>=4&&b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3;
+        sheriDiagSet('WebM signature',valid?'VALID (EBML)':'INVALID');
+      }).catch(()=>sheriDiagSet('WebM signature','CHECK FAILED'));
+    }
       const settings=sheriDiagStream?.getAudioTracks?.()[0]?.getSettings?.()||{};
       sheriDiagSet(`🎙 <b>Microphone:</b> ✅ recorded <b>${(sheriDiagBlob.size/1024).toFixed(1)} KB</b><br>Format: ${esc(sheriDiagMime)}<br>Mic: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s).<br>Next: tap <b>▶ Play recording</b>, then <b>📝 Test Whisper</b>.`);
       sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
@@ -1376,6 +1385,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
         if(whisperBody?.model)sheriDiagSet('Whisper model',whisperBody.model);
         if(whisperBody?.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(whisperBody.audio_bytes));
         if(whisperBody?.audio_mime)sheriDiagSet('Whisper audio MIME',whisperBody.audio_mime);
+        if(whisperBody?.webm_signature)sheriDiagSet('Whisper WebM signature',whisperBody.webm_signature);
       }else{
         sheriDiagSet('Whisper error','HTTP 200 but empty transcript');
       }
@@ -1387,6 +1397,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
       if(whisperBody?.model)sheriDiagSet('Whisper model',whisperBody.model);
       if(whisperBody?.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(whisperBody.audio_bytes));
       if(whisperBody?.audio_mime)sheriDiagSet('Whisper audio MIME',whisperBody.audio_mime);
+      if(whisperBody?.webm_signature)sheriDiagSet('Whisper WebM signature',whisperBody.webm_signature);
       console.error('Shericeri Whisper failure:',{status:res.status,body:whisperBody,raw:responseText});
     }
   }catch(err){console.error('Shericeri transcribe exception:',err);}
