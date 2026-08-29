@@ -1335,12 +1335,60 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
     sheriDiagSet('Encode',Math.round(performance.now()-encodeStart)+' ms');
     const lang=currentShericeriLang().slice(0,2);
     const transcribeStart=performance.now();
-    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'transcribe',audio:dataUrl,language:lang}});
-    sheriDiagSet('Whisper HTTP',error?'ERROR':'OK');
-    sheriDiagSet('Whisper round-trip',Math.round(performance.now()-transcribeStart)+' ms');
-    if(error){console.error('Shericeri transcribe error:',error,data);}
-    if(!error&&data?.transcript){transcript=data.transcript.trim(); sheriDiagSet('Transcript',transcript||'(empty)')}
-    else if(error){sheriDiagSet('Whisper error',error.message||'non-2xx');}
+    // Use raw fetch for transcription diagnostics so we can see the actual
+    // HTTP status and JSON error body returned by the Edge Function. The
+    // Supabase invoke helper collapses non-2xx responses into a generic
+    // FunctionsHttpError and hides the provider response body.
+    let currentSession;
+    const {data:{session:existingSession}}=await sb.auth.getSession();
+    currentSession=existingSession;
+    if(!currentSession?.access_token){
+      const {data:{session:refreshedSession},error:refreshError}=await sb.auth.refreshSession();
+      if(refreshError||!refreshedSession?.access_token) throw refreshError||new Error('No valid Supabase session');
+      currentSession=refreshedSession;
+    }
+    let res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},
+      body:JSON.stringify({mode:'transcribe',audio:dataUrl,language:lang,diagnostic:true})
+    });
+    if(res.status===401){
+      const {data:{session:refreshedSession},error:refreshError}=await sb.auth.refreshSession();
+      if(refreshError||!refreshedSession?.access_token) throw refreshError||new Error('Session refresh failed after Whisper 401');
+      currentSession=refreshedSession;
+      res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},
+        body:JSON.stringify({mode:'transcribe',audio:dataUrl,language:lang,diagnostic:true})
+      });
+    }
+    const whisperMs=Math.round(performance.now()-transcribeStart);
+    sheriDiagSet('Whisper HTTP',res.status+(res.ok?' OK':' ERROR'));
+    sheriDiagSet('Whisper round-trip',whisperMs+' ms');
+    let whisperBody=null;
+    const responseText=await res.text();
+    try{whisperBody=responseText?JSON.parse(responseText):null}catch(_){whisperBody=null;}
+    if(res.ok){
+      const transcriptText=(whisperBody?.transcript||'').trim();
+      if(transcriptText){
+        transcript=transcriptText;
+        sheriDiagSet('Transcript',transcript);
+        if(whisperBody?.model)sheriDiagSet('Whisper model',whisperBody.model);
+        if(whisperBody?.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(whisperBody.audio_bytes));
+        if(whisperBody?.audio_mime)sheriDiagSet('Whisper audio MIME',whisperBody.audio_mime);
+      }else{
+        sheriDiagSet('Whisper error','HTTP 200 but empty transcript');
+      }
+    }else{
+      const providerStatus=whisperBody?.provider_status;
+      const providerError=whisperBody?.provider_error||whisperBody?.error||responseText||'No error body returned';
+      sheriDiagSet('Whisper provider HTTP',String(providerStatus||res.status));
+      sheriDiagSet('Whisper provider error',String(providerError).slice(0,900));
+      if(whisperBody?.model)sheriDiagSet('Whisper model',whisperBody.model);
+      if(whisperBody?.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(whisperBody.audio_bytes));
+      if(whisperBody?.audio_mime)sheriDiagSet('Whisper audio MIME',whisperBody.audio_mime);
+      console.error('Shericeri Whisper failure:',{status:res.status,body:whisperBody,raw:responseText});
+    }
   }catch(err){console.error('Shericeri transcribe exception:',err);}
   if(!shericeriActive)return;
   if(transcript.length<2){
