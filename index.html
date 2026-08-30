@@ -1573,6 +1573,7 @@ function sheriDrainSpeakQueue(){
   utt.lang=lang;
   utt.rate=1.03;
   utt.pitch=1;
+  utt.volume=1; // 1.0 is the max the Web Speech API allows — see note below if this still isn't loud enough
   const isAndroid=/Android/i.test(navigator.userAgent||'');
   const voice=isAndroid?null:pickVoice(lang);
   if(voice)utt.voice=voice;
