@@ -191,7 +191,7 @@
   <div class="notice" id="shericeriNotice">Connecting…</div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
-      <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
+      <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic — AUDIO TRANSPORT V9.2</div>
       <div class="sub" style="margin-bottom:10px">This temporary test isolates browser audio transport to the advisor function. It does not call Groq, AI, TTS, or change your business data.</div>
       <div id="sheriDiagStatus" style="font-size:13px;line-height:1.6">Ready.</div>
       <div class="actions" style="margin-top:10px">
@@ -199,7 +199,7 @@
         <button class="btn small secondary" onclick="sheriDiagRecord()">🎙 Record test</button>
         <button class="btn small secondary" onclick="sheriDiagStop()">⏹ Stop</button>
         <button class="btn small secondary" onclick="sheriDiagPlay()">▶ Play recording</button>
-        <button class="btn small" onclick="sheriDiagAudioProbe()">🧪 Test Audio Transport</button>
+        <button class="btn small" onclick="sheriDiagAudioProbe()">🧪 Test Audio Transport V9.2</button>
         <button class="btn small danger" onclick="sheriDiagClear()">Clear</button>
       </div>
     </div>
@@ -1101,26 +1101,78 @@ function sheriDiagPlay(){
   audio.play().then(()=>sheriDiagSet('▶ <b>Playback:</b> 🔊 playing your recording…')).catch(e=>sheriDiagSet('▶ <b>Playback:</b> ❌ '+esc(e.message||String(e))));
 }
 async function sheriDiagAudioProbe(){
-  if(!sheriDiagBlob){sheriDiagSet('📝 <b>Whisper:</b> ❌ no recording yet. Record something first.');return}
-  sheriDiagSet('📝 <b>Whisper:</b> sending '+(sheriDiagBlob.size/1024).toFixed(1)+' KB to the transcription service…');
+  if(!sheriDiagBlob){
+    sheriDiagSet('🧪 <b>Audio Transport V9.2:</b> ❌ No recording yet. Record something first.');
+    return;
+  }
+
+  // ISOLATED TEST: mode=audio_probe. The advisor branch for this mode
+  // returns audio bytes/signature and deliberately does NOT call Groq.
+  sheriDiagSet(
+    '🧪 <b>Audio Transport V9.2:</b> sending '+
+    (sheriDiagBlob.size/1024).toFixed(1)+
+    ' KB to advisor — <b>Groq will NOT be called</b>…'
+  );
+
   const started=performance.now();
+
   try{
     const dataUrl=await blobToDataUrl(sheriDiagBlob);
-    const lang=currentShericeriLang().slice(0,2);
-    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'audio_probe',audio:dataUrl,diagnostic:true}});
-    const ms=Math.round(performance.now()-started);
-    if(error)throw new Error(error.message||String(error));
-    if(error)throw new Error(error.message||String(error));
-    sheriDiagSet(
-      `🧪 <b>Audio probe:</b> ✅ ${ms} ms<br>`+
-      `<b>Bytes received by advisor:</b> ${esc(String(data?.audio_bytes??'?'))}<br>`+
-      `<b>Original MIME:</b> ${esc(String(data?.audio_mime??'?'))}<br>`+
-      `<b>Normalized MIME:</b> ${esc(String(data?.normalized_mime??'?'))}<br>`+
-      `<b>First bytes:</b> ${esc(String(data?.first_bytes??'(none)'))}<br>`+
-      `<b>WebM signature:</b> ${esc(String(data?.webm_signature??'N/A'))}<br>`+
-      `<b>Groq called:</b> NO — this is an isolated transport test.`
+
+    // Inspect the exact Blob in the browser before transmission.
+    const localBuf=await sheriDiagBlob.arrayBuffer();
+    const localBytes=new Uint8Array(localBuf);
+    const localFirstBytes=Array.from(localBytes.slice(0,16))
+      .map(n=>n.toString(16).padStart(2,'0').toUpperCase())
+      .join(' ');
+    const localWebm=(
+      (sheriDiagBlob.type||'').toLowerCase().startsWith('audio/webm') &&
+      localBytes.length>=4 &&
+      localBytes[0]===0x1a && localBytes[1]===0x45 &&
+      localBytes[2]===0xdf && localBytes[3]===0xa3
     );
-  }catch(e){sheriDiagSet('🧪 <b>Audio probe:</b> ❌ '+esc(e.message||String(e)));}
+
+    const {data,error}=await sb.functions.invoke('advisor',{
+      body:{
+        mode:'audio_probe',
+        audio:dataUrl,
+        diagnostic:true
+      }
+    });
+
+    const ms=Math.round(performance.now()-started);
+
+    if(error){
+      throw new Error(error.message||String(error));
+    }
+
+    // Refuse to treat a normal advisor/Whisper response as a probe result.
+    if(data?.probe!=='audio_integrity_v9_2'){
+      throw new Error(
+        'Unexpected advisor response. Expected audio_integrity_v9_2 probe, got '+
+        String(data?.probe||'no probe marker')
+      );
+    }
+
+    sheriDiagSet(
+      `🧪 <b>Audio Transport V9.2:</b> ✅ ${ms} ms<br>`+
+      `<b>Local bytes:</b> ${esc(String(sheriDiagBlob.size))}<br>`+
+      `<b>Local MIME:</b> ${esc(String(sheriDiagBlob.type||sheriDiagMime||'?'))}<br>`+
+      `<b>Local first bytes:</b> ${esc(localFirstBytes||'(none)')}<br>`+
+      `<b>Local WebM signature:</b> ${localWebm?'VALID (EBML)':'NOT VALID / N-A'}<br>`+
+      `<b>Bytes received by advisor:</b> ${esc(String(data?.audio_bytes??'?'))}<br>`+
+      `<b>Original MIME at advisor:</b> ${esc(String(data?.audio_mime??'?'))}<br>`+
+      `<b>Normalized MIME:</b> ${esc(String(data?.normalized_mime??'?'))}<br>`+
+      `<b>First bytes at advisor:</b> ${esc(String(data?.first_bytes??'(none)'))}<br>`+
+      `<b>WebM signature at advisor:</b> ${esc(String(data?.webm_signature??'N/A'))}<br>`+
+      `<b>Groq called:</b> NO — isolated transport test`
+    );
+  }catch(e){
+    sheriDiagSet(
+      '🧪 <b>Audio Transport V9.2:</b> ❌ '+
+      esc(e.message||String(e))
+    );
+  }
 }
 function sheriDiagClear(){sheriDiagBlob=null;sheriDiagChunks=[];sheriDiagSet('Ready.');}
 
