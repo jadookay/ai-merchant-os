@@ -191,7 +191,7 @@
   <div class="notice" id="shericeriNotice">Connecting…</div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
-      <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic — AUDIO TRANSPORT V9.2</div>
+      <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
       <div class="sub" style="margin-bottom:10px">This temporary test isolates browser audio transport to the advisor function. It does not call Groq, AI, TTS, or change your business data.</div>
       <div id="sheriDiagStatus" style="font-size:13px;line-height:1.6">Ready.</div>
       <div class="actions" style="margin-top:10px">
@@ -199,7 +199,7 @@
         <button class="btn small secondary" onclick="sheriDiagRecord()">🎙 Record test</button>
         <button class="btn small secondary" onclick="sheriDiagStop()">⏹ Stop</button>
         <button class="btn small secondary" onclick="sheriDiagPlay()">▶ Play recording</button>
-        <button class="btn small" onclick="sheriDiagAudioProbe()">🧪 Test Audio Transport V9.2</button>
+        <button class="btn small" onclick="sheriDiagAudioProbe()">🧪 Test Audio Transport</button>
         <button class="btn small danger" onclick="sheriDiagClear()">Clear</button>
       </div>
     </div>
@@ -1102,76 +1102,100 @@ function sheriDiagPlay(){
 }
 async function sheriDiagAudioProbe(){
   if(!sheriDiagBlob){
-    sheriDiagSet('🧪 <b>Audio Transport V9.2:</b> ❌ No recording yet. Record something first.');
+    sheriDiagSet('🧪 <b>Audio Transport V9.3:</b> ❌ No recording yet. Record something first.');
     return;
   }
 
-  // ISOLATED TEST: mode=audio_probe. The advisor branch for this mode
-  // returns audio bytes/signature and deliberately does NOT call Groq.
-  sheriDiagSet(
-    '🧪 <b>Audio Transport V9.2:</b> sending '+
-    (sheriDiagBlob.size/1024).toFixed(1)+
-    ' KB to advisor — <b>Groq will NOT be called</b>…'
-  );
-
+  const sizeKB=(sheriDiagBlob.size/1024).toFixed(1);
+  const mime=sheriDiagBlob.type||sheriDiagMime||'unknown';
+  sheriDiagSet('🧪 <b>Audio Transport V9.3:</b> sending '+sizeKB+' KB to advisor.<br><b>Groq Whisper will NOT be called.</b>');
   const started=performance.now();
 
   try{
     const dataUrl=await blobToDataUrl(sheriDiagBlob);
+    if(!dataUrl||!dataUrl.startsWith('data:audio/')){
+      throw new Error('Recording did not produce a valid audio data URL.');
+    }
 
-    // Inspect the exact Blob in the browser before transmission.
-    const localBuf=await sheriDiagBlob.arrayBuffer();
-    const localBytes=new Uint8Array(localBuf);
-    const localFirstBytes=Array.from(localBytes.slice(0,16))
-      .map(n=>n.toString(16).padStart(2,'0').toUpperCase())
-      .join(' ');
-    const localWebm=(
-      (sheriDiagBlob.type||'').toLowerCase().startsWith('audio/webm') &&
-      localBytes.length>=4 &&
-      localBytes[0]===0x1a && localBytes[1]===0x45 &&
-      localBytes[2]===0xdf && localBytes[3]===0xa3
-    );
-
-    const {data,error}=await sb.functions.invoke('advisor',{
-      body:{
-        mode:'audio_probe',
-        audio:dataUrl,
-        diagnostic:true
+    // Use raw fetch here on purpose. Supabase functions.invoke() collapses
+    // non-2xx responses into FunctionsHttpError and can hide the response body.
+    let currentSession=null;
+    const {data:{session:existingSession}}=await sb.auth.getSession();
+    currentSession=existingSession;
+    if(!currentSession?.access_token){
+      const {data:{session:refreshedSession},error:refreshError}=await sb.auth.refreshSession();
+      if(refreshError||!refreshedSession?.access_token){
+        throw refreshError||new Error('No valid Supabase session. Please sign in again.');
       }
+      currentSession=refreshedSession;
+    }
+
+    const requestBody=JSON.stringify({
+      mode:'audio_probe',
+      audio:dataUrl,
+      diagnostic:true,
+      probe_version:'9.3'
     });
 
+    let res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'apikey':SUPABASE_ANON_KEY,
+        'Authorization':'Bearer '+currentSession.access_token
+      },
+      body:requestBody
+    });
+
+    // Handle the same intermittent Supabase auth problem we've seen in the
+    // normal Shericeri path: refresh once, then retry exactly once.
+    if(res.status===401){
+      const {data:{session:refreshedSession},error:refreshError}=await sb.auth.refreshSession();
+      if(refreshError||!refreshedSession?.access_token){
+        throw refreshError||new Error('Session refresh failed after audio probe 401.');
+      }
+      currentSession=refreshedSession;
+      res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          'apikey':SUPABASE_ANON_KEY,
+          'Authorization':'Bearer '+currentSession.access_token
+        },
+        body:requestBody
+      });
+    }
+
     const ms=Math.round(performance.now()-started);
+    const responseText=await res.text();
+    let body=null;
+    try{body=responseText?JSON.parse(responseText):null}catch(_){body=null;}
 
-    if(error){
-      throw new Error(error.message||String(error));
-    }
-
-    // Refuse to treat a normal advisor/Whisper response as a probe result.
-    if(data?.probe!=='audio_integrity_v9_2'){
-      throw new Error(
-        'Unexpected advisor response. Expected audio_integrity_v9_2 probe, got '+
-        String(data?.probe||'no probe marker')
+    if(!res.ok){
+      const serverError=body?.error || body?.message || responseText || '(empty response body)';
+      sheriDiagSet(
+        '🧪 <b>Audio Transport V9.3:</b> ❌ '+res.status+' '+esc(res.statusText||'')+' — '+ms+' ms<br>'+
+        '<b>Advisor response:</b> '+esc(String(serverError))+'<br>'+
+        '<b>Groq called:</b> NO — request was rejected before the probe returned.'
       );
+      return;
+    }
+
+    if(!body||body.probe!=='audio_integrity_v9'){
+      throw new Error('Unexpected advisor response: audio_probe branch was not reached. Response: '+responseText.slice(0,500));
     }
 
     sheriDiagSet(
-      `🧪 <b>Audio Transport V9.2:</b> ✅ ${ms} ms<br>`+
-      `<b>Local bytes:</b> ${esc(String(sheriDiagBlob.size))}<br>`+
-      `<b>Local MIME:</b> ${esc(String(sheriDiagBlob.type||sheriDiagMime||'?'))}<br>`+
-      `<b>Local first bytes:</b> ${esc(localFirstBytes||'(none)')}<br>`+
-      `<b>Local WebM signature:</b> ${localWebm?'VALID (EBML)':'NOT VALID / N-A'}<br>`+
-      `<b>Bytes received by advisor:</b> ${esc(String(data?.audio_bytes??'?'))}<br>`+
-      `<b>Original MIME at advisor:</b> ${esc(String(data?.audio_mime??'?'))}<br>`+
-      `<b>Normalized MIME:</b> ${esc(String(data?.normalized_mime??'?'))}<br>`+
-      `<b>First bytes at advisor:</b> ${esc(String(data?.first_bytes??'(none)'))}<br>`+
-      `<b>WebM signature at advisor:</b> ${esc(String(data?.webm_signature??'N/A'))}<br>`+
-      `<b>Groq called:</b> NO — isolated transport test`
-    );
+      `🧪 <b>Audio Transport V9.3:</b> ✅ ${ms} ms<br>`+
+      `<b>Bytes received by advisor:</b> ${esc(String(body.audio_bytes??'?'))}<br>`+
+      `<b>Original MIME:</b> ${esc(String(body.audio_mime??mime))}<br>`+
+      `<b>Normalized MIME:</b> ${esc(String(body.normalized_mime??'?'))}<br>`+
+      `<b>First bytes:</b> ${esc(String(body.first_bytes??'(none)'))}<br>`+
+      `<b>WebM signature:</b> ${esc(String(body.webm_signature??'N/A'))}<br>`+
+      `<b>Groq called:</b> NO — isolated transport test`);
+
   }catch(e){
-    sheriDiagSet(
-      '🧪 <b>Audio Transport V9.2:</b> ❌ '+
-      esc(e.message||String(e))
-    );
+    sheriDiagSet('🧪 <b>Audio Transport V9.3:</b> ❌ '+esc(e.message||String(e)));
   }
 }
 function sheriDiagClear(){sheriDiagBlob=null;sheriDiagChunks=[];sheriDiagSet('Ready.');}
@@ -1234,7 +1258,7 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V9.3 AUDIO PROBE</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
