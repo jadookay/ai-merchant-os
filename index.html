@@ -1102,23 +1102,30 @@ function sheriDiagPlay(){
 }
 async function sheriDiagAudioProbe(){
   if(!sheriDiagBlob){
-    sheriDiagSet('🧪 <b>Audio Transport V9.3:</b> ❌ No recording yet. Record something first.');
+    sheriDiagSet('🧪 <b>Audio Transport V9.4:</b> ❌ No recording yet. Record something first.');
     return;
   }
 
   const sizeKB=(sheriDiagBlob.size/1024).toFixed(1);
   const mime=sheriDiagBlob.type||sheriDiagMime||'unknown';
-  sheriDiagSet('🧪 <b>Audio Transport V9.3:</b> sending '+sizeKB+' KB to advisor.<br><b>Groq Whisper will NOT be called.</b>');
   const started=performance.now();
 
   try{
     const dataUrl=await blobToDataUrl(sheriDiagBlob);
+    const commaIndex=typeof dataUrl==='string'?dataUrl.indexOf(','):-1;
+    const dataUrlHeader=commaIndex>=0?dataUrl.slice(0,commaIndex):String(dataUrl).slice(0,120);
+
+    sheriDiagSet('Data URL header',dataUrlHeader);
+    sheriDiagSet(
+      '🧪 <b>Audio Transport V9.4:</b> sending '+sizeKB+
+      ' KB to advisor.<br><b>Header:</b> '+esc(dataUrlHeader)+
+      '<br><b>Groq Whisper will NOT be called by this probe.</b>'
+    );
+
     if(!dataUrl||!dataUrl.startsWith('data:audio/')){
-      throw new Error('Recording did not produce a valid audio data URL.');
+      throw new Error('Recording did not produce a valid audio Data URL. Header: '+dataUrlHeader);
     }
 
-    // Use raw fetch here on purpose. Supabase functions.invoke() collapses
-    // non-2xx responses into FunctionsHttpError and can hide the response body.
     let currentSession=null;
     const {data:{session:existingSession}}=await sb.auth.getSession();
     currentSession=existingSession;
@@ -1134,10 +1141,10 @@ async function sheriDiagAudioProbe(){
       mode:'audio_probe',
       audio:dataUrl,
       diagnostic:true,
-      probe_version:'9.3'
+      probe_version:'9.4'
     });
 
-    let res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+    const doProbe=()=>fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
       method:'POST',
       headers:{
         'Content-Type':'application/json',
@@ -1147,23 +1154,15 @@ async function sheriDiagAudioProbe(){
       body:requestBody
     });
 
-    // Handle the same intermittent Supabase auth problem we've seen in the
-    // normal Shericeri path: refresh once, then retry exactly once.
+    let res=await doProbe();
+
     if(res.status===401){
       const {data:{session:refreshedSession},error:refreshError}=await sb.auth.refreshSession();
       if(refreshError||!refreshedSession?.access_token){
         throw refreshError||new Error('Session refresh failed after audio probe 401.');
       }
       currentSession=refreshedSession;
-      res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'apikey':SUPABASE_ANON_KEY,
-          'Authorization':'Bearer '+currentSession.access_token
-        },
-        body:requestBody
-      });
+      res=await doProbe();
     }
 
     const ms=Math.round(performance.now()-started);
@@ -1172,11 +1171,14 @@ async function sheriDiagAudioProbe(){
     try{body=responseText?JSON.parse(responseText):null}catch(_){body=null;}
 
     if(!res.ok){
-      const serverError=body?.error || body?.message || responseText || '(empty response body)';
+      const serverError=body?.error||body?.message||responseText||'(empty response body)';
+      const serverHeader=body?.data_url_header||'(not returned)';
       sheriDiagSet(
-        '🧪 <b>Audio Transport V9.3:</b> ❌ '+res.status+' '+esc(res.statusText||'')+' — '+ms+' ms<br>'+
+        '🧪 <b>Audio Transport V9.4:</b> ❌ '+res.status+' '+esc(res.statusText||'')+' — '+ms+' ms<br>'+
+        '<b>Client Data URL header:</b> '+esc(dataUrlHeader)+'<br>'+
+        '<b>Advisor saw header:</b> '+esc(String(serverHeader))+'<br>'+
         '<b>Advisor response:</b> '+esc(String(serverError))+'<br>'+
-        '<b>Groq called:</b> NO — request was rejected before the probe returned.'
+        '<b>Groq called:</b> NO'
       );
       return;
     }
@@ -1186,16 +1188,19 @@ async function sheriDiagAudioProbe(){
     }
 
     sheriDiagSet(
-      `🧪 <b>Audio Transport V9.3:</b> ✅ ${ms} ms<br>`+
+      `🧪 <b>Audio Transport V9.4:</b> ✅ ${ms} ms<br>`+
+      `<b>Client Data URL header:</b> ${esc(dataUrlHeader)}<br>`+
+      `<b>Advisor Data URL header:</b> ${esc(String(body.data_url_header??'?'))}<br>`+
       `<b>Bytes received by advisor:</b> ${esc(String(body.audio_bytes??'?'))}<br>`+
       `<b>Original MIME:</b> ${esc(String(body.audio_mime??mime))}<br>`+
       `<b>Normalized MIME:</b> ${esc(String(body.normalized_mime??'?'))}<br>`+
       `<b>First bytes:</b> ${esc(String(body.first_bytes??'(none)'))}<br>`+
       `<b>WebM signature:</b> ${esc(String(body.webm_signature??'N/A'))}<br>`+
-      `<b>Groq called:</b> NO — isolated transport test`);
+      `<b>Groq called:</b> NO — isolated transport test`
+    );
 
   }catch(e){
-    sheriDiagSet('🧪 <b>Audio Transport V9.3:</b> ❌ '+esc(e.message||String(e)));
+    sheriDiagSet('🧪 <b>Audio Transport V9.4:</b> ❌ '+esc(e.message||String(e)));
   }
 }
 function sheriDiagClear(){sheriDiagBlob=null;sheriDiagChunks=[];sheriDiagSet('Ready.');}
@@ -1258,7 +1263,7 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V9.3 AUDIO PROBE</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V9.4 DATA URL FIX</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
