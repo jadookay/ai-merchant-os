@@ -1328,7 +1328,7 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V9.8 MIC SELECT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V10.1 CONTINUOUS LISTEN TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
@@ -1449,6 +1449,8 @@ async function startShericeriLoop(){
   }
   showSheriHero();
   sheriDiagReset();
+  sheriAwaitingUserTurn=false;
+  sheriDiagSet('Turn mode','CONTINUOUS / hands-free');
   sheriDiagSet('Microphone request','starting');
   setSheriStatus('Requesting microphone access…');
   await ensureVoicesLoaded();
@@ -1710,12 +1712,14 @@ let sheriStreamActive=false;
 let sheriTurnFailed=false; // prevents infrastructure/TTS failures from auto-restarting the microphone // true while more streamed text chunks may still arrive
 let sheriTurnId=0;
 let sheriResponsePhase='idle';
+let sheriAwaitingUserTurn=false;
 function sheriResetSpeechState(){
   sheriSpeakQueue=[];
   sheriIsSpeaking=false;
   sheriStreamActive=false;
   sheriTurnFailed=false;
   sheriResponsePhase='idle';
+  sheriAwaitingUserTurn=false;
   if(window.speechSynthesis)speechSynthesis.cancel();
 }
 function sheriEnqueueSpeech(text){
@@ -1736,7 +1740,7 @@ const SHERI_TTS_VOLUME=1.0;
 function sheriDrainSpeakQueue(){
   if(sheriIsSpeaking)return;
   if(!sheriSpeakQueue.length){
-    if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed){ sheriAwaitingUserTurn=true; sheriResponsePhase='awaiting_user'; if(typeof sheriDiagSet==='function')sheriDiagSet('Response phase','Awaiting user tap'); const btn=document.getElementById('shericeriTalkBtn'); if(btn){btn.textContent='🎙️';btn.style.background=''} setSheriStatus('Shericeri finished speaking. Tap the microphone to talk again.'); } // V9.6: wait for user before reopening mic; prevents speaker-to-mic feedback
+    if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed){ sheriAwaitingUserTurn=false; sheriResponsePhase='auto_listen'; if(typeof sheriDiagSet==='function')sheriDiagSet('Response phase','Auto-listening'); setSheriStatus('Shericeri is listening…'); sheriDiagSet('Turn mode','CONTINUOUS / hands-free'); setTimeout(()=>{if(shericeriActive&&!sheriIsSpeaking&&!sheriStreamActive&&!sheriTurnFailed)shericeriListenOnce()},180); } // V10.1: continuous hands-free mode; resume listening only after TTS queue is fully drained
     return;
   }
   const next=sheriSpeakQueue.shift();
