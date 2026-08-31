@@ -1218,6 +1218,7 @@ let shericeriAudioCtx=null;
 let shericeriAnalyser=null;
 let shericeriRecorder=null;
 let shericeriVadTimer=null;
+let sheriAwaitingUserTurn=false;
 
 const SHERI_SPEECH_THRESHOLD=14;   // avg frequency-bin magnitude (0-255) counted as "someone is talking"
 const SHERI_SILENCE_STOP_MS=1100;  // how long a pause must last before we consider the turn finished
@@ -1313,7 +1314,9 @@ function currentShericeriLang(){
 }
 
 function toggleShericeri(){
-  if(shericeriActive){stopShericeri()}else{startShericeriLoop()}
+  if(!shericeriActive){startShericeriLoop();return}
+  if(sheriAwaitingUserTurn){sheriAwaitingUserTurn=false; const btn=document.getElementById('shericeriTalkBtn'); if(btn){btn.textContent='⏹️';btn.style.background='#dc2626'} shericeriListenOnce(); return}
+  stopShericeri();
 }
 async function startShericeriLoop(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){
@@ -1340,12 +1343,14 @@ async function startShericeriLoop(){
   shericeriAnalyser.fftSize=256;
   source.connect(shericeriAnalyser);
   shericeriActive=true;
+  sheriAwaitingUserTurn=false;
   const btn=document.getElementById('shericeriTalkBtn');
   if(btn){btn.textContent='⏹️';btn.style.background='#dc2626'}
   shericeriListenOnce();
 }
 function stopShericeri(){
   shericeriActive=false;
+  sheriAwaitingUserTurn=false;
   const btn=document.getElementById('shericeriTalkBtn');
   if(btn){btn.textContent='🎙️';btn.style.background=''}
   setSheriStatus('Tap to start talking with Shericeri.');
@@ -1563,7 +1568,7 @@ const SHERI_TTS_VOLUME=1.0;
 function sheriDrainSpeakQueue(){
   if(sheriIsSpeaking)return;
   if(!sheriSpeakQueue.length){
-    if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed)shericeriListenOnce(); // truly done — never auto-listen after a failed turn
+    if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed){ sheriAwaitingUserTurn=true; const btn=document.getElementById('shericeriTalkBtn'); if(btn){btn.textContent='🎙️';btn.style.background=''} setSheriStatus('Shericeri finished speaking. Tap the microphone to talk again.'); } // V9.6: wait for user before reopening mic; prevents speaker-to-mic feedback
     return;
   }
   const next=sheriSpeakQueue.shift();
