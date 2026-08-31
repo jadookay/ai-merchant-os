@@ -199,6 +199,7 @@
         <button class="btn small secondary" onclick="sheriDiagRecord()">🎙 Record test</button>
         <button class="btn small secondary" onclick="sheriDiagStop()">⏹ Stop</button>
         <button class="btn small secondary" onclick="sheriDiagPlay()">▶ Play recording</button>
+        <button class="btn small secondary" onclick="sheriDiagWhisper()">📝 Whisper only</button>
         <button class="btn small" onclick="sheriDiagAudioProbe()">🧪 Test Audio Transport</button>
         <button class="btn small danger" onclick="sheriDiagClear()">Clear</button>
       </div>
@@ -1021,6 +1022,9 @@ let sheriDiagRecorder=null;
 let sheriDiagChunks=[];
 let sheriDiagBlob=null;
 let sheriDiagMime='audio/webm';
+let sheriDiagStartedAt=0;
+let sheriDiagMeterTimer=null;
+let sheriDiagAnalyser=null;
 
 function toggleShericeriDiagnostic(){
   const el=document.getElementById('sheriDiagnostic');
@@ -1061,6 +1065,26 @@ async function sheriDiagRecord(){
       if(window.MediaRecorder.isTypeSupported?.(t)){sheriDiagMime=t;break}
     }
     sheriDiagStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    const track=sheriDiagStream.getAudioTracks()[0];
+    const settings=track?.getSettings?.()||{};
+    sheriDiagSet(`🎙 <b>Microphone:</b> permission OK — ${esc(track?.label||'browser-selected input')}<br>Settings: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s), echoCancellation=${settings.echoCancellation===undefined?'?':settings.echoCancellation}, noiseSuppression=${settings.noiseSuppression===undefined?'?':settings.noiseSuppression}, autoGainControl=${settings.autoGainControl===undefined?'?':settings.autoGainControl}`);
+    try{
+      const ctx=new (window.AudioContext||window.webkitAudioContext)();
+      const source=ctx.createMediaStreamSource(sheriDiagStream);
+      sheriDiagAnalyser=ctx.createAnalyser(); sheriDiagAnalyser.fftSize=512; source.connect(sheriDiagAnalyser);
+      const data=new Uint8Array(sheriDiagAnalyser.fftSize);
+      clearInterval(sheriDiagMeterTimer);
+      sheriDiagMeterTimer=setInterval(()=>{
+        if(!sheriDiagAnalyser)return;
+        sheriDiagAnalyser.getByteTimeDomainData(data);
+        let sum=0,peak=0;
+        for(const v of data){const d=Math.abs(v-128);sum+=d*d;if(d>peak)peak=d;}
+        const rms=Math.sqrt(sum/data.length);
+        const elapsed=((Date.now()-sheriDiagStartedAt)/1000).toFixed(1);
+        sheriDiagSet(`🎙 <b>MIC LIVE:</b> elapsed ${elapsed}s — RMS ${rms.toFixed(1)} / 128, peak ${peak} / 128<br>Speak now. If RMS/peak barely move while speaking, the browser is not receiving useful microphone audio.`);
+      },150);
+      sheriDiagStream._diagAudioCtx=ctx;
+    }catch(e){console.warn('Mic meter unavailable',e)}
     sheriDiagRecorder=new MediaRecorder(sheriDiagStream,{mimeType:sheriDiagMime});
     sheriDiagRecorder.ondataavailable=e=>{if(e.data?.size)sheriDiagChunks.push(e.data)};
     sheriDiagRecorder.onstop=()=>{
@@ -1077,16 +1101,48 @@ async function sheriDiagRecord(){
         }
       }).catch(e=>sheriDiagSet('Recording byte check','FAILED: '+String(e)));
       const settings=sheriDiagStream?.getAudioTracks?.()[0]?.getSettings?.()||{};
-      sheriDiagSet(`🎙 <b>Microphone:</b> ✅ recorded <b>${(sheriDiagBlob.size/1024).toFixed(1)} KB</b><br>Format: ${esc(sheriDiagMime)}<br>Mic: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s).<br>Next: tap <b>▶ Play recording</b>, then <b>🧪 Test Audio Transport</b>.`);
+      const durationMs=Date.now()-sheriDiagStartedAt;
+      clearInterval(sheriDiagMeterTimer); sheriDiagMeterTimer=null;
+      try{sheriDiagStream?._diagAudioCtx?.close()}catch(_){}
+      sheriDiagAnalyser=null;
+      sheriDiagSet(`🎙 <b>Microphone:</b> ✅ recorded <b>${(sheriDiagBlob.size/1024).toFixed(1)} KB</b> in <b>${(durationMs/1000).toFixed(1)}s</b><br>Format: ${esc(sheriDiagMime)}<br>Mic: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s).<br>Next: tap <b>▶ Play recording</b>, then <b>🧪 Test Audio Transport</b>.`);
       sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
     };
     sheriDiagRecorder.onerror=e=>sheriDiagSet('🎙 <b>Microphone:</b> ❌ '+esc(e.error?.message||'recording error'));
+    sheriDiagStartedAt=Date.now();
     sheriDiagRecorder.start(250);
     sheriDiagSet('🎙 <b>Microphone:</b> 🔴 recording… Speak normally for 3–5 seconds, then tap <b>Stop</b>.');
   }catch(e){
     sheriDiagSet('🎙 <b>Microphone:</b> ❌ '+esc(e.message||String(e)));
     sheriDiagStream?.getTracks().forEach(t=>t.stop());sheriDiagStream=null;
   }
+}
+async function sheriDiagWhisper(){
+  if(!sheriDiagBlob){sheriDiagSet('📝 <b>Whisper only:</b> ❌ Record a test first.');return}
+  sheriDiagSet('📝 <b>Whisper only:</b> transcribing… <b>NO Shericeri response will be generated.</b>');
+  try{
+    const dataUrl=await blobToDataUrl(sheriDiagBlob);
+    let {data:{session:currentSession}}=await sb.auth.getSession();
+    if(!currentSession?.access_token){
+      const {data:{session:refreshedSession},error}=await sb.auth.refreshSession();
+      if(error||!refreshedSession?.access_token)throw error||new Error('No valid Supabase session');
+      currentSession=refreshedSession;
+    }
+    const lang=currentShericeriLang().slice(0,2);
+    const started=performance.now();
+    const body=JSON.stringify({mode:'transcribe',audio:dataUrl,language:lang,diagnostic:true});
+    const headers={'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token};
+    let res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{method:'POST',headers,body});
+    if(res.status===401){
+      const {data:{session:refreshedSession},error}=await sb.auth.refreshSession();
+      if(error||!refreshedSession?.access_token)throw error||new Error('Session refresh failed after 401');
+      res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{method:'POST',headers:{...headers,Authorization:'Bearer '+refreshedSession.access_token},body});
+    }
+    const ms=Math.round(performance.now()-started);
+    const raw=await res.text(); let out=null; try{out=raw?JSON.parse(raw):null}catch(_){}
+    if(!res.ok)throw new Error(`HTTP ${res.status}: ${out?.provider_error||out?.error||raw||'no response body'}`);
+    sheriDiagSet(`📝 <b>Whisper only:</b> ✅ ${ms} ms<br><b>Transcript:</b> “${esc(String(out?.transcript||'(empty)'))}”<br><b>Model:</b> ${esc(String(out?.model||'?'))}<br><b>Audio bytes:</b> ${esc(String(out?.audio_bytes??'?'))}<br><b>Audio MIME:</b> ${esc(String(out?.audio_mime||sheriDiagMime))}<br><b>WebM signature:</b> ${esc(String(out?.webm_signature||'N/A'))}<br><b>Shericeri response:</b> <b>NO</b>`);
+  }catch(e){sheriDiagSet('📝 <b>Whisper only:</b> ❌ '+esc(e.message||String(e)));}
 }
 function sheriDiagStop(){
   if(sheriDiagRecorder&&sheriDiagRecorder.state!=='inactive')sheriDiagRecorder.stop();
