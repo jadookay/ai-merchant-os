@@ -1490,6 +1490,9 @@ function stopShericeri(){
   shericeriHistory=[]; // each tap-to-talk session starts with a clean memory
   hideSheriHero();
 }
+function sheriVadDiag(label,value){
+  if(typeof sheriDiagSet==='function') sheriDiagSet(label,value);
+}
 function shericeriListenOnce(){
   if(!shericeriActive||!shericeriMicStream)return;
   const chunks=[];
@@ -1508,6 +1511,7 @@ function shericeriListenOnce(){
     if(!shericeriActive)return;
     const blob=new Blob(chunks,{type:mimeType});
     sheriDiagSet('Recording','stopped — '+(blob.size/1024).toFixed(1)+' KB');
+    sheriVadDiag('VAD final',`speech=${hasSpoken?'YES':'NO'}; max avg=${maxAvg.toFixed(1)}; max peak=${maxPeak}; reason=${stopReason||'manual/unknown'}`);
     sheriDiagSet('Audio type',blob.type||mimeType);
     await shericeriTranscribeAndRespond(blob,mimeType);
   };
@@ -1519,32 +1523,63 @@ function shericeriListenOnce(){
 
   const startTime=Date.now();
   let hasSpoken=false;
+  let speechStartTime=null;
   let silenceStart=null;
+  let maxAvg=0;
+  let maxPeak=0;
+  let stopReason='';
   const data=new Uint8Array(shericeriAnalyser.frequencyBinCount);
+  sheriVadDiag('VAD phase','LISTENING — waiting for speech');
+  sheriVadDiag('VAD threshold',SHERI_SPEECH_THRESHOLD+' avg');
+  sheriVadDiag('VAD speech detected','NO');
+  sheriVadDiag('VAD stop reason','—');
   clearInterval(shericeriVadTimer);
   shericeriVadTimer=setInterval(()=>{
     if(!shericeriActive||!shericeriRecorder||shericeriRecorder.state==='inactive'){clearInterval(shericeriVadTimer);return}
     shericeriAnalyser.getByteFrequencyData(data);
-    let sum=0;for(let i=0;i<data.length;i++)sum+=data[i];
+    let sum=0,peak=0;for(let i=0;i<data.length;i++){sum+=data[i];if(data[i]>peak)peak=data[i]}
     const avg=sum/data.length;
     const now=Date.now();
+    if(avg>maxAvg)maxAvg=avg;
+    if(peak>maxPeak)maxPeak=peak;
+    const elapsed=((now-startTime)/1000).toFixed(1);
+    sheriVadDiag('VAD live',`${elapsed}s — avg ${avg.toFixed(1)} / peak ${peak}`);
+    sheriVadDiag('VAD max observed',`avg ${maxAvg.toFixed(1)} / peak ${maxPeak}`);
     if(avg>SHERI_SPEECH_THRESHOLD){
+      if(!hasSpoken){
+        speechStartTime=now;
+        sheriVadDiag('VAD speech detected','YES');
+        sheriVadDiag('VAD speech start',((now-startTime)/1000).toFixed(1)+'s');
+      }
       hasSpoken=true;
       silenceStart=null;
+      sheriVadDiag('VAD phase','SPEECH DETECTED');
     }else if(hasSpoken){
-      if(silenceStart===null)silenceStart=now;
-      else if(now-silenceStart>=SHERI_SILENCE_STOP_MS){
+      if(silenceStart===null){
+        silenceStart=now;
+        sheriVadDiag('VAD phase','SILENCE TIMER RUNNING');
+      }else{
+        sheriVadDiag('VAD silence',((now-silenceStart)/1000).toFixed(1)+'s / '+(SHERI_SILENCE_STOP_MS/1000).toFixed(1)+'s');
+      }
+      if(silenceStart!==null&&now-silenceStart>=SHERI_SILENCE_STOP_MS){
+        stopReason='silence after speech';
+        sheriVadDiag('VAD stop reason',stopReason);
         clearInterval(shericeriVadTimer);
         try{shericeriRecorder.stop()}catch(e){}
         return;
       }
     }else if(now-startTime>=SHERI_NO_SPEECH_TIMEOUT_MS){
+      stopReason='no speech timeout';
+      sheriVadDiag('VAD stop reason',stopReason);
+      sheriVadDiag('VAD phase','NO SPEECH — stopping');
       clearInterval(shericeriVadTimer);
       try{shericeriRecorder.stop()}catch(e){}
-      // shericeriTranscribeAndRespond will see a near-empty clip and skip the AI call.
       return;
     }
     if(now-startTime>=SHERI_MAX_RECORD_MS){
+      stopReason='maximum recording duration';
+      sheriVadDiag('VAD stop reason',stopReason);
+      sheriVadDiag('VAD phase','MAX DURATION — stopping');
       clearInterval(shericeriVadTimer);
       try{shericeriRecorder.stop()}catch(e){}
     }
