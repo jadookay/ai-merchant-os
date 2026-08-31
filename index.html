@@ -1038,7 +1038,7 @@ async function sheriDiagSpeaker(){
     speechSynthesis.cancel();
     const lang=currentShericeriLang();
     const utt=new SpeechSynthesisUtterance('Hello Jean. This is Shericeri. Your speaker test is working.');
-    utt.lang=lang;utt.rate=1.0;utt.pitch=1;
+    utt.lang=lang;utt.rate=1.0;utt.pitch=1;utt.volume=SHERI_TTS_VOLUME;
     const isAndroid=/Android/i.test(navigator.userAgent||'');
     const voices=speechSynthesis.getVoices();
     const voice=isAndroid?null:pickVoice(lang);
@@ -1558,6 +1558,8 @@ function sheriEnqueueSpeech(text){
   sheriSpeakQueue.push(text);
   sheriDrainSpeakQueue();
 }
+// V9.5 TTS volume: explicitly request the browser's maximum SpeechSynthesis volume.
+const SHERI_TTS_VOLUME=1.0;
 function sheriDrainSpeakQueue(){
   if(sheriIsSpeaking)return;
   if(!sheriSpeakQueue.length){
@@ -1573,6 +1575,7 @@ function sheriDrainSpeakQueue(){
   utt.lang=lang;
   utt.rate=1.03;
   utt.pitch=1;
+  utt.volume=SHERI_TTS_VOLUME;
   const isAndroid=/Android/i.test(navigator.userAgent||'');
   const voice=isAndroid?null:pickVoice(lang);
   if(voice)utt.voice=voice;
@@ -1743,6 +1746,7 @@ async function shericeriRespond(transcript){
       const errUtt=new SpeechSynthesisUtterance(fallback);
       errUtt.lang=currentShericeriLang();
       errUtt.rate=1.03;
+      errUtt.volume=SHERI_TTS_VOLUME;
       errUtt.onstart=()=>{if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR FALLBACK STARTED')};
       errUtt.onend=()=>{if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR FALLBACK ENDED')};
       errUtt.onerror=e=>{if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR FALLBACK: '+(e?.error||'unknown'))};
