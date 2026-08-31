@@ -194,6 +194,13 @@
       <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
       <div class="sub" style="margin-bottom:10px">This temporary test isolates browser audio transport to the advisor function. It does not call Groq, AI, TTS, or change your business data.</div>
       <div id="sheriDiagStatus" style="font-size:13px;line-height:1.6">Ready.</div>
+      <div style="margin-top:10px">
+        <label style="color:#475569">🎙️ Microphone input</label>
+        <select id="sheriMicSelect" style="width:100%;margin-top:5px">
+          <option value="">Loading microphone devices…</option>
+        </select>
+        <div id="sheriMicSelectStatus" class="sub" style="margin-top:5px">Choose the physical microphone. Avoid Stereo Mix / loopback inputs.</div>
+      </div>
       <div class="actions" style="margin-top:10px">
         <button class="btn small secondary" onclick="sheriDiagSpeaker()">🔊 Test speaker</button>
         <button class="btn small secondary" onclick="sheriDiagRecord()">🎙 Record test</button>
@@ -1064,7 +1071,8 @@ async function sheriDiagRecord(){
     for(const t of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus']){
       if(window.MediaRecorder.isTypeSupported?.(t)){sheriDiagMime=t;break}
     }
-    sheriDiagStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    await refreshSheriAudioInputs();
+    sheriDiagStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
     const track=sheriDiagStream.getAudioTracks()[0];
     const settings=track?.getSettings?.()||{};
     sheriDiagSet(`🎙 <b>Microphone:</b> permission OK — ${esc(track?.label||'browser-selected input')}<br>Settings: ${settings.sampleRate||'?'} Hz, ${settings.channelCount||'?'} channel(s), echoCancellation=${settings.echoCancellation===undefined?'?':settings.echoCancellation}, noiseSuppression=${settings.noiseSuppression===undefined?'?':settings.noiseSuppression}, autoGainControl=${settings.autoGainControl===undefined?'?':settings.autoGainControl}`);
@@ -1320,13 +1328,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V9.4 DATA URL FIX</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V9.8 MIC SELECT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){sheriDiagEnsure().style.display='block'}
+function sheriDiagShow(){sheriDiagEnsure().style.display='block';refreshSheriAudioInputs()}
 function sheriDiagSet(label,value){
   const d=sheriDiagEnsure(), rows=d.querySelector('#sheriDiagRows');
   let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));
@@ -1334,12 +1342,72 @@ function sheriDiagSet(label,value){
   row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>';
   sheriDiagShow();
 }
+let sheriSelectedAudioInputId='';
+let sheriAudioInputDevices=[];
+
+function sheriScoreInputDevice(device){
+  const label=(device?.label||'').toLowerCase();
+  if(/stereo mix|what u hear|loopback|wave out|monitor|virtual|vb-audio|voicemeeter|mix(ing)? output/.test(label)) return -100;
+  if(/microphone|mic|internal|built-?in|array|realtek.*microphone|headset microphone|usb microphone|webcam microphone/.test(label)) return 100;
+  return 10;
+}
+
+async function refreshSheriAudioInputs(preferredId=''){
+  const select=document.getElementById('sheriMicSelect');
+  if(!select||!navigator.mediaDevices?.enumerateDevices)return;
+  try{
+    const devices=await navigator.mediaDevices.enumerateDevices();
+    sheriAudioInputDevices=devices.filter(d=>d.kind==='audioinput');
+    const current=preferredId||sheriSelectedAudioInputId;
+    select.innerHTML='';
+    if(!sheriAudioInputDevices.length){
+      select.innerHTML='<option value="">No microphone inputs reported</option>';
+      return;
+    }
+    const ordered=[...sheriAudioInputDevices].sort((a,b)=>sheriScoreInputDevice(b)-sheriScoreInputDevice(a));
+    ordered.forEach((d,i)=>{
+      const opt=document.createElement('option');
+      opt.value=d.deviceId;
+      opt.textContent=d.label||`Microphone ${i+1}`;
+      if(d.deviceId===current)opt.selected=true;
+      select.appendChild(opt);
+    });
+    if(!select.value){
+      const best=ordered[0];
+      select.value=best.deviceId;
+    }
+    sheriSelectedAudioInputId=select.value||'';
+    const label=(ordered.find(d=>d.deviceId===sheriSelectedAudioInputId)?.label||'selected input');
+    const status=document.getElementById('sheriMicSelectStatus');
+    if(status){
+      const bad=sheriScoreInputDevice(ordered.find(d=>d.deviceId===sheriSelectedAudioInputId))<0;
+      status.textContent=bad?'⚠️ This is a loopback/system-output input. Select the physical microphone instead.':'✅ Selected input: '+label;
+    }
+    select.onchange=()=>{
+      sheriSelectedAudioInputId=select.value||'';
+      const d=sheriAudioInputDevices.find(x=>x.deviceId===sheriSelectedAudioInputId);
+      const status=document.getElementById('sheriMicSelectStatus');
+      const bad=sheriScoreInputDevice(d)<0;
+      if(status)status.textContent=bad?'⚠️ This is a loopback/system-output input. Select the physical microphone instead.':'✅ Selected input: '+(d?.label||'selected input');
+    };
+  }catch(err){
+    sheriDiagSet('Microphone device list','FAILED: '+(err?.message||err));
+  }
+}
+
+function sheriAudioConstraints(){
+  const audio={echoCancellation:true,noiseSuppression:true,autoGainControl:true};
+  if(sheriSelectedAudioInputId)audio.deviceId={exact:sheriSelectedAudioInputId};
+  return {audio};
+}
+
 function sheriDiagReset(){
   const d=sheriDiagEnsure(), rows=d.querySelector('#sheriDiagRows');
   rows.innerHTML=''; sheriDiagShow();
   sheriDiagSet('Browser',navigator.userAgent.includes('Android')?'Android':'Other');
   sheriDiagSet('TTS available',!!window.speechSynthesis);
   sheriDiagSet('MediaRecorder',!!window.MediaRecorder);
+  refreshSheriAudioInputs();
 }
 
 function setSheriStatus(text){
@@ -1385,8 +1453,12 @@ async function startShericeriLoop(){
   setSheriStatus('Requesting microphone access…');
   await ensureVoicesLoaded();
   try{
-    shericeriMicStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-    sheriDiagSet('Microphone','granted');
+    await refreshSheriAudioInputs();
+    shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
+    const micTrack=shericeriMicStream.getAudioTracks()[0];
+    const micSettings=micTrack?.getSettings?.()||{};
+    sheriDiagSet('Microphone','granted — '+(micTrack?.label||'selected input'));
+    sheriDiagSet('Mic settings',(micSettings.sampleRate||'?')+' Hz, '+(micSettings.channelCount||'?')+' channel(s)');
   }catch(err){
     sheriDiagSet('Microphone','FAILED: '+(err?.name||err?.message||err));
     setSheriStatus('Could not access the microphone. Check mic permission for this site.');
