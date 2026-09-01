@@ -1712,7 +1712,6 @@ let sheriStreamActive=false;
 let sheriTurnFailed=false; // prevents infrastructure/TTS failures from auto-restarting the microphone // true while more streamed text chunks may still arrive
 let sheriTurnId=0;
 let sheriResponsePhase='idle';
-let sheriAwaitingUserTurn=false;
 function sheriResetSpeechState(){
   sheriSpeakQueue=[];
   sheriIsSpeaking=false;
