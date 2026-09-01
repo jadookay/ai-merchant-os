@@ -1803,6 +1803,7 @@ function sheriSplitCompleteSentences(buffer){
   return{complete,remainder};
 }
 
+// V11: explicit server-side deterministic orchestrator is exposed via response headers.
 async function shericeriRespond(transcript){
   if(!shericeriActive)return;
   const thisTurnId=++sheriTurnId;
@@ -1812,6 +1813,7 @@ async function shericeriRespond(transcript){
     sheriDiagSet('Response phase','Transcript received');
     sheriDiagSet('Exact transcript',transcript.slice(0,500));
     sheriDiagSet('Transcript length',String(transcript.length));
+    sheriDiagSet('Orchestrator','V11 explicit deterministic routing');
   }
   const box=document.getElementById('shericeriMessages');
   document.getElementById('sheriHero').classList.remove('listening');
@@ -1889,11 +1891,19 @@ async function shericeriRespond(transcript){
     if(res.ok){
       const usedModel=res.headers.get('X-Sheri-Model');
       const usedRoute=res.headers.get('X-Sheri-Route');
+      const orchIntent=res.headers.get('X-Sheri-Intent');
+      const orchComplexity=res.headers.get('X-Sheri-Complexity');
+      const orchTool=res.headers.get('X-Sheri-Tool');
+      const orchResponse=res.headers.get('X-Sheri-Response-Mode');
       const remainingRequests=res.headers.get('X-Sheri-Rate-Remaining-Requests');
       const remainingTokens=res.headers.get('X-Sheri-Rate-Remaining-Tokens');
       const resetRequests=res.headers.get('X-Sheri-Rate-Reset-Requests');
       if(usedModel)sheriDiagSet('Advisor model',usedModel);
       if(usedRoute)sheriDiagSet('Advisor route',usedRoute);
+      if(orchIntent)sheriDiagSet('Orchestrator intent',orchIntent);
+      if(orchComplexity)sheriDiagSet('Orchestrator complexity',orchComplexity);
+      if(orchTool)sheriDiagSet('Orchestrator tool',orchTool);
+      if(orchResponse)sheriDiagSet('Orchestrator response mode',orchResponse);
       if(remainingRequests)sheriDiagSet('Model RPD remaining',remainingRequests);
       if(remainingTokens)sheriDiagSet('Model TPM remaining',remainingTokens);
       if(resetRequests)sheriDiagSet('Model RPD reset',resetRequests);
