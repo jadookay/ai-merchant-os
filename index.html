@@ -466,7 +466,7 @@ function sheriOnlineEvents(){
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
-  navigator.serviceWorker.register('./shericeri_v12_2_android_audio_sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./shericeri_v12_3_sw.js').catch(()=>{});
 }
 
 async function sheriOfflineInit(){
@@ -483,7 +483,7 @@ async function sheriOfflineDiagnostics(){
   alert(msg);
 }
 function sheriOfflineLocalAnswer(q){
-  const text=(q||'').toLowerCase().trim();
+  const text=(q||'').toLowerCase().replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
   const low=activeProducts().filter(p=>p.stock<=p.reorder);
   const best=bestProducts()[0];
   const rev=revenue(),pr=profit();
@@ -1559,10 +1559,10 @@ let shericeriRecorder=null;
 let shericeriVadTimer=null;
 let sheriAwaitingUserTurn=false;
 
-const SHERI_SPEECH_THRESHOLD=14;   // avg frequency-bin magnitude (0-255) counted as "someone is talking"
-const SHERI_SILENCE_STOP_MS=350; // V12.2 faster conversational turn detection; metrics below expose what actually triggered the stop
-const SHERI_MIN_SPEECH_MS=180; // V10.3 require speech energy to persist briefly before confirming speech
-const SHERI_NO_SPEECH_TIMEOUT_MS=7000; // give up (no AI call) if nothing at all is heard in this window
+const SHERI_SPEECH_THRESHOLD=14;   // legacy threshold retained; now treated as a timing hint, not a hard speech gate
+const SHERI_SILENCE_STOP_MS=350; // keep the successful faster conversational timeout
+const SHERI_MIN_SPEECH_MS=180; // keep the successful minimum confirmation window
+const SHERI_NO_SPEECH_TIMEOUT_MS=3500; // quiet Android inputs get a shorter uncertain-speech window; Whisper still decides
 const SHERI_MAX_RECORD_MS=20000;   // hard safety cap per turn
 
 function toggleShericeriSearch(){
@@ -1768,7 +1768,23 @@ async function startShericeriLoop(){
   if(btn){btn.textContent='⏹️';btn.style.background='#dc2626'}
   shericeriListenOnce();
 }
+function sheriSleepAfterGoodbye(turnId){
+  if(turnId!==sheriTurnId)return;
+  sheriSleepAfterTtsTurnId=turnId;
+  shericeriActive=false;
+  sheriAwaitingUserTurn=false;
+  clearInterval(shericeriVadTimer);
+  try{shericeriRecorder&&shericeriRecorder.state!=='inactive'&&shericeriRecorder.stop()}catch(e){}
+  if(shericeriMicStream){shericeriMicStream.getTracks().forEach(t=>t.stop());shericeriMicStream=null}
+  if(shericeriAudioCtx){try{shericeriAudioCtx.close()}catch(e){}shericeriAudioCtx=null}
+  const btn=document.getElementById('shericeriTalkBtn');
+  if(btn){btn.textContent='🎙️';btn.style.background=''}
+  setSheriStatus('Goodbye — Shericeri is resting.');
+  sheriDiagSet('Session state','SLEEPING after goodbye');
+}
+
 function stopShericeri(){
+  sheriSleepAfterTtsTurnId=0;
   shericeriActive=false;
   sheriAwaitingUserTurn=false;
   const btn=document.getElementById('shericeriTalkBtn');
@@ -1833,11 +1849,13 @@ function shericeriListenOnce(){
   const data=new Uint8Array(shericeriAnalyser.frequencyBinCount);
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',SHERI_SPEECH_THRESHOLD+' avg');
-  sheriVadDiag('Latency profile','V12.2 — silence 0.35s / min speech 180ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.3 — silence 0.35s / min speech 180ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD speech energy detected','NO');
   sheriVadDiag('VAD speech confirmed','NO');
   sheriVadDiag('VAD silence duration','0 ms');
   sheriVadDiag('VAD stop reason','—');
+  sheriVadDiag('No-speech safety timeout',SHERI_NO_SPEECH_TIMEOUT_MS+' ms (Whisper still decides)');
   clearInterval(shericeriVadTimer);
   shericeriVadTimer=setInterval(()=>{
     if(!shericeriActive||!shericeriRecorder||shericeriRecorder.state==='inactive'){clearInterval(shericeriVadTimer);return}
@@ -1858,6 +1876,8 @@ function shericeriListenOnce(){
       return;
     }
 
+    // VAD is now a soft timing hint. We still track the threshold crossings,
+    // but a weak Android signal does NOT automatically discard a recording.
     if(avg>SHERI_SPEECH_THRESHOLD){
       speechEnergyDetected=true;
       sheriVadDiag('VAD speech energy detected','YES');
@@ -1874,12 +1894,10 @@ function shericeriListenOnce(){
           sheriVadDiag('VAD speech start',((speechStartTime-startTime)/1000).toFixed(1)+'s');
         }
       }
-      if(speechConfirmed){
-        silenceStart=null;
-        silenceDuration=0;
-        sheriVadDiag('VAD phase','SPEECH DETECTED');
-        sheriVadDiag('VAD silence duration','0 ms');
-      }
+      silenceStart=null;
+      silenceDuration=0;
+      sheriVadDiag('VAD phase',speechConfirmed?'SPEECH DETECTED':'SPEECH CANDIDATE');
+      sheriVadDiag('VAD silence duration','0 ms');
     }else if(speechConfirmed){
       if(silenceStart===null){
         silenceStart=now;
@@ -1898,9 +1916,12 @@ function shericeriListenOnce(){
         return;
       }
     }else if(now-startTime>=SHERI_NO_SPEECH_TIMEOUT_MS){
-      stopReason='no speech timeout';
+      // Do not throw away a non-empty recording just because VAD never crossed
+      // its threshold. Whisper is the semantic authority for speech. Only stop
+      // after the long safety window, then let Whisper inspect the clip.
+      stopReason='VAD uncertain — sending clip to Whisper';
       sheriVadDiag('VAD stop reason',stopReason);
-      sheriVadDiag('VAD phase','NO SPEECH — stopping');
+      sheriVadDiag('VAD phase','VAD UNCERTAIN — Whisper decides');
       clearInterval(shericeriVadTimer);
       try{shericeriRecorder.stop()}catch(e){}
       return;
@@ -1959,6 +1980,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
       });
     }
     const whisperMs=Math.round(performance.now()-transcribeStart);
+    sheriWhisperFinishedAt=performance.now();
     sheriDiagSet('Whisper HTTP',res.status+(res.ok?' OK':' ERROR'));
     sheriDiagSet('Whisper round-trip',whisperMs+' ms');
     let whisperBody=null;
@@ -2002,14 +2024,14 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
 // greetings, or session-ending phrases. This preserves the V11 deterministic
 // routing philosophy while saving latency and LLM tokens.
 function sheriConversationFastLane(q){
-  const text=(q||'').toLowerCase().trim();
-  if(/^(hi|hello|hey|good morning|good afternoon|good evening|bonjour|salut|muraho|bite|amakuru)([!.?]|\s*)$/i.test(text)){
+  const text=(q||'').toLowerCase().replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
+  if(/^(hi|hello|hey|good morning|good afternoon|good evening|bonjour|salut|muraho|bite|amakuru)[!.?]*$/i.test(text)){
     return 'Hello, darling. What are we working on today?';
   }
-  if(/^(thanks|thank you|thank you so much|merci|murakoze|murakoze cyane)([!.?]|\s*)$/i.test(text)){
+  if(/^(thanks|thank you|thank you so much|thanks a lot|many thanks|merci|merci beaucoup|murakoze|murakoze cyane)[!.?]*$/i.test(text)){
     return 'Anytime, darling. I’ve got you.';
   }
-  if(/^(bye|goodbye|good night|see you|see you later|all right,? bye|alright,? bye|okay,? bye|murabeho)([!.?]|\s*)$/i.test(text)){
+  if(/^(bye|goodbye|good night|see you|see you later|all right,? bye|alright,? bye|okay,? bye|ok,? bye|bye bye|murabeho|murabeho cyane)[!.?]*$/i.test(text)){
     return 'Bye, darling. Keep those numbers healthy.';
   }
   return null;
@@ -2075,6 +2097,12 @@ let sheriStreamActive=false;
 let sheriTurnFailed=false;
 let sheriTurnId=0;
 let sheriResponsePhase='idle';
+let sheriSleepAfterTtsTurnId=0;
+let sheriTurnStartedAt=0;
+let sheriTtsQueuedAt=0;
+let sheriTtsStartedAt=0;
+let sheriWhisperFinishedAt=0;
+let sheriAdvisorFirstChunkAt=0;
 
 function sheriResetSpeechState(){
   sheriSpeakQueue=[];
@@ -2096,6 +2124,7 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
     return;
   }
   sheriResponsePhase='tts_queued';
+  sheriTtsQueuedAt=performance.now();
   if(typeof sheriDiagSet==='function'){
     sheriDiagSet('Response phase','TTS queued');
     sheriDiagSet('TTS queued text',text.slice(0,300));
@@ -2202,6 +2231,15 @@ function sheriDrainSpeakQueue(){
       sheriDiagSet('Response phase','TTS ended');
       sheriDiagSet('TTS end reason',reason);
     }
+    if(sheriSleepAfterTtsTurnId===turnId){
+      sheriSleepAfterTtsTurnId=0;
+      sheriDiagSet('Session state','SLEEPING');
+      sheriResetSpeechState();
+      shericeriHistory=[]; sheriHistoryTurnId=0;
+      hideSheriHero();
+      setSheriStatus('Tap to start talking with Shericeri.');
+      return;
+    }
     sheriDrainSpeakQueue();
   };
 
@@ -2211,12 +2249,15 @@ function sheriDrainSpeakQueue(){
       return;
     }
     started=true;
+    sheriTtsStartedAt=performance.now();
     sheriIsSpeaking=true;
     sheriResponsePhase='tts_speaking';
     if(typeof sheriDiagSet==='function'){
       sheriDiagSet('TTS','STARTED');
       sheriDiagSet('Response phase','TTS speaking');
       sheriDiagSet('TTS turn ID',String(turnId));
+      sheriDiagSet('Turn → TTS start',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
+      sheriDiagSet('TTS queue → start',Math.round(performance.now()-sheriTtsQueuedAt)+' ms');
       if(isAndroid){
         sheriDiagSet('Android TTS voice',voice?`${voice.name} (${voice.lang})`:'browser/OS default');
         sheriDiagSet('Android TTS rate',String(SHERI_ANDROID_TTS_RATE));
@@ -2238,6 +2279,7 @@ function sheriDrainSpeakQueue(){
     sheriSpeakQueue=sheriSpeakQueue.filter(x=>x.turnId!==turnId);
     sheriStreamActive=false;
     setSheriStatus('Shericeri could not play that response. Tap to try again.');
+    if(sheriSleepAfterTtsTurnId===turnId){ sheriSleepAfterTtsTurnId=0; shericeriHistory=[]; sheriHistoryTurnId=0; hideSheriHero(); setSheriStatus('Tap to start talking with Shericeri.'); }
     if(window.speechSynthesis)try{speechSynthesis.cancel()}catch(_){}
   };
 
@@ -2292,6 +2334,8 @@ async function shericeriRespond(transcript){
     return;
   }
   const thisTurnId=++sheriTurnId;
+  sheriTurnStartedAt=performance.now();
+  sheriWhisperFinishedAt=sheriWhisperFinishedAt||performance.now();
   sheriResponsePhase='transcript_received';
   sheriStartHistoryTurn(thisTurnId,transcript);
   if(typeof sheriDiagSet==='function'){
@@ -2312,8 +2356,13 @@ async function shericeriRespond(transcript){
   if(conversationalFast){
     if(box){box.innerHTML+=`<div class="msg ai">${esc(conversationalFast)}</div>`;box.scrollTop=box.scrollHeight}
     sheriCommitAssistantHistory(thisTurnId,conversationalFast);
+    const isGoodbye=/^(bye|goodbye|good night|see you|see you later|all right,? bye|alright,? bye|okay,? bye|murabeho)([!.?]|\s*)$/i.test((transcript||'').trim().toLowerCase());
     sheriResetSpeechState();
     sheriStreamActive=false;
+    if(isGoodbye){
+      sheriSleepAfterGoodbye(thisTurnId);
+      sheriDiagSet('Goodbye action','PLAY FAREWELL → sleep → shrink image');
+    }
     sheriEnqueueSpeech(conversationalFast,thisTurnId);
     return;
   }
@@ -2421,7 +2470,7 @@ async function shericeriRespond(transcript){
       const chunkText=decoder.decode(value,{stream:true});
       if(!chunkText)continue;
       gotAnyChunk=true;
-      if(fullAnswer.length===0 && typeof sheriDiagSet==='function'){ sheriDiagSet('First response chunk',chunkText.slice(0,300)); sheriDiagSet('Response phase','Advisor first chunk received'); }
+      if(fullAnswer.length===0){ sheriAdvisorFirstChunkAt=performance.now(); if(typeof sheriDiagSet==='function'){ sheriDiagSet('First response chunk',chunkText.slice(0,300)); sheriDiagSet('Response phase','Advisor first chunk received'); sheriDiagSet('Turn → first TTS-ready chunk',Math.round(sheriAdvisorFirstChunkAt-sheriTurnStartedAt)+' ms'); sheriDiagSet('Whisper → advisor first chunk',Math.round(sheriAdvisorFirstChunkAt-sheriWhisperFinishedAt)+' ms'); } }
       buffer+=chunkText;
       fullAnswer+=chunkText;
       if(box){
@@ -2448,7 +2497,7 @@ async function shericeriRespond(transcript){
 
   sheriStreamActive=false;
   sheriResponsePhase='advisor_complete';
-  if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','Advisor complete'); sheriDiagSet('Full response',fullAnswer.trim().slice(0,800)); sheriDiagSet('Full response length',String(fullAnswer.trim().length)); }
+  if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','Advisor complete'); sheriDiagSet('Full response',fullAnswer.trim().slice(0,800)); sheriDiagSet('Full response length',String(fullAnswer.trim().length)); sheriDiagSet('Turn elapsed',Math.round(performance.now()-sheriTurnStartedAt)+' ms'); }
   if(buffer.trim())sheriEnqueueSpeech(buffer.trim(),thisTurnId);
 
   if(!gotAnyChunk){
