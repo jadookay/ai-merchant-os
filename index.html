@@ -1285,7 +1285,7 @@ let shericeriVadTimer=null;
 let sheriAwaitingUserTurn=false;
 
 const SHERI_SPEECH_THRESHOLD=14;   // avg frequency-bin magnitude (0-255) counted as "someone is talking"
-const SHERI_SILENCE_STOP_MS=1100;  // how long a pause must last before we consider the turn finished
+const SHERI_SILENCE_STOP_MS=800; // V10.2 latency tuning: shorter end-of-turn silence window  // how long a pause must last before we consider the turn finished
 const SHERI_NO_SPEECH_TIMEOUT_MS=7000; // give up (no AI call) if nothing at all is heard in this window
 const SHERI_MAX_RECORD_MS=20000;   // hard safety cap per turn
 
@@ -1533,6 +1533,7 @@ function shericeriListenOnce(){
   const data=new Uint8Array(shericeriAnalyser.frequencyBinCount);
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',SHERI_SPEECH_THRESHOLD+' avg');
+  sheriVadDiag('Latency profile','V10.2 — silence 0.8s / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD speech detected','NO');
   sheriVadDiag('VAD stop reason','—');
   clearInterval(shericeriVadTimer);
@@ -1585,7 +1586,7 @@ function shericeriListenOnce(){
       clearInterval(shericeriVadTimer);
       try{shericeriRecorder.stop()}catch(e){}
     }
-  },100);
+  },75);
 }
 function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)})}
 async function shericeriTranscribeAndRespond(blob,mimeType){
@@ -1739,7 +1740,8 @@ const SHERI_TTS_VOLUME=1.0;
 function sheriDrainSpeakQueue(){
   if(sheriIsSpeaking)return;
   if(!sheriSpeakQueue.length){
-    if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed){ sheriAwaitingUserTurn=false; sheriResponsePhase='auto_listen'; if(typeof sheriDiagSet==='function')sheriDiagSet('Response phase','Auto-listening'); setSheriStatus('Shericeri is listening…'); sheriDiagSet('Turn mode','CONTINUOUS / hands-free'); setTimeout(()=>{if(shericeriActive&&!sheriIsSpeaking&&!sheriStreamActive&&!sheriTurnFailed)shericeriListenOnce()},180); } // V10.1: continuous hands-free mode; resume listening only after TTS queue is fully drained
+    if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed){ sheriAwaitingUserTurn=false; sheriResponsePhase='auto_listen'; if(typeof sheriDiagSet==='function')sheriDiagSet('Response phase','Auto-listening'); setSheriStatus('Shericeri is listening…'); sheriDiagSet('Turn mode','CONTINUOUS / hands-free'); setTimeout(()=>{if(shericeriActive&&!sheriIsSpeaking&&!sheriStreamActive&&!sheriTurnFailed)shericeriListenOnce()},100);
+       } // V10.1: continuous hands-free mode; resume listening only after TTS queue is fully drained
     return;
   }
   const next=sheriSpeakQueue.shift();
