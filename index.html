@@ -59,7 +59,12 @@
   </div>
 </div>
 
+<meta name="shericeri-version" content="V12.1 Offline-First Hardened">
 <div class="app" id="appRoot" style="display:none">
+  <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 10px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px">
+    <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Ready</span></div>
+    <div style="display:flex;gap:6px"><button class="btn small secondary" onclick="sheriSyncOutbox()">Sync now</button><button class="btn small secondary" onclick="sheriOfflineDiagnostics()">Offline status</button></div>
+  </div>
 <aside class="side">
   <div class="brand">AI <span>Business OS</span></div>
   <div class="nav">
@@ -188,7 +193,7 @@
 
 <section id="shericeri" class="view">
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
-  <div class="notice" id="shericeriNotice">Connecting…</div>
+  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12 offline-first: saved business data and deterministic crunching work offline; full offline voice input requires the local Sherpa-ONNX bridge.</div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
       <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
@@ -281,7 +286,245 @@ function money(n){return 'RWF '+Math.round(n||0).toLocaleString()}
 let session=null;
 let state={merchant:null,products:[],sales:[],expenses:[]};
 let editingProductId=null;
+
 let advisorAvailable=null; // null=unknown, true/false once tested
+
+// ── V12 Offline-first layer ────────────────────────────────────────────────
+// Durable local cache: IndexedDB is used instead of localStorage so business
+// records can survive offline sessions without bloating the synchronous store.
+const SHERI_LOCAL_DB='shericeri_offline_v12';
+const SHERI_LOCAL_DB_VERSION=2;
+let sheriOfflineDb=null;
+let sheriConnectivity=navigator.onLine?'online':'offline';
+let sheriSyncBusy=false;
+let sheriSyncQueued=0;
+let sheriOfflineVoiceNote='';
+
+function sheriNow(){return new Date().toISOString()}
+function sheriUuid(){try{return crypto.randomUUID()}catch(_){return 'local-'+Date.now()+'-'+Math.random().toString(16).slice(2)}}
+function sheriIsOffline(){return !navigator.onLine||sheriConnectivity==='offline'}
+function sheriSetConnectivity(mode,reason=''){
+  sheriConnectivity=mode;
+  const dot=mode==='online'?'🟢':mode==='degraded'?'🟠':'🔴';
+  const label=mode==='online'?'Online':mode==='degraded'?'Weak connection':'Offline';
+  const el=document.getElementById('sheriConnectivityLabel'); if(el)el.textContent=`${dot} ${label}`;
+  const bar=document.getElementById('sheriOfflineBar'); if(bar)bar.style.background=mode==='offline'?'#fef2f2':mode==='degraded'?'#fffbeb':'#f8fafc';
+  const sync=document.getElementById('sheriSyncLabel'); if(sync)sync.textContent=reason||`${sheriSyncQueued} pending local change(s)`;
+}
+function sheriOpenLocalDb(){
+  if(sheriOfflineDb)return Promise.resolve(sheriOfflineDb);
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(SHERI_LOCAL_DB,SHERI_LOCAL_DB_VERSION);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      const tx=req.transaction;
+      for(const store of ['meta','merchants','products','sales','expenses','outbox','conflicts']){
+        if(!db.objectStoreNames.contains(store))db.createObjectStore(store,{keyPath:'key'});
+      }
+      // V12.1 schema migration marker. Future versions must add an explicit
+      // migration block here rather than silently changing record shapes.
+      try{tx.objectStore('meta').put({key:'schema',version:2,migrated_at:new Date().toISOString()})}catch(_){/* ignore */}
+    };
+    req.onsuccess=()=>{sheriOfflineDb=req.result;resolve(req.result)};
+    req.onerror=()=>reject(req.error||new Error('Could not open local offline database'));
+  });
+}
+function sheriTx(store,mode='readonly'){
+  if(!sheriOfflineDb)throw new Error('Offline database not initialized');
+  return sheriOfflineDb.transaction(store,mode).objectStore(store);
+}
+async function sheriPut(store,key,value){
+  await sheriOpenLocalDb();
+  return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').put({key,...value});req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)})
+}
+async function sheriGet(store,key){
+  await sheriOpenLocalDb();
+  return new Promise((resolve,reject)=>{const req=sheriTx(store).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)})
+}
+async function sheriGetAll(store){
+  await sheriOpenLocalDb();
+  return new Promise((resolve,reject)=>{const req=sheriTx(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)})
+}
+async function sheriDelete(store,key){
+  await sheriOpenLocalDb();
+  return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(key);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)})
+}
+async function sheriSaveSnapshot(){
+  if(!state.merchant)return;
+  await sheriPut('merchants',state.merchant.id,{record:{...state.merchant}});
+  for(const p of state.products)await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
+  for(const x of state.sales)await sheriPut('sales',x.id,{merchant_id:state.merchant.id,record:{...x}});
+  for(const x of state.expenses)await sheriPut('expenses',x.id,{merchant_id:state.merchant.id,record:{...x}});
+}
+async function sheriLoadLocalSnapshot(merchantId){
+  await sheriOpenLocalDb();
+  const m=await sheriGet('merchants',merchantId);
+  const [ps,ss,es]=await Promise.all([sheriGetAll('products'),sheriGetAll('sales'),sheriGetAll('expenses')]);
+  if(!m)return false;
+  state.merchant=m.record||m;
+  state.products=ps.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
+  state.sales=ss.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
+  state.expenses=es.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
+  return true;
+}
+async function sheriQueue(op){
+  const key=sheriUuid();
+  await sheriPut('outbox',key,{created_at:sheriNow(),op});
+  sheriSyncQueued=(await sheriGetAll('outbox')).length;
+  sheriSetConnectivity(sheriConnectivity);
+  return key;
+}
+async function sheriQueueCount(){sheriSyncQueued=(await sheriGetAll('outbox')).length;return sheriSyncQueued}
+async function sheriRecordConflict(info){
+  const key=sheriUuid(); await sheriPut('conflicts',key,{created_at:sheriNow(),info});
+}
+function sheriServerRecord(record){
+  const out={};
+  for(const [k,v] of Object.entries(record||{})){
+    if(k.startsWith('_')||k==='updated_at')continue;
+    out[k]=v;
+  }
+  return out;
+}
+async function sheriReconcileMerchantId(){
+  if(!session?.user?.id||!navigator.onLine||!state.merchant?._localOnly)return;
+  try{
+    let {data,error}=await sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle();
+    if(error)throw error;
+    if(!data){
+      const r=await sb.from('merchants').insert({user_id:session.user.id,name:state.merchant.name||'My Business',category:state.merchant.category||'Food & Grocery'}).select().single();
+      if(r.error)throw r.error; data=r.data;
+    }
+    const oldId=state.merchant.id,newId=data.id;
+    if(oldId===newId){state.merchant=data;return}
+    state.merchant=data;
+    for(const p of state.products){p.merchant_id=newId;await sheriPut('products',p.id,{merchant_id:newId,record:{...p}})}
+    for(const x of state.sales){x.merchant_id=newId;await sheriPut('sales',x.id,{merchant_id:newId,record:{...x}})}
+    for(const x of state.expenses){x.merchant_id=newId;await sheriPut('expenses',x.id,{merchant_id:newId,record:{...x}})}
+    const ops=await sheriGetAll('outbox');
+    for(const item of ops){
+      const op=item.op||{};
+      if(op.record?.merchant_id===oldId)op.record.merchant_id=newId;
+      await sheriPut('outbox',item.key,{...item,op});
+    }
+    await sheriPut('merchants',newId,{user_id:data.user_id,record:{...data}});
+    await sheriDelete('merchants',oldId);
+    delete state.merchant._localOnly;
+  }catch(e){console.warn('[Shericeri offline] merchant reconcile failed',e)}
+}
+async function sheriSyncOutbox(){
+  if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy)return;
+  sheriSyncBusy=true;
+  await sheriReconcileMerchantId();
+  try{
+    const items=(await sheriGetAll('outbox')).sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+    sheriSyncQueued=items.length; sheriSetConnectivity('online');
+    for(const item of items){
+      const op=item.op||{};
+      try{
+        if(op.type==='merchant_upsert'){
+          const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
+        }else if(op.type==='product_upsert'){
+          const {error}=await sb.from('products').upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
+        }else if(op.type==='product_delete'){
+          const {error}=await sb.from('products').update({deleted:true}).eq('id',op.id); if(error)throw error;
+        }else if(op.type==='sale_upsert'){
+          const {error}=await sb.from('sales').upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
+          if(op.productId!=null){
+            const {data:serverProduct,error:pErr}=await sb.from('products').select('id,stock').eq('id',op.productId).maybeSingle();
+            if(pErr)throw pErr;
+            const stockConflict=!!(serverProduct&&op.expectedServerStock!=null&&serverProduct.stock!==op.expectedServerStock);
+            if(stockConflict){
+              // V12.1 SAFETY: never overwrite a newer server stock value after a
+              // detected multi-device conflict. Record the operation for manual/
+              // atomic server-side reconciliation instead.
+              await sheriRecordConflict({type:'stock_conflict',product_id:op.productId,local_stock:op.localStock,server_stock:serverProduct.stock,sale_id:op.record.id,operation:op});
+            }else{
+              const {error:sErr}=await sb.from('products').update({stock:op.localStock}).eq('id',op.productId); if(sErr)throw sErr;
+            }
+          }
+        }else if(op.type==='expense_upsert'){
+          const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
+        }else if(op.type==='expense_delete'){
+          const {error}=await sb.from('expenses').delete().eq('id',op.id); if(error)throw error;
+        }else if(op.type==='sale_delete'){
+          const {error}=await sb.from('sales').delete().eq('id',op.id); if(error)throw error;
+        }
+        await sheriDelete('outbox',item.key);
+      }catch(err){
+        console.warn('[Shericeri sync] pending operation failed',op,err);
+        break;
+      }
+    }
+    await sheriQueueCount();
+    sheriSetConnectivity('online',sheriSyncQueued?`${sheriSyncQueued} pending local change(s)`:'All local changes synced');
+    if(sheriSyncQueued===0)try{await loadAll(true)}catch(_){}
+  }finally{sheriSyncBusy=false}
+}
+function sheriOnlineEvents(){
+  window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sheriSyncOutbox()});
+  window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
+}
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
+  navigator.serviceWorker.register('./shericeri_v12_1_sw.js').catch(()=>{});
+}
+
+async function sheriOfflineInit(){
+  await sheriOpenLocalDb();
+  await sheriQueueCount();
+  sheriSetConnectivity(navigator.onLine?'online':'offline');
+  if(!window._sheriOfflineEventsBound){ sheriOnlineEvents(); window._sheriOfflineEventsBound=true; }
+  if(!window._sheriSyncTimer)window._sheriSyncTimer=setInterval(()=>{if(navigator.onLine)sheriSyncOutbox()},15000);
+}
+async function sheriOfflineDiagnostics(){
+  const q=await sheriQueueCount(),conf=(await sheriGetAll('conflicts')).length;
+  const localReady=!!sheriOfflineDb;
+  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nRecorded conflicts: ${conf}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
+  alert(msg);
+}
+function sheriOfflineLocalAnswer(q){
+  const text=(q||'').toLowerCase().trim();
+  const low=activeProducts().filter(p=>p.stock<=p.reorder);
+  const best=bestProducts()[0];
+  const rev=revenue(),pr=profit();
+  if(/revenue|sales today|total sales|how much.*sold|how much.*sell/.test(text))return `You've sold ${money(rev)} so far, across ${state.sales.length} transactions.`;
+  if(/profit|loss|how am i doing/.test(text))return pr>=0?`You're sitting at ${money(pr)} in estimated profit.`:`You're at a loss of ${money(Math.abs(pr))} right now.`;
+  if(/low stock|restock|what should i stock|inventory/.test(text))return low.length?`Top restock priority: ${low.slice(0,3).map(p=>p.name).join(', ')}.`:`Stock levels look healthy — nothing urgent to restock.`;
+  if(/best product|best.?sell|sells? best|top product/.test(text))return best&&best.rev?`${best.name} is your star right now — ${money(best.rev)} in revenue.`:'Not enough sales recorded yet to crown a winner.';
+  if(/how many (transactions|sales)/.test(text))return `${state.sales.length} transactions recorded so far.`;
+  return null;
+}
+async function sheriLocalTts(text,lang){
+  try{
+    if(window.SHERPA_ONNX_TTS_BRIDGE?.speak){await window.SHERPA_ONNX_TTS_BRIDGE.speak(String(text),String(lang||'en-US'));return true}
+  }catch(e){console.warn('[Shericeri local TTS bridge]',e)}
+  if(!window.speechSynthesis||!window.SpeechSynthesisUtterance)return false;
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang=lang||currentShericeriLang?.()||'en-US';u.rate=1.03;u.pitch=1;u.volume=1;speechSynthesis.resume();speechSynthesis.speak(u);return true}catch(_){return false}
+}
+async function sheriLocalStt(blob,lang){
+  try{
+    if(window.SHERPA_ONNX_STT_BRIDGE?.transcribeBlob){const r=await window.SHERPA_ONNX_STT_BRIDGE.transcribeBlob(blob,String(lang||'en-US'));return typeof r==='string'?r:(r?.text||'')}
+  }catch(e){console.warn('[Shericeri local STT bridge]',e)}
+  return null;
+}
+async function sheriOfflineRouteText(text){
+  const answer=sheriOfflineLocalAnswer(text);
+  if(answer){
+    sheriPushHistory('user',text);sheriPushHistory('assistant',answer);
+    const box=document.getElementById('shericeriMessages');if(box){box.innerHTML+=`<div class="msg me">${esc(text)}</div><div class="msg ai">${esc(answer)}</div>`;box.scrollTop=box.scrollHeight}
+    sheriDiagSet('Offline route','LOCAL BUSINESS DATA');
+    sheriDiagSet('Offline LLM tokens','0');
+    sheriDiagSet('Offline TTS',window.speechSynthesis?'local/browser':'unavailable');
+    await sheriLocalTts(answer,currentShericeriLang?.()||'en-US');
+    return true;
+  }
+  const fallback=`I’m offline, darling. I can still crunch your saved sales, stock, expenses and profit, but I need internet for fresh research or deeper AI analysis.`;
+  sheriDiagSet('Offline route','OFFLINE CAPABILITY LIMIT');
+  sheriDiagSet('Offline LLM tokens','0');
+  await sheriLocalTts(fallback,currentShericeriLang?.()||'en-US');
+  const box=document.getElementById('shericeriMessages');if(box){box.innerHTML+=`<div class="msg me">${esc(text)}</div><div class="msg ai">${esc(fallback)}</div>`;box.scrollTop=box.scrollHeight}
+  return true;
+}
 
 // ── Auth ─────────────────────────────────────────────────────────────────
 async function handleSignUp(){
@@ -303,36 +546,62 @@ async function handleSignIn(){
 async function signOut(){await sb.auth.signOut();location.reload()}
 async function onAuthed(sess){
   session=sess;
+  await sheriOfflineInit();
   document.getElementById('authScreen').style.display='none';
   document.getElementById('appRoot').style.display='';
   await ensureMerchant();
   await loadAll();
   render();
-  checkAdvisor();
+  if(navigator.onLine)checkAdvisor();
+  else {const n=document.getElementById('shericeriNotice');if(n)n.textContent='Offline mode — saved business data is still available.'}
 }
 async function ensureMerchant(){
+  if(!navigator.onLine){
+    const cached=await sheriGetAll('merchants');
+    const mine=cached.find(x=>x.record?.user_id===session.user.id || x.user_id===session.user.id);
+    if(mine){state.merchant=mine.record||mine;return}
+    state.merchant={id:sheriUuid(),user_id:session.user.id,name:'My Business',category:'Food & Grocery',created_at:sheriNow(),_localOnly:true};
+    await sheriSaveSnapshot();
+    await sheriQueue({type:'merchant_upsert',record:{...state.merchant}});
+    return;
+  }
   let {data,error}=await sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle();
-  if(error){alert('Could not load your business profile: '+error.message);return}
+  if(error){
+    const cached=await sheriGetAll('merchants');
+    const mine=cached.find(x=>x.record?.user_id===session.user.id || x.user_id===session.user.id);
+    if(mine){state.merchant=mine.record||mine;sheriSetConnectivity('degraded','Using cached business profile');return}
+    throw error
+  }
   if(!data){
     const {data:created,error:cErr}=await sb.from('merchants').insert({user_id:session.user.id,name:'My Business',category:'Food & Grocery'}).select().single();
-    if(cErr){alert('Could not create your business profile: '+cErr.message);return}
+    if(cErr)throw cErr;
     data=created;
   }
   state.merchant=data;
+  await sheriPut('merchants',data.id,{user_id:data.user_id,record:{...data}});
 }
 
 // ── Data loading ─────────────────────────────────────────────────────────
-async function loadAll(){
-  const mId=state.merchant.id;
-  const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr}]=await Promise.all([
-    sb.from('products').select('*').eq('merchant_id',mId).order('created_at'),
-    sb.from('sales').select('*').eq('merchant_id',mId).order('created_at'),
-    sb.from('expenses').select('*').eq('merchant_id',mId).order('created_at')
-  ]);
-  if(pErr||sErr||eErr){alert('Could not load your data: '+(pErr||sErr||eErr).message);return}
-  state.products=products||[];
-  state.sales=sales||[];
-  state.expenses=expenses||[];
+async function loadAll(silent=false){
+  const mId=state.merchant?.id; if(!mId)return;
+  // Local-first: render immediately even when connectivity is poor.
+  const hadLocal=await sheriLoadLocalSnapshot(mId);
+  if(hadLocal)render();
+  if(!navigator.onLine){sheriSetConnectivity('offline','Using on-device business data');return}
+  try{
+    const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr}]=await Promise.all([
+      sb.from('products').select('*').eq('merchant_id',mId).order('created_at'),
+      sb.from('sales').select('*').eq('merchant_id',mId).order('created_at'),
+      sb.from('expenses').select('*').eq('merchant_id',mId).order('created_at')
+    ]);
+    if(pErr||sErr||eErr)throw (pErr||sErr||eErr);
+    state.products=products||[];state.sales=sales||[];state.expenses=expenses||[];
+    await sheriSaveSnapshot();
+    sheriSetConnectivity('online','Server data synced');
+  }catch(err){
+    sheriSetConnectivity('degraded','Using cached data — server refresh failed');
+    if(!hadLocal&&!silent)alert('Could not load your data and no local copy is available yet: '+(err.message||err));
+  }
 }
 function product(id){return state.products.find(p=>p.id===id)}
 function activeProducts(){return state.products.filter(p=>!p.deleted)}
@@ -395,29 +664,22 @@ async function recordSale(){
   if(!p||q<1||price<0)return alert('Enter valid sale details.');
   if(q>p.stock)return alert('Not enough stock.');
   const newStock=p.stock-q;
-  const {error:upErr}=await sb.from('products').update({stock:newStock}).eq('id',p.id);
-  if(upErr)return alert('Could not update stock: '+upErr.message);
-  const {data:saleRow,error:sErr}=await sb.from('sales').insert({merchant_id:state.merchant.id,product_id:p.id,product_name_snapshot:p.name,qty:q,price,cost:p.cost}).select().single();
-  if(sErr){await sb.from('products').update({stock:p.stock}).eq('id',p.id);return alert('Could not record sale: '+sErr.message)}
-  p.stock=newStock;
-  state.sales.push(saleRow);
-  render();
-  alert('Sale recorded.');
+  const saleRow={id:sheriUuid(),merchant_id:state.merchant.id,product_id:p.id,product_name_snapshot:p.name,qty:q,price,cost:p.cost,created_at:sheriNow()};
+  p.stock=newStock;state.sales.push(saleRow);
+  await sheriSaveSnapshot();
+  await sheriQueue({type:'sale_upsert',record:saleRow,productId:p.id,localStock:newStock,expectedServerStock:newStock+q});
+  if(navigator.onLine)await sheriSyncOutbox();
+  render(); alert(navigator.onLine?'Sale recorded.':'Sale recorded offline — it will sync automatically when connected.');
 }
 async function voidSale(id){
-  const s=state.sales.find(x=>x.id===id);
-  if(!s)return;
+  const s=state.sales.find(x=>x.id===id); if(!s)return;
   if(!confirm('Void this sale? Its stock will be added back to inventory.'))return;
-  const p=product(s.product_id);
-  if(p){
-    const newStock=p.stock+s.qty;
-    const {error:upErr}=await sb.from('products').update({stock:newStock}).eq('id',p.id);
-    if(upErr)return alert(upErr.message);
-    p.stock=newStock;
-  }
-  const {error:delErr}=await sb.from('sales').delete().eq('id',id);
-  if(delErr)return alert(delErr.message);
+  const p=product(s.product_id); if(p)p.stock+=s.qty;
   state.sales=state.sales.filter(x=>x.id!==id);
+  await sheriSaveSnapshot();
+  await sheriQueue({type:'sale_delete',id});
+  if(p)await sheriQueue({type:'product_upsert',record:{...p}});
+  if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
 function renderSales(){document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.slice().reverse().map(s=>{const p=product(s.product_id);return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
@@ -599,36 +861,28 @@ function cancelProductEdit(){document.getElementById('addProduct').style.display
 async function saveProduct(){
   const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value,barcode=pBarcode.value.trim()||null,expiry_date=pExpiry.value||null;
   if(!name||!cost||!sell)return alert('Complete product details.');
+  const now=sheriNow();
   if(editingProductId){
-    const imageUrl=pendingProductImage?await uploadProductImage(editingProductId):undefined;
-    const patch={name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date};
-    if(imageUrl)patch.image_url=imageUrl;
-    const {data,error}=await sb.from('products').update(patch).eq('id',editingProductId).select().single();
-    if(error)return alert(error.message);
-    const idx=state.products.findIndex(p=>p.id===editingProductId);
-    state.products[idx]=data;
+    const p=product(editingProductId); if(!p)return;
+    Object.assign(p,{name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,updated_at:now});
+    await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
+    await sheriQueue({type:'product_upsert',record:{...p}});
   }else{
-    const {data,error}=await sb.from('products').insert({merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date}).select().single();
-    if(error)return alert(error.message);
-    if(pendingProductImage){
-      const imageUrl=await uploadProductImage(data.id);
-      if(imageUrl){
-        const {data:updated,error:updErr}=await sb.from('products').update({image_url:imageUrl}).eq('id',data.id).select().single();
-        if(!updErr)data.image_url=updated.image_url;
-      }
-    }
-    state.products.push(data);
+    const p={id:sheriUuid(),merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,created_at:now,updated_at:now};
+    state.products.push(p);
+    await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
+    await sheriQueue({type:'product_upsert',record:{...p}});
   }
-  document.getElementById('addProduct').style.display='none';
-  clearProductForm();
-  render();
+  if(navigator.onLine)await sheriSyncOutbox();
+  document.getElementById('addProduct').style.display='none';clearProductForm();render();
 }
 async function deleteProduct(id){
   const p=product(id);if(!p)return;
   if(!confirm(`Delete "${p.name}"? Past sales stay in your history, but you won't be able to sell it again.`))return;
-  const {error}=await sb.from('products').update({deleted:true}).eq('id',id);
-  if(error)return alert(error.message);
-  p.deleted=true;
+  p.deleted=true;p.updated_at=sheriNow();
+  await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
+  await sheriQueue({type:'product_delete',id});
+  if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
 function expiryPill(p){
@@ -819,17 +1073,17 @@ const PRODUCT_CATEGORIES_LIST=["Food & Grocery","Cosmetics & Beauty","Clothing &
 async function addExpense(){
   const description=eDesc.value.trim(),amount=+eAmt.value,cat=eCat.value;
   if(!description||!amount)return alert('Complete expense details.');
-  const {data,error}=await sb.from('expenses').insert({merchant_id:state.merchant.id,description,amount,cat}).select().single();
-  if(error)return alert(error.message);
-  state.expenses.push(data);
-  eDesc.value=eAmt.value='';
-  render();
+  const data={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,cat,created_at:sheriNow()};
+  state.expenses.push(data);await sheriSaveSnapshot();
+  await sheriQueue({type:'expense_upsert',record:data});
+  if(navigator.onLine)await sheriSyncOutbox();
+  eDesc.value=eAmt.value='';render();
 }
 async function deleteExpense(id){
   if(!confirm('Delete this expense?'))return;
-  const {error}=await sb.from('expenses').delete().eq('id',id);
-  if(error)return alert(error.message);
-  state.expenses=state.expenses.filter(x=>x.id!==id);
+  state.expenses=state.expenses.filter(x=>x.id!==id);await sheriSaveSnapshot();
+  await sheriQueue({type:'expense_delete',id});
+  if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
 function renderExpenses(){document.getElementById('expenseTable').innerHTML=state.expenses.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${state.expenses.slice().reverse().map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses recorded.</div>'}
@@ -837,11 +1091,10 @@ function renderExpenses(){document.getElementById('expenseTable').innerHTML=stat
 // ── Settings ─────────────────────────────────────────────────────────────
 async function saveSettings(){
   const name=document.getElementById('setName').value||'Merchant',category=document.getElementById('setCat').value;
-  const {error}=await sb.from('merchants').update({name,category}).eq('id',state.merchant.id);
-  if(error)return alert(error.message);
-  state.merchant.name=name;state.merchant.category=category;
-  render();
-  alert('Settings saved.');
+  Object.assign(state.merchant,{name,category,updated_at:sheriNow()});await sheriSaveSnapshot();
+  await sheriQueue({type:'merchant_upsert',record:{...state.merchant}});
+  if(navigator.onLine)await sheriSyncOutbox();
+  render();alert(navigator.onLine?'Settings saved.':'Settings saved offline — they will sync automatically.');
 }
 async function seedDemoData(){
   if(!confirm('Add sample products so you can test the app? This will not remove existing data.'))return;
@@ -1737,7 +1990,7 @@ function sheriEnqueueSpeech(text){
   if(!text)return;
   sheriResponsePhase='tts_queued';
   if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','TTS queued'); sheriDiagSet('TTS queued text',text.slice(0,300)); sheriDiagSet('TTS queue length',String(sheriSpeakQueue.length+1)); }
-  if(!window.speechSynthesis){
+  if(!window.speechSynthesis&&!window.SHERPA_ONNX_TTS_BRIDGE?.speak){
     setSheriStatus('(Text-to-speech not supported in this browser — reading only.)');
     if(!sheriStreamActive&&shericeriActive&&!sheriTurnFailed)shericeriListenOnce(); // keep going only on a healthy turn
     return;
@@ -1787,8 +2040,16 @@ function sheriDrainSpeakQueue(){
     setSheriStatus('Shericeri could not play that response. Tap to try again.');
     if(window.speechSynthesis)try{speechSynthesis.cancel()}catch(_){}
   };
-  const speakNow=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e.message||String(e)));sheriIsSpeaking=false;sheriTurnFailed=true;sheriSpeakQueue=[];sheriStreamActive=false;setSheriStatus('Shericeri could not play that response. Tap to try again.')}};
-  if(isAndroid)setTimeout(speakNow,90);else speakNow();
+  const speakNow=async()=>{
+    try{
+      if(window.SHERPA_ONNX_TTS_BRIDGE?.speak){
+        await window.SHERPA_ONNX_TTS_BRIDGE.speak(next,lang);
+        finish();
+        return;
+      }
+      speechSynthesis.resume();speechSynthesis.speak(utt);
+    }catch(e){if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e.message||String(e)));sheriIsSpeaking=false;sheriTurnFailed=true;sheriSpeakQueue=[];sheriStreamActive=false;setSheriStatus('Shericeri could not play that response. Tap to try again.')}};
+  if(isAndroid)setTimeout(()=>speakNow(),90);else speakNow();
 }
 // Splits a growing text buffer into complete sentences plus a leftover tail
 // that's still being written — used to feed the speak queue progressively.
@@ -1806,6 +2067,11 @@ function sheriSplitCompleteSentences(buffer){
 // V11: explicit server-side deterministic orchestrator is exposed via response headers.
 async function shericeriRespond(transcript){
   if(!shericeriActive)return;
+  if(!navigator.onLine){
+    await sheriOfflineRouteText(transcript);
+    if(shericeriActive&&typeof sheriDiagSet==='function')sheriDiagSet('Response phase','Offline local response');
+    return;
+  }
   const thisTurnId=++sheriTurnId;
   sheriResponsePhase='transcript_received';
   if(typeof sheriDiagSet==='function'){
@@ -1979,6 +2245,7 @@ async function shericeriRespond(transcript){
 
 // ── Boot ─────────────────────────────────────────────────────────────────
 (async function boot(){
+  await sheriOfflineInit();
   const {data:{session:existing}}=await sb.auth.getSession();
   if(existing)await onAuthed(existing);
   sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_OUT')location.reload()});
