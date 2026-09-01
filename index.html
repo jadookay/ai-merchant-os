@@ -1285,7 +1285,8 @@ let shericeriVadTimer=null;
 let sheriAwaitingUserTurn=false;
 
 const SHERI_SPEECH_THRESHOLD=14;   // avg frequency-bin magnitude (0-255) counted as "someone is talking"
-const SHERI_SILENCE_STOP_MS=800; // V10.2 latency tuning: shorter end-of-turn silence window  // how long a pause must last before we consider the turn finished
+const SHERI_SILENCE_STOP_MS=650; // V10.3 recommended conversational latency target
+const SHERI_MIN_SPEECH_MS=180; // V10.3 require speech energy to persist briefly before confirming speech
 const SHERI_NO_SPEECH_TIMEOUT_MS=7000; // give up (no AI call) if nothing at all is heard in this window
 const SHERI_MAX_RECORD_MS=20000;   // hard safety cap per turn
 
@@ -1526,6 +1527,7 @@ function shericeriListenOnce(){
   const startTime=Date.now();
   let hasSpoken=false;
   let speechStartTime=null;
+  let speechCandidateStart=null;
   let silenceStart=null;
   let maxAvg=0;
   let maxPeak=0;
@@ -1533,7 +1535,7 @@ function shericeriListenOnce(){
   const data=new Uint8Array(shericeriAnalyser.frequencyBinCount);
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',SHERI_SPEECH_THRESHOLD+' avg');
-  sheriVadDiag('Latency profile','V10.2 — silence 0.8s / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V10.3 — silence 0.65s / min speech 180ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD speech detected','NO');
   sheriVadDiag('VAD stop reason','—');
   clearInterval(shericeriVadTimer);
@@ -1550,13 +1552,21 @@ function shericeriListenOnce(){
     sheriVadDiag('VAD max observed',`avg ${maxAvg.toFixed(1)} / peak ${maxPeak}`);
     if(avg>SHERI_SPEECH_THRESHOLD){
       if(!hasSpoken){
-        speechStartTime=now;
-        sheriVadDiag('VAD speech detected','YES');
-        sheriVadDiag('VAD speech start',((now-startTime)/1000).toFixed(1)+'s');
+        if(speechCandidateStart===null){
+          speechCandidateStart=now;
+          sheriVadDiag('VAD phase','SPEECH CANDIDATE');
+        }
+        if(now-speechCandidateStart>=SHERI_MIN_SPEECH_MS){
+          speechStartTime=speechStartTime??speechCandidateStart;
+          hasSpoken=true;
+          sheriVadDiag('VAD speech detected','YES');
+          sheriVadDiag('VAD speech start',((speechStartTime-startTime)/1000).toFixed(1)+'s');
+        }
       }
-      hasSpoken=true;
-      silenceStart=null;
-      sheriVadDiag('VAD phase','SPEECH DETECTED');
+      if(hasSpoken){
+        silenceStart=null;
+        sheriVadDiag('VAD phase','SPEECH DETECTED');
+      }
     }else if(hasSpoken){
       if(silenceStart===null){
         silenceStart=now;
