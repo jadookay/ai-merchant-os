@@ -59,7 +59,7 @@
   </div>
 </div>
 
-<meta name="shericeri-version" content="V12.1 Offline-First Hardened">
+<meta name="shericeri-version" content="V12.6 Voice Loop Finalize / Android Diagnostics">
 <div class="app" id="appRoot" style="display:none">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 10px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px">
     <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Ready</span></div>
@@ -2179,8 +2179,9 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
     return;
   }
   sheriResponsePhase='tts_queued';
-  sheriTtsQueuedAt=performance.now();
-  if(sheriAdvisorFirstChunkAt) sheriDiagSet('Advisor first chunk → TTS queue',Math.round(sheriTtsQueuedAt-sheriAdvisorFirstChunkAt)+' ms');
+  const queuedAt=performance.now();
+  sheriTtsQueuedAt=queuedAt; // retained for compatibility with existing diagnostics/state
+  if(sheriAdvisorFirstChunkAt) sheriDiagSet('Advisor first chunk → TTS queue',Math.round(queuedAt-sheriAdvisorFirstChunkAt)+' ms');
   if(typeof sheriDiagSet==='function'){
     sheriDiagSet('Response phase','TTS queued');
     sheriDiagSet('TTS queued text',text.slice(0,300));
@@ -2201,11 +2202,11 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
     }
     return;
   }
-  sheriSpeakQueue.push({text,turnId});
+  sheriSpeakQueue.push({text,turnId,queuedAt});
   sheriDrainSpeakQueue();
 }
 
-// V9.5 TTS volume: explicitly request the browser's maximum SpeechSynthesis volume.
+// V12.6 preserves the V9.5 TTS loudness policy: request the browser's maximum SpeechSynthesis volume.
 const SHERI_TTS_VOLUME=1.0;
 const SHERI_ANDROID_TTS_RATE=1.03;
 const SHERI_ANDROID_TTS_PITCH=1.0;
@@ -2244,6 +2245,7 @@ function sheriDrainSpeakQueue(){
   const item=sheriSpeakQueue.shift();
   const next=item.text;
   const turnId=item.turnId;
+  const queuedAt=item.queuedAt||sheriTtsQueuedAt||performance.now();
 
   // Never start speech from an older turn.
   if(turnId!==sheriTurnId){
@@ -2296,6 +2298,10 @@ function sheriDrainSpeakQueue(){
       sheriDiagSet('TTS',started?'ended':'ended without onstart');
       sheriDiagSet('Response phase','TTS ended');
       sheriDiagSet('TTS end reason',reason);
+      const hasPendingCurrentTurn=sheriSpeakQueue.some(x=>x.turnId===turnId);
+      if(!hasPendingCurrentTurn&&!sheriStreamActive&&sheriTurnStartedAt){
+        sheriDiagSet('Full turn elapsed',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
+      }
     }
     if(sheriSleepAfterTtsTurnId===turnId){
       sheriSleepAfterTtsTurnId=0;
@@ -2323,7 +2329,7 @@ function sheriDrainSpeakQueue(){
       sheriDiagSet('Response phase','TTS speaking');
       sheriDiagSet('TTS turn ID',String(turnId));
       sheriDiagSet('Turn → TTS start',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
-      sheriDiagSet('TTS queue → start',Math.round(performance.now()-sheriTtsQueuedAt)+' ms');
+      sheriDiagSet('TTS queue → start',Math.round(performance.now()-queuedAt)+' ms');
       if(isAndroid){
         const availableVoices=speechSynthesis.getVoices();
         const defaultCandidate=availableVoices.find(v=>v.default);
@@ -2578,7 +2584,7 @@ async function shericeriRespond(transcript){
 
   sheriStreamActive=false;
   sheriResponsePhase='advisor_complete';
-  if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','Advisor complete'); sheriDiagSet('Full response',fullAnswer.trim().slice(0,800)); sheriDiagSet('Full response length',String(fullAnswer.trim().length)); sheriDiagSet('Full turn elapsed',Math.round(performance.now()-sheriTurnStartedAt)+' ms'); }
+  if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','Advisor complete'); sheriDiagSet('Full response',fullAnswer.trim().slice(0,800)); sheriDiagSet('Full response length',String(fullAnswer.trim().length)); sheriDiagSet('Advisor stream complete elapsed',Math.round(performance.now()-sheriTurnStartedAt)+' ms'); }
   if(buffer.trim())sheriEnqueueSpeech(buffer.trim(),thisTurnId);
 
   if(!gotAnyChunk){
