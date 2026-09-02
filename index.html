@@ -265,13 +265,14 @@
   </div>
   <div id="sheriHeroName">SHERICERI</div>
   <div id="sheriHeroStatus">Tap to talk</div>
-  <div class="actions" style="margin-top:22px">
+  <div class="actions" style="margin-top:18px;gap:12px;justify-content:center">
     <select id="sheriHeroLang" style="width:auto;display:inline-block;background:#111;color:#D4AF37;border-color:#D4AF37">
       <option value="en-US">English</option>
       <option value="fr-FR">Français</option>
       <option value="rw-RW">Kinyarwanda</option>
     </select>
-    <button class="btn danger" onclick="stopShericeriHero()">End</button>
+    <button id="sheriHeroTalkBtn" class="btn" type="button" style="min-width:120px" onclick="heroShericeriTalk()">🎙️ Talk</button>
+    <button class="btn danger" type="button" onclick="stopShericeriHero()">End</button>
   </div>
 </div>
 
@@ -468,7 +469,7 @@ function sheriOnlineEvents(){
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
-  navigator.serviceWorker.register('./shericeri_v12_10_android_voice_websearch_sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./shericeri_v12_10_1_preflight_sw.js').catch(()=>{});
 }
 
 async function sheriOfflineInit(){
@@ -1243,7 +1244,7 @@ async function askAI(webSearch){
   let answered=false;
   if(advisorAvailable!==false){
     try{
-      const body=webSearch
+      const body=effectiveWebSearch
         ?{mode:'search',question:q}
         :{question:q||'What do you see in this photo, and does it relate to my business?',context,image:img?img.dataUrl:null};
       const {data,error}=await sb.functions.invoke('advisor',{body});
@@ -1650,13 +1651,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.10 ANDROID VOICE • LATENCY • WEB SEARCH TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.10.1 PRE-RELEASE TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();if(typeof sheriDiagSet==='function'){sheriDiagSet('Runtime version','V12.10');sheriDiagSet('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');sheriDiagSet('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.10.1');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -1762,6 +1763,28 @@ function hideSheriHero(){
 }
 function launchShericeri(){toggleShericeri()}
 function stopShericeriHero(){stopShericeri()}
+function heroShericeriTalk(){
+  // The full-screen hero intentionally sits above the page mic button.
+  // Give the hero its own talk control so the user is never trapped with only End.
+  if(!shericeriActive){
+    startShericeriLoop();
+    return;
+  }
+  if(sheriIsSpeaking||sheriResponsePhase==='tts_starting'||sheriResponsePhase==='tts_speaking'){
+    setSheriStatus('Shericeri is speaking…');
+    return;
+  }
+  if(sheriAwaitingUserTurn){
+    sheriAwaitingUserTurn=false;
+    shericeriListenOnce();
+    return;
+  }
+  if(shericeriRecorder?.state==='recording'){
+    setSheriStatus('Shericeri is listening…');
+    return;
+  }
+  shericeriListenOnce();
+}
 function currentShericeriLang(){
   const heroLang=document.getElementById('sheriHeroLang');
   const pageLang=document.getElementById('shericeriLang');
@@ -1826,6 +1849,8 @@ async function startShericeriLoop(){
   sheriAwaitingUserTurn=false;
   const btn=document.getElementById('shericeriTalkBtn');
   if(btn){btn.textContent='⏹️';btn.style.background='#dc2626'}
+  const heroBtn=document.getElementById('sheriHeroTalkBtn');
+  if(heroBtn){heroBtn.textContent='🎙️ Listening…';heroBtn.disabled=true;}
   shericeriListenOnce();
 }
 function sheriSleepAfterGoodbye(turnId){
@@ -1850,6 +1875,8 @@ function stopShericeri(){
   sheriAwaitingUserTurn=false;
   const btn=document.getElementById('shericeriTalkBtn');
   if(btn){btn.textContent='🎙️';btn.style.background=''}
+  const heroBtn=document.getElementById('sheriHeroTalkBtn');
+  if(heroBtn){heroBtn.textContent='🎙️ Talk';heroBtn.disabled=false;}
   setSheriStatus('Tap to start talking with Shericeri.');
   clearInterval(shericeriVadTimer);
   try{shericeriRecorder&&shericeriRecorder.state!=='inactive'&&shericeriRecorder.stop()}catch(e){}
@@ -1921,7 +1948,7 @@ function shericeriListenOnce(){
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.10 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.10.1 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
@@ -2013,7 +2040,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V12.10');
+  sheriDiagSet('Runtime version','V12.10.1');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
@@ -2288,6 +2315,8 @@ function sheriScheduleNextListen(turnId){
     sheriDiagSet('Turn mode','CONTINUOUS / hands-free');
     sheriDiagSet('Listen guard','100 ms');
   }
+  const heroBtn=document.getElementById('sheriHeroTalkBtn');
+  if(heroBtn){heroBtn.textContent='🎙️ Listening…';heroBtn.disabled=true;}
   setSheriStatus('Shericeri is listening…');
   setTimeout(()=>{
     if(turnId!==sheriTurnId)return;
