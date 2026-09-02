@@ -466,7 +466,7 @@ function sheriOnlineEvents(){
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
-  navigator.serviceWorker.register('./shericeri_v12_5_android_speech_sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./shericeri_v12_6_voice_loop_sw.js').catch(()=>{});
 }
 
 async function sheriOfflineInit(){
@@ -1568,7 +1568,7 @@ const SHERI_ANDROID_MIN_SPEECH_MS=150;
 const SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS=2200;   // legacy threshold retained; now treated as a timing hint, not a hard speech gate
 const SHERI_SILENCE_STOP_MS=350; // keep the successful faster conversational timeout
 const SHERI_MIN_SPEECH_MS=180; // keep the successful minimum confirmation window
-const SHERI_NO_SPEECH_TIMEOUT_MS=3500; // quiet Android inputs get a shorter uncertain-speech window; Whisper still decides
+const SHERI_NO_SPEECH_TIMEOUT_MS=2200; // uncertain-speech safety window; Whisper still decides
 const SHERI_MAX_RECORD_MS=20000;   // hard safety cap per turn
 
 function toggleShericeriSearch(){
@@ -1624,7 +1624,7 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.5 ANDROID SPEECH TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.6 VOICE LOOP TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
@@ -1885,7 +1885,7 @@ function shericeriListenOnce(){
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.5 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.6 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
@@ -2066,7 +2066,12 @@ function sheriNormalizePhrase(q){
 }
 function sheriIsGoodbyePhrase(q){
   const text=sheriNormalizePhrase(q);
-  return /^(bye|goodbye|good night|see you|see you later|all right,? bye|alright,? bye|okay,? bye|ok,? bye|bye bye|see ya|murabeho|murabeho cyane)[!.?]*$/i.test(text);
+  if(/^(bye|goodbye|good night|see you|see you later|all right,? bye|alright,? bye|okay,? bye|ok,? bye|bye bye|see ya|murabeho|murabeho cyane)[!.?]*$/i.test(text)) return true;
+  // Also recognize natural closing phrases that end with a goodbye, e.g.
+  // “that's it, thank you, bye” / “thank you, bye” without triggering on
+  // questions that merely mention the word “goodbye”.
+  if(/^(?:that's it|thats it|that is it|okay|ok|alright|all right|thanks?|thank you(?: so much)?|merci(?: beaucoup)?|murakoze(?: cyane)?)(?:[ ,;]+(?:and|then|but)?[ ,;]*(?:thanks?|thank you(?: so much)?|merci(?: beaucoup)?|murakoze(?: cyane)?))?[ ,;]+(?:bye|goodbye|good night|see you(?: later)?|see ya|murabeho(?: cyane)?)[!.?]*$/i.test(text)) return true;
+  return false;
 }
 function sheriConversationFastLane(q){
   const text=sheriNormalizePhrase(q);
@@ -2077,6 +2082,7 @@ function sheriConversationFastLane(q){
     return 'Anytime, darling. I’ve got you.';
   }
   if(sheriIsGoodbyePhrase(text)){
+    if(/(?:thanks?|thank you|merci|murakoze)/i.test(text)) return 'You’re welcome, darling. Bye — take care!';
     return 'Bye, darling. Keep those numbers healthy.';
   }
   return null;
@@ -2097,6 +2103,9 @@ function sheriFastLane(q){
   }
   if(/how much (did i|have i) (sell|sold)|sales today|total sales|revenue/.test(q)){
     return `You've sold ${money(rev)} so far, across ${state.sales.length} transactions.`;
+  }
+  if(/expenses?|spending|costs?/.test(q)){
+    return `Your total expenses are ${money(totalExpenses())}.`;
   }
   if(/how (am i doing|is my business)|profit|nunguka/.test(q)){
     return pr>=0?`You're sitting at ${money(pr)} in estimated profit. Not bad at all.`:`You're at a loss of ${money(Math.abs(pr))} right now — let's turn that around.`;
