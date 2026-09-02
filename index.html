@@ -466,7 +466,7 @@ function sheriOnlineEvents(){
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
-  navigator.serviceWorker.register('./shericeri_v12_7_diagnostics_voice_loop_sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./shericeri_v12_7_1_diagnostics_safe_sw.js').catch(()=>{});
 }
 
 async function sheriOfflineInit(){
@@ -1624,18 +1624,14 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.7 DIAGNOSTIC INTEGRITY TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.7.1 DIAGNOSTIC INTEGRITY TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
 function sheriDiagShow(){sheriDiagEnsure().style.display='block';refreshSheriAudioInputs()}
-function sheriDiagClearTurn(){
-  const d=sheriDiagEnsure(), rows=d.querySelector('#sheriDiagRows');
-  if(!rows)return;
-  rows.innerHTML='';
-}
+function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriDiagSet(label,value){
   const d=sheriDiagEnsure(), rows=d.querySelector('#sheriDiagRows');
   let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));
@@ -1890,7 +1886,7 @@ function shericeriListenOnce(){
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.7 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.7.1 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
@@ -1979,15 +1975,9 @@ function shericeriListenOnce(){
 }
 function blobToDataUrl(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob)})}
 async function shericeriTranscribeAndRespond(blob,mimeType){
-  const turnPipelineStartedAt=performance.now();
-  sheriRecordingStoppedAt=turnPipelineStartedAt;
-  sheriWhisperFinishedAt=0;
-  sheriAdvisorFirstChunkAt=0;
-  sheriTtsQueuedAt=0;
-  sheriTtsStartedAt=0;
   sheriDiagClearTurn();
-  sheriDiagSet('Response phase','Transcription starting');
   sheriDiagSet('Diagnostics turn','new pipeline turn');
+  sheriDiagSet('Runtime version','V12.7.1');
   const whisperRequestStarted=performance.now();
   if(blob.size<800){
     // Effectively silent clip (mic picked up nothing meaningful) — don't
@@ -2180,9 +2170,6 @@ function sheriResetSpeechState(){
   sheriTurnFailed=false;
   sheriResponsePhase='idle';
   sheriAwaitingUserTurn=false;
-  sheriTtsQueuedAt=0;
-  sheriTtsStartedAt=0;
-  sheriAdvisorFirstChunkAt=0;
   if(window.speechSynthesis)try{speechSynthesis.cancel()}catch(_){}
 }
 
@@ -2197,11 +2184,7 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
   }
   sheriResponsePhase='tts_queued';
   sheriTtsQueuedAt=performance.now();
-  if(sheriAdvisorFirstChunkAt){
-    sheriDiagSet('Advisor first chunk → TTS queue',Math.max(0,Math.round(sheriTtsQueuedAt-sheriAdvisorFirstChunkAt))+' ms');
-  }else{
-    sheriDiagSet('Response → TTS queue',Math.round(sheriTtsQueuedAt-sheriTurnStartedAt)+' ms');
-  }
+  if(sheriAdvisorFirstChunkAt) sheriDiagSet('Advisor first chunk → TTS queue',Math.round(sheriTtsQueuedAt-sheriAdvisorFirstChunkAt)+' ms');
   if(typeof sheriDiagSet==='function'){
     sheriDiagSet('Response phase','TTS queued');
     sheriDiagSet('TTS queued text',text.slice(0,300));
@@ -2343,7 +2326,6 @@ function sheriDrainSpeakQueue(){
       sheriDiagSet('TTS','STARTED');
       sheriDiagSet('Response phase','TTS speaking');
       sheriDiagSet('TTS turn ID',String(turnId));
-      sheriDiagSet('TTS source',window.SHERPA_ONNX_TTS_BRIDGE?.speak?'LOCAL BRIDGE':'BROWSER SPEECH SYNTHESIS');
       sheriDiagSet('Turn → TTS start',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
       sheriDiagSet('TTS queue → start',Math.round(performance.now()-sheriTtsQueuedAt)+' ms');
       if(isAndroid){
@@ -2427,14 +2409,13 @@ async function shericeriRespond(transcript){
     return;
   }
   const thisTurnId=++sheriTurnId;
-  sheriTurnStartedAt=turnPipelineStartedAt;
-  sheriWhisperFinishedAt=performance.now();
+  sheriTurnStartedAt=performance.now();
+  sheriWhisperFinishedAt=sheriWhisperFinishedAt||performance.now();
   sheriResponsePhase='transcript_received';
   sheriStartHistoryTurn(thisTurnId,transcript);
   if(typeof sheriDiagSet==='function'){
     sheriDiagSet('Turn ID',String(thisTurnId));
     sheriDiagSet('Response phase','Transcript received');
-    sheriDiagSet('Recording stop → Whisper complete',Math.round(sheriWhisperFinishedAt-turnPipelineStartedAt)+' ms');
     sheriDiagSet('Exact transcript',transcript.slice(0,500));
     sheriDiagSet('Transcript length',String(transcript.length));
     sheriDiagSet('Orchestrator','V11 explicit deterministic routing');
@@ -2454,11 +2435,8 @@ async function shericeriRespond(transcript){
   if(conversationalFast){
     if(typeof sheriDiagSet==='function'){
       sheriDiagSet('Conversation fast lane','MATCHED');
-      sheriDiagSet('Response source','DETERMINISTIC LOCAL');
       sheriDiagSet('Advisor call','SKIPPED — deterministic conversation');
       sheriDiagSet('Advisor round-trip','0 ms — not called');
-      sheriDiagSet('First response chunk',conversationalFast.slice(0,300));
-      sheriDiagSet('Turn → first response chunk',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
     }
     if(box){box.innerHTML+=`<div class="msg ai">${esc(conversationalFast)}</div>`;box.scrollTop=box.scrollHeight}
     sheriCommitAssistantHistory(thisTurnId,conversationalFast);
@@ -2475,15 +2453,8 @@ async function shericeriRespond(transcript){
 
   // Business fast lane: answer instantly from local data, skip the AI entirely.
   const fast=sheriFastLane(transcript);
-  if(typeof sheriDiagSet==='function')sheriDiagSet('Business fast lane',''+(fast?'MATCHED':'not matched'));
+  if(typeof sheriDiagSet==='function')sheriDiagSet('Fast lane',''+(fast?'MATCHED':'not matched'));
   if(fast){
-    if(typeof sheriDiagSet==='function'){
-      sheriDiagSet('Response source','DETERMINISTIC LOCAL BUSINESS');
-      sheriDiagSet('Advisor call','SKIPPED — deterministic business');
-      sheriDiagSet('Advisor round-trip','0 ms — not called');
-      sheriDiagSet('First response chunk',fast.slice(0,300));
-      sheriDiagSet('Turn → first response chunk',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
-    }
     if(box){box.innerHTML+=`<div class="msg ai">${esc(fast)}</div>`;box.scrollTop=box.scrollHeight}
     sheriCommitAssistantHistory(thisTurnId,fast);
     sheriResetSpeechState();
@@ -2525,8 +2496,7 @@ async function shericeriRespond(transcript){
       throw new Error('Shericeri session expired — please sign in again.');
     }
     const advisorStart=performance.now();
-     sheriDiagSet('Response source','CLOUD ADVISOR');
-     sheriDiagSet('Whisper complete → advisor request',Math.round(advisorStart-sheriWhisperFinishedAt)+' ms');
+     sheriDiagSet('Whisper → advisor request',Math.round(advisorStart-sheriWhisperFinishedAt)+' ms');
     sheriResponsePhase='advisor_request';
     if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','Advisor request started'); sheriDiagSet('Advisor question',transcript.slice(0,500)); }
     let res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
