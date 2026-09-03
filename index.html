@@ -59,7 +59,7 @@
   </div>
 </div>
 
-<meta name="shericeri-version" content="V12.10.2 Search Reliability">
+<meta name="shericeri-version" content="V12.1 Offline-First Hardened">
 <div class="app" id="appRoot" style="display:none">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 10px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px">
     <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Ready</span></div>
@@ -193,7 +193,7 @@
 
 <section id="shericeri" class="view">
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
-  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12 offline-first: saved business data and deterministic crunching work offline; full offline voice input requires the local Sherpa-ONNX bridge.</div>
+  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.11 offline-first: English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
       <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
@@ -469,7 +469,18 @@ function sheriOnlineEvents(){
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
-  navigator.serviceWorker.register('./shericeri_v12_10_2_sw.js').catch(()=>{});
+  (async()=>{
+    try{
+      const expected='./shericeri_v12_11_2_preflight_sw.js';
+      const reg=await navigator.serviceWorker.register(expected,{updateViaCache:'none'});
+      await reg.update();
+      // If an older controller is still attached, let the new registration take
+      // over on the next navigation rather than silently reporting a stale shell.
+      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v12_11_2_preflight_sw.js')){
+        sheriDiagSet?.('Service Worker update','new V12.11.2 worker registered; old controller still active until reload');
+      }
+    }catch(e){ console.warn('[Shericeri SW] registration/update failed',e); }
+  })();
 }
 
 async function sheriOfflineInit(){
@@ -482,16 +493,36 @@ async function sheriOfflineInit(){
 async function sheriOfflineDiagnostics(){
   const q=await sheriQueueCount(),conf=(await sheriGetAll('conflicts')).length;
   const localReady=!!sheriOfflineDb;
-  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nRecorded conflicts: ${conf}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
+  const rwTts=!!window.SHERPA_ONNX_TTS_BRIDGE?.speak;
+  const rwStt=!!window.SHERPA_ONNX_STT_BRIDGE?.transcribeBlob;
+  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nRecorded conflicts: ${conf}\nKinyarwanda offline STT bridge: ${rwStt?'READY':'NOT INSTALLED'}\nKinyarwanda offline TTS bridge: ${rwTts?'READY':'NOT INSTALLED'}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
   alert(msg);
 }
 function sheriOfflineLocalAnswer(q){
-  const text=(q||'').toLowerCase().replace(/[’‘]/g,"'").replace(/\s+/g,' ').trim();
+  const text=sheriNormalizePhrase(q||'');
+  const lang=sheriLanguageKey();
   const low=activeProducts().filter(p=>p.stock<=p.reorder);
   const best=bestProducts()[0];
-  const rev=revenue(),pr=profit();
+  const rev=revenue(),pr=profit(),exp=totalExpenses();
+
+  if(lang==='rw'){
+    if(/(amafaranga.*ncuruza|ncuruza.*angahe|nagurishije|ninjije|ibyagurishijwe|amafaranga.*gurisha|sales|revenue)/i.test(text))
+      return `Kugeza ubu wagurishije ${money(rev)}, mu bikorwa byo kugurisha ${state.sales.length}.`;
+    if(/(inyungu|nunguka|inyungu yanjye|igihombo|business.*meze|ubucuruzi.*meze)/i.test(text))
+      return pr>=0?`Inyungu igereranijwe ni ${money(pr)}.`:`Ufite igihombo igereranijwe cya ${money(Math.abs(pr))}.`;
+    if(/(nakoresheje|amafaranga.*nakoresheje|ibyakoreshejwe|expenses|spending|costs?)/i.test(text))
+      return `Amafaranga wakoresheje yose ni ${money(exp)}.`;
+    if(/(stock|ububiko|ibicuruzwa.*birimo|biri hafi kurangira|byenda kurangira|kongera.*ububiko|ongera.*ibicuruzwa)/i.test(text))
+      return low.length?`Ibyihutirwa kongera mu bubiko ni: ${low.slice(0,3).map(p=>p.name).join(', ')}.`:`Ububiko bwawe bumeze neza; nta gicuruzwa cyihutirwa kongera.`;
+    if(/(genda cyane|cyagurishijwe cyane|igicuruzwa.*cyiza|igicuruzwa.*isonga|best product|best sell)/i.test(text))
+      return best&&best.rev?`${best.name} ni cyo gicuruzwa kiri ku isonga, gifite amafaranga yinjijwe angana na ${money(best.rev)}.`:'Nta makuru ahagije y’ibicuruzwa yagurishijwe kugira ngo hamenyekane icy’isonga.';
+    if(/(ibikorwa.*kugurisha|transactions|transactions zingahe|sales zingahe|ibicuruzwa byagurishijwe kangahe)/i.test(text))
+      return `Ufite ibikorwa byo kugurisha ${state.sales.length} kugeza ubu.`;
+    return null;
+  }
   if(/revenue|sales today|total sales|how much.*sold|how much.*sell/.test(text))return `You've sold ${money(rev)} so far, across ${state.sales.length} transactions.`;
   if(/profit|loss|how am i doing/.test(text))return pr>=0?`You're sitting at ${money(pr)} in estimated profit.`:`You're at a loss of ${money(Math.abs(pr))} right now.`;
+  if(/expenses?|spending|costs?/.test(text))return `Your total expenses are ${money(exp)}.`;
   if(/low stock|restock|what should i stock|inventory/.test(text))return low.length?`Top restock priority: ${low.slice(0,3).map(p=>p.name).join(', ')}.`:`Stock levels look healthy — nothing urgent to restock.`;
   if(/best product|best.?sell|sells? best|top product/.test(text))return best&&best.rev?`${best.name} is your star right now — ${money(best.rev)} in revenue.`:'Not enough sales recorded yet to crown a winner.';
   if(/how many (transactions|sales)/.test(text))return `${state.sales.length} transactions recorded so far.`;
@@ -519,9 +550,11 @@ async function sheriLocalTts(text,lang){
     u.lang=requestedLang;
     u.rate=0.98;u.pitch=0.97;u.volume=1;
     const selectedVoice=pickVoice(requestedLang);
-    if(selectedVoice) u.voice=selectedVoice;
-    if(/^rw/i.test(requestedLang) && !selectedVoice){
-      throw new Error('Kinyarwanda TTS voice is not available in this browser; install/use the local Sherpa-ONNX Kinyarwanda TTS bridge.');
+    if(/^rw/i.test(requestedLang)){
+      if(!selectedVoice) throw new Error('Kinyarwanda TTS voice is not available in this browser; use the installed local Kinyarwanda TTS bridge.');
+      u.voice=selectedVoice;
+    }else if(selectedVoice){
+      u.voice=selectedVoice;
     }
     u.onend=()=>{if(offlineTurn===sheriLocalTtsSeq){sheriIsSpeaking=false;sheriResponsePhase='tts_ended'}};
     u.onerror=()=>{if(offlineTurn===sheriLocalTtsSeq){sheriIsSpeaking=false;sheriResponsePhase='idle'}};
@@ -548,7 +581,11 @@ async function sheriOfflineRouteText(text){
     await sheriLocalTts(answer,currentShericeriLang?.()||'en-US');
     return true;
   }
-  const fallback=`I’m offline, darling. I can still crunch your saved sales, stock, expenses and profit, but I need internet for fresh research or deeper AI analysis.`;
+  const fallback=sheriLanguageKey()==='rw'
+    ? `Ndi offline, ariko ndacyashobora kureba ibicuruzwa, ububiko, ibyo wagurishije, amafaranga wakoresheje n’inyungu bibitswe kuri telefoni. Ku bushakashatsi bushya cyangwa isesengura ryimbitse, nkeneye internet.`
+    : sheriLanguageKey()==='fr'
+      ? `Je suis hors ligne, mais je peux encore analyser vos ventes, votre stock, vos dépenses et votre bénéfice enregistrés. Pour des recherches récentes ou une analyse approfondie, j’ai besoin d’internet.`
+      : `I’m offline, darling. I can still crunch your saved sales, stock, expenses and profit, but I need internet for fresh research or deeper AI analysis.`;
   sheriDiagSet('Offline route','OFFLINE CAPABILITY LIMIT');
   sheriDiagSet('Offline LLM tokens','0');
   await sheriLocalTts(fallback,currentShericeriLang?.()||'en-US');
@@ -1228,7 +1265,7 @@ async function askAI(webSearch){
   const thinkingId='think-'+Date.now();
   box.innerHTML+=`<div class="msg ai" id="${thinkingId}">${webSearch?'Searching the web…':'Thinking…'}</div>`;
   box.scrollTop=box.scrollHeight;
-  const wantsWebResearch=/\b(research|look up|look it up|search the web|search online|find online|find the latest|latest information|current information|current prices|recent news|news about|what is happening|what's happening|market research|do some research|can you research)\b/i.test(q||'');
+  const wantsWebResearch=/\b(research|look up|look it up|search the web|search online|find online|find the latest|latest information|current information|current prices|recent news|news about|what is happening|what's happening|market research|do some research|can you research|price of|prices? of|how much is|how much are|cost of|costs? of|market price|retail price|supplier price|in kigali|in rwanda|igiciro|ibiciro|igura angahe|bigura angahe|angahe.*kigali|angahe.*rwanda|mu kigali|mu rwanda|shakisha|gushakisha|amakuru agezweho)\b/i.test(q||'');
   const effectiveWebSearch=shericeriSearchOn||wantsWebResearch;
   if(typeof sheriDiagSet==='function'){
     sheriDiagSet('Web research intent',wantsWebResearch?'DETECTED':'not detected');
@@ -1326,12 +1363,12 @@ function toggleShericeriDiagnostic(){
   const el=document.getElementById('sheriDiagnostic');
   if(el)el.style.display=el.style.display==='none'?'block':'none';
 }
-function sheriSpeakerStatusSet(text){
+function sheriDiagSet(text){
   const el=document.getElementById('sheriDiagStatus');
   if(el)el.innerHTML=text;
 }
 async function sheriDiagSpeaker(){
-  sheriSpeakerStatusSet('🔊 <b>Speaker:</b> testing…');
+  sheriDiagSet('🔊 <b>Speaker:</b> testing…');
   try{
     if(!window.speechSynthesis||!window.SpeechSynthesisUtterance)throw new Error('Speech synthesis is not supported');
     await ensureVoicesLoaded();
@@ -1341,18 +1378,18 @@ async function sheriDiagSpeaker(){
     utt.lang=lang;utt.rate=1.03;utt.pitch=1;utt.volume=SHERI_TTS_VOLUME;
     const isAndroid=/Android/i.test(navigator.userAgent||'');
     const voices=speechSynthesis.getVoices();
-    const voice=pickVoice(lang);
+    const voice=isAndroid?null:pickVoice(lang);
     if(voice)utt.voice=voice;
     if(isAndroid){ utt.rate=SHERI_ANDROID_TTS_RATE; utt.pitch=SHERI_ANDROID_TTS_PITCH; }
     const defaultCandidate=voices.find(v=>v.default);
     const voiceLabel=voice?esc(voice.name):(isAndroid?'Android platform/OS default voice':'browser default voice');
-    sheriSpeakerStatusSet(`🔊 <b>Speaker:</b> queued — ${voices.length} voices; ${voiceLabel}; default candidate: ${defaultCandidate?esc(defaultCandidate.name):'not exposed'}`);
-    utt.onstart=()=>sheriSpeakerStatusSet(`🔊 <b>Speaker:</b> ✅ onstart — ${voiceLabel}`);
-    utt.onend=()=>sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ✅ onend. If you heard nothing, report this screenshot.');
-    utt.onerror=e=>sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
-    const speakTest=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)))}};
+    sheriDiagSet(`🔊 <b>Speaker:</b> queued — ${voices.length} voices; ${voiceLabel}; default candidate: ${defaultCandidate?esc(defaultCandidate.name):'not exposed'}`);
+    utt.onstart=()=>sheriDiagSet(`🔊 <b>Speaker:</b> ✅ onstart — ${voiceLabel}`);
+    utt.onend=()=>sheriDiagSet('🔊 <b>Speaker:</b> ✅ onend. If you heard nothing, report this screenshot.');
+    utt.onerror=e=>sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
+    const speakTest=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)))}};
     if(isAndroid)setTimeout(speakTest,90);else speakTest();
-  }catch(e){sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
+  }catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
 }
 async function sheriDiagRecord(){
   try{
@@ -1619,6 +1656,11 @@ function pickVoice(lang){
     const n=String(v.name||'').toLowerCase();
     const vl=String(v.lang||'').toLowerCase().replace('_','-');
     let score=0;
+    // Prefer a genuinely female-labelled voice when the platform exposes one.
+    // Gender metadata is not standardized by Web Speech, so this is intentionally
+    // a conservative name/label heuristic; language matching remains the first rule.
+    if(/\b(female|woman|girl|samantha|zira|hazel|susan|susan|karen|ava|sara|aria|jenny|libby|sonia|google us english female)\b/.test(n))score-=12;
+    if(/\b(david|mark|george|daniel|alex|guy|male|man)\b/.test(n))score+=8;
     if(n.includes('natural')||n.includes('neural')||n.includes('premium')||n.includes('enhanced'))score-=8;
     if(n.includes('google'))score-=5;
     if(n.includes('microsoft'))score-=3;
@@ -1632,8 +1674,8 @@ function pickVoice(lang){
 }
 function sheriAndroidTtsProfile(lang){
   const voices=window.speechSynthesis?speechSynthesis.getVoices():[];
-  const voice=pickVoice(lang);
   const isAndroid=/Android/i.test(navigator.userAgent||'');
+  const voice=isAndroid?null:pickVoice(lang);
   return {
     isAndroid,
     voiceCount:voices.length,
@@ -1651,13 +1693,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.10.2 SEARCH-RELIABILITY TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.11.2 PRE-RELEASE TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.10.2');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.11.2');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -1948,7 +1990,7 @@ function shericeriListenOnce(){
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.10.2 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.11.2 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
@@ -2040,7 +2082,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V12.10.2');
+  sheriDiagSet('Runtime version','V12.11.2');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
@@ -2057,6 +2099,7 @@ if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDi
     const dataUrl=await blobToDataUrl(blob);
     sheriDiagSet('Encode',Math.round(performance.now()-encodeStart)+' ms');
     const lang=currentShericeriLang().slice(0,2);
+    if(lang==='rw') sheriDiagSet('Kinyarwanda STT bridge',window.SHERPA_ONNX_STT_BRIDGE?.transcribeBlob?'READY':'NOT INSTALLED');
     const transcribeStart=performance.now();
     // Use raw fetch for transcription diagnostics so we can see the actual
     // HTTP status and JSON error body returned by the Edge Function. The
@@ -2175,6 +2218,7 @@ function sheriTranslateBusinessFast(answer){
 }
 function sheriConversationFastLane(q){
   const text=sheriNormalizePhrase(q);
+  if(/^(so|okay|ok|alright|all right|well|hmm|hm|yeah|yes)[!.?]*$/i.test(text)){ const k=sheriLanguageKey(); return k==='rw'?'Yego — ndagutega amatwi.':k==='fr'?'D’accord — je vous écoute.':'Okay — I’m listening.'; }
   if(/^(hi|hello|hey|good morning|good afternoon|good evening|bonjour|salut|muraho|bite|amakuru)[!.?]*$/i.test(text)) return sheriLocalizeConversationResponse('greeting');
   if(/^(thanks|thank you|thank you so much|thanks a lot|many thanks|merci|merci beaucoup|murakoze|murakoze cyane)[!.?]*$/i.test(text)) return sheriLocalizeConversationResponse('thanks');
   if(sheriIsGoodbyePhrase(text)) return sheriLocalizeConversationResponse('goodbye');
@@ -2301,9 +2345,9 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
 
 // V9.5 TTS volume: explicitly request the browser's maximum SpeechSynthesis volume.
 const SHERI_TTS_VOLUME=1.0;
-const SHERI_ANDROID_TTS_RATE=1.0;
-const SHERI_ANDROID_TTS_PITCH=0.96;
-const SHERI_ANDROID_TTS_VOICE_POLICY='language-matched';
+const SHERI_ANDROID_TTS_RATE=1.03;
+const SHERI_ANDROID_TTS_PITCH=1.0;
+const SHERI_ANDROID_TTS_VOICE_POLICY='platform/default voice (V10.1-compatible)';
 
 function sheriScheduleNextListen(turnId){
   if(turnId!==sheriTurnId)return;
@@ -2364,7 +2408,7 @@ function sheriDrainSpeakQueue(){
   const utt=new SpeechSynthesisUtterance(next);
   utt.lang=lang;
   const isAndroid=/Android/i.test(navigator.userAgent||'');
-  const voice=pickVoice(lang);
+  const voice=isAndroid?null:pickVoice(lang);
   if(/^rw/i.test(lang) && !voice && !window.SHERPA_ONNX_TTS_BRIDGE?.speak){
     if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','Kinyarwanda voice unavailable — local Sherpa-ONNX bridge required');
     sheriIsSpeaking=false;
@@ -2423,7 +2467,8 @@ function sheriDrainSpeakQueue(){
       sheriDiagSet('Turn → TTS start',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
       sheriDiagSet('TTS queue → start',Math.round(performance.now()-sheriTtsQueuedAt)+' ms');
       sheriDiagSet('TTS requested language',lang);
-      sheriDiagSet('TTS selected voice',voice?`${voice.name} (${voice.lang})`:'none');
+      if(/^rw/i.test(lang)) sheriDiagSet('Kinyarwanda TTS bridge',window.SHERPA_ONNX_TTS_BRIDGE?.speak?'READY':'NOT INSTALLED');
+      sheriDiagSet('TTS selected voice',voice?`${voice.name} (${voice.lang})`:(isAndroid?'Android platform/OS default voice':'none'));
       if(isAndroid){
         const availableVoices=speechSynthesis.getVoices();
         const compatibleVoices=availableVoices.filter(v=>{
@@ -2433,7 +2478,7 @@ function sheriDrainSpeakQueue(){
           return vl===sl || vl===short || vl.startsWith(short+'-');
         });
         const compatibleCandidate=compatibleVoices[0];
-        sheriDiagSet('Android TTS voice policy',SHERI_ANDROID_TTS_VOICE_POLICY+' (language locked)');
+        sheriDiagSet('Android TTS voice policy',SHERI_ANDROID_TTS_VOICE_POLICY+'; requested language locked via utt.lang');
         sheriDiagSet('Android TTS voice candidate',compatibleCandidate?`${compatibleCandidate.name} (${compatibleCandidate.lang})`:'none for requested language');
         sheriDiagSet('Android TTS voices available',String(availableVoices.length));
         sheriDiagSet('Android TTS rate',String(SHERI_ANDROID_TTS_RATE));
@@ -2466,13 +2511,12 @@ function sheriDrainSpeakQueue(){
       return;
     }
     try{
-      if(isAndroid){
-        const nowVoices=speechSynthesis.getVoices();
-        if(!nowVoices.length){ try{ await ensureVoicesLoaded(180); }catch(_){} }
+      let selectedVoice=null;
+      if(!isAndroid){
+        selectedVoice=pickVoice(lang);
+        if(selectedVoice && utt.voice!==selectedVoice) utt.voice=selectedVoice;
       }
-      const selectedVoice=pickVoice(lang);
-      if(selectedVoice && utt.voice!==selectedVoice) utt.voice=selectedVoice;
-      if(typeof sheriDiagSet==='function')sheriDiagSet('TTS selected voice',selectedVoice?`${selectedVoice.name} (${selectedVoice.lang})`:'none for requested language');
+      if(typeof sheriDiagSet==='function')sheriDiagSet('TTS selected voice',selectedVoice?`${selectedVoice.name} (${selectedVoice.lang})`:(isAndroid?'Android platform/OS default voice':'none for requested language'));
       if(window.SHERPA_ONNX_TTS_BRIDGE?.speak){
         await window.SHERPA_ONNX_TTS_BRIDGE.speak(next,lang);
         finish('local-bridge-complete');
@@ -2520,7 +2564,7 @@ async function shericeriRespond(transcript){
   sheriTurnStartedAt=preservedTurnStartedAt||performance.now();
   sheriRecordingStoppedAt=preservedRecordingStoppedAt||0;
   sheriWhisperFinishedAt=preservedWhisperFinishedAt||performance.now();
-  const researchIntent=/(\bresearch\b|\blook up\b|\blook it up\b|\bsearch the web\b|\bsearch online\b|\bfind online\b|\bfind the latest\b|\blatest information\b|\bcurrent information\b|\bcurrent prices\b|\brecent news\b|\bnews about\b|\bwhat is happening\b|\bwhat's happening\b|\bmarket research\b|\bdo some research\b|\bcan you research\b|\bresearch this\b)/i.test(String(transcript||''));
+  const researchIntent=/(\bresearch\b|\blook up\b|\blook it up\b|\bsearch the web\b|\bsearch online\b|\bfind online\b|\bfind the latest\b|\blatest information\b|\bcurrent information\b|\bcurrent prices\b|\brecent news\b|\bnews about\b|\bwhat is happening\b|\bwhat's happening\b|\bmarket research\b|\bdo some research\b|\bcan you research\b|\bresearch this\b|\bprice of\b|\bprices? of\b|\bhow much is\b|\bhow much are\b|\bcost of\b|\bcosts? of\b|\bmarket price\b|\bretail price\b|\bsupplier price\b|\bin kigali\b|\bin rwanda\b)/i.test(String(transcript||''));
   const effectiveWebSearch=!!shericeriSearchOn || researchIntent;
   if(typeof sheriDiagSet==='function'){
     sheriDiagSet('Web research intent',researchIntent?'DETECTED':'not detected');
