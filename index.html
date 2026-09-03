@@ -59,7 +59,7 @@
   </div>
 </div>
 
-<meta name="shericeri-version" content="V12.1 Offline-First Hardened">
+<meta name="shericeri-version" content="V12.10.2 Search Reliability">
 <div class="app" id="appRoot" style="display:none">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 10px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px">
     <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Ready</span></div>
@@ -469,7 +469,7 @@ function sheriOnlineEvents(){
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
-  navigator.serviceWorker.register('./shericeri_v12_10_1_preflight_sw.js').catch(()=>{});
+  navigator.serviceWorker.register('./shericeri_v12_10_2_sw.js').catch(()=>{});
 }
 
 async function sheriOfflineInit(){
@@ -1326,12 +1326,12 @@ function toggleShericeriDiagnostic(){
   const el=document.getElementById('sheriDiagnostic');
   if(el)el.style.display=el.style.display==='none'?'block':'none';
 }
-function sheriDiagSet(text){
+function sheriSpeakerStatusSet(text){
   const el=document.getElementById('sheriDiagStatus');
   if(el)el.innerHTML=text;
 }
 async function sheriDiagSpeaker(){
-  sheriDiagSet('🔊 <b>Speaker:</b> testing…');
+  sheriSpeakerStatusSet('🔊 <b>Speaker:</b> testing…');
   try{
     if(!window.speechSynthesis||!window.SpeechSynthesisUtterance)throw new Error('Speech synthesis is not supported');
     await ensureVoicesLoaded();
@@ -1346,13 +1346,13 @@ async function sheriDiagSpeaker(){
     if(isAndroid){ utt.rate=SHERI_ANDROID_TTS_RATE; utt.pitch=SHERI_ANDROID_TTS_PITCH; }
     const defaultCandidate=voices.find(v=>v.default);
     const voiceLabel=voice?esc(voice.name):(isAndroid?'Android platform/OS default voice':'browser default voice');
-    sheriDiagSet(`🔊 <b>Speaker:</b> queued — ${voices.length} voices; ${voiceLabel}; default candidate: ${defaultCandidate?esc(defaultCandidate.name):'not exposed'}`);
-    utt.onstart=()=>sheriDiagSet(`🔊 <b>Speaker:</b> ✅ onstart — ${voiceLabel}`);
-    utt.onend=()=>sheriDiagSet('🔊 <b>Speaker:</b> ✅ onend. If you heard nothing, report this screenshot.');
-    utt.onerror=e=>sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
-    const speakTest=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)))}};
+    sheriSpeakerStatusSet(`🔊 <b>Speaker:</b> queued — ${voices.length} voices; ${voiceLabel}; default candidate: ${defaultCandidate?esc(defaultCandidate.name):'not exposed'}`);
+    utt.onstart=()=>sheriSpeakerStatusSet(`🔊 <b>Speaker:</b> ✅ onstart — ${voiceLabel}`);
+    utt.onend=()=>sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ✅ onend. If you heard nothing, report this screenshot.');
+    utt.onerror=e=>sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
+    const speakTest=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)))}};
     if(isAndroid)setTimeout(speakTest,90);else speakTest();
-  }catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
+  }catch(e){sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
 }
 async function sheriDiagRecord(){
   try{
@@ -1651,13 +1651,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.10.1 PRE-RELEASE TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.10.2 SEARCH-RELIABILITY TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.10.1');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.10.2');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -1948,7 +1948,7 @@ function shericeriListenOnce(){
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.10.1 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.10.2 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
@@ -2040,7 +2040,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V12.10.1');
+  sheriDiagSet('Runtime version','V12.10.2');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
