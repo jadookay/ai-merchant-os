@@ -193,7 +193,7 @@
 
 <section id="shericeri" class="view">
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
-  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.11 offline-first: English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
+  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.12 offline-first: English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
       <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
@@ -217,7 +217,7 @@
       </div>
     </div>
     <div class="actions" style="justify-content:center;margin-bottom:16px">
-      <select id="shericeriLang" style="width:auto;display:inline-block">
+      <select id="shericeriLang" style="width:auto;display:inline-block" onchange="sheriSyncLangSelectors(this)">
         <option value="en-US">English</option>
         <option value="fr-FR">Français</option>
         <option value="rw-RW">Kinyarwanda</option>
@@ -266,7 +266,7 @@
   <div id="sheriHeroName">SHERICERI</div>
   <div id="sheriHeroStatus">Tap to talk</div>
   <div class="actions" style="margin-top:18px;gap:12px;justify-content:center">
-    <select id="sheriHeroLang" style="width:auto;display:inline-block;background:#111;color:#D4AF37;border-color:#D4AF37">
+    <select id="sheriHeroLang" style="width:auto;display:inline-block;background:#111;color:#D4AF37;border-color:#D4AF37" onchange="sheriSyncLangSelectors(this)">
       <option value="en-US">English</option>
       <option value="fr-FR">Français</option>
       <option value="rw-RW">Kinyarwanda</option>
@@ -471,13 +471,13 @@ function sheriOnlineEvents(){
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
   (async()=>{
     try{
-      const expected='./shericeri_v12_11_2_preflight_sw.js';
+      const expected='./shericeri_v12_12_best_sw.js';
       const reg=await navigator.serviceWorker.register(expected,{updateViaCache:'none'});
       await reg.update();
       // If an older controller is still attached, let the new registration take
       // over on the next navigation rather than silently reporting a stale shell.
-      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v12_11_2_preflight_sw.js')){
-        sheriDiagSet?.('Service Worker update','new V12.11.2 worker registered; old controller still active until reload');
+      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v12_12_best_sw.js')){
+        sheriDiagSet?.('Service Worker update','new V12.12 worker registered; old controller still active until reload');
       }
     }catch(e){ console.warn('[Shericeri SW] registration/update failed',e); }
   })();
@@ -1363,12 +1363,12 @@ function toggleShericeriDiagnostic(){
   const el=document.getElementById('sheriDiagnostic');
   if(el)el.style.display=el.style.display==='none'?'block':'none';
 }
-function sheriDiagSet(text){
+function sheriSpeakerStatusSet(text){
   const el=document.getElementById('sheriDiagStatus');
   if(el)el.innerHTML=text;
 }
 async function sheriDiagSpeaker(){
-  sheriDiagSet('🔊 <b>Speaker:</b> testing…');
+  sheriSpeakerStatusSet('🔊 <b>Speaker:</b> testing…');
   try{
     if(!window.speechSynthesis||!window.SpeechSynthesisUtterance)throw new Error('Speech synthesis is not supported');
     await ensureVoicesLoaded();
@@ -1383,13 +1383,13 @@ async function sheriDiagSpeaker(){
     if(isAndroid){ utt.rate=SHERI_ANDROID_TTS_RATE; utt.pitch=SHERI_ANDROID_TTS_PITCH; }
     const defaultCandidate=voices.find(v=>v.default);
     const voiceLabel=voice?esc(voice.name):(isAndroid?'Android platform/OS default voice':'browser default voice');
-    sheriDiagSet(`🔊 <b>Speaker:</b> queued — ${voices.length} voices; ${voiceLabel}; default candidate: ${defaultCandidate?esc(defaultCandidate.name):'not exposed'}`);
-    utt.onstart=()=>sheriDiagSet(`🔊 <b>Speaker:</b> ✅ onstart — ${voiceLabel}`);
-    utt.onend=()=>sheriDiagSet('🔊 <b>Speaker:</b> ✅ onend. If you heard nothing, report this screenshot.');
-    utt.onerror=e=>sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
-    const speakTest=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)))}};
+    sheriSpeakerStatusSet(`🔊 <b>Speaker:</b> queued — ${voices.length} voices; ${voiceLabel}; default candidate: ${defaultCandidate?esc(defaultCandidate.name):'not exposed'}`);
+    utt.onstart=()=>sheriSpeakerStatusSet(`🔊 <b>Speaker:</b> ✅ onstart — ${voiceLabel}`);
+    utt.onend=()=>sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ✅ onend. If you heard nothing, report this screenshot.');
+    utt.onerror=e=>sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.error||'speech synthesis error'));
+    const speakTest=()=>{try{speechSynthesis.resume();speechSynthesis.speak(utt)}catch(e){sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)))}};
     if(isAndroid)setTimeout(speakTest,90);else speakTest();
-  }catch(e){sheriDiagSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
+  }catch(e){sheriSpeakerStatusSet('🔊 <b>Speaker:</b> ❌ '+esc(e.message||String(e)));}
 }
 async function sheriDiagRecord(){
   try{
@@ -1693,13 +1693,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.11.2 PRE-RELEASE TEST</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.12 KINYARWANDA + DESKTOP MIC FIX</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.11.2');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.12');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -1827,6 +1827,20 @@ function heroShericeriTalk(){
   }
   shericeriListenOnce();
 }
+function sheriLangCode(){ return currentShericeriLang().slice(0,2).toLowerCase(); }
+function sheriIsKinyarwanda(){ return sheriLangCode()==='rw'; }
+function sheriLocalized(en,fr,rw){ const c=sheriLangCode(); return c==='rw'?rw:(c==='fr'?fr:en); }
+function sheriSyncLangSelectors(source){
+  const page=document.getElementById('shericeriLang'), hero=document.getElementById('sheriHeroLang');
+  const value=source?.value||currentShericeriLang();
+  if(page&&page.value!==value)page.value=value;
+  if(hero&&hero.value!==value)hero.value=value;
+  if(typeof sheriDiagSet==='function')sheriDiagSet('Selected language',value);
+  try{ ensureVoicesLoaded().then(()=>{
+    const v=pickVoice(value);
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Selected TTS voice',v?`${v.name} (${v.lang})`:(sheriIsKinyarwanda()?'No rw-RW voice exposed; bridge/device fallback required':'platform default'));
+  }).catch(()=>{}); }catch(_){}
+}
 function currentShericeriLang(){
   const heroLang=document.getElementById('sheriHeroLang');
   const pageLang=document.getElementById('shericeriLang');
@@ -1871,7 +1885,17 @@ async function startShericeriLoop(){
   }
   try{
     await refreshSheriAudioInputs();
-    shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
+    try{
+      shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
+    }catch(primaryMicError){
+      // Desktop browsers can expose a stale/virtual deviceId after permissions,
+      // docking, Bluetooth changes, or browser restarts. Never let that prevent
+      // the normal/default microphone from being tried. Android keeps its tested
+      // path unchanged because its audio profile is already working well.
+      sheriDiagSet('Microphone selected-input attempt','FAILED — '+(primaryMicError?.name||primaryMicError?.message||primaryMicError));
+      shericeriMicStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      sheriDiagSet('Microphone fallback','DEFAULT BROWSER INPUT — selected device was unavailable');
+    }
     const micTrack=shericeriMicStream.getAudioTracks()[0];
     const micSettings=micTrack?.getSettings?.()||{};
     sheriDiagSet('Microphone','granted — '+(micTrack?.label||'selected input'));
@@ -1983,16 +2007,22 @@ function shericeriListenOnce(){
   let maxPeak=0;
   let stopReason='';
   const data=new Uint8Array(shericeriAnalyser.frequencyBinCount);
+  const timeData=new Uint8Array(shericeriAnalyser.fftSize);
   const isAndroid=/Android/i.test(navigator.userAgent||'');
   const vadThreshold=isAndroid?SHERI_ANDROID_SPEECH_THRESHOLD:SHERI_SPEECH_THRESHOLD;
-  const silenceStopMs=isAndroid?SHERI_ANDROID_SILENCE_STOP_MS:350;
+  // Desktop microphones often report much lower analyser averages than Android.
+  // Use an adaptive time-domain RMS signal as a second speech detector instead of
+  // relying on a fixed frequency-domain threshold. Android keeps its proven profile.
+  let noiseRms=2.5;
+  let noiseSamples=0;
+  const silenceStopMs=isAndroid?SHERI_ANDROID_SILENCE_STOP_MS:500;
   const minSpeechMs=isAndroid?SHERI_ANDROID_MIN_SPEECH_MS:180;
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.11.2 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.12 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
-  sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP PROFILE');
+  sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP ADAPTIVE MIC PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
   sheriVadDiag('VAD speech confirmed','NO');
   sheriVadDiag('VAD silence duration','0 ms');
@@ -2002,14 +2032,22 @@ function shericeriListenOnce(){
   shericeriVadTimer=setInterval(()=>{
     if(!shericeriActive||!shericeriRecorder||shericeriRecorder.state==='inactive'){clearInterval(shericeriVadTimer);return}
     shericeriAnalyser.getByteFrequencyData(data);
+    shericeriAnalyser.getByteTimeDomainData(timeData);
     let sum=0,peak=0;for(let i=0;i<data.length;i++){sum+=data[i];if(data[i]>peak)peak=data[i]}
     const avg=sum/data.length;
+    let rmsSum=0,timePeak=0;
+    for(let i=0;i<timeData.length;i++){const d=Math.abs(timeData[i]-128);rmsSum+=d*d;if(d>timePeak)timePeak=d;}
+    const rms=Math.sqrt(rmsSum/timeData.length);
+    if(!isAndroid && noiseSamples<10 && !speechConfirmed){ noiseRms=(noiseRms*0.7)+(rms*0.3); noiseSamples++; }
+    const adaptiveDesktopSpeech=!isAndroid && rms>Math.max(4.0,noiseRms*1.8) && timePeak>7;
+    const speechDetected=avg>vadThreshold || (isAndroid && peak>45 && avg>vadThreshold*0.55) || adaptiveDesktopSpeech;
     const now=Date.now();
     if(avg>maxAvg)maxAvg=avg;
     if(peak>maxPeak)maxPeak=peak;
     const elapsed=((now-startTime)/1000).toFixed(1);
-    sheriVadDiag('VAD live',`${elapsed}s — avg ${avg.toFixed(1)} / peak ${peak}`);
+    sheriVadDiag('VAD live',`${elapsed}s — avg ${avg.toFixed(1)} / peak ${peak} / RMS ${rms.toFixed(1)} / time-peak ${timePeak}`);
     sheriVadDiag('VAD max observed',`avg ${maxAvg.toFixed(1)} / peak ${maxPeak}`);
+    if(!isAndroid)sheriVadDiag('Desktop adaptive speech',adaptiveDesktopSpeech?'YES':'NO — noise floor '+noiseRms.toFixed(1));
     // TTS interruption protection. Do not interpret speaker output as user speech.
     if(sheriIsSpeaking||sheriResponsePhase==='tts_starting'||sheriResponsePhase==='tts_speaking'){
       sheriVadDiag('VAD blocked','TTS speaking');
@@ -2020,7 +2058,7 @@ function shericeriListenOnce(){
 
     // VAD is now a soft timing hint. We still track the threshold crossings,
     // but a weak Android signal does NOT automatically discard a recording.
-    if(avg>vadThreshold || (isAndroid && peak>45 && avg>vadThreshold*0.55)){
+    if(speechDetected){
       speechEnergyDetected=true;
       sheriVadDiag('VAD speech energy detected','YES');
       if(!speechConfirmed){
@@ -2082,7 +2120,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V12.11.2');
+  sheriDiagSet('Runtime version','V12.12');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
@@ -2564,7 +2602,7 @@ async function shericeriRespond(transcript){
   sheriTurnStartedAt=preservedTurnStartedAt||performance.now();
   sheriRecordingStoppedAt=preservedRecordingStoppedAt||0;
   sheriWhisperFinishedAt=preservedWhisperFinishedAt||performance.now();
-  const researchIntent=/(\bresearch\b|\blook up\b|\blook it up\b|\bsearch the web\b|\bsearch online\b|\bfind online\b|\bfind the latest\b|\blatest information\b|\bcurrent information\b|\bcurrent prices\b|\brecent news\b|\bnews about\b|\bwhat is happening\b|\bwhat's happening\b|\bmarket research\b|\bdo some research\b|\bcan you research\b|\bresearch this\b|\bprice of\b|\bprices? of\b|\bhow much is\b|\bhow much are\b|\bcost of\b|\bcosts? of\b|\bmarket price\b|\bretail price\b|\bsupplier price\b|\bin kigali\b|\bin rwanda\b)/i.test(String(transcript||''));
+  const researchIntent=/(\bresearch\b|\blook up\b|\blook it up\b|\bsearch the web\b|\bsearch online\b|\bfind online\b|\bfind the latest\b|\blatest information\b|\bcurrent information\b|\bcurrent prices\b|\brecent news\b|\bnews about\b|\bwhat is happening\b|\bwhat's happening\b|\bmarket research\b|\bdo some research\b|\bcan you research\b|\bresearch this\b|\bprice of\b|\bprices? of\b|\bhow much is\b|\bhow much are\b|\bcost of\b|\bcosts? of\b|\bmarket price\b|\bretail price\b|\bsupplier price\b|\bin kigali\b|\bin rwanda\b|\bigiciro\b|\bibiciro\b|\bigura angahe\b|\bbigura angahe\b|angahe.*kigali|angahe.*rwanda|\bmu kigali\b|\bmu rwanda\b|\bshakisha\b|\bgushakisha\b|\bamakuru agezweho\b)/i.test(String(transcript||''));
   const effectiveWebSearch=!!shericeriSearchOn || researchIntent;
   if(typeof sheriDiagSet==='function'){
     sheriDiagSet('Web research intent',researchIntent?'DETECTED':'not detected');
