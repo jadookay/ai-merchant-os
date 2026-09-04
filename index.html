@@ -193,7 +193,7 @@
 
 <section id="shericeri" class="view">
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
-  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.12 offline-first: English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
+  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.13.1 offline-first: English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div><div id="sheriNativeAsrInstall" style="display:none;margin:6px 0 10px"><button class="btn small secondary" onclick="sheriInstallNativeKinyarwandaAsr()">Install offline Kinyarwanda voice</button><span id="sheriNativeAsrInstallStatus" class="sub" style="margin-left:8px"></span></div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
       <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
@@ -490,12 +490,48 @@ async function sheriOfflineInit(){
   if(!window._sheriOfflineEventsBound){ sheriOnlineEvents(); window._sheriOfflineEventsBound=true; }
   if(!window._sheriSyncTimer)window._sheriSyncTimer=setInterval(()=>{if(navigator.onLine)sheriSyncOutbox()},15000);
 }
+function sheriNativeAndroid(){return !!window.ShericeriAndroid;}
+function sheriShowNativeAsrInstaller(){
+  const el=document.getElementById('sheriNativeAsrInstall');
+  if(el)el.style.display=sheriNativeAndroid()?'block':'none';
+}
+function sheriInstallNativeKinyarwandaAsr(){
+  if(!window.ShericeriAndroid)return;
+  const status=document.getElementById('sheriNativeAsrInstallStatus');
+  if(status)status.textContent='Downloading ~365 MB — Wi-Fi recommended…';
+  const result=window.ShericeriAndroid.installKinyarwandaAsrModel();
+  if(result==='ALREADY_INSTALLED'&&status)status.textContent='Offline Kinyarwanda ASR already installed.';
+}
+window.addEventListener('shericeri-native-bridge-ready',e=>{
+  sheriShowNativeAsrInstaller();
+  const d=e.detail||{};
+  const status=document.getElementById('sheriNativeAsrInstallStatus');
+  if(status&&d.kinyarwandaAsrModelInstall==='installed')status.textContent='Offline Kinyarwanda ASR installed.';
+});
+window.addEventListener('shericeri-native-model_download_progress',e=>{
+  const status=document.getElementById('sheriNativeAsrInstallStatus');
+  if(!status)return;
+  const done=Number(e.detail?.done||0), total=Number(e.detail?.total||0);
+  status.textContent=total?`Downloading offline Kinyarwanda ASR… ${Math.round(done/total*100)}%`:'Downloading offline Kinyarwanda ASR…';
+});
+window.addEventListener('shericeri-native-model_install_complete',e=>{
+  const status=document.getElementById('sheriNativeAsrInstallStatus');
+  if(status)status.textContent='Offline Kinyarwanda ASR installed and verified.';
+  sheriDiagSet?.('Kinyarwanda ASR model','INSTALLED — SHA-256 verified');
+});
+window.addEventListener('shericeri-native-model_install_error',e=>{
+  const status=document.getElementById('sheriNativeAsrInstallStatus');
+  if(status)status.textContent='ASR install failed: '+String(e.detail?.message||'unknown error');
+  sheriDiagSet?.('Kinyarwanda ASR model','INSTALL FAILED');
+});
+
 async function sheriOfflineDiagnostics(){
   const q=await sheriQueueCount(),conf=(await sheriGetAll('conflicts')).length;
   const localReady=!!sheriOfflineDb;
   const rwTts=!!window.SHERPA_ONNX_TTS_BRIDGE?.speak;
-  const rwStt=!!window.SHERPA_ONNX_STT_BRIDGE?.transcribeBlob;
-  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nRecorded conflicts: ${conf}\nKinyarwanda offline STT bridge: ${rwStt?'READY':'NOT INSTALLED'}\nKinyarwanda offline TTS bridge: ${rwTts?'READY':'NOT INSTALLED'}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
+  const rwStt=!!window.SHERPA_ONNX_STT_BRIDGE?.startRecording || !!window.SHERPA_ONNX_STT_BRIDGE?.transcribeBlob;
+  const nativeStatus=(()=>{try{return window.ShericeriAndroid?JSON.parse(window.ShericeriAndroid.status()):null}catch(_){return null}})();
+  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nRecorded conflicts: ${conf}\nKinyarwanda offline STT bridge: ${rwStt?'READY':'NOT INSTALLED'}\nKinyarwanda offline TTS bridge: ${rwTts?'READY':'NOT INSTALLED'}\nNative Kinyarwanda ASR model: ${nativeStatus?.kinyarwandaAsrModelInstall||'unknown'}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
   alert(msg);
 }
 function sheriOfflineLocalAnswer(q){
@@ -1821,8 +1857,8 @@ function heroShericeriTalk(){
     shericeriListenOnce();
     return;
   }
-  if(shericeriRecorder?.state==='recording'){
-    setSheriStatus('Shericeri is listening…');
+  if(shericeriRecorder?.state==='recording' || window.sheriNativeRwRecording){
+    setSheriStatus(sheriIsKinyarwanda()&&!navigator.onLine?'Shericeri is listening offline…':'Shericeri is listening…');
     return;
   }
   shericeriListenOnce();
@@ -1955,7 +1991,66 @@ function stopShericeri(){
 function sheriVadDiag(label,value){
   if(typeof sheriDiagSet==='function') sheriDiagSet(label,value);
 }
+window.sheriNativeRwRecording=window.sheriNativeRwRecording||false;
+window.addEventListener('shericeri-native-recording_started',e=>{
+  window.sheriNativeRwRecording=true;
+  sheriDiagSet?.('Native recording','STARTED — '+(e.detail?.sampleRate||16000)+' Hz PCM16');
+});
+window.addEventListener('shericeri-native-recording_stopped',e=>{
+  window.sheriNativeRwRecording=false;
+  sheriRecordingStoppedAt=performance.now();
+  sheriDiagSet?.('Native recording','STOPPED — '+(e.detail?.durationMs||0)+' ms; '+(e.detail?.bytes||0)+' bytes');
+  sheriDiagSet?.('Native stop reason',e.detail?.stopReason||'unknown');
+  sheriDiagSet?.('Native max RMS',String(e.detail?.maxRms??''));
+  document.getElementById('sheriHero')?.classList.remove('listening');
+});
+window.addEventListener('shericeri-native-stt_result',e=>{
+  window.sheriNativeRwRecording=false;
+  const text=String(e.detail?.text||'').trim();
+  sheriWhisperFinishedAt=performance.now();
+  sheriDiagSet?.('Native STT','COMPLETED — offline');
+  sheriDiagSet?.('Exact transcript',text||'(empty)');
+  sheriDiagSet?.('Whisper','SKIPPED');
+  document.getElementById('sheriHero')?.classList.remove('listening');
+  if(!shericeriActive)return;
+  if(text.length<2){
+    setSheriStatus('Sinshobora kumva neza — ongera uvuge.');
+    setTimeout(()=>{if(shericeriActive)shericeriListenOnce()},400);
+    return;
+  }
+  shericeriRespond(text);
+});
+window.addEventListener('shericeri-native-error',e=>{
+  window.sheriNativeRwRecording=false;
+  document.getElementById('sheriHero')?.classList.remove('listening');
+  sheriDiagSet?.('Native voice error',String(e.detail?.message||e.detail||'unknown error'));
+  setSheriStatus('Offline voice is not ready on this device yet.');
+});
+
 function shericeriListenOnce(){
+  // Android native offline lane: Kinyarwanda speech is captured as fresh 16 kHz
+  // PCM by the app, never as a WebM blob. Online Kinyarwanda keeps the proven
+  // Whisper path so this feature cannot regress the connected experience.
+  if(sheriIsKinyarwanda() && !navigator.onLine && window.SHERPA_ONNX_STT_BRIDGE?.startRecording){
+    if(window.sheriNativeRwRecording){
+      window.SHERPA_ONNX_STT_BRIDGE.stopRecording('rw');
+      return;
+    }
+    window.sheriNativeRwRecording=true;
+    setSheriStatus('Shericeri is listening offline…');
+    document.getElementById('sheriHero')?.classList.add('listening');
+    sheriDiagSet('Offline voice','NATIVE SHERPA-ONNX');
+    sheriDiagSet('Kinyarwanda STT bridge','READY');
+    sheriDiagSet('Audio path','Android AudioRecord → PCM16 16 kHz');
+    sheriDiagSet('Whisper','SKIPPED — offline native STT');
+    const started=window.SHERPA_ONNX_STT_BRIDGE.startRecording('rw');
+    if(started==='MODEL_NOT_INSTALLED'){
+      window.sheriNativeRwRecording=false;
+      document.getElementById('sheriHero')?.classList.remove('listening');
+      setSheriStatus('Kinyarwanda offline voice model is not installed yet.');
+    }
+    return;
+  }
   // TTS interruption protection: while Shericeri is speaking, microphone VAD must
   // not create a new turn from speaker feedback or audio bleed.
   if(sheriIsSpeaking||sheriResponsePhase==='tts_starting'||sheriResponsePhase==='tts_speaking'){
@@ -2120,7 +2215,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V12.12');
+  sheriDiagSet('Runtime version','V12.12.1 + native Android preflight');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
