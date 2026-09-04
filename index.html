@@ -59,7 +59,7 @@
   </div>
 </div>
 
-<meta name="shericeri-version" content="V12.1 Offline-First Hardened">
+<meta name="shericeri-version" content="V12.14.2 Merchant Data + Research Hardening">
 <div class="app" id="appRoot" style="display:none">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 10px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px">
     <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Ready</span></div>
@@ -72,6 +72,8 @@
     <button data-view="sales">＋ Record Sale</button>
     <button data-view="inventory">▦ Inventory</button>
     <button data-view="expenses">◉ Expenses</button>
+    <button data-view="customers">☺ Customers</button>
+    <button data-view="forecast">📈 Forecast</button>
     <button data-view="advisor">✦ AI Advisor</button>
     <button data-view="shericeri">🎙️ Shericeri</button>
     <button data-view="settings">⚙ Settings</button>
@@ -95,6 +97,7 @@
       <div><label>Product</label><select id="saleProduct"></select></div>
       <div><label>Quantity</label><input id="saleQty" type="number" min="1" value="1"></div>
       <div><label>Selling price / unit (RWF)</label><input id="salePrice" type="number" min="0"></div>
+      <div><label>Customer (optional)</label><select id="saleCustomer"><option value="">— Anonymous —</option></select></div>
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="recordSale()">Record sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
     <div id="voiceStatus" class="sub" style="margin-top:8px"></div>
@@ -178,6 +181,31 @@
   <div class="card section"><h2>Expense history</h2><div id="expenseTable"></div></div>
 </section>
 
+<section id="customers" class="view">
+  <div class="top"><div><h1>Customers</h1><div class="sub">Optional — track individual customers when it's useful. Most sales can stay anonymous.</div></div></div>
+  <div class="card">
+    <div class="formgrid">
+      <div><label>Name</label><input id="cName" placeholder="Alice Uwase"></div>
+      <div><label>Phone (optional)</label><input id="cPhone" placeholder="078..."></div>
+      <div><label>Notes (optional)</label><input id="cNotes" placeholder="e.g. buys in bulk, prefers Kinyarwanda"></div>
+    </div>
+    <div class="actions" style="margin-top:14px"><button class="btn" onclick="addCustomer()">Add customer</button></div>
+  </div>
+  <div class="card section"><h2>Customer list</h2><div id="customerTable"></div></div>
+</section>
+
+<section id="forecast" class="view">
+  <div class="top"><div><h1>Forecast</h1><div class="sub">Simple projections from your recent sales — not statistical modeling, just plain averages over your real history.</div></div></div>
+  <div class="card">
+    <h2 style="margin-top:0">This week vs last week</h2>
+    <div id="forecastTrends"></div>
+  </div>
+  <div class="card section">
+    <h2>Restock soon (based on how fast items are actually selling)</h2>
+    <div id="forecastRestock"></div>
+  </div>
+</section>
+
 <section id="advisor" class="view">
   <div class="top"><div><h1>AI Business Advisor</h1><div class="sub">Ask questions about the business data recorded in this app.</div></div></div>
   <div class="card chat">
@@ -193,7 +221,7 @@
 
 <section id="shericeri" class="view">
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
-  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.13.1 offline-first: English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div><div id="sheriNativeAsrInstall" style="display:none;margin:6px 0 10px"><button class="btn small secondary" onclick="sheriInstallNativeKinyarwandaAsr()">Install offline Kinyarwanda voice</button><span id="sheriNativeAsrInstallStatus" class="sub" style="margin-left:8px"></span></div>
+  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.14.2 offline-first: Merchant Data + Memory + Customers + Forecasting foundation; English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
       <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
@@ -239,6 +267,7 @@
 <section id="settings" class="view">
   <div class="top"><div><h1>Merchant settings</h1><div class="sub">Your data is stored in your Supabase account, synced across devices.</div></div></div>
   <div class="card">
+    <div class="sub" style="margin-bottom:10px">Your Shericeri ID: <b id="setMerchantCode">—</b> <span style="opacity:.7">(say this number if you contact support)</span></div>
     <div class="formgrid">
       <div><label>Business / merchant name</label><input id="setName"></div>
       <div><label>Primary category</label><select id="setCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div>
@@ -287,7 +316,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function money(n){return 'RWF '+Math.round(n||0).toLocaleString()}
 
 let session=null;
-let state={merchant:null,products:[],sales:[],expenses:[]};
+let state={merchant:null,products:[],sales:[],expenses:[],memory:[],customers:[]};
 let editingProductId=null;
 
 let advisorAvailable=null; // null=unknown, true/false once tested
@@ -296,7 +325,7 @@ let advisorAvailable=null; // null=unknown, true/false once tested
 // Durable local cache: IndexedDB is used instead of localStorage so business
 // records can survive offline sessions without bloating the synchronous store.
 const SHERI_LOCAL_DB='shericeri_offline_v12';
-const SHERI_LOCAL_DB_VERSION=2;
+const SHERI_LOCAL_DB_VERSION=4;
 let sheriOfflineDb=null;
 let sheriConnectivity=navigator.onLine?'online':'offline';
 let sheriSyncBusy=false;
@@ -321,12 +350,14 @@ function sheriOpenLocalDb(){
     req.onupgradeneeded=()=>{
       const db=req.result;
       const tx=req.transaction;
-      for(const store of ['meta','merchants','products','sales','expenses','outbox','conflicts']){
+      for(const store of ['meta','merchants','products','sales','expenses','outbox','conflicts','memory','customers']){
         if(!db.objectStoreNames.contains(store))db.createObjectStore(store,{keyPath:'key'});
       }
-      // V12.1 schema migration marker. Future versions must add an explicit
+      // V12.14.2 schema migration marker. Future versions must add an explicit
       // migration block here rather than silently changing record shapes.
-      try{tx.objectStore('meta').put({key:'schema',version:2,migrated_at:new Date().toISOString()})}catch(_){/* ignore */}
+      // V12.14.1: added 'memory' store (shericeri_memory table mirror).
+      // V12.14.1: added 'customers' store (customers table mirror).
+      try{tx.objectStore('meta').put({key:'schema',version:4,migrated_at:new Date().toISOString()})}catch(_){/* ignore */}
     };
     req.onsuccess=()=>{sheriOfflineDb=req.result;resolve(req.result)};
     req.onerror=()=>reject(req.error||new Error('Could not open local offline database'));
@@ -358,16 +389,21 @@ async function sheriSaveSnapshot(){
   for(const p of state.products)await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
   for(const x of state.sales)await sheriPut('sales',x.id,{merchant_id:state.merchant.id,record:{...x}});
   for(const x of state.expenses)await sheriPut('expenses',x.id,{merchant_id:state.merchant.id,record:{...x}});
+  for(const m of state.memory)await sheriPut('memory',m.id,{merchant_id:state.merchant.id,record:{...m}});
+  for(const c of state.customers)await sheriPut('customers',c.id,{merchant_id:state.merchant.id,record:{...c}});
 }
 async function sheriLoadLocalSnapshot(merchantId){
   await sheriOpenLocalDb();
   const m=await sheriGet('merchants',merchantId);
-  const [ps,ss,es]=await Promise.all([sheriGetAll('products'),sheriGetAll('sales'),sheriGetAll('expenses')]);
+  const [ps,ss,es,ms,cs]=await Promise.all([sheriGetAll('products'),sheriGetAll('sales'),sheriGetAll('expenses'),sheriGetAll('memory'),sheriGetAll('customers')]);
   if(!m)return false;
   state.merchant=m.record||m;
   state.products=ps.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
   state.sales=ss.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
   state.expenses=es.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
+  state.memory=ms.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x)
+    .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  state.customers=cs.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
   return true;
 }
 async function sheriQueue(op){
@@ -376,6 +412,56 @@ async function sheriQueue(op){
   sheriSyncQueued=(await sheriGetAll('outbox')).length;
   sheriSetConnectivity(sheriConnectivity);
   return key;
+}
+async function sheriQueueMemory(category,content){
+  if(!state.merchant||!content||!content.trim())return null;
+  const record={
+    id:sheriUuid(),
+    merchant_id:state.merchant.id,
+    category,
+    content:content.trim().slice(0,2000),
+    created_at:sheriNow(),
+    last_referenced_at:null,
+    reference_count:0,
+    deleted:false,
+  };
+  state.memory.unshift(record);
+  await sheriPut('memory',record.id,{merchant_id:state.merchant.id,record:{...record}});
+  await sheriQueue({type:'memory_insert',record});
+  return record;
+}
+// V12.14.1 mechanical memory-write rule (deliberately simple for a first
+// working version — an LLM-judged "is this memory-worthy" pass is a
+// reasonable next step, but starting mechanical keeps this debuggable and
+// cheap while the plumbing gets proven out).
+const SHERI_REMEMBER_TRIGGER=/\b(remember that|remember this|please remember|note that|keep in mind that|souviens[- ]toi que|n'oublie pas que|retiens que|wibuke ko|wibuke)\b/i;
+function sheriDecideMemoryWrite(userText,answerText,route){
+  const u=String(userText||'').trim();
+  if(!u)return null;
+  if(SHERI_REMEMBER_TRIGGER.test(u)){
+    return {category:'preference',content:u.slice(0,500)};
+  }
+  // Casual/general small talk isn't worth a durable memory row; anything
+  // that reached business data, deep analysis, or web search is.
+  if(route==='local_business'||route==='deep'||route==='search'){
+    const a=String(answerText||'').trim();
+    const compact=`Q: ${u.slice(0,200)}${a?` — A: ${a.slice(0,300)}`:''}`;
+    return {category:'summary',content:compact};
+  }
+  return null;
+}
+// Selects a small, prompt-budget-conscious set of memory rows to inject
+// into the next request — most recent preferences/insights first (they're
+// durable and cheap), then a handful of recent summaries for continuity.
+// Deliberately recency-based rather than semantic/relevance-ranked for v1;
+// see project notes for why that ordering was chosen deliberately.
+function sheriRecentMemoryForPrompt(){
+  const active=(state.memory||[]).filter(m=>!m.deleted);
+  const durable=active.filter(m=>m.category==='preference'||m.category==='insight').slice(0,6);
+  const summaries=active.filter(m=>m.category==='summary').slice(0,4);
+  return [...durable,...summaries]
+    .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))
+    .map(m=>({category:m.category,content:m.content}));
 }
 async function sheriQueueCount(){sheriSyncQueued=(await sheriGetAll('outbox')).length;return sheriSyncQueued}
 async function sheriRecordConflict(info){
@@ -404,6 +490,8 @@ async function sheriReconcileMerchantId(){
     for(const p of state.products){p.merchant_id=newId;await sheriPut('products',p.id,{merchant_id:newId,record:{...p}})}
     for(const x of state.sales){x.merchant_id=newId;await sheriPut('sales',x.id,{merchant_id:newId,record:{...x}})}
     for(const x of state.expenses){x.merchant_id=newId;await sheriPut('expenses',x.id,{merchant_id:newId,record:{...x}})}
+    for(const m of state.memory){m.merchant_id=newId;await sheriPut('memory',m.id,{merchant_id:newId,record:{...m}})}
+    for(const c of state.customers){c.merchant_id=newId;await sheriPut('customers',c.id,{merchant_id:newId,record:{...c}})}
     const ops=await sheriGetAll('outbox');
     for(const item of ops){
       const op=item.op||{};
@@ -438,7 +526,7 @@ async function sheriSyncOutbox(){
             if(pErr)throw pErr;
             const stockConflict=!!(serverProduct&&op.expectedServerStock!=null&&serverProduct.stock!==op.expectedServerStock);
             if(stockConflict){
-              // V12.1 SAFETY: never overwrite a newer server stock value after a
+              // V12.14.1 SAFETY: never overwrite a newer server stock value after a
               // detected multi-device conflict. Record the operation for manual/
               // atomic server-side reconciliation instead.
               await sheriRecordConflict({type:'stock_conflict',product_id:op.productId,local_stock:op.localStock,server_stock:serverProduct.stock,sale_id:op.record.id,operation:op});
@@ -452,6 +540,12 @@ async function sheriSyncOutbox(){
           const {error}=await sb.from('expenses').delete().eq('id',op.id); if(error)throw error;
         }else if(op.type==='sale_delete'){
           const {error}=await sb.from('sales').delete().eq('id',op.id); if(error)throw error;
+        }else if(op.type==='memory_insert'){
+          const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
+        }else if(op.type==='customer_upsert'){
+          const {error}=await sb.from('customers').upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
+        }else if(op.type==='customer_delete'){
+          const {error}=await sb.from('customers').update({deleted:true}).eq('id',op.id); if(error)throw error;
         }
         await sheriDelete('outbox',item.key);
       }catch(err){
@@ -471,13 +565,13 @@ function sheriOnlineEvents(){
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
   (async()=>{
     try{
-      const expected='./shericeri_v12_12_best_sw.js';
+      const expected='./shericeri_v12_14_2_preflight_sw.js';
       const reg=await navigator.serviceWorker.register(expected,{updateViaCache:'none'});
       await reg.update();
       // If an older controller is still attached, let the new registration take
       // over on the next navigation rather than silently reporting a stale shell.
-      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v12_12_best_sw.js')){
-        sheriDiagSet?.('Service Worker update','new V12.12 worker registered; old controller still active until reload');
+      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v12_14_2_preflight_sw.js')){
+        sheriDiagSet?.('Service Worker update','new V12.14.2 worker registered; old controller still active until reload');
       }
     }catch(e){ console.warn('[Shericeri SW] registration/update failed',e); }
   })();
@@ -490,48 +584,12 @@ async function sheriOfflineInit(){
   if(!window._sheriOfflineEventsBound){ sheriOnlineEvents(); window._sheriOfflineEventsBound=true; }
   if(!window._sheriSyncTimer)window._sheriSyncTimer=setInterval(()=>{if(navigator.onLine)sheriSyncOutbox()},15000);
 }
-function sheriNativeAndroid(){return !!window.ShericeriAndroid;}
-function sheriShowNativeAsrInstaller(){
-  const el=document.getElementById('sheriNativeAsrInstall');
-  if(el)el.style.display=sheriNativeAndroid()?'block':'none';
-}
-function sheriInstallNativeKinyarwandaAsr(){
-  if(!window.ShericeriAndroid)return;
-  const status=document.getElementById('sheriNativeAsrInstallStatus');
-  if(status)status.textContent='Downloading ~365 MB — Wi-Fi recommended…';
-  const result=window.ShericeriAndroid.installKinyarwandaAsrModel();
-  if(result==='ALREADY_INSTALLED'&&status)status.textContent='Offline Kinyarwanda ASR already installed.';
-}
-window.addEventListener('shericeri-native-bridge-ready',e=>{
-  sheriShowNativeAsrInstaller();
-  const d=e.detail||{};
-  const status=document.getElementById('sheriNativeAsrInstallStatus');
-  if(status&&d.kinyarwandaAsrModelInstall==='installed')status.textContent='Offline Kinyarwanda ASR installed.';
-});
-window.addEventListener('shericeri-native-model_download_progress',e=>{
-  const status=document.getElementById('sheriNativeAsrInstallStatus');
-  if(!status)return;
-  const done=Number(e.detail?.done||0), total=Number(e.detail?.total||0);
-  status.textContent=total?`Downloading offline Kinyarwanda ASR… ${Math.round(done/total*100)}%`:'Downloading offline Kinyarwanda ASR…';
-});
-window.addEventListener('shericeri-native-model_install_complete',e=>{
-  const status=document.getElementById('sheriNativeAsrInstallStatus');
-  if(status)status.textContent='Offline Kinyarwanda ASR installed and verified.';
-  sheriDiagSet?.('Kinyarwanda ASR model','INSTALLED — SHA-256 verified');
-});
-window.addEventListener('shericeri-native-model_install_error',e=>{
-  const status=document.getElementById('sheriNativeAsrInstallStatus');
-  if(status)status.textContent='ASR install failed: '+String(e.detail?.message||'unknown error');
-  sheriDiagSet?.('Kinyarwanda ASR model','INSTALL FAILED');
-});
-
 async function sheriOfflineDiagnostics(){
   const q=await sheriQueueCount(),conf=(await sheriGetAll('conflicts')).length;
   const localReady=!!sheriOfflineDb;
   const rwTts=!!window.SHERPA_ONNX_TTS_BRIDGE?.speak;
-  const rwStt=!!window.SHERPA_ONNX_STT_BRIDGE?.startRecording || !!window.SHERPA_ONNX_STT_BRIDGE?.transcribeBlob;
-  const nativeStatus=(()=>{try{return window.ShericeriAndroid?JSON.parse(window.ShericeriAndroid.status()):null}catch(_){return null}})();
-  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nRecorded conflicts: ${conf}\nKinyarwanda offline STT bridge: ${rwStt?'READY':'NOT INSTALLED'}\nKinyarwanda offline TTS bridge: ${rwTts?'READY':'NOT INSTALLED'}\nNative Kinyarwanda ASR model: ${nativeStatus?.kinyarwandaAsrModelInstall||'unknown'}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
+  const rwStt=!!window.SHERPA_ONNX_STT_BRIDGE?.transcribeBlob;
+  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nRecorded conflicts: ${conf}\nKinyarwanda offline STT bridge: ${rwStt?'READY':'NOT INSTALLED'}\nKinyarwanda offline TTS bridge: ${rwTts?'READY':'NOT INSTALLED'}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
   alert(msg);
 }
 function sheriOfflineLocalAnswer(q){
@@ -692,13 +750,22 @@ async function loadAll(silent=false){
   if(hadLocal)render();
   if(!navigator.onLine){sheriSetConnectivity('offline','Using on-device business data');return}
   try{
-    const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr}]=await Promise.all([
+    const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr},{data:memory,error:mErr},{data:customers,error:cErr}]=await Promise.all([
       sb.from('products').select('*').eq('merchant_id',mId).order('created_at'),
       sb.from('sales').select('*').eq('merchant_id',mId).order('created_at'),
-      sb.from('expenses').select('*').eq('merchant_id',mId).order('created_at')
+      sb.from('expenses').select('*').eq('merchant_id',mId).order('created_at'),
+      sb.from('shericeri_memory').select('*').eq('merchant_id',mId).eq('deleted',false).order('created_at',{ascending:false}).limit(200),
+      sb.from('customers').select('*').eq('merchant_id',mId).eq('deleted',false).order('name')
     ]);
     if(pErr||sErr||eErr)throw (pErr||sErr||eErr);
     state.products=products||[];state.sales=sales||[];state.expenses=expenses||[];
+    // Memory/customers failing to load should never block the rest of the
+    // app — fall back to whatever's cached locally rather than throwing
+    // the whole sync.
+    if(!mErr)state.memory=memory||[];
+    else console.warn('[Sheri memory] server refresh failed, using local cache',mErr);
+    if(!cErr)state.customers=customers||[];
+    else console.warn('[Sheri customers] server refresh failed, using local cache',cErr);
     await sheriSaveSnapshot();
     sheriSetConnectivity('online','Server data synced');
   }catch(err){
@@ -708,6 +775,29 @@ async function loadAll(silent=false){
 }
 function product(id){return state.products.find(p=>p.id===id)}
 function activeProducts(){return state.products.filter(p=>!p.deleted)}
+function customer(id){return state.customers.find(c=>c.id===id)}
+function activeCustomers(){return state.customers.filter(c=>!c.deleted)}
+function customerStats(){
+  // One pass over sales, keyed by customer_id — revenue, visit count, and
+  // last purchase date per customer. Sales with no customer_id (the
+  // majority, most likely — walk-in customers) are excluded entirely.
+  const byId={};
+  for(const s of state.sales){
+    if(!s.customer_id)continue;
+    const row=byId[s.customer_id]||(byId[s.customer_id]={revenue:0,visits:0,lastPurchase:null});
+    row.revenue+=s.qty*s.price;
+    row.visits+=1;
+    if(!row.lastPurchase||s.created_at>row.lastPurchase)row.lastPurchase=s.created_at;
+  }
+  return activeCustomers().map(c=>({
+    id:c.id,name:c.name,phone:c.phone,
+    revenue:byId[c.id]?.revenue||0,
+    visits:byId[c.id]?.visits||0,
+    lastPurchase:byId[c.id]?.lastPurchase||null,
+  })).sort((a,b)=>b.revenue-a.revenue);
+}
+function topCustomers(n=5){return customerStats().filter(c=>c.revenue>0).slice(0,n)}
+function repeatCustomerCount(){return customerStats().filter(c=>c.visits>1).length}
 function revenue(){return state.sales.reduce((s,x)=>s+x.qty*x.price,0)}
 function cogs(){return state.sales.reduce((s,x)=>s+x.qty*(x.cost??0),0)}
 function totalExpenses(){return state.expenses.reduce((s,x)=>s+x.amount,0)}
@@ -724,6 +814,89 @@ function bestProducts(){
     const prof=ps.reduce((x,s)=>x+s.qty*(s.price-(s.cost??0)),0);
     return {...p,rev,profit:prof};
   }).sort((a,b)=>b.rev-a.rev);
+}
+
+// ── Forecasting ──────────────────────────────────────────────────────────
+// Deliberately simple, explainable heuristics — not a statistical/ML model.
+// With the sales volumes a small merchant actually has (often a handful of
+// transactions a day), a real trend/seasonality model would be noise
+// dressed up as precision. Everything here is a plain average over a
+// lookback window, and every function returns null rather than a guess
+// when there isn't enough history to say anything real.
+//
+// Deliberately NOT built: a "cash runway" forecast. That needs a starting
+// cash/bank balance, and nothing in this schema tracks one — inventing a
+// number for it would be exactly the kind of fabricated-looking-precise
+// output this whole build has been trying to avoid. What IS honestly
+// computable from real data is whether daily profit is trending up or
+// down, so that's what dailyProfitTrend() reports instead.
+
+function sheriDaysAgo(days){return new Date(Date.now()-days*86400000).toISOString()}
+
+function salesVelocity(productId,lookbackDays=14){
+  const cutoff=sheriDaysAgo(lookbackDays);
+  const recent=state.sales.filter(s=>s.product_id===productId&&s.created_at>=cutoff);
+  if(!recent.length)return null;
+  const totalQty=recent.reduce((sum,s)=>sum+s.qty,0);
+  const earliest=recent.reduce((min,s)=>s.created_at<min?s.created_at:min,recent[0].created_at);
+  // Use the actual span of the observed sales, not the full lookback window —
+  // one sale on day 1 of a 14-day window is not "1/14th of a unit per day."
+  const daysElapsed=Math.max(1,Math.min(lookbackDays,(Date.now()-new Date(earliest).getTime())/86400000));
+  return totalQty/daysElapsed;
+}
+
+function daysUntilStockout(productId){
+  const p=product(productId);
+  if(!p)return null;
+  const velocity=salesVelocity(productId);
+  if(!velocity||velocity<=0)return null; // no recent sales — not forecastable, not "infinite"
+  return p.stock/velocity;
+}
+
+// Products projected to run out within `withinDays`, soonest first. This is
+// a velocity-based forecast, distinct from the existing static reorder-point
+// check (stock<=reorder) — a product can be above its reorder point but
+// still selling fast enough to run out soon, or below it but barely moving.
+function restockForecast(withinDays=14){
+  return activeProducts().map(p=>({
+    id:p.id,name:p.name,stock:p.stock,
+    daysUntilStockout:daysUntilStockout(p.id),
+  })).filter(x=>x.daysUntilStockout!=null&&x.daysUntilStockout<=withinDays)
+    .sort((a,b)=>a.daysUntilStockout-b.daysUntilStockout);
+}
+
+// Recent window vs the window before it — a plain week-over-week (or
+// whatever windowDays is) comparison, not a projection into the future.
+function revenueTrend(windowDays=7){
+  const recentCutoff=sheriDaysAgo(windowDays),priorCutoff=sheriDaysAgo(windowDays*2);
+  const recentRevenue=state.sales.filter(s=>s.created_at>=recentCutoff).reduce((sum,s)=>sum+s.qty*s.price,0);
+  const priorRevenue=state.sales.filter(s=>s.created_at>=priorCutoff&&s.created_at<recentCutoff).reduce((sum,s)=>sum+s.qty*s.price,0);
+  if(priorRevenue===0){
+    if(recentRevenue===0)return{direction:'flat',changePct:null,recentRevenue,priorRevenue,windowDays};
+    return{direction:'up',changePct:null,recentRevenue,priorRevenue,windowDays}; // no prior baseline to compute a % from
+  }
+  const changePct=((recentRevenue-priorRevenue)/priorRevenue)*100;
+  const direction=changePct>5?'up':changePct<-5?'down':'flat';
+  return{direction,changePct,recentRevenue,priorRevenue,windowDays};
+}
+
+// Same week-over-week comparison, but for profit rather than revenue — a
+// business can have flat/rising revenue while profit erodes (rising costs,
+// discounting), so this is deliberately a separate signal, not derived from
+// revenueTrend().
+function dailyProfitTrend(windowDays=7){
+  const recentCutoff=sheriDaysAgo(windowDays),priorCutoff=sheriDaysAgo(windowDays*2);
+  const profitInWindow=(from,to)=>{
+    const salesRev=state.sales.filter(s=>s.created_at>=from&&(!to||s.created_at<to))
+      .reduce((sum,s)=>sum+s.qty*(s.price-(s.cost??0)),0);
+    const exp=state.expenses.filter(e=>e.created_at>=from&&(!to||e.created_at<to))
+      .reduce((sum,e)=>sum+e.amount,0);
+    return salesRev-exp;
+  };
+  const recentProfit=profitInWindow(recentCutoff,null);
+  const priorProfit=profitInWindow(priorCutoff,recentCutoff);
+  const direction=recentProfit>priorProfit+1?'improving':recentProfit<priorProfit-1?'worsening':'flat';
+  return{direction,recentProfit,priorProfit,windowDays};
 }
 
 // ── Navigation / render ──────────────────────────────────────────────────
@@ -749,25 +922,30 @@ function render(){
     (best&&best.rev>0)?`<div>🔥 <b>Best revenue product:</b> ${esc(best.name)}</div>`:'',
     profit()>=0?`<div>💰 <b>Estimated profit:</b> ${money(profit())}</div>`:`<div>⚠️ <b>Estimated loss:</b> ${money(Math.abs(profit()))}</div>`
   ].filter(Boolean).join('');
-  fillSelects();renderSales();renderInventory();renderExpenses();
+  fillSelects();renderSales();renderInventory();renderExpenses();renderCustomers();renderForecast();
   document.getElementById('setName').value=state.merchant.name;
   document.getElementById('setCat').value=state.merchant.category;
+  const codeEl=document.getElementById('setMerchantCode');
+  if(codeEl)codeEl.textContent=state.merchant.merchant_code||'(assigned once synced online)';
 }
 function fillSelects(){
   document.getElementById('saleProduct').innerHTML=activeProducts().map(p=>`<option value="${p.id}">${esc(p.name)} (stock ${p.stock})</option>`).join('');
   const p=product(document.getElementById('saleProduct').value);
   if(p)document.getElementById('salePrice').value=p.sell;
+  const custSel=document.getElementById('saleCustomer');
+  if(custSel)custSel.innerHTML='<option value="">— Anonymous —</option>'+activeCustomers().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
 }
 document.getElementById('saleProduct').onchange=()=>{const p=product(document.getElementById('saleProduct').value);document.getElementById('salePrice').value=p?p.sell:''}
 
 // ── Sales ────────────────────────────────────────────────────────────────
 async function recordSale(){
   const id=document.getElementById('saleProduct').value,q=+document.getElementById('saleQty').value,price=+document.getElementById('salePrice').value;
+  const custId=document.getElementById('saleCustomer').value||null;
   const p=product(id);
   if(!p||q<1||price<0)return alert('Enter valid sale details.');
   if(q>p.stock)return alert('Not enough stock.');
   const newStock=p.stock-q;
-  const saleRow={id:sheriUuid(),merchant_id:state.merchant.id,product_id:p.id,product_name_snapshot:p.name,qty:q,price,cost:p.cost,created_at:sheriNow()};
+  const saleRow={id:sheriUuid(),merchant_id:state.merchant.id,product_id:p.id,product_name_snapshot:p.name,customer_id:custId,qty:q,price,cost:p.cost,created_at:sheriNow()};
   p.stock=newStock;state.sales.push(saleRow);
   await sheriSaveSnapshot();
   await sheriQueue({type:'sale_upsert',record:saleRow,productId:p.id,localStock:newStock,expectedServerStock:newStock+q});
@@ -785,7 +963,7 @@ async function voidSale(id){
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
-function renderSales(){document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.slice().reverse().map(s=>{const p=product(s.product_id);return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
+function renderSales(){document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.slice().reverse().map(s=>{const p=product(s.product_id);const c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
 
 // ── Products ─────────────────────────────────────────────────────────────
 let pendingProductImage=null; // {dataUrl, mimeType, file}
@@ -1191,6 +1369,43 @@ async function deleteExpense(id){
 }
 function renderExpenses(){document.getElementById('expenseTable').innerHTML=state.expenses.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${state.expenses.slice().reverse().map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses recorded.</div>'}
 
+// ── Customers ────────────────────────────────────────────────────────────
+async function addCustomer(){
+  const name=document.getElementById('cName').value.trim();
+  const phone=document.getElementById('cPhone').value.trim();
+  const notes=document.getElementById('cNotes').value.trim();
+  if(!name)return alert('Enter a customer name.');
+  const data={id:sheriUuid(),merchant_id:state.merchant.id,name,phone:phone||null,notes:notes||null,created_at:sheriNow(),deleted:false};
+  state.customers.push(data);await sheriSaveSnapshot();
+  await sheriQueue({type:'customer_upsert',record:data});
+  if(navigator.onLine)await sheriSyncOutbox();
+  document.getElementById('cName').value=document.getElementById('cPhone').value=document.getElementById('cNotes').value='';
+  render();
+}
+async function deleteCustomer(id){
+  if(!confirm('Remove this customer? Their past sales stay on record.'))return;
+  const c=customer(id); if(!c)return;
+  c.deleted=true;await sheriSaveSnapshot();
+  await sheriQueue({type:'customer_delete',id});
+  if(navigator.onLine)await sheriSyncOutbox();
+  render();
+}
+function renderCustomers(){
+  const rows=customerStats();
+  document.getElementById('customerTable').innerHTML=rows.length?`<table class="table"><tr><th>Name</th><th>Phone</th><th>Revenue</th><th>Visits</th><th>Last purchase</th><th></th></tr>${rows.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.phone||'—')}</td><td>${money(c.revenue)}</td><td>${c.visits}</td><td>${c.lastPurchase?new Date(c.lastPurchase).toLocaleDateString():'—'}</td><td><button class="btn small danger" onclick="deleteCustomer('${c.id}')">Remove</button></td></tr>`).join('')}</table>`:'<div class="empty">No customers added yet — most sales can stay anonymous, add a customer here only when you want Shericeri to track them individually.</div>';
+}
+function renderForecast(){
+  const rev=revenueTrend(),prof=dailyProfitTrend();
+  const arrow=d=>d==='up'||d==='improving'?'📈':d==='down'||d==='worsening'?'📉':'➖';
+  const pctText=rev.changePct==null?'':` (${rev.changePct>0?'+':''}${rev.changePct.toFixed(0)}%)`;
+  document.getElementById('forecastTrends').innerHTML=`
+    <div>${arrow(rev.direction)} <b>Revenue:</b> ${money(rev.recentRevenue)} this week vs ${money(rev.priorRevenue)} last week${pctText} — trending <b>${rev.direction}</b></div>
+    <div style="margin-top:8px">${arrow(prof.direction)} <b>Profit:</b> ${money(prof.recentProfit)} this week vs ${money(prof.priorProfit)} last week — <b>${prof.direction}</b></div>
+    <div class="sub" style="margin-top:8px">Based on the last 7 days vs the 7 days before that. Needs at least a couple weeks of sales history to be meaningful.</div>`;
+  const forecast=restockForecast();
+  document.getElementById('forecastRestock').innerHTML=forecast.length?`<table class="table"><tr><th>Product</th><th>Stock</th><th>Est. days left</th></tr>${forecast.map(f=>`<tr><td>${esc(f.name)}</td><td>${f.stock}</td><td>${f.daysUntilStockout<1?'Today':Math.round(f.daysUntilStockout)+' days'}</td></tr>`).join('')}</table>`:'<div class="empty">Nothing projected to run out soon — or not enough recent sales history yet to estimate.</div>';
+}
+
 // ── Settings ─────────────────────────────────────────────────────────────
 async function saveSettings(){
   const name=document.getElementById('setName').value||'Merchant',category=document.getElementById('setCat').value;
@@ -1312,7 +1527,13 @@ async function askAI(webSearch){
     salesCount:state.sales.length,
     merchantName:state.merchant.name,merchantCategory:state.merchant.category,
     lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
-    topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit}))
+    topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),
+    customerCount:activeCustomers().length,
+    repeatCustomers:repeatCustomerCount(),
+    topCustomers:topCustomers(5).map(c=>({name:c.name,revenue:c.revenue,visits:c.visits})),
+    revenueTrend:revenueTrend(),
+    profitTrend:dailyProfitTrend(),
+    restockForecast:restockForecast().map(f=>({name:f.name,stock:f.stock,daysUntilStockout:Math.round(f.daysUntilStockout)}))
   };
   let answered=false;
   if(advisorAvailable!==false){
@@ -1648,6 +1869,8 @@ let shericeriAnalyser=null;
 let shericeriRecorder=null;
 let shericeriVadTimer=null;
 let sheriAwaitingUserTurn=false;
+let sheriActiveRecordingId='';
+let sheriNextListenTimer=null;
 
 const SHERI_SPEECH_THRESHOLD=14;
 const SHERI_ANDROID_SPEECH_THRESHOLD=7; // Android phones commonly expose lower analyser averages.
@@ -1729,13 +1952,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.12 KINYARWANDA + DESKTOP MIC FIX</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.14.2 PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.12');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.14.2');set('Service Worker controller',navigator.serviceWorker?.controller?'active':'not controlling');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -1857,8 +2080,8 @@ function heroShericeriTalk(){
     shericeriListenOnce();
     return;
   }
-  if(shericeriRecorder?.state==='recording' || window.sheriNativeRwRecording){
-    setSheriStatus(sheriIsKinyarwanda()&&!navigator.onLine?'Shericeri is listening offline…':'Shericeri is listening…');
+  if(shericeriRecorder?.state==='recording'){
+    setSheriStatus('Shericeri is listening…');
     return;
   }
   shericeriListenOnce();
@@ -1921,19 +2144,49 @@ async function startShericeriLoop(){
   }
   try{
     await refreshSheriAudioInputs();
+    const isAndroid=/Android/i.test(navigator.userAgent);
+    const selected=sheriAudioInputDevices.find(d=>d.deviceId===sheriSelectedAudioInputId);
+    if(!isAndroid && (!selected || sheriScoreInputDevice(selected)<0)){
+      const physical=[...sheriAudioInputDevices].filter(d=>sheriScoreInputDevice(d)>=0);
+      const best=physical.sort((a,b)=>sheriScoreInputDevice(b)-sheriScoreInputDevice(a))[0];
+      if(best){
+        sheriSelectedAudioInputId=best.deviceId;
+        const select=document.getElementById('sheriMicSelect'); if(select)select.value=best.deviceId;
+        sheriDiagSet('Microphone auto-selection','PHYSICAL INPUT — '+(best.label||'selected microphone'));
+      }else{
+        sheriDiagSet('Microphone auto-selection','NO VERIFIED PHYSICAL INPUT');
+      }
+    }
     try{
       shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
     }catch(primaryMicError){
-      // Desktop browsers can expose a stale/virtual deviceId after permissions,
-      // docking, Bluetooth changes, or browser restarts. Never let that prevent
-      // the normal/default microphone from being tried. Android keeps its tested
-      // path unchanged because its audio profile is already working well.
       sheriDiagSet('Microphone selected-input attempt','FAILED — '+(primaryMicError?.name||primaryMicError?.message||primaryMicError));
-      shericeriMicStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-      sheriDiagSet('Microphone fallback','DEFAULT BROWSER INPUT — selected device was unavailable');
+      if(!isAndroid && sheriSelectedAudioInputId){
+        sheriSelectedAudioInputId='';
+        sheriDiagSet('Microphone exact-device retry','NOT USING BROWSER DEFAULT — re-enumerating physical inputs');
+        await refreshSheriAudioInputs();
+        const physical=[...sheriAudioInputDevices].filter(d=>sheriScoreInputDevice(d)>=0);
+        const best=physical.sort((a,b)=>sheriScoreInputDevice(b)-sheriScoreInputDevice(a))[0];
+        if(!best)throw primaryMicError;
+        sheriSelectedAudioInputId=best.deviceId;
+        shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
+      }else{
+        throw primaryMicError;
+      }
     }
     const micTrack=shericeriMicStream.getAudioTracks()[0];
     const micSettings=micTrack?.getSettings?.()||{};
+    const returnedDeviceId=micSettings.deviceId||'';
+    const returned=sheriAudioInputDevices.find(d=>d.deviceId===returnedDeviceId);
+    if(!isAndroid && returnedDeviceId && sheriSelectedAudioInputId && returnedDeviceId!==sheriSelectedAudioInputId){
+      sheriDiagSet('Microphone verification','FAILED — browser returned a different input');
+      throw new Error('Browser did not open the selected physical microphone.');
+    }
+    if(!isAndroid && returned && sheriScoreInputDevice(returned)<0){
+      sheriDiagSet('Microphone verification','FAILED — loopback/virtual input returned');
+      throw new Error('Browser returned a loopback or virtual audio input.');
+    }
+    sheriDiagSet('Microphone verification',returned?.label||micTrack?.label||'verified');
     sheriDiagSet('Microphone','granted — '+(micTrack?.label||'selected input'));
     sheriDiagSet('Mic settings',(micSettings.sampleRate||'?')+' Hz, '+(micSettings.channelCount||'?')+' channel(s)');
   }catch(err){
@@ -1957,6 +2210,8 @@ async function startShericeriLoop(){
 }
 function sheriSleepAfterGoodbye(turnId){
   if(turnId!==sheriTurnId)return;
+  sheriActiveRecordingId='';
+  if(sheriNextListenTimer){clearTimeout(sheriNextListenTimer);sheriNextListenTimer=null}
   sheriSleepAfterTtsTurnId=turnId;
   sheriResponsePhase='goodbye_waiting_for_tts';
   shericeriActive=false;
@@ -1973,6 +2228,8 @@ function sheriSleepAfterGoodbye(turnId){
 
 function stopShericeri(){
   sheriSleepAfterTtsTurnId=0;
+  sheriActiveRecordingId='';
+  if(sheriNextListenTimer){clearTimeout(sheriNextListenTimer);sheriNextListenTimer=null}
   shericeriActive=false;
   sheriAwaitingUserTurn=false;
   const btn=document.getElementById('shericeriTalkBtn');
@@ -1991,66 +2248,16 @@ function stopShericeri(){
 function sheriVadDiag(label,value){
   if(typeof sheriDiagSet==='function') sheriDiagSet(label,value);
 }
-window.sheriNativeRwRecording=window.sheriNativeRwRecording||false;
-window.addEventListener('shericeri-native-recording_started',e=>{
-  window.sheriNativeRwRecording=true;
-  sheriDiagSet?.('Native recording','STARTED — '+(e.detail?.sampleRate||16000)+' Hz PCM16');
-});
-window.addEventListener('shericeri-native-recording_stopped',e=>{
-  window.sheriNativeRwRecording=false;
-  sheriRecordingStoppedAt=performance.now();
-  sheriDiagSet?.('Native recording','STOPPED — '+(e.detail?.durationMs||0)+' ms; '+(e.detail?.bytes||0)+' bytes');
-  sheriDiagSet?.('Native stop reason',e.detail?.stopReason||'unknown');
-  sheriDiagSet?.('Native max RMS',String(e.detail?.maxRms??''));
-  document.getElementById('sheriHero')?.classList.remove('listening');
-});
-window.addEventListener('shericeri-native-stt_result',e=>{
-  window.sheriNativeRwRecording=false;
-  const text=String(e.detail?.text||'').trim();
-  sheriWhisperFinishedAt=performance.now();
-  sheriDiagSet?.('Native STT','COMPLETED — offline');
-  sheriDiagSet?.('Exact transcript',text||'(empty)');
-  sheriDiagSet?.('Whisper','SKIPPED');
-  document.getElementById('sheriHero')?.classList.remove('listening');
-  if(!shericeriActive)return;
-  if(text.length<2){
-    setSheriStatus('Sinshobora kumva neza — ongera uvuge.');
-    setTimeout(()=>{if(shericeriActive)shericeriListenOnce()},400);
-    return;
-  }
-  shericeriRespond(text);
-});
-window.addEventListener('shericeri-native-error',e=>{
-  window.sheriNativeRwRecording=false;
-  document.getElementById('sheriHero')?.classList.remove('listening');
-  sheriDiagSet?.('Native voice error',String(e.detail?.message||e.detail||'unknown error'));
-  setSheriStatus('Offline voice is not ready on this device yet.');
-});
-
+function sheriStopBrowserRecorder(reason='manual'){
+  const r=shericeriRecorder;
+  if(!r||r.state==='inactive')return false;
+  try{
+    sheriDiagSet('Recorder stop request',reason);
+    if(typeof r.requestData==='function')r.requestData();
+  }catch(_){}
+  try{r.stop();return true}catch(e){sheriDiagSet('Recorder stop error',String(e?.message||e));return false;}
+}
 function shericeriListenOnce(){
-  // Android native offline lane: Kinyarwanda speech is captured as fresh 16 kHz
-  // PCM by the app, never as a WebM blob. Online Kinyarwanda keeps the proven
-  // Whisper path so this feature cannot regress the connected experience.
-  if(sheriIsKinyarwanda() && !navigator.onLine && window.SHERPA_ONNX_STT_BRIDGE?.startRecording){
-    if(window.sheriNativeRwRecording){
-      window.SHERPA_ONNX_STT_BRIDGE.stopRecording('rw');
-      return;
-    }
-    window.sheriNativeRwRecording=true;
-    setSheriStatus('Shericeri is listening offline…');
-    document.getElementById('sheriHero')?.classList.add('listening');
-    sheriDiagSet('Offline voice','NATIVE SHERPA-ONNX');
-    sheriDiagSet('Kinyarwanda STT bridge','READY');
-    sheriDiagSet('Audio path','Android AudioRecord → PCM16 16 kHz');
-    sheriDiagSet('Whisper','SKIPPED — offline native STT');
-    const started=window.SHERPA_ONNX_STT_BRIDGE.startRecording('rw');
-    if(started==='MODEL_NOT_INSTALLED'){
-      window.sheriNativeRwRecording=false;
-      document.getElementById('sheriHero')?.classList.remove('listening');
-      setSheriStatus('Kinyarwanda offline voice model is not installed yet.');
-    }
-    return;
-  }
   // TTS interruption protection: while Shericeri is speaking, microphone VAD must
   // not create a new turn from speaker feedback or audio bleed.
   if(sheriIsSpeaking||sheriResponsePhase==='tts_starting'||sheriResponsePhase==='tts_speaking'){
@@ -2058,6 +2265,11 @@ function shericeriListenOnce(){
     return;
   }
   if(!shericeriActive||!shericeriMicStream)return;
+  // Every browser recording gets a unique identity. This prevents a late onstop
+  // callback from an older recorder from being mistaken for the current turn.
+  const recordingId=sheriUuid();
+  sheriActiveRecordingId=recordingId;
+  const recordingStartedAt=performance.now();
   const chunks=[];
   let mimeType='audio/webm';
   for(const t of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus']){
@@ -2071,11 +2283,33 @@ function shericeriListenOnce(){
   shericeriRecorder.ondataavailable=e=>{if(e.data&&e.data.size>0)chunks.push(e.data)};
   shericeriRecorder.onstop=async()=>{
     document.getElementById('sheriHero').classList.remove('listening');
-    if(!shericeriActive)return;
-    const recordingStoppedAt=performance.now();
-     sheriRecordingStoppedAt=recordingStoppedAt;
-     const blob=new Blob(chunks,{type:mimeType});
+    const stoppedAt=performance.now();
+    const blob=new Blob(chunks,{type:mimeType});
+    // A recorder callback can arrive after stopShericeri() or after a newer
+    // recording has already started. Never let that old callback feed Whisper.
+    if(recordingId!==sheriActiveRecordingId){
+      sheriDiagSet('Recording stale callback','IGNORED '+recordingId+'; current='+sheriActiveRecordingId);
+      return;
+    }
+    sheriActiveRecordingId='';
+    sheriRecordingStoppedAt=stoppedAt;
+    sheriDiagSet('Recording ID',recordingId);
+    sheriDiagSet('Recording duration',Math.round(stoppedAt-recordingStartedAt)+' ms');
     sheriDiagSet('Recording','stopped — '+(blob.size/1024).toFixed(1)+' KB');
+    sheriDiagSet('Recording bytes',String(blob.size));
+    try{
+      const buf=await blob.arrayBuffer();
+      const b=new Uint8Array(buf);
+      const first=Array.from(b.slice(0,16)).map(n=>n.toString(16).padStart(2,'0').toUpperCase()).join(' ');
+      sheriDiagSet('Recording first bytes',first||'(empty)');
+      if((blob.type||mimeType).toLowerCase().startsWith('audio/webm')){
+        sheriDiagSet('WebM signature',b.length>=4&&b[0]===0x1a&&b[1]===0x45&&b[2]===0xdf&&b[3]===0xa3?'VALID (EBML)':'INVALID');
+      }
+      if(window.crypto?.subtle){
+        const digest=await crypto.subtle.digest('SHA-256',buf);
+        sheriDiagSet('Recording SHA-256',Array.from(new Uint8Array(digest)).map(n=>n.toString(16).padStart(2,'0')).join(''));
+      }
+    }catch(e){ sheriDiagSet('Recording integrity','FAILED: '+(e?.message||e)); }
     sheriVadDiag('VAD speech energy detected',speechEnergyDetected?'YES':'NO');
     sheriVadDiag('VAD speech confirmed',speechConfirmed?'YES':'NO');
     sheriVadDiag('VAD silence duration',Math.round(silenceDuration)+' ms');
@@ -2087,8 +2321,9 @@ function shericeriListenOnce(){
 
   setSheriStatus('Listening…');
   document.getElementById('sheriHero').classList.add('listening');
-  shericeriRecorder.start();
+  shericeriRecorder.start(250);
   sheriDiagSet('Recording','started ('+mimeType+')');
+  sheriDiagSet('Recording ID',recordingId);
 
   const startTime=Date.now();
   let speechEnergyDetected=false;
@@ -2115,7 +2350,7 @@ function shericeriListenOnce(){
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.12 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.14.2 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP ADAPTIVE MIC PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
@@ -2147,7 +2382,7 @@ function shericeriListenOnce(){
     if(sheriIsSpeaking||sheriResponsePhase==='tts_starting'||sheriResponsePhase==='tts_speaking'){
       sheriVadDiag('VAD blocked','TTS speaking');
       clearInterval(shericeriVadTimer);
-      try{shericeriRecorder.stop()}catch(e){}
+      sheriStopBrowserRecorder('VAD/TTS stop')
       return;
     }
 
@@ -2187,7 +2422,7 @@ function shericeriListenOnce(){
         stopReason='silence after confirmed speech';
         sheriVadDiag('VAD stop reason',stopReason);
         clearInterval(shericeriVadTimer);
-        try{shericeriRecorder.stop()}catch(e){}
+        sheriStopBrowserRecorder('VAD/TTS stop')
         return;
       }
     }else if(now-startTime>=noSpeechTimeoutMs){
@@ -2198,7 +2433,7 @@ function shericeriListenOnce(){
       sheriVadDiag('VAD stop reason',stopReason);
       sheriVadDiag('VAD phase','VAD UNCERTAIN — Whisper decides');
       clearInterval(shericeriVadTimer);
-      try{shericeriRecorder.stop()}catch(e){}
+      sheriStopBrowserRecorder('VAD/TTS stop')
       return;
     }
     if(now-startTime>=SHERI_MAX_RECORD_MS){
@@ -2206,7 +2441,7 @@ function shericeriListenOnce(){
       sheriVadDiag('VAD stop reason',stopReason);
       sheriVadDiag('VAD phase','MAX DURATION — stopping');
       clearInterval(shericeriVadTimer);
-      try{shericeriRecorder.stop()}catch(e){}
+      sheriStopBrowserRecorder('VAD/TTS stop')
     }
   },75);
 }
@@ -2215,7 +2450,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V12.12.1 + native Android preflight');
+  sheriDiagSet('Runtime version','V12.14.2');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
@@ -2359,29 +2594,64 @@ function sheriConversationFastLane(q){
 }
 
 function sheriFastLane(q){
-  q=q.toLowerCase();
+  const text=sheriNormalizePhrase(q);
   const low=activeProducts().filter(p=>p.stock<=p.reorder);
   const best=bestProducts()[0];
-  const rev=revenue(),pr=profit();
-  if(/restock|low stock|what should i stock|ongera/.test(q)){
+  const rev=revenue(),pr=profit(),exp=totalExpenses();
+  const sales=state.sales.slice().sort((a,b)=>new Date(b.created_at||0)-new Date(a.created_at||0));
+  const productName=s=>{const p=product(s.product_id);return p?.name||s.product_name_snapshot||'Deleted product'};
+  const fmtSale=s=>`${productName(s)}, ${s.qty} × ${money(s.price)} = ${money(s.qty*s.price)}`;
+
+  if(/(show|list|give me|what are|tell me).*(last|latest|recent).*(transactions?|sales?)/.test(text)||/(transactions?|sales?).*(last|latest|recent)/.test(text)){
+    if(!sales.length)return 'There are no sales recorded yet.';
+    const n=/\b(\d+)\b/.exec(text)?.[1]?Math.min(10,Math.max(1,+(/\b(\d+)\b/.exec(text)?.[1]||3))):3;
+    const rows=sales.slice(0,n); return `Your ${rows.length} most recent transactions are: ${rows.map((x,i)=>`${i+1}. ${fmtSale(x)}`).join('; ')}.`;
+  }
+  if(/^(show|list|give me|what are|tell me about)\s+(my\s+)?transactions?\.?$/.test(text)||/^(show|list|give me)\s+(my\s+)?sales?\.?$/.test(text)){
+    if(!sales.length)return 'There are no sales recorded yet.';
+    const rows=sales.slice(0,5); return `You have ${sales.length} transactions. The latest ${rows.length} are: ${rows.map((x,i)=>`${i+1}. ${fmtSale(x)}`).join('; ')}.`;
+  }
+  if(/(what did i sell|sales today|what have i sold today|today.*sales?)/.test(text)){
+    const day=new Date(); const y=day.getFullYear(),m=day.getMonth(),d=day.getDate();
+    const today=sales.filter(x=>{const t=new Date(x.created_at);return t.getFullYear()===y&&t.getMonth()===m&&t.getDate()===d});
+    if(!today.length)return 'You have no sales recorded today.';
+    const total=today.reduce((a,x)=>a+x.qty*x.price,0); return `Today you have ${today.length} transactions totaling ${money(total)}: ${today.slice(0,5).map(fmtSale).join('; ')}.`;
+  }
+  if(/(inventory list|list.*inventory|show.*inventory|what.*in stock|what.*have.*stock|stock list)/.test(text)){
+    const ps=activeProducts(); if(!ps.length)return 'Your inventory is empty right now.';
+    const rows=ps.slice(0,8).map(p=>`${p.name}: ${p.stock} in stock`); return `You have ${ps.length} products in inventory. Here are the first ${rows.length}: ${rows.join('; ')}.`;
+  }
+  if(/(low stock|what.*low|running low|need.*restock|restock|what should i stock|ongera)/.test(text)){
     if(!low.length)return 'Stock levels look healthy across the board, darling — nothing urgent to restock.';
-    return `Top priority: ${low.slice(0,3).map(p=>p.name).join(', ')}. Get on that.`;
+    return `Top restock priority: ${low.slice(0,5).map(p=>`${p.name} (${p.stock} left, reorder at ${p.reorder})`).join('; ')}.`;
   }
-  if(/best.?sell|best product|top product|sells? best/.test(q)){
+  if(/(product.*detail|details.*product|how much.*(cost|stock).*product|stock.*of|how many.*(left|have).*(of|for))/.test(text)){
+    const ps=activeProducts(); const hit=ps.find(p=>text.includes(String(p.name||'').toLowerCase()));
+    if(hit)return `${hit.name} has ${hit.stock} in stock. Selling price is ${money(hit.sell)} and cost is ${money(hit.cost)}.`;
+  }
+  if(/(best.?sell|best product|top product|sells? best)/.test(text)){
     if(!best||!best.rev)return 'Not enough sales recorded yet to crown a winner.';
-    return `${best.name} is your star right now — ${money(best.rev)} in revenue.`;
+    return `${best.name} is your star right now — ${money(best.rev)} in revenue and ${money(best.profit)} estimated product profit.`;
   }
-  if(/how much (did i|have i) (sell|sold)|sales today|total sales|revenue/.test(q)){
-    return `You've sold ${money(rev)} so far, across ${state.sales.length} transactions.`;
+  if(/(revenue|how much.*(sell|sold)|total sales)/.test(text))return `You've sold ${money(rev)} so far, across ${state.sales.length} transactions.`;
+  if(/(profit|loss|how am i doing|how is my business)/.test(text))return pr>=0?`You're sitting at ${money(pr)} in estimated profit, after ${money(cogs())} in cost of goods and ${money(exp)} in expenses.`:`You're at a loss of ${money(Math.abs(pr))} right now, after ${money(cogs())} in cost of goods and ${money(exp)} in expenses.`;
+  if(/(expenses?|spending|what did i spend|how much.*spend)/.test(text))return `Your total recorded expenses are ${money(exp)}.`;
+  if(/how many (transactions|sales)/.test(text))return `${state.sales.length} transactions recorded so far.`;
+  if(/(best customer|top customer|who.*buys? (the )?most|biggest customer)/.test(text)){
+    const top=topCustomers(1)[0]; if(!top)return "You haven't linked any sales to a specific customer yet — most of yours are anonymous right now.";
+    return `${top.name} is your top customer — ${money(top.revenue)} across ${top.visits} visit${top.visits===1?'':'s'}.`;
   }
-  if(/expenses?|spending|costs?/.test(q)){
-    return `Your total expenses are ${money(totalExpenses())}.`;
+  if(/how many customers|customer count|repeat customers?/.test(text)){
+    const n=activeCustomers().length,repeat=repeatCustomerCount(); if(!n)return 'No customers tracked individually yet — you can add them any time from the Customers tab.';
+    return `You've got ${n} customer${n===1?'':'s'} on file, and ${repeat} of them ${repeat===1?'has':'have'} come back more than once.`;
   }
-  if(/how (am i doing|is my business)|profit|nunguka/.test(q)){
-    return pr>=0?`You're sitting at ${money(pr)} in estimated profit. Not bad at all.`:`You're at a loss of ${money(Math.abs(pr))} right now — let's turn that around.`;
+  if(/(will|when).*(run out|stock ?out)|about to run out|running out of stock/.test(text)){
+    const soon=restockForecast(14); if(!soon.length)return "Nothing's projected to run out in the next couple weeks, darling — or there's not enough recent sales history yet to tell.";
+    const first=soon[0]; return `${first.name} first — about ${first.daysUntilStockout<1?'today':Math.round(first.daysUntilStockout)+' days'} left at the current pace. ${soon.length>1?`${soon.length-1} more after that.`:''}`;
   }
-  if(/how many (transactions|sales)/.test(q)){
-    return `${state.sales.length} transactions recorded so far.`;
+  if(/trending|is my business (growing|doing well)|revenue trend|going up|going down/.test(text)){
+    const trend=revenueTrend(); if(trend.priorRevenue===0&&trend.recentRevenue===0)return "Not enough sales yet to spot a trend, darling — record a few more and ask me again.";
+    const pct=trend.changePct==null?'':`, about ${Math.abs(trend.changePct).toFixed(0)}% ${trend.direction==='up'?'up':'down'}`; return `Revenue is trending ${trend.direction}${pct} compared to last week.`;
   }
   return null;
 }
@@ -2485,6 +2755,7 @@ const SHERI_ANDROID_TTS_VOICE_POLICY='platform/default voice (V10.1-compatible)'
 function sheriScheduleNextListen(turnId){
   if(turnId!==sheriTurnId)return;
   if(!shericeriActive||sheriIsSpeaking||sheriStreamActive||sheriTurnFailed)return;
+  if(sheriNextListenTimer)return;
   sheriAwaitingUserTurn=false;
   sheriResponsePhase='auto_listen';
   if(typeof sheriDiagSet==='function'){
@@ -2495,7 +2766,8 @@ function sheriScheduleNextListen(turnId){
   const heroBtn=document.getElementById('sheriHeroTalkBtn');
   if(heroBtn){heroBtn.textContent='🎙️ Listening…';heroBtn.disabled=true;}
   setSheriStatus('Shericeri is listening…');
-  setTimeout(()=>{
+  sheriNextListenTimer=setTimeout(()=>{
+    sheriNextListenTimer=null;
     if(turnId!==sheriTurnId)return;
     if(!shericeriActive||sheriIsSpeaking||sheriStreamActive||sheriTurnFailed)return;
     shericeriListenOnce();
@@ -2781,13 +3053,21 @@ async function shericeriRespond(transcript){
     salesCount:state.sales.length,
     merchantName:state.merchant.name,merchantCategory:state.merchant.category,
     lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
-    topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit}))
+    topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),
+    customerCount:activeCustomers().length,
+    repeatCustomers:repeatCustomerCount(),
+    topCustomers:topCustomers(5).map(c=>({name:c.name,revenue:c.revenue,visits:c.visits})),
+    revenueTrend:revenueTrend(),
+    profitTrend:dailyProfitTrend(),
+    restockForecast:restockForecast().map(f=>({name:f.name,stock:f.stock,daysUntilStockout:Math.round(f.daysUntilStockout)}))
   };
+  const sheriMemoryPayload=sheriRecentMemoryForPrompt();
 
   sheriResetSpeechState();
   sheriStreamActive=true;
   let fullAnswer='',buffer='',gotAnyChunk=false;
   let streamingEl=null;
+  let sheriTurnRoute='';
 
   try{
     // Get the freshest Supabase session immediately before the streaming call.
@@ -2814,7 +3094,7 @@ async function shericeriRespond(transcript){
     let res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},
-      body:JSON.stringify({mode:'shericeri',question:transcript,context,webSearch:effectiveWebSearch,language:currentShericeriLang(),history:sheriHistorySnapshot()})
+      body:JSON.stringify({mode:'shericeri',question:transcript,context,memory:sheriMemoryPayload,webSearch:effectiveWebSearch,language:currentShericeriLang(),history:sheriHistorySnapshot()})
     });
     // If the gateway rejects the token once, refresh the session and retry exactly once.
     if(res.status===401){
@@ -2825,7 +3105,7 @@ async function shericeriRespond(transcript){
       res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
         method:'POST',
         headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+refreshedSession.access_token},
-        body:JSON.stringify({mode:'shericeri',question:transcript,context,webSearch:effectiveWebSearch,language:currentShericeriLang(),history:sheriHistorySnapshot()})
+        body:JSON.stringify({mode:'shericeri',question:transcript,context,memory:sheriMemoryPayload,webSearch:effectiveWebSearch,language:currentShericeriLang(),history:sheriHistorySnapshot()})
       });
     }
     const advisorMs=Math.round(performance.now()-advisorStart);
@@ -2843,7 +3123,7 @@ async function shericeriRespond(transcript){
       const remainingTokens=res.headers.get('X-Sheri-Rate-Remaining-Tokens');
       const resetRequests=res.headers.get('X-Sheri-Rate-Reset-Requests');
       if(usedModel)sheriDiagSet('Advisor model',usedModel);
-      if(usedRoute)sheriDiagSet('Advisor route',usedRoute);
+      if(usedRoute){sheriDiagSet('Advisor route',usedRoute);sheriTurnRoute=usedRoute;}
       if(orchIntent)sheriDiagSet('Orchestrator intent',orchIntent);
       if(orchComplexity)sheriDiagSet('Orchestrator complexity',orchComplexity);
       if(orchTool)sheriDiagSet('Orchestrator tool',orchTool);
@@ -2913,6 +3193,15 @@ async function shericeriRespond(transcript){
       sheriDiagSet('History turn ID',String(thisTurnId));
       sheriDiagSet('History saved user',transcript.slice(0,300));
       sheriDiagSet('History saved assistant',fullAnswer.trim().slice(0,500));
+    }
+    if(committed){
+      const memDecision=sheriDecideMemoryWrite(transcript,fullAnswer.trim(),sheriTurnRoute);
+      if(memDecision){
+        sheriQueueMemory(memDecision.category,memDecision.content).catch(e=>console.warn('[Sheri memory] queue failed',e));
+        if(typeof sheriDiagSet==='function')sheriDiagSet('Memory write',memDecision.category+': '+memDecision.content.slice(0,120));
+      }else if(typeof sheriDiagSet==='function'){
+        sheriDiagSet('Memory write','skipped (casual/general turn)');
+      }
     }
   }else{
     if(typeof sheriDiagSet==='function')sheriDiagSet('History integrity','STALE RESPONSE NOT COMMITTED; current turn='+sheriTurnId);
