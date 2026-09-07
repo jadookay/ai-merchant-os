@@ -59,7 +59,7 @@
   </div>
 </div>
 
-<meta name="shericeri-version" content="V12.14.5 Kinyarwanda Whisper Repair">
+<meta name="shericeri-version" content="V12.15 Kinyarwanda Whisper Repair">
 <div class="app" id="appRoot" style="display:none">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 10px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px">
     <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Ready</span></div>
@@ -221,7 +221,7 @@
 
 <section id="shericeri" class="view">
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
-  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.14.5 offline-first: Merchant Data + Memory + Customers + Forecasting foundation; English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
+  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.15 offline-first: Merchant Data + Memory + Customers + Forecasting foundation; English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
       <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
@@ -575,7 +575,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
       // If an older controller is still attached, let the new registration take
       // over on the next navigation rather than silently reporting a stale shell.
       if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v12_14_5_device_voice_sw.js')){
-        sheriDiagSet?.('Service Worker update','new V12.14.5 worker registered; old controller still active until reload');
+        sheriDiagSet?.('Service Worker update','new V12.15 worker registered; old controller still active until reload');
       }
     }catch(e){ console.warn('[Shericeri SW] registration/update failed',e); }
   })();
@@ -1954,13 +1954,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.14.5 PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.15 LATENCY PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.14.5');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.15');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -2352,7 +2352,7 @@ function shericeriListenOnce(){
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.14.5 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V12.15 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP ADAPTIVE MIC PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
@@ -2452,7 +2452,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V12.14.5');
+  sheriDiagSet('Runtime version','V12.15');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
@@ -3050,7 +3050,7 @@ async function shericeriRespond(transcript){
     return;
   }
 
-  setSheriStatus('Shericeri is thinking…');
+  setSheriStatus(effectiveWebSearch?'Shericeri is checking live information…':'Shericeri is thinking…');
   if(typeof sheriDiagSet==='function')sheriDiagSet('Response source','CLOUD ADVISOR');
   const context={
     revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
@@ -3069,6 +3069,21 @@ async function shericeriRespond(transcript){
 
   sheriResetSpeechState();
   sheriStreamActive=true;
+
+  // Live web research can legitimately take longer than a normal business turn.
+  // Give the user immediate spoken feedback instead of leaving the microphone
+  // silent while Compound Mini searches. This is deliberately tiny so it does
+  // not become a second conversational turn or materially delay the answer.
+  if(effectiveWebSearch){
+    const lang=currentShericeriLang();
+    const ack=/^rw/i.test(lang)?'Reka ndebe amakuru agezweho.':/^fr/i.test(lang)?'Laissez-moi vérifier les informations récentes.':'Let me check the latest information.';
+    if(typeof sheriDiagSet==='function'){
+      sheriDiagSet('Web research acknowledgement','LOCAL — spoken immediately');
+      sheriDiagSet('Web research timeout','5000 ms server-side');
+    }
+    sheriEnqueueSpeech(ack,thisTurnId);
+  }
+
   let fullAnswer='',buffer='',gotAnyChunk=false;
   let streamingEl=null;
   let sheriTurnRoute='';
@@ -3126,7 +3141,9 @@ async function shericeriRespond(transcript){
       const remainingRequests=res.headers.get('X-Sheri-Rate-Remaining-Requests');
       const remainingTokens=res.headers.get('X-Sheri-Rate-Remaining-Tokens');
       const resetRequests=res.headers.get('X-Sheri-Rate-Reset-Requests');
+      const searchMs=res.headers.get('X-Sheri-Search-Ms');
       if(usedModel)sheriDiagSet('Advisor model',usedModel);
+      if(searchMs)sheriDiagSet('Server web-search time',searchMs+' ms');
       if(usedRoute){sheriDiagSet('Advisor route',usedRoute);sheriTurnRoute=usedRoute;}
       if(orchIntent)sheriDiagSet('Orchestrator intent',orchIntent);
       if(orchComplexity)sheriDiagSet('Orchestrator complexity',orchComplexity);
