@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827">
 <title>AI Business OS</title>
+<meta name="app-version" content="V13.0 AUTH + BUSINESS IDENTITY">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -37,6 +38,8 @@
 #sheriHeroPulse{position:absolute;height:4cm;width:2.5cm;border-radius:18px;border:1.5px solid #D4AF37;opacity:0;pointer-events:none}
 #sheriHero.listening #sheriHeroPulse{animation:sheriPulse 1.6s ease-out infinite}
 @keyframes sheriPulse{0%{opacity:.55;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
+
+.auth-card{max-width:430px}.auth-card .brand{margin-left:0}.auth-title{font-size:25px;font-weight:800;margin:0 0 6px}.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:18px 0 14px;background:#f3f4f6;padding:5px;border-radius:10px}.auth-tabs button{border:0;background:transparent;padding:9px;border-radius:8px;font-weight:700;color:#6b7280;cursor:pointer}.auth-tabs button.active{background:white;color:#1d4ed8;box-shadow:0 1px 3px #0001}.auth-panel{display:none}.auth-panel.active{display:block}.auth-field{position:relative}.auth-field input{padding-right:44px}.pw-toggle{position:absolute;right:8px;top:27px;border:0;background:transparent;cursor:pointer;color:#6b7280;padding:6px}.oauth-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.oauth-btn{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 12px;border-radius:9px;font-weight:700;cursor:pointer}.oauth-btn:hover{background:#f9fafb}.auth-divider{display:flex;align-items:center;gap:9px;color:#9ca3af;font-size:11px;margin:16px 0}.auth-divider:before,.auth-divider:after{content:"";height:1px;background:var(--line);flex:1}.auth-links{display:flex;justify-content:space-between;gap:8px;margin-top:12px}.text-btn{border:0;background:none;color:#2563eb;cursor:pointer;padding:4px;font-size:12px}.auth-status{min-height:20px;margin-top:12px}.onboard-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg)}.onboard-card{width:100%;max-width:620px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;box-shadow:0 8px 30px #0000000c}.onboard-card h1{margin:0 0 5px;font-size:25px}.onboard-card .formgrid{margin-top:18px}.required-mark{color:var(--bad)}.onboard-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.field-help{font-size:11px;color:var(--muted);margin-top:4px}.profile-badge{display:inline-flex;gap:6px;align-items:center;padding:5px 9px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700}
 </style>
 
 <!-- V5 Whisper diagnostic patch: server now returns provider_status,
@@ -45,21 +48,9 @@
 </head>
 <body>
 
-<div id="authScreen" class="auth-wrap">
-  <div class="auth-card">
-    <div class="brand">AI <span>Business OS</span></div>
-    <p class="sub">Sign in to sync your business data across devices.</p>
-    <label>Email</label><input id="authEmail" type="email" autocomplete="email">
-    <label>Password</label><input id="authPassword" type="password" autocomplete="current-password">
-    <div class="actions" style="margin-top:14px">
-      <button class="btn" onclick="handleSignIn()">Sign in</button>
-      <button class="btn secondary" onclick="handleSignUp()">Create account</button>
-    </div>
-    <div id="authStatus" class="sub" style="margin-top:10px"></div>
-  </div>
-</div>
+<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI <span>Business OS</span></div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" onclick="switchAuthMode('signup')">Create account</button></div><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" onclick="togglePassword('authPassword',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignIn()">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" onclick="togglePassword('signupPassword',this)">👁</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" onclick="togglePassword('signupConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPassword',this)">👁</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPasswordConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, the app will not reveal account emails. Check your password manager or saved browser accounts first. If you still cannot identify the email, use support recovery with your business details.</p><button class="btn secondary" style="width:100%;margin-top:14px" onclick="switchAuthMode('signin')">Back to sign in</button></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div><div id="onboardingScreen" class="onboard-wrap" style="display:none"><div class="onboard-card"><div class="brand" style="margin-left:0">AI <span>Business OS</span></div><h1>Set up your business</h1><p class="sub">This profile powers your dashboard, accounting, inventory, forecasts and AI features. Country and currency are required.</p><div class="profile-badge" style="margin-top:10px">⚡ One business profile across the whole app</div><div class="formgrid"><div style="grid-column:1/-1"><label>Business name <span class="required-mark">*</span></label><input id="onboardName" autocomplete="organization" placeholder="e.g. Jean’s General Store"></div><div><label>TIN number <span class="sub">(optional)</span></label><input id="onboardTin" inputmode="numeric" placeholder="Optional"></div><div><label>Fiscal year <span class="sub">(optional)</span></label><select id="onboardFiscalYear"></select></div><div><label>Country <span class="required-mark">*</span></label><select id="onboardCountry"></select></div><div><label>Currency <span class="required-mark">*</span></label><select id="onboardCurrency"></select></div></div><div id="onboardStatus" class="sub auth-status"></div><div class="onboard-actions"><button class="btn" onclick="completeOnboarding()">Continue to my business</button></div></div></div>
 
-<meta name="shericeri-version" content="V12.15.1 Kinyarwanda Whisper Repair">
+<meta name="shericeri-version" content="V13.0 AUTH + BUSINESS IDENTITY">
 <div class="app" id="appRoot" style="display:none">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 10px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px">
     <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Ready</span></div>
@@ -96,7 +87,7 @@
     <div class="formgrid">
       <div><label>Product</label><select id="saleProduct"></select></div>
       <div><label>Quantity</label><input id="saleQty" type="number" min="1" value="1"></div>
-      <div><label>Selling price / unit (RWF)</label><input id="salePrice" type="number" min="0"></div>
+      <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="salePrice" type="number" min="0"></div>
       <div><label>Customer (optional)</label><select id="saleCustomer"><option value="">— Anonymous —</option></select></div>
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="recordSale()">Record sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
@@ -111,8 +102,8 @@
     <div class="formgrid">
       <div><label>Product name</label><input id="pName"></div>
       <div><label>Category</label><select id="pCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div>
-      <div><label>Cost / unit (RWF)</label><input id="pCost" type="number"></div>
-      <div><label>Selling price / unit (RWF)</label><input id="pSell" type="number"></div>
+      <div><label>Cost / unit (<span data-currency-label>RWF</span>)</label><input id="pCost" type="number"></div>
+      <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="pSell" type="number"></div>
       <div><label>Current stock</label><input id="pStock" type="number"></div>
       <div><label>Reorder level</label><input id="pReorder" type="number"></div>
       <div><label>Barcode (optional)</label><input id="pBarcode" placeholder="Scanned automatically, or type manually"></div>
@@ -173,7 +164,7 @@
   <div class="card">
     <div class="formgrid">
       <div><label>Description</label><input id="eDesc" placeholder="Transport"></div>
-      <div><label>Amount (RWF)</label><input id="eAmt" type="number"></div>
+      <div><label>Amount (<span data-currency-label>RWF</span>)</label><input id="eAmt" type="number"></div>
       <div><label>Category</label><select id="eCat"><option>Transport</option><option>Rent</option><option>Utilities</option><option>Supplies</option><option>Other</option></select></div>
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="addExpense()">Add expense</button></div>
@@ -221,7 +212,7 @@
 
 <section id="shericeri" class="view">
   <div class="top"><div><h1>Shericeri</h1><div class="sub">/ʃɛ.ɹi.tʃɛ.ɹi/ — your voice-to-voice finance & business darling.</div></div></div>
-  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V12.15.1 offline-first: Merchant Data + Memory + Customers + Forecasting foundation; English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
+  <div class="notice" id="shericeriNotice">Connecting…</div><div id="sheriOfflineCapability" class="sub" style="margin:6px 0 10px">V13.0 offline-first: Merchant Data + Memory + Customers + Forecasting foundation; English/French continue online/offline where device engines are available; Kinyarwanda offline voice uses the installed local Kinyarwanda ASR/TTS bridge and local merchant data.</div>
   <div class="card" style="text-align:center;padding:28px 17px">
     <div id="sheriDiagnostic" class="card" style="display:none;text-align:left;margin-bottom:18px;background:#f8fafc;border:1px solid #cbd5e1">
       <div style="font-weight:800;margin-bottom:8px">🔧 Shericeri Voice Diagnostic</div>
@@ -268,11 +259,7 @@
   <div class="top"><div><h1>Merchant settings</h1><div class="sub">Your data is stored in your Supabase account, synced across devices.</div></div></div>
   <div class="card">
     <div class="sub" style="margin-bottom:10px">Your Shericeri ID: <b id="setMerchantCode">—</b> <span style="opacity:.7">(say this number if you contact support)</span></div>
-    <div class="formgrid">
-      <div><label>Business / merchant name</label><input id="setName"></div>
-      <div><label>Primary category</label><select id="setCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div>
-      <div><label>Currency</label><input value="RWF" disabled></div>
-    </div>
+    <div class="formgrid"><div><label>Business / merchant name</label><input id="setName"></div><div><label>Primary category</label><select id="setCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div><div><label>TIN number <span class="sub">(optional)</span></label><input id="setTin"></div><div><label>Fiscal year <span class="sub">(optional)</span></label><select id="setFiscalYear"></select></div><div><label>Country</label><select id="setCountry"></select></div><div><label>Currency</label><select id="setCurrency"></select></div></div>
     <div class="actions" style="margin-top:14px">
       <button class="btn" onclick="saveSettings()">Save</button>
       <button class="btn secondary" onclick="exportData()">⬇ Export data (backup)</button>
@@ -313,7 +300,10 @@ const SUPABASE_ANON_KEY = 'sb_publishable_zRtqPyHL9Gqjck1hoAZibQ_KD9TiazY';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function money(n){return 'RWF '+Math.round(n||0).toLocaleString()}
+function merchantCurrency(){return state?.merchant?.currency||'RWF'}
+function merchantCountry(){return state?.merchant?.country||'RW'}
+function merchantLocale(){try{return new Intl.Locale('en-'+merchantCountry().toUpperCase()).toString()}catch(_){return 'en-RW'}}
+function money(n){try{return new Intl.NumberFormat(merchantLocale(),{style:'currency',currency:merchantCurrency(),maximumFractionDigits:0}).format(Number(n)||0)}catch(_){return merchantCurrency()+' '+Math.round(n||0).toLocaleString()}}
 
 let session=null;
 let state={merchant:null,products:[],sales:[],expenses:[],memory:[],customers:[]};
@@ -478,28 +468,47 @@ function sheriServerRecord(record){
 async function sheriReconcileMerchantId(){
   if(!session?.user?.id||!navigator.onLine||!state.merchant?._localOnly)return;
   try{
+    const local={...state.merchant};
+    const oldId=local.id;
     let {data,error}=await sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle();
     if(error)throw error;
     if(!data){
-      const r=await sb.from('merchants').insert({user_id:session.user.id,name:state.merchant.name||'My Business',category:state.merchant.category||'Food & Grocery'}).select().single();
-      if(r.error)throw r.error; data=r.data;
+      const insertRecord=sheriServerRecord(local);
+      delete insertRecord.id;
+      const r=await sb.from('merchants').insert({user_id:session.user.id,...insertRecord}).select().single();
+      if(r.error)throw r.error;
+      data=r.data;
     }
-    const oldId=state.merchant.id,newId=data.id;
-    if(oldId===newId){state.merchant=data;return}
-    state.merchant=data;
-    for(const p of state.products){p.merchant_id=newId;await sheriPut('products',p.id,{merchant_id:newId,record:{...p}})}
-    for(const x of state.sales){x.merchant_id=newId;await sheriPut('sales',x.id,{merchant_id:newId,record:{...x}})}
-    for(const x of state.expenses){x.merchant_id=newId;await sheriPut('expenses',x.id,{merchant_id:newId,record:{...x}})}
-    for(const m of state.memory){m.merchant_id=newId;await sheriPut('memory',m.id,{merchant_id:newId,record:{...m}})}
-    for(const c of state.customers){c.merchant_id=newId;await sheriPut('customers',c.id,{merchant_id:newId,record:{...c}})}
-    const ops=await sheriGetAll('outbox');
-    for(const item of ops){
-      const op=item.op||{};
-      if(op.record?.merchant_id===oldId)op.record.merchant_id=newId;
-      await sheriPut('outbox',item.key,{...item,op});
+    const newId=data.id;
+    // A server merchant already exists: keep its canonical id but apply the
+    // complete offline profile that the user just entered before syncing the
+    // rest of the outbox. This prevents loss of TIN/country/currency/fiscal year.
+    if(newId!==oldId){
+      const profile={...sheriServerRecord(local),user_id:session.user.id};
+      delete profile.id;
+      const r=await sb.from('merchants').update(profile).eq('id',newId).select().single();
+      if(r.error)throw r.error;
+      data=r.data;
+      for(const p of state.products){p.merchant_id=newId;await sheriPut('products',p.id,{merchant_id:newId,record:{...p}})}
+      for(const x of state.sales){x.merchant_id=newId;await sheriPut('sales',x.id,{merchant_id:newId,record:{...x}})}
+      for(const x of state.expenses){x.merchant_id=newId;await sheriPut('expenses',x.id,{merchant_id:newId,record:{...x}})}
+      for(const m of state.memory){m.merchant_id=newId;await sheriPut('memory',m.id,{merchant_id:newId,record:{...m}})}
+      for(const c of state.customers){c.merchant_id=newId;await sheriPut('customers',c.id,{merchant_id:newId,record:{...c}})}
+      const ops=await sheriGetAll('outbox');
+      for(const item of ops){
+        const op=item.op||{};
+        if(op.type==='merchant_upsert'&&op.record?.id===oldId)op.record.id=newId;
+        if(op.record?.merchant_id===oldId)op.record.merchant_id=newId;
+        await sheriPut('outbox',item.key,{...item,op});
+      }
+      // The profile was already applied to the real server merchant. Remove
+      // only this stale merchant-upsert operation; data operations still sync.
+      const refreshed=await sheriGetAll('outbox');
+      for(const item of refreshed){if(item.op?.type==='merchant_upsert'&&item.op?.record?.id===newId)await sheriDelete('outbox',item.key)}
+      await sheriDelete('merchants',oldId);
     }
+    state.merchant={...data};
     await sheriPut('merchants',newId,{user_id:data.user_id,record:{...data}});
-    await sheriDelete('merchants',oldId);
     delete state.merchant._localOnly;
   }catch(e){console.warn('[Shericeri offline] merchant reconcile failed',e)}
 }
@@ -565,7 +574,7 @@ function sheriOnlineEvents(){
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
   (async()=>{
     try{
-      const expected='./shericeri_v12_15_1_search_fix_sw.js';
+      const expected='./shericeri_v13_0_auth_business_identity_sw.js';
       const reg=await navigator.serviceWorker.register(expected,{updateViaCache:'none'});
       sheriDiagSet?.('Service Worker registration','REGISTERED — '+expected);
       const reportSw=()=>{const w=reg.installing||reg.waiting||reg.active;if(w)sheriDiagSet?.('Service Worker lifecycle',String(w.state||'unknown').toUpperCase())};
@@ -575,7 +584,7 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
       // If an older controller is still attached, let the new registration take
       // over on the next navigation rather than silently reporting a stale shell.
       if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v12_15_1_search_fix_sw.js')){
-        sheriDiagSet?.('Service Worker update','new V12.15.1 worker registered; old controller still active until reload');
+        sheriDiagSet?.('Service Worker update','new V13.0 worker registered; old controller still active until reload');
       }
     }catch(e){ console.warn('[Shericeri SW] registration/update failed',e); }
   })();
@@ -689,60 +698,35 @@ async function sheriOfflineRouteText(text){
   return true;
 }
 
-// ── Auth ─────────────────────────────────────────────────────────────────
-async function handleSignUp(){
-  const email=authEmail.value.trim(),password=authPassword.value;
-  if(!email||!password)return authStatus.textContent='Enter an email and password.';
-  authStatus.textContent='Creating account…';
-  const {error}=await sb.auth.signUp({email,password});
-  if(error)return authStatus.textContent=error.message;
-  authStatus.textContent='Account created. If email confirmation is on, check your inbox, then sign in.';
-}
-async function handleSignIn(){
-  const email=authEmail.value.trim(),password=authPassword.value;
-  if(!email||!password)return authStatus.textContent='Enter an email and password.';
-  authStatus.textContent='Signing in…';
-  const {data,error}=await sb.auth.signInWithPassword({email,password});
-  if(error)return authStatus.textContent=error.message;
-  await onAuthed(data.session);
-}
-async function signOut(){await sb.auth.signOut();location.reload()}
-async function onAuthed(sess){
-  session=sess;
-  await sheriOfflineInit();
-  document.getElementById('authScreen').style.display='none';
-  document.getElementById('appRoot').style.display='';
-  await ensureMerchant();
-  await loadAll();
-  render();
-  if(navigator.onLine)checkAdvisor();
-  else {const n=document.getElementById('shericeriNotice');if(n)n.textContent='Offline mode — saved business data is still available.'}
-}
-async function ensureMerchant(){
-  if(!navigator.onLine){
-    const cached=await sheriGetAll('merchants');
-    const mine=cached.find(x=>x.record?.user_id===session.user.id || x.user_id===session.user.id);
-    if(mine){state.merchant=mine.record||mine;return}
-    state.merchant={id:sheriUuid(),user_id:session.user.id,name:'My Business',category:'Food & Grocery',created_at:sheriNow(),_localOnly:true};
-    await sheriSaveSnapshot();
-    await sheriQueue({type:'merchant_upsert',record:{...state.merchant}});
-    return;
-  }
-  let {data,error}=await sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle();
-  if(error){
-    const cached=await sheriGetAll('merchants');
-    const mine=cached.find(x=>x.record?.user_id===session.user.id || x.user_id===session.user.id);
-    if(mine){state.merchant=mine.record||mine;sheriSetConnectivity('degraded','Using cached business profile');return}
-    throw error
-  }
-  if(!data){
-    const {data:created,error:cErr}=await sb.from('merchants').insert({user_id:session.user.id,name:'My Business',category:'Food & Grocery'}).select().single();
-    if(cErr)throw cErr;
-    data=created;
-  }
-  state.merchant=data;
-  await sheriPut('merchants',data.id,{user_id:data.user_id,record:{...data}});
-}
+// ── Authentication + Business Identity V13 ────────────────────────────────
+const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
+const SHERI_COUNTRY_CODES=['AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB','BY','BE','BZ','BJ','BT','BO','BA','BW','BR','BN','BG','BF','BI','CV','KH','CM','CA','CF','TD','CL','CN','CO','KM','CG','CD','CR','CI','HR','CU','CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','SZ','ET','FJ','FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN','HU','IS','IN','ID','IR','IQ','IE','IL','IT','JM','JP','JO','KZ','KE','KI','KP','KR','KW','KG','LA','LV','LB','LS','LR','LY','LI','LT','LU','MG','MW','MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC','MN','ME','MA','MZ','MM','NA','NR','NP','NL','NZ','NI','NE','NG','MK','NO','OM','PK','PW','PA','PG','PY','PE','PH','PL','PT','QA','RO','RU','RW','KN','LC','VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO','ZA','SS','ES','LK','SD','SR','SE','CH','SY','TW','TJ','TZ','TH','TL','TG','TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VA','VE','VN','YE','ZM','ZW'];
+const SHERI_CURRENCY_CODES=['AED','AFN','ALL','AMD','ANG','AOA','ARS','AUD','AWG','AZN','BAM','BBD','BDT','BGN','BHD','BIF','BMD','BND','BOB','BOV','BRL','BSD','BTN','BWP','BYN','BZD','CAD','CDF','CHE','CHF','CHW','CLF','CLP','CNY','COP','COU','CRC','CUC','CUP','CVE','CZK','DJF','DKK','DOP','DZD','EGP','ERN','ETB','EUR','FJD','FKP','GBP','GEL','GHS','GIP','GMD','GNF','GTQ','GYD','HKD','HNL','HTG','HUF','IDR','ILS','INR','IQD','IRR','ISK','JMD','JOD','JPY','KES','KGS','KHR','KMF','KPW','KRW','KWD','KYD','KZT','LAK','LBP','LKR','LRD','LSL','LYD','MAD','MDL','MGA','MKD','MMK','MNT','MOP','MRU','MUR','MVR','MWK','MXN','MXV','MYR','MZN','NAD','NGN','NIO','NOK','NPR','NZD','OMR','PAB','PEN','PGK','PHP','PKR','PLN','PYG','QAR','RON','RSD','RUB','RWF','SAR','SBD','SCR','SDG','SEK','SGD','SHP','SLE','SLL','SOS','SRD','SSP','STN','SVC','SYP','SZL','THB','TJS','TMT','TND','TOP','TRY','TTD','TWD','TZS','UAH','UGX','USD','USN','UYU','UYW','UZS','VED','VES','VND','VUV','WST','XAF','XAG','XAU','XCD','XOF','XPF','YER','ZAR','ZMW','ZWL'];
+const SHERI_COUNTRY_CURRENCY={RW:'RWF',US:'USD',GB:'GBP',FR:'EUR',DE:'EUR',BE:'EUR',CA:'CAD',AU:'AUD',NZ:'NZD',KE:'KES',TZ:'TZS',UG:'UGX',NG:'NGN',GH:'GHS',ZA:'ZAR',ZM:'ZMW',MW:'MWK',BI:'BIF',CD:'CDF',CG:'XAF',CM:'XAF',ET:'ETB',IN:'INR',CN:'CNY',JP:'JPY',AE:'AED',SA:'SAR',QA:'QAR',CH:'CHF',SE:'SEK',NO:'NOK',DK:'DKK'};
+function displayName(type,code){try{return new Intl.DisplayNames(['en'],{type}).of(code)||code}catch(_){return code}}
+function populateCountrySelect(id,value){const el=document.getElementById(id);if(!el)return;el.innerHTML='<option value="">Select country</option>'+SHERI_COUNTRY_CODES.map(c=>`<option value="${c}">${esc(displayName('region',c))} (${c})</option>`).join('');if(value)el.value=value}
+function populateCurrencySelect(id,value){const el=document.getElementById(id);if(!el)return;el.innerHTML='<option value="">Select currency</option>'+SHERI_CURRENCY_CODES.map(c=>`<option value="${c}">${esc(displayName('currency',c))} (${c})</option>`).join('');if(value)el.value=value}
+function populateFiscalYear(id,value){const el=document.getElementById(id);if(!el)return;const now=new Date().getFullYear();el.innerHTML='<option value="">Not specified</option>'+Array.from({length:12},(_,i)=>now-i).map(y=>`<option value="${y}">${y}</option>`).join('');if(value)el.value=String(value)}
+function initProfileSelectors(){populateCountrySelect('onboardCountry');populateCurrencySelect('onboardCurrency');populateFiscalYear('onboardFiscalYear');populateCountrySelect('setCountry');populateCurrencySelect('setCurrency');populateFiscalYear('setFiscalYear');const c=document.getElementById('onboardCountry');if(c)c.onchange=()=>{const suggested=SHERI_COUNTRY_CURRENCY[c.value];if(suggested)document.getElementById('onboardCurrency').value=suggested}}
+function isAppleDevice(){return /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)||/Mac|iPhone|iPad|iPod/.test(navigator.platform||'')}
+function setAuthStatus(msg,isError=false){const el=document.getElementById('authStatus');if(el){el.textContent=msg;el.className='sub auth-status '+(isError?'bad':'')}}
+function switchAuthMode(mode){document.querySelectorAll('.auth-panel').forEach(x=>x.classList.remove('active'));const map={signin:'signinPanel',signup:'signupPanel','forgot-password':'forgotPasswordPanel','forgot-email':'forgotEmailPanel','reset-password':'resetPasswordPanel'};const target=document.getElementById(map[mode]||'signinPanel');if(target)target.classList.add('active');document.getElementById('authTabSignIn').classList.toggle('active',mode==='signin');document.getElementById('authTabSignUp').classList.toggle('active',mode==='signup');document.getElementById('authTitle').textContent=mode==='signup'?'Create your account':mode==='reset-password'?'Recover your account':'Welcome back';document.getElementById('authSubtitle').textContent=mode==='signup'?'Create one account for your business workspace.':mode==='reset-password'?'Set a new secure password.':'Sign in to access your business workspace.';setAuthStatus('')}
+function showForgotPassword(){switchAuthMode('forgot-password');document.getElementById('resetEmail').value=document.getElementById('authEmail').value.trim()}
+function showForgotEmail(){switchAuthMode('forgot-email')}
+function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;el.type=el.type==='password'?'text':'password';if(btn)btn.textContent=el.type==='password'?'👁':'🙈'}
+function friendlyAuthError(error){const m=String(error?.message||error||'Authentication failed.'),x=m.toLowerCase();if(x.includes('invalid login credentials'))return 'Incorrect email or password. If you have not created an account yet, choose Create account.';if(x.includes('email not confirmed'))return 'Your email is not confirmed yet. Check your inbox or resend the confirmation email.';if(x.includes('user already registered'))return 'An account with this email already exists. Try signing in or use Forgot password.';return m}
+async function handleSignUp(){const email=document.getElementById('signupEmail').value.trim(),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;if(!email||!password||!confirm)return setAuthStatus('Enter your email, password and password confirmation.',true);if(password.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);if(password!==confirm)return setAuthStatus('Passwords do not match.',true);if(!navigator.onLine)return setAuthStatus('Creating an account requires internet. After first sign-in, your business workspace can continue offline.',true);setAuthStatus('Creating account…');const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT}});if(error)return setAuthStatus(friendlyAuthError(error),true);if(data.session)setAuthStatus('Account created. Let’s set up your business…');else setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.')}
+async function resendSignupConfirmation(){const email=(document.getElementById('signupEmail')?.value||'').trim();if(!email)return setAuthStatus('Enter the email you used to create the account.',true);if(!navigator.onLine)return setAuthStatus('Resending the confirmation email requires internet.',true);setAuthStatus('Resending confirmation email…');const {error}=await sb.auth.resend({type:'signup',email});setAuthStatus(error?friendlyAuthError(error):'Confirmation email sent again. Check your inbox.')}
+async function handleSignIn(){const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value;if(!email||!password)return setAuthStatus('Enter your email and password.',true);if(!navigator.onLine)return setAuthStatus('You are offline. Reconnect to sign in, or use an already active saved session.',true);setAuthStatus('Signing in…');const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)return setAuthStatus(friendlyAuthError(error),true);setAuthStatus('Signed in. Loading your business…')}
+async function signInOAuth(provider){if(!navigator.onLine)return setAuthStatus('Social sign-in requires internet.',true);setAuthStatus(`Opening ${provider==='apple'?'Apple':'Google'} sign-in…`);const {error}=await sb.auth.signInWithOAuth({provider,options:{redirectTo:SHERI_AUTH_REDIRECT}});if(error)setAuthStatus(friendlyAuthError(error),true)}
+async function sendPasswordReset(){const email=document.getElementById('resetEmail').value.trim();if(!email)return setAuthStatus('Enter the email on your account.',true);if(!navigator.onLine)return setAuthStatus('Password recovery requires internet.',true);setAuthStatus('Sending recovery link…');const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:SHERI_AUTH_REDIRECT});if(error)return setAuthStatus(friendlyAuthError(error),true);setAuthStatus('If an account uses that email, a recovery link has been sent. Check your inbox and spam folder.')}
+async function updateRecoveredPassword(){const p=document.getElementById('newPassword').value,c=document.getElementById('newPasswordConfirm').value;if(p.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);if(p!==c)return setAuthStatus('Passwords do not match.',true);const {error}=await sb.auth.updateUser({password:p});if(error)return setAuthStatus(friendlyAuthError(error),true);setAuthStatus('Password updated. Signing you in…');const {data:{session:recovered}}=await sb.auth.getSession();if(recovered)await onAuthed(recovered)}
+function merchantProfileComplete(m){return !!(m&&m.name&&m.name!=='My Business'&&m.country&&m.currency)}
+function showOnboarding(){document.getElementById('authScreen').style.display='none';document.getElementById('appRoot').style.display='none';document.getElementById('onboardingScreen').style.display='flex';initProfileSelectors();document.getElementById('onboardCountry').value=state.merchant?.country||'RW';document.getElementById('onboardCurrency').value=state.merchant?.currency||SHERI_COUNTRY_CURRENCY[document.getElementById('onboardCountry').value]||'RWF';document.getElementById('onboardName').value=state.merchant?.name&&state.merchant.name!=='My Business'?state.merchant.name:'';document.getElementById('onboardTin').value=state.merchant?.tin||'';populateFiscalYear('onboardFiscalYear',state.merchant?.fiscal_year)}
+async function ensureMerchant(){if(!navigator.onLine){const cached=await sheriGetAll('merchants');const mine=cached.find(x=>x.record?.user_id===session.user.id||x.user_id===session.user.id);if(mine){state.merchant=mine.record||mine;return true}return false}let {data,error}=await sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle();if(error){const cached=await sheriGetAll('merchants');const mine=cached.find(x=>x.record?.user_id===session.user.id||x.user_id===session.user.id);if(mine){state.merchant=mine.record||mine;sheriSetConnectivity('degraded','Using cached business profile');return true}throw error}if(data){state.merchant=data;await sheriPut('merchants',data.id,{user_id:data.user_id,record:{...data}});return true}return false}
+async function completeOnboarding(){const name=document.getElementById('onboardName').value.trim(),tin=document.getElementById('onboardTin').value.trim()||null,fy=document.getElementById('onboardFiscalYear').value||null,country=document.getElementById('onboardCountry').value,currency=document.getElementById('onboardCurrency').value,status=document.getElementById('onboardStatus');if(!name||!country||!currency){status.textContent='Business name, country and currency are required.';status.className='sub auth-status bad';return}status.textContent='Saving your business profile…';const record={user_id:session.user.id,name,category:state.merchant?.category||'Other',tin,fiscal_year:fy?Number(fy):null,country,currency,updated_at:sheriNow()};try{let result;if(navigator.onLine){result=state.merchant?.id&&!state.merchant._localOnly?await sb.from('merchants').update(record).eq('id',state.merchant.id).select().single():await sb.from('merchants').insert(record).select().single();if(result.error)throw result.error;state.merchant=result.data}else{state.merchant={id:state.merchant?.id||sheriUuid(),...record,_localOnly:true};await sheriQueue({type:'merchant_upsert',record:{...state.merchant}})}await sheriSaveSnapshot();document.getElementById('onboardingScreen').style.display='none';document.getElementById('appRoot').style.display='';await loadAll();render();if(navigator.onLine)checkAdvisor()}catch(e){status.textContent='Could not save your business profile: '+String(e.message||e);status.className='sub auth-status bad'}}
+async function onAuthed(sess){session=sess;await sheriOfflineInit();const complete=await ensureMerchant();if(complete&&merchantProfileComplete(state.merchant)){document.getElementById('authScreen').style.display='none';document.getElementById('onboardingScreen').style.display='none';document.getElementById('appRoot').style.display='';await loadAll();render();if(navigator.onLine)checkAdvisor();else{const n=document.getElementById('shericeriNotice');if(n)n.textContent='Offline mode — saved business data is still available.'}}else showOnboarding()}
+async function signOut(){await sb.auth.signOut();session=null;location.reload()}
 
 // ── Data loading ─────────────────────────────────────────────────────────
 async function loadAll(silent=false){
@@ -908,6 +892,7 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset
 function render(){
   if(!state.merchant)return;
   document.getElementById('merchantName').textContent=state.merchant.name;
+  document.querySelectorAll('[data-currency-label]').forEach(el=>el.textContent=merchantCurrency());
   document.getElementById('today').textContent=new Date().toLocaleDateString('en-RW',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   let low=activeProducts().filter(p=>p.stock<=p.reorder).length;
   document.getElementById('metrics').innerHTML=[
@@ -927,6 +912,8 @@ function render(){
   fillSelects();renderSales();renderInventory();renderExpenses();renderCustomers();renderForecast();
   document.getElementById('setName').value=state.merchant.name;
   document.getElementById('setCat').value=state.merchant.category;
+  const tinEl=document.getElementById('setTin');if(tinEl)tinEl.value=state.merchant.tin||'';
+  populateFiscalYear('setFiscalYear',state.merchant.fiscal_year);populateCountrySelect('setCountry',state.merchant.country||'RW');populateCurrencySelect('setCurrency',state.merchant.currency||'RWF');
   const codeEl=document.getElementById('setMerchantCode');
   if(codeEl)codeEl.textContent=state.merchant.merchant_code||'(assigned once synced online)';
 }
@@ -1409,13 +1396,7 @@ function renderForecast(){
 }
 
 // ── Settings ─────────────────────────────────────────────────────────────
-async function saveSettings(){
-  const name=document.getElementById('setName').value||'Merchant',category=document.getElementById('setCat').value;
-  Object.assign(state.merchant,{name,category,updated_at:sheriNow()});await sheriSaveSnapshot();
-  await sheriQueue({type:'merchant_upsert',record:{...state.merchant}});
-  if(navigator.onLine)await sheriSyncOutbox();
-  render();alert(navigator.onLine?'Settings saved.':'Settings saved offline — they will sync automatically.');
-}
+async function saveSettings(){const name=document.getElementById('setName').value.trim()||'Merchant',category=document.getElementById('setCat').value,tin=document.getElementById('setTin').value.trim()||null,fiscalYear=document.getElementById('setFiscalYear').value||null,country=document.getElementById('setCountry').value,currency=document.getElementById('setCurrency').value;if(!country||!currency)return alert('Country and currency are required.');const oldCurrency=state.merchant.currency||'RWF';Object.assign(state.merchant,{name,category,tin,fiscal_year:fiscalYear?Number(fiscalYear):null,country,currency,updated_at:sheriNow()});await sheriSaveSnapshot();await sheriQueue({type:'merchant_upsert',record:{...state.merchant}});if(navigator.onLine)await sheriSyncOutbox();render();alert(oldCurrency!==currency?'Settings saved. Existing numeric amounts were not converted; the new currency is now used for display and new transactions.':(navigator.onLine?'Settings saved.':'Settings saved offline — they will sync automatically.'));}
 async function seedDemoData(){
   if(!confirm('Add sample products so you can test the app? This will not remove existing data.'))return;
   const items=[
@@ -1527,7 +1508,7 @@ async function askAI(webSearch){
   const context={
     revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
     salesCount:state.sales.length,
-    merchantName:state.merchant.name,merchantCategory:state.merchant.category,
+    merchantName:state.merchant.name,merchantCategory:state.merchant.category,merchantTin:state.merchant.tin||null,fiscalYear:state.merchant.fiscal_year||null,country:state.merchant.country||'RW',currency:state.merchant.currency||'RWF',
     lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
     topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),
     customerCount:activeCustomers().length,
@@ -1954,13 +1935,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V12.15.1 LATENCY PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V13.0 PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V12.15.1');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V13.0');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -2352,7 +2333,7 @@ function shericeriListenOnce(){
   const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
-  sheriVadDiag('Latency profile','V12.15.1 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
+  sheriVadDiag('Latency profile','V13.0 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
   sheriVadDiag('VAD authority','SOFT TIMING HINT — Whisper decides usable speech');
   sheriVadDiag('VAD profile',isAndroid?'ANDROID LOW-SIGNAL PROFILE':'DESKTOP ADAPTIVE MIC PROFILE');
   sheriVadDiag('VAD speech energy detected','NO');
@@ -2452,7 +2433,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V12.15.1');
+  sheriDiagSet('Runtime version','V13.0');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
@@ -3055,7 +3036,7 @@ async function shericeriRespond(transcript){
   const context={
     revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
     salesCount:state.sales.length,
-    merchantName:state.merchant.name,merchantCategory:state.merchant.category,
+    merchantName:state.merchant.name,merchantCategory:state.merchant.category,merchantTin:state.merchant.tin||null,fiscalYear:state.merchant.fiscal_year||null,country:state.merchant.country||'RW',currency:state.merchant.currency||'RWF',
     lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
     topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),
     customerCount:activeCustomers().length,
@@ -3237,12 +3218,7 @@ async function shericeriRespond(transcript){
     ensureVoicesLoaded(350).catch(()=>{});
   }
 })();
-(async function boot(){
-  await sheriOfflineInit();
-  const {data:{session:existing}}=await sb.auth.getSession();
-  if(existing)await onAuthed(existing);
-  sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_OUT')location.reload()});
-})();
+(async function boot(){await sheriOfflineInit();initProfileSelectors();if(!isAppleDevice()){document.getElementById('appleOAuthBtn')?.style.setProperty('display','none');document.getElementById('appleOAuthBtn2')?.style.setProperty('display','none')}const {data:{session:existing}}=await sb.auth.getSession();if(existing)await onAuthed(existing);sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
 
 function sheriDiagAudioIntegrity(body){try{if(!body||typeof body!=='object')return;if(body.first_bytes)sheriDiagSet('Whisper first bytes',String(body.first_bytes));if(body.webm_signature)sheriDiagSet('Whisper WebM signature',String(body.webm_signature));if(body.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(body.audio_bytes));if(body.audio_mime)sheriDiagSet('Whisper audio MIME',String(body.audio_mime));}catch(_){}}
 </script>
