@@ -8,8 +8,9 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS</title>
-<meta name="app-version" content="V14.0.0 BUSINESS OS LAYERS 3-10">
+<meta name="app-version" content="V14.1.2 BUSINESS OS + ACCOUNTING">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -48,12 +49,18 @@
 <!-- V5 Whisper diagnostic patch: server now returns provider_status,
      provider_error, audio_bytes, audio_mime and model in the JSON body. -->
 
+
+<style id="sheriMerchantSimplicityV1412">
+/* V14.1.2: accounting engine remains active, but implementation mechanics stay out of the merchant UI. */
+#money .sheri-internal-accounting, #reports .sheri-internal-accounting { display:none !important; }
+#accTB, #accGL, #accAudit { display:none !important; }
+</style>
 </head>
 <body>
 
-<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI <span>Business OS</span></div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" onclick="switchAuthMode('signup')">Create account</button></div><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" onclick="togglePassword('authPassword',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignIn()">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" onclick="togglePassword('signupPassword',this)">👁</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" onclick="togglePassword('signupConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPassword',this)">👁</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPasswordConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Merchant code <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div><div id="onboardingScreen" class="onboard-wrap" style="display:none"><div class="onboard-card"><div class="brand" style="margin-left:0">AI <span>Business OS</span></div><h1>Set up your business</h1><p class="sub">This profile powers your dashboard, accounting, inventory, forecasts and AI features. Country and currency are required.</p><div class="profile-badge" style="margin-top:10px">⚡ One business profile across the whole app</div><div class="formgrid"><div style="grid-column:1/-1"><label>Business name <span class="required-mark">*</span></label><input id="onboardName" autocomplete="organization" placeholder="e.g. Jean’s General Store"></div><div><label>TIN number <span class="sub">(optional)</span></label><input id="onboardTin" inputmode="numeric" placeholder="Optional"></div><div><label>Fiscal year <span class="sub">(optional)</span></label><select id="onboardFiscalYear"></select></div><div><label>Country <span class="required-mark">*</span></label><select id="onboardCountry"></select></div><div><label>Currency <span class="required-mark">*</span></label><select id="onboardCurrency"></select></div></div><div id="onboardStatus" class="sub auth-status"></div><div class="onboard-actions"><button class="btn" onclick="completeOnboarding()">Continue to my business</button></div></div></div>
+<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI <span>Business OS</span></div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" onclick="switchAuthMode('signup')">Create account</button></div><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" onclick="togglePassword('authPassword',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignIn()">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" onclick="togglePassword('signupPassword',this)">👁</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" onclick="togglePassword('signupConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPassword',this)">👁</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPasswordConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Merchant code <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div><div id="onboardingScreen" class="onboard-wrap" style="display:none"><div class="onboard-card"><div class="brand" style="margin-left:0">AI <span>Business OS</span></div><h1>Set up your business</h1><p class="sub">This profile powers your dashboard, accounting, inventory, forecasts and AI features. Country and currency are required.</p><div class="profile-badge" style="margin-top:10px">⚡ One business profile across the whole app</div><div class="formgrid"><div style="grid-column:1/-1"><label>Business name <span class="required-mark">*</span></label><input id="onboardName" autocomplete="organization" placeholder="e.g. Jean’s General Store"></div><div><label>TIN number <span class="sub">(optional)</span></label><input id="onboardTin" inputmode="numeric" placeholder="Optional"></div><div><label>Fiscal year <span class="sub">(optional)</span></label><select id="onboardFiscalYear"></select></div><div><label>Country <span class="required-mark">*</span></label><select id="onboardCountry"></select></div><div><label>Currency <span class="required-mark">*</span></label><select id="onboardCurrency"></select></div></div><div id="onboardStatus" class="sub auth-status"></div><div class="onboard-actions"><button class="btn" onclick="completeOnboarding()">Continue to my business</button></div></div></div>
 
-<meta name="shericeri-version" content="V14.0.0 BUSINESS OS LAYERS 3-10">
+<meta name="shericeri-version" content="V14.1.2 BUSINESS OS + ACCOUNTING">
 <div class="app" id="appRoot" style="display:none">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 10px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px">
     <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Ready</span></div>
@@ -69,6 +76,9 @@
     <button data-view="customers">☺ Customers</button>
     <button data-view="forecast">📈 Forecast</button>
     <button data-view="businessOS">◈ Business OS</button>
+    <button data-view="money">💰 Money</button>
+    <button data-view="reports">▤ Reports</button>
+    <button data-view="adjustments">↩ Returns</button>
     <button data-view="advisor">✦ AI Advisor</button>
     <button data-view="shericeri">🎙️ Shericeri</button>
     <button data-view="settings">⚙ Settings</button>
@@ -182,7 +192,7 @@
     <div class="formgrid">
       <div><label>Name</label><input id="cName" placeholder="Alice Uwase"></div>
       <div><label>Phone (optional)</label><input id="cPhone" placeholder="078..."></div>
-      <div><label>Notes (optional)</label><input id="cNotes" placeholder="e.g. buys in bulk, prefers Kinyarwanda"></div>
+      <div><label>Notes (optional)</label><input id="cNotes" placeholder="e.g. buys in bulk, prefers Kinyarwanda"></div><div><label>Credit limit</label><input id="cCreditLimit" type="number" min="0" step="0.01" value="0"></div>
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="addCustomer()">Add customer</button></div>
   </div>
@@ -275,7 +285,7 @@
       <div><label>Quantity</label><input id="osPurchaseQty" type="number" min="1" value="1"></div>
       <div><label>Unit cost (<span data-currency-label>RWF</span>)</label><input id="osPurchaseCost" type="number" min="0"></div>
       <div><label>Due date (optional)</label><input id="osPurchaseDue" type="date"></div>
-      <div><label>Status</label><select id="osPurchaseStatus"><option value="received">Received</option><option value="ordered">Ordered</option><option value="partially_received">Partially received</option></select></div>
+      <div><label>Status</label><select id="osPurchaseStatus"><option value="received">Received</option><option value="ordered">Ordered</option></select></div>
     </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="addOSPurchase()">Record purchase</button></div><div id="osPurchaseTable" style="margin-top:12px"></div></div>
   </div>
   <div class="grid2 section">
@@ -294,6 +304,44 @@
     <div class="card"><h2>AI Command Center</h2><div id="osAIInsight" class="notice">Ask for an AI business insight. Online mode can use the cloud advisor; offline mode uses deterministic analysis of saved business data.</div><div class="actions" style="margin-top:12px"><button class="btn" onclick="generateOSInsight()">Analyze my business</button><button class="btn secondary" onclick="show('advisor')">Open AI Advisor</button></div></div>
   </div>
   <div class="card section"><h2>Management Reports</h2><div id="osReports"></div></div>
+</section>
+
+<section id="money" class="view">
+  <div class="top"><div><h1>Money</h1><div class="sub">Simple bookkeeping: invoices, bills, payments, cash & bank, tax and recurring money — all backed by the double-entry ledger.</div></div><button class="btn" onclick="accRebuildFromOperations()">↻ Rebuild accounting</button></div>
+  <div class="metrics" id="accMetrics"></div>
+  <div class="grid2 section">
+    <div class="card"><h2>Customer invoice</h2><div class="formgrid">
+      <div><label>Customer</label><select id="accInvoiceCustomer"></select></div><div><label>Issue date</label><input id="accInvoiceDate" type="date"></div><div><label>Due date</label><input id="accInvoiceDue" type="date"></div>
+      <div><label>Product / description</label><input id="accInvoiceDesc" placeholder="Product or service"></div><div><label>Quantity</label><input id="accInvoiceQty" type="number" min="0.01" step="0.01" value="1"></div><div><label>Unit price</label><input id="accInvoicePrice" type="number" min="0" step="0.01"></div>
+      <div><label>Tax rate</label><select id="accInvoiceTax"></select></div><div><label>Discount</label><input id="accInvoiceDiscount" type="number" min="0" step="0.01" value="0"></div><div><label>Notes</label><input id="accInvoiceNotes" placeholder="Optional"></div>
+    </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateInvoice()">Create invoice</button></div><div id="accInvoiceTable" style="margin-top:12px"></div></div>
+    <div class="card"><h2>Supplier bill</h2><div class="formgrid">
+      <div><label>Supplier</label><select id="accBillSupplier"></select></div><div><label>Issue date</label><input id="accBillDate" type="date"></div><div><label>Due date</label><input id="accBillDue" type="date"></div>
+      <div><label>Product / description</label><input id="accBillDesc" placeholder="Stock or service"></div><div><label>Quantity</label><input id="accBillQty" type="number" min="0.01" step="0.01" value="1"></div><div><label>Unit cost</label><input id="accBillCost" type="number" min="0" step="0.01"></div>
+      <div><label>Tax rate</label><select id="accBillTax"></select></div><div><label>Discount</label><input id="accBillDiscount" type="number" min="0" step="0.01" value="0"></div><div><label>Notes</label><input id="accBillNotes" placeholder="Optional"></div>
+    </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBill()">Create bill</button></div><div id="accBillTable" style="margin-top:12px"></div></div>
+  </div>
+  <div class="grid2 section">
+    <div class="card"><h2>Receive / make payment</h2><div class="formgrid"><div><label>Payment type</label><select id="accPaymentType"><option value="customer_receipt">Customer payment received</option><option value="supplier_payment">Supplier payment</option><option value="expense_payment">Expense paid</option><option value="other_income">Other income</option><option value="other_expense">Other expense</option></select></div><div><label>Related invoice/bill <span class="sub">(optional)</span></label><select id="accPaymentSource"></select></div><div><label>Amount</label><input id="accPaymentAmount" type="number" min="0" step="0.01"></div><div><label>Cash / bank account</label><select id="accPaymentAccount"></select></div><div><label>Date</label><input id="accPaymentDate" type="date"></div><div><label>Reference</label><input id="accPaymentRef" placeholder="Receipt / transaction ref"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreatePayment()">Record payment</button></div><div id="accPaymentTable" style="margin-top:12px"></div></div>
+    <div class="card"><h2>Cash & bank accounts</h2><div class="formgrid"><div><label>Account name</label><input id="accBankName" placeholder="Cash till / Bank account"></div><div><label>Type</label><select id="accBankType"><option value="cash">Cash</option><option value="bank">Bank</option><option value="mobile_money">Mobile money</option></select></div><div><label>Opening balance</label><input id="accBankOpening" type="number" min="0" step="0.01" value="0"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBankAccount()">Add account</button></div><div id="accBankTable" style="margin-top:12px"></div><div class="sub" style="margin-top:10px">Reconciliation records the last date you checked the account against its statement.</div></div>
+  </div>
+  <div class="grid2 section">
+    <div class="card"><h2>Tax rates</h2><div class="formgrid"><div><label>Name</label><input id="accTaxName" placeholder="VAT 18%"></div><div><label>Rate %</label><input id="accTaxRate" type="number" min="0" step="0.01"></div><div><label>Type</label><select id="accTaxType"><option value="output">Sales tax</option><option value="input">Purchase tax</option></select></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateTaxRate()">Add tax rate</button></div><div id="accTaxTable" style="margin-top:12px"></div></div>
+    <div class="card"><h2>Recurring transactions</h2><div class="formgrid"><div><label>Description</label><input id="accRecDesc" placeholder="Monthly rent"></div><div><label>Amount</label><input id="accRecAmount" type="number" min="0" step="0.01"></div><div><label>Frequency</label><select id="accRecFreq"><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="daily">Daily</option></select></div><div><label>Next run</label><input id="accRecNext" type="date"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateRecurring()">Save recurring</button><button class="btn secondary" onclick="accRunDueRecurring()">Run due now</button></div><div id="accRecurringTable" style="margin-top:12px"></div></div>
+  </div>
+  <div class="card section"><h2>Opening balance & period lock</h2><div class="formgrid"><div><label>Account</label><select id="accOpeningAccount"></select></div><div><label>Opening amount</label><input id="accOpeningAmount" type="number" min="0" step="0.01"></div><div><label>Normal balance</label><select id="accOpeningSide"><option value="debit">Debit</option><option value="credit">Credit</option></select></div><div><label>Opening date</label><input id="accOpeningDate" type="date"></div><div><label>Lock transactions through</label><input id="accLockDate" type="date"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accPostOpeningBalance()">Post opening balance</button><button class="btn secondary" onclick="accSaveLockDate()">Save period lock</button></div><div id="accAccountingStatus" class="sub" style="margin-top:8px"></div></div>
+</section>
+<section id="adjustments" class="view">
+  <div class="top"><div><h1>Returns & adjustments</h1><div class="sub">Record sales returns, purchase returns and explicit discounts without hiding them inside the books.</div></div></div>
+  <div class="card"><div class="formgrid"><div><label>Adjustment</label><select id="accAdjType"><option value="sales_return">Sales return / refund</option><option value="purchase_return">Purchase return</option><option value="sales_discount">Sales discount</option></select></div><div><label>Amount</label><input id="accAdjAmount" type="number" min="0" step="0.01"></div><div><label>Cash / bank account</label><select id="accAdjAccount"></select></div><div><label>Date</label><input id="accAdjDate" type="date"></div><div><label>Description</label><input id="accAdjDesc" placeholder="Reason for adjustment"></div><div><label>Inventory quantity returned <span class="sub">(optional)</span></label><input id="accAdjQty" type="number" min="0" step="0.01" value="0"></div><div><label>Product <span class="sub">(optional)</span></label><select id="accAdjProduct"></select></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateAdjustment()">Record adjustment</button></div><div id="accAdjTable" style="margin-top:12px"></div></div>
+</section>
+<section id="reports" class="view">
+  <div class="top"><div><h1>Reports</h1><div class="sub">Accounting reports are generated from the double-entry ledger.</div></div><button class="btn" onclick="accValidateLedger()">✓ Check ledger integrity</button></div>
+  <div class="metrics" id="reportMetrics"></div>
+  <div class="grid2 section"><div class="card"><h2>Profit & Loss</h2><div id="accPL"></div></div><div class="card"><h2>Balance Sheet</h2><div id="accBS"></div></div></div>
+  <div class="grid2 section"><div class="card"><h2>Cash Flow</h2><div id="accCF"></div></div><div class="card"><h2>Trial Balance</h2><div id="accTB"></div></div></div>
+  <div class="card section"><h2>General Ledger</h2><div id="accGL"></div></div>
+  <div class="card section"><h2>Audit trail</h2><div id="accAudit"></div></div>
 </section>
 <section id="settings" class="view">
   <div class="top"><div><h1>Merchant settings</h1><div class="sub">Your data is stored in your Supabase account, synced across devices.</div></div></div>
@@ -346,7 +394,7 @@ function merchantLocale(){try{return new Intl.Locale('en-'+merchantCountry().toU
 function money(n){try{return new Intl.NumberFormat(merchantLocale(),{style:'currency',currency:merchantCurrency(),maximumFractionDigits:0}).format(Number(n)||0)}catch(_){return merchantCurrency()+' '+Math.round(n||0).toLocaleString()}}
 
 let session=null;
-let state={merchant:null,products:[],sales:[],expenses:[],memory:[],customers:[],suppliers:[],purchases:[],cashEntries:[],budgets:[]};
+let state={merchant:null,products:[],sales:[],expenses:[],memory:[],customers:[],suppliers:[],purchases:[],cashEntries:[],budgets:[],accounts:[],journalEntries:[],journalLines:[],invoices:[],bills:[],payments:[],bankAccounts:[],taxRates:[],recurringTransactions:[],accountingSettings:null,auditLog:[]};
 let editingProductId=null;
 
 let advisorAvailable=null; // null=unknown, true/false once tested
@@ -355,7 +403,7 @@ let advisorAvailable=null; // null=unknown, true/false once tested
 // Durable local cache: IndexedDB is used instead of localStorage so business
 // records can survive offline sessions without bloating the synchronous store.
 const SHERI_LOCAL_DB='shericeri_offline_v12';
-const SHERI_LOCAL_DB_VERSION=10;
+const SHERI_LOCAL_DB_VERSION=12;
 let sheriOfflineDb=null;
 let sheriConnectivity=navigator.onLine?'online':'offline';
 let sheriSyncBusy=false;
@@ -380,14 +428,14 @@ function sheriOpenLocalDb(){
     req.onupgradeneeded=()=>{
       const db=req.result;
       const tx=req.transaction;
-      for(const store of ['meta','merchants','products','sales','expenses','outbox','conflicts','memory','customers','suppliers','purchases','cashEntries','budgets']){
+      for(const store of ['meta','merchants','products','sales','expenses','outbox','conflicts','memory','customers','suppliers','purchases','cashEntries','budgets','accounts','journalEntries','journalLines','invoices','bills','payments','bankAccounts','taxRates','recurringTransactions','accountingSettings','auditLog']){
         if(!db.objectStoreNames.contains(store))db.createObjectStore(store,{keyPath:'key'});
       }
       // V12.14.2 schema migration marker. Future versions must add an explicit
       // migration block here rather than silently changing record shapes.
       // V12.14.1: added 'memory' store (shericeri_memory table mirror).
       // V12.14.1: added 'customers' store (customers table mirror).
-      try{tx.objectStore('meta').put({key:'schema',version:10,migrated_at:new Date().toISOString()})}catch(_){/* ignore */}
+      try{tx.objectStore('meta').put({key:'schema',version:12,migrated_at:new Date().toISOString()})}catch(_){/* ignore */}
     };
     req.onsuccess=()=>{sheriOfflineDb=req.result;resolve(req.result)};
     req.onerror=()=>reject(req.error||new Error('Could not open local offline database'));
@@ -426,6 +474,24 @@ async function sheriSaveSnapshot(){
   for(const x of state.cashEntries)await sheriPut('cashEntries',x.id,{merchant_id:state.merchant.id,record:{...x}});
   for(const x of state.budgets)await sheriPut('budgets',x.id,{merchant_id:state.merchant.id,record:{...x}});
 }
+async function sheriSaveAccountingSnapshot(){
+  if(!state.merchant)return;
+  const mid=state.merchant.id;
+  const groups=[['accounts',state.accounts],['journalEntries',state.journalEntries],['journalLines',state.journalLines],['invoices',state.invoices],['bills',state.bills],['payments',state.payments],['bankAccounts',state.bankAccounts],['taxRates',state.taxRates],['recurringTransactions',state.recurringTransactions],['auditLog',state.auditLog]];
+  for(const [store,rows] of groups)for(const row of (rows||[]))await sheriPut(store,row.id||row.key,{merchant_id:mid,record:{...row}});
+  if(state.accountingSettings)await sheriPut('accountingSettings','settings',{merchant_id:mid,record:{...state.accountingSettings}});
+}
+async function sheriLoadAccountingSnapshot(merchantId){
+  await sheriOpenLocalDb();
+  const stores=['accounts','journalEntries','journalLines','invoices','bills','payments','bankAccounts','taxRates','recurringTransactions','accountingSettings','auditLog'];
+  const vals=await Promise.all(stores.map(x=>sheriGetAll(x)));
+  const [as,jes,jls,ins,bills,pays,banks,taxes,recs,sets]=vals;
+  const pick=a=>a.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
+  state.accounts=pick(as); state.journalEntries=pick(jes); state.journalLines=pick(jls); state.invoices=pick(ins); state.bills=pick(bills); state.payments=pick(pays); state.bankAccounts=pick(banks); state.taxRates=pick(taxes); state.recurringTransactions=pick(recs); state.auditLog=pick(vals[10]||[]);
+  const setting=sets.find(x=>x.merchant_id===merchantId); state.accountingSettings=setting?.record||null;
+  return true;
+}
+
 async function sheriLoadLocalSnapshot(merchantId){
   await sheriOpenLocalDb();
   const m=await sheriGet('merchants',merchantId);
@@ -442,6 +508,7 @@ async function sheriLoadLocalSnapshot(merchantId){
   state.purchases=purs.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
   state.cashEntries=cash.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
   state.budgets=buds.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
+  await sheriLoadAccountingSnapshot(merchantId);
   return true;
 }
 async function sheriQueue(op){
@@ -617,6 +684,12 @@ async function sheriSyncOutbox(){
           const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
         }else if(op.type==='budget_delete'){
           const {error}=await sb.from('budgets').delete().eq('id',op.id); if(error)throw error;
+        }else if(op.type==='accounting_upsert'){
+          const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
+        }else if(op.type==='accounting_settings_upsert'){
+          const {error}=await sb.from('accounting_settings').upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'}); if(error)throw error;
+        }else if(op.type==='accounting_delete'){
+          const {error}=await sb.from(op.table).delete().eq('id',op.id); if(error)throw error;
         }else if(op.type==='memory_insert'){
           const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'}); if(error)throw error;
         }else if(op.type==='customer_upsert'){
@@ -642,7 +715,7 @@ function sheriOnlineEvents(){
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
   (async()=>{
     try{
-      const expected='./shericeri_v14_0_0_business_os_sw.js';
+      const expected='./shericeri_v14_1_2_accounting_sw.js';
       const reg=await navigator.serviceWorker.register(expected,{updateViaCache:'none'});
       sheriDiagSet?.('Service Worker registration','REGISTERED — '+expected);
       const reportSw=()=>{const w=reg.installing||reg.waiting||reg.active;if(w)sheriDiagSet?.('Service Worker lifecycle',String(w.state||'unknown').toUpperCase())};
@@ -652,8 +725,8 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
       // If an older controller is still attached, let the new registration take
       // over on the next navigation rather than silently reporting a stale shell.
       if(reg.waiting)try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(_){}
-      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v14_0_0_business_os_sw.js')){
-        sheriDiagSet?.('Service Worker update','V14.0.0 worker registered; old controller will be replaced now');
+      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v14_1_2_accounting_sw.js')){
+        sheriDiagSet?.('Service Worker update','V14.1.2 worker registered');
       }
     }catch(e){ console.warn('[Shericeri SW] registration/update failed',e); }
   })();
@@ -768,17 +841,17 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.0.0';
+const SHERI_RELEASE='V14.1.2';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=(SHERI_IS_LOCAL?window.location.origin+window.location.pathname:SHERI_PRODUCTION_URL).replace(/\/$/,'');
-const SHERI_CACHE_BUSTER='sheri_v=14.0.0';
+const SHERI_CACHE_BUSTER='sheri_v=14.1.2';
 function sheriEnsureFreshRelease(){
   try{
     if(window.top!==window.self)return;
     const u=new URL(window.location.href);
     if(!u.searchParams.has('sheri_v')){
-      u.searchParams.set('sheri_v','14.0.0');
+      u.searchParams.set('sheri_v','14.1.0');
       window.location.replace(u.toString());
     }
   }catch(_){/* keep app usable if URL APIs are restricted */}
@@ -795,19 +868,56 @@ function populateFiscalYear(id,value){const el=document.getElementById(id);if(!e
 function initProfileSelectors(){populateCountrySelect('onboardCountry');populateCurrencySelect('onboardCurrency');populateFiscalYear('onboardFiscalYear');populateCountrySelect('setCountry');populateCurrencySelect('setCurrency');populateFiscalYear('setFiscalYear');const c=document.getElementById('onboardCountry');if(c)c.onchange=()=>{const suggested=SHERI_COUNTRY_CURRENCY[c.value];if(suggested)document.getElementById('onboardCurrency').value=suggested}}
 function isAppleDevice(){return /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)||/Mac|iPhone|iPad|iPod/.test(navigator.platform||'')}
 function setAuthStatus(msg,isError=false){const el=document.getElementById('authStatus');if(el){el.textContent=msg;el.className='sub auth-status '+(isError?'bad':'')}}
-function switchAuthMode(mode){document.querySelectorAll('.auth-panel').forEach(x=>x.classList.remove('active'));const map={signin:'signinPanel',signup:'signupPanel','forgot-password':'forgotPasswordPanel','forgot-email':'forgotEmailPanel','reset-password':'resetPasswordPanel'};const target=document.getElementById(map[mode]||'signinPanel');if(target)target.classList.add('active');document.getElementById('authTabSignIn').classList.toggle('active',mode==='signin');document.getElementById('authTabSignUp').classList.toggle('active',mode==='signup');document.getElementById('authTitle').textContent=mode==='signup'?'Create your account':mode==='reset-password'?'Recover your account':'Welcome back';document.getElementById('authSubtitle').textContent=mode==='signup'?'Create one account for your business workspace.':mode==='reset-password'?'Set a new secure password.':'Sign in to access your business workspace.';if(mode==='forgot-email')initRecoveryForm();setAuthStatus('')}
+function switchAuthMode(mode){document.querySelectorAll('.auth-panel').forEach(x=>x.classList.remove('active'));const map={signin:'signinPanel',signup:'signupPanel','forgot-password':'forgotPasswordPanel','forgot-email':'forgotEmailPanel','reset-password':'resetPasswordPanel'};const target=document.getElementById(map[mode]||'signinPanel');if(target)target.classList.add('active');document.getElementById('authTabSignIn').classList.toggle('active',mode==='signin');document.getElementById('authTabSignUp').classList.toggle('active',mode==='signup');document.getElementById('authTitle').textContent=mode==='signup'?'Create your account':mode==='reset-password'?'Recover your account':'Welcome back';document.getElementById('authSubtitle').textContent=mode==='signup'?'Create one account for your business workspace.':mode==='reset-password'?'Set a new secure password.':'Sign in to access your business workspace.';if(mode==='forgot-email')initRecoveryForm();setAuthStatus('');setTimeout(sheriTurnstileRender,50)}
 function showForgotPassword(){switchAuthMode('forgot-password');document.getElementById('resetEmail').value=document.getElementById('authEmail').value.trim()}
 function showForgotEmail(){switchAuthMode('forgot-email')}
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;el.type=el.type==='password'?'text':'password';if(btn)btn.textContent=el.type==='password'?'👁':'🙈'}
+const SHERI_TURNSTILE_SITE_KEY='0x4AAAAAAEu6H87iXa9cExGa';
+let sheriTurnstileWidgetId=null;
+let sheriTurnstileToken='';
+let sheriTurnstileBusy=false;
+function sheriTurnstileRender(){
+  const wrap=document.getElementById('sheriTurnstileWrap'),host=document.getElementById('sheriTurnstile');
+  if(!wrap||!host)return; wrap.style.display='block';
+  if(sheriTurnstileWidgetId!==null)return;
+  if(!window.turnstile){setAuthStatus('Security check is still loading. Please wait a moment and try again.',true);return}
+  try{
+    sheriTurnstileWidgetId=window.turnstile.render(host,{sitekey:SHERI_TURNSTILE_SITE_KEY,theme:'auto',callback:t=>{sheriTurnstileToken=t},'expired-callback':()=>{sheriTurnstileToken=''},'timeout-callback':()=>{sheriTurnstileToken='';setAuthStatus('Security check timed out. Please try again.',true)},'error-callback':()=>{sheriTurnstileToken='';setAuthStatus('Security check could not be completed. Refresh and try again.',true)}});
+  }catch(e){sheriTurnstileWidgetId=null;setAuthStatus('Security check could not be loaded. Please refresh and try again.',true)}
+}
+function sheriTurnstileReset(){sheriTurnstileToken='';try{if(window.turnstile&&sheriTurnstileWidgetId!==null)window.turnstile.reset(sheriTurnstileWidgetId)}catch(_){}}
+async function sheriGetCaptchaToken(){
+  sheriTurnstileRender();
+  for(let i=0;i<50&&!sheriTurnstileToken;i++)await new Promise(r=>setTimeout(r,100));
+  if(!sheriTurnstileToken)throw new Error('Complete the security check, then try again.');
+  return sheriTurnstileToken;
+}
 function friendlyAuthError(error){const m=String(error?.message||error||'Authentication failed.'),x=m.toLowerCase();if(x.includes('invalid login credentials')||x.includes('invalid login'))return 'Incorrect email or password. If you do not have an account yet, choose Create account.';if(x.includes('email not confirmed'))return 'Your email is not confirmed yet. Check your inbox or resend the confirmation email.';if(x.includes('user already registered')||x.includes('email_exists')||x.includes('email address already exists'))return 'This email is already registered. Sign in instead, or use Forgot password.';if(x.includes('unsupported provider')||x.includes('provider is not enabled'))return 'This social sign-in is not enabled in the Shericeri Supabase project yet. Enable the provider in Supabase Auth, then try again.';if(x.includes('otp_expired')||x.includes('otp expired')||x.includes('expired'))return 'That recovery link has expired or has already been used. Request a new password-reset link.';return m}
 function normalizeAuthEmail(v){return String(v||'').trim().toLowerCase()}
 function markSignupExistingEmail(message){const el=document.getElementById('signupEmail');if(el)el.setAttribute('aria-invalid','true');setAuthStatus(message,true)}
-async function handleSignUp(){const email=normalizeAuthEmail(document.getElementById('signupEmail').value),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;document.getElementById('signupEmail').value=email;if(!email||!password||!confirm)return setAuthStatus('Enter your email, password and password confirmation.',true);if(password.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);if(password!==confirm)return setAuthStatus('Passwords do not match.',true);if(!navigator.onLine)return setAuthStatus('Creating an account requires internet. After first sign-in, your business workspace can continue offline.',true);setAuthStatus('Checking account status…');const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT}});if(error)return markSignupExistingEmail(friendlyAuthError(error));const returnedUser=data?.user;const identities=Array.isArray(returnedUser?.identities)?returnedUser.identities:[];if(returnedUser&&identities.length===0&&!data?.session){return markSignupExistingEmail('This email is already associated with an account. Please use Sign in or Forgot password instead.')}if(data.session)setAuthStatus('Account created. Let’s set up your business…');else setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.')}
-async function resendSignupConfirmation(){const email=normalizeAuthEmail(document.getElementById('signupEmail')?.value);if(!email)return setAuthStatus('Enter the email you used to create the account.',true);if(!navigator.onLine)return setAuthStatus('Resending the confirmation email requires internet.',true);setAuthStatus('Resending confirmation email…');const {error}=await sb.auth.resend({type:'signup',email});setAuthStatus(error?friendlyAuthError(error):'Confirmation email sent again. Check your inbox.')}
-async function handleSignIn(){const email=normalizeAuthEmail(document.getElementById('authEmail').value),password=document.getElementById('authPassword').value;document.getElementById('authEmail').value=email;if(!email||!password)return setAuthStatus('Enter your email and password.',true);if(!navigator.onLine)return setAuthStatus('You are offline. Reconnect to sign in, or use an already active saved session.',true);setAuthStatus('Signing in…');const {data,error}=await sb.auth.signInWithPassword({email,password});if(error)return setAuthStatus(friendlyAuthError(error),true);setAuthStatus('Signed in. Loading your business…')}
+async function handleSignUp(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
+  const email=normalizeAuthEmail(document.getElementById('signupEmail').value),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;document.getElementById('signupEmail').value=email;
+  if(!email||!password||!confirm)return setAuthStatus('Enter your email, password and password confirmation.',true);if(password.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);if(password!==confirm)return setAuthStatus('Passwords do not match.',true);if(!navigator.onLine)return setAuthStatus('Creating an account requires internet. After first sign-in, your business workspace can continue offline.',true);
+  try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();setAuthStatus('Creating account…');const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,captchaToken}});if(error)return markSignupExistingEmail(friendlyAuthError(error));const returnedUser=data?.user,identities=Array.isArray(returnedUser?.identities)?returnedUser.identities:[];if(returnedUser&&identities.length===0&&!data?.session)return markSignupExistingEmail('This email is already associated with an account. Please use Sign in or Forgot password instead.');if(data.session)setAuthStatus('Account created. Let’s set up your business…');else setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.');}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
+}
+async function resendSignupConfirmation(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);const email=normalizeAuthEmail(document.getElementById('signupEmail')?.value);if(!email)return setAuthStatus('Enter the email you used to create the account.',true);if(!navigator.onLine)return setAuthStatus('Resending the confirmation email requires internet.',true);try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();const {error}=await sb.auth.resend({type:'signup',email,options:{captchaToken}});if(error)throw error;setAuthStatus('Confirmation email sent again. Check your inbox and spam.')}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}}
+async function handleSignIn(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
+  const email=normalizeAuthEmail(document.getElementById('authEmail').value),password=document.getElementById('authPassword').value; document.getElementById('authEmail').value=email;
+  if(!email||!password)return setAuthStatus('Enter your email and password.',true);
+  if(!navigator.onLine)return setAuthStatus('You are offline. Reconnect to sign in, or use an already active saved session.',true);
+  try{ sheriTurnstileBusy=true; setAuthStatus('Complete the security check…'); const captchaToken=await sheriGetCaptchaToken(); setAuthStatus('Signing in…');
+    const {data,error}=await sb.auth.signInWithPassword({email,password,options:{captchaToken}}); if(error)return setAuthStatus(friendlyAuthError(error),true); setAuthStatus('Signed in. Loading your business…');
+  }catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
+}
 async function probeAuthProviders(){try{const res=await fetch(`${SUPABASE_URL}/auth/v1/settings`,{headers:{apikey:SUPABASE_ANON_KEY}});if(!res.ok)return;const cfg=await res.json();const ext=cfg?.external||{};for(const [provider,id] of [['google','googleOAuthBtn'],['apple','appleOAuthBtn']]){const enabled=ext[provider]===true;document.querySelectorAll(`[onclick="signInOAuth('${provider}')"]`).forEach(btn=>{btn.disabled=!enabled;btn.style.opacity=enabled?'1':'.55';btn.title=enabled?'Continue with '+provider[0].toUpperCase()+provider.slice(1):provider[0].toUpperCase()+provider.slice(1)+' sign-in is not enabled in Supabase yet';});}return ext}catch(_){return null}}
 async function signInOAuth(provider){if(!navigator.onLine)return setAuthStatus('Social sign-in requires internet.',true);setAuthStatus(`Opening ${provider==='apple'?'Apple':'Google'} sign-in…`);const {error}=await sb.auth.signInWithOAuth({provider,options:{redirectTo:SHERI_AUTH_REDIRECT}});if(error)setAuthStatus(friendlyAuthError(error),true)}
-async function sendPasswordReset(){const email=normalizeAuthEmail(document.getElementById('resetEmail').value);document.getElementById('resetEmail').value=email;if(!email)return setAuthStatus('Enter the email on your account.',true);if(!navigator.onLine)return setAuthStatus('Password recovery requires internet.',true);setAuthStatus('Sending recovery link…');const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:SHERI_AUTH_REDIRECT});if(error)return setAuthStatus(friendlyAuthError(error),true);setAuthStatus('Recovery link sent if an account uses that email. Open the newest email only; older recovery links can expire after a new request. Check spam if needed.')}
+async function sendPasswordReset(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
+  const email=normalizeAuthEmail(document.getElementById('resetEmail').value); document.getElementById('resetEmail').value=email;
+  if(!email)return setAuthStatus('Enter the email on your account.',true); if(!navigator.onLine)return setAuthStatus('Password recovery requires internet.',true);
+  try{ sheriTurnstileBusy=true; setAuthStatus('Complete the security check…'); const captchaToken=await sheriGetCaptchaToken(); setAuthStatus('Sending recovery link…');
+    const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:SHERI_AUTH_REDIRECT,captchaToken}); if(error)return setAuthStatus(friendlyAuthError(error),true); setAuthStatus('Recovery link sent if an account uses that email. Open the newest email only; older recovery links can expire after a new request.');
+  }catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
+}
 async function updateRecoveredPassword(){const p=document.getElementById('newPassword').value,c=document.getElementById('newPasswordConfirm').value;if(p.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);if(p!==c)return setAuthStatus('Passwords do not match.',true);const {error}=await sb.auth.updateUser({password:p});if(error)return setAuthStatus(friendlyAuthError(error),true);setAuthStatus('Password updated. Signing you in…');const {data:{session:recovered}}=await sb.auth.getSession();if(recovered)await onAuthed(recovered)}
 function initRecoveryForm(){const c=document.getElementById('recoveryCountry');if(c){populateCountrySelect('recoveryCountry',c.value||'RW')}}
 async function submitBusinessRecovery(){const businessName=document.getElementById('recoveryBusinessName').value.trim(),tin=document.getElementById('recoveryTin').value.trim()||null,country=document.getElementById('recoveryCountry').value,merchantCode=document.getElementById('recoveryMerchantCode').value.trim()||null,contact=document.getElementById('recoveryContact').value.trim();if(!businessName||!country||!contact)return setAuthStatus('Business name, country and a reachable contact are required for recovery.',true);if(!navigator.onLine)return setAuthStatus('Recovery requests require internet.',true);setAuthStatus('Submitting recovery request…');try{const {error}=await sb.from('account_recovery_requests').insert({business_name:businessName,tin,country,merchant_code:merchantCode,contact,source:'forgot_email'});if(error)throw error;setAuthStatus('Recovery request submitted. Support can verify your business details and contact you using the contact information you provided. Shericeri will not reveal the stored account email in the browser.')}catch(e){setAuthStatus('Could not submit the recovery request right now. Please try again when online.',true)}}
@@ -824,7 +934,7 @@ async function loadAll(silent=false){
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
   if(hadLocal)render();
-  if(!navigator.onLine){sheriSetConnectivity('offline','Using on-device business data');return}
+  if(!navigator.onLine){await accEnsureBase();sheriSetConnectivity('offline','Using on-device business data');return}
   try{
     const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr},{data:memory,error:mErr},{data:customers,error:cErr},{data:suppliers,error:supErr},{data:purchases,error:purErr},{data:cashEntries,error:cashErr},{data:budgets,error:budErr}]=await Promise.all([
       sb.from('products').select('*').eq('merchant_id',mId).order('created_at'),
@@ -855,6 +965,34 @@ async function loadAll(silent=false){
     if(!budErr)state.budgets=budgets||[];
     else console.warn('[Sheri budgets] server refresh failed, using local cache',budErr);
     await sheriSaveSnapshot();
+    try{
+      const q=await Promise.all([
+        sb.from('chart_of_accounts').select('*').eq('merchant_id',mId).order('code'),
+        sb.from('journal_entries').select('*').eq('merchant_id',mId).order('entry_date',{ascending:false}),
+        sb.from('journal_lines').select('*').eq('merchant_id',mId),
+        sb.from('invoices').select('*').eq('merchant_id',mId).order('issue_date',{ascending:false}),
+        sb.from('bills').select('*').eq('merchant_id',mId).order('issue_date',{ascending:false}),
+        sb.from('payments').select('*').eq('merchant_id',mId).order('payment_date',{ascending:false}),
+        sb.from('bank_accounts').select('*').eq('merchant_id',mId).order('name'),
+        sb.from('tax_rates').select('*').eq('merchant_id',mId).order('name'),
+        sb.from('recurring_transactions').select('*').eq('merchant_id',mId).order('next_run'),
+        sb.from('accounting_settings').select('*').eq('merchant_id',mId).maybeSingle(),
+        sb.from('audit_log').select('*').eq('merchant_id',mId).order('created_at',{ascending:false}).limit(100)
+      ]);
+      if(!q[0].error)state.accounts=q[0].data||[];
+      if(!q[1].error)state.journalEntries=q[1].data||[];
+      if(!q[2].error)state.journalLines=q[2].data||[];
+      if(!q[3].error)state.invoices=q[3].data||[];
+      if(!q[4].error)state.bills=q[4].data||[];
+      if(!q[5].error)state.payments=q[5].data||[];
+      if(!q[6].error)state.bankAccounts=q[6].data||[];
+      if(!q[7].error)state.taxRates=q[7].data||[];
+      if(!q[8].error)state.recurringTransactions=q[8].data||[];
+      if(!q[9].error)state.accountingSettings=q[9].data;
+      if(!q[10].error)state.auditLog=q[10].data||[];
+      await sheriSaveAccountingSnapshot();
+    }catch(e){console.warn('[Sheri accounting] server refresh failed; local accounting retained',e)}
+    await accEnsureBase();
     sheriSetConnectivity('online','Server data synced');
   }catch(err){
     sheriSetConnectivity('degraded','Using cached data — server refresh failed');
@@ -1013,6 +1151,7 @@ function render(){
   ].filter(Boolean).join('');
   fillSelects();renderSales();renderInventory();renderExpenses();renderCustomers();renderForecast();
   renderBusinessOS();
+  accEnsureBase().then(()=>{renderMoney();renderReports()}).catch(e=>console.warn('[Sheri accounting render]',e));
   document.getElementById('setName').value=state.merchant.name;
   document.getElementById('setCat').value=state.merchant.category;
   const tinEl=document.getElementById('setTin');if(tinEl)tinEl.value=state.merchant.tin||'';
@@ -1424,20 +1563,24 @@ async function mergeImportedProducts(items,status){
       if(!existing.reorder&&raw.reorder!=null)patch.reorder=Number(raw.reorder)||0;
       if(!existing.barcode&&raw.barcode)patch.barcode=String(raw.barcode);
       if(!existing.expiry_date&&raw.expiry_date)patch.expiry_date=raw.expiry_date;
-      const {data,error}=await sb.from('products').update(patch).eq('id',existing.id).select().single();
-      if(!error){const idx=state.products.findIndex(p=>p.id===existing.id);state.products[idx]=data;merged++}else skipped++;
+      Object.assign(existing,patch,{updated_at:sheriNow()});
+      await sheriPut('products',existing.id,{merchant_id:state.merchant.id,record:{...existing}});
+      await sheriQueue({type:'product_upsert',record:{...existing}});
+      merged++;
     }else{
-      const {data,error}=await sb.from('products').insert({
-        merchant_id:state.merchant.id,name,
+      const data={id:sheriUuid(),merchant_id:state.merchant.id,name,
         cat:PRODUCT_CATEGORIES_LIST.includes(raw.category)?raw.category:'Other',
         cost:Number(raw.cost)||0,sell:Number(raw.sell)||0,
         stock:incomingStock,reorder:Number(raw.reorder)||0,
         barcode:raw.barcode?String(raw.barcode):null,
-        expiry_date:raw.expiry_date||null
-      }).select().single();
-      if(!error){state.products.push(data);added++}else skipped++;
+        expiry_date:raw.expiry_date||null,created_at:sheriNow(),updated_at:sheriNow(),deleted:false};
+      state.products.push(data);
+      await sheriPut('products',data.id,{merchant_id:state.merchant.id,record:{...data}});
+      await sheriQueue({type:'product_upsert',record:{...data}});
+      added++;
     }
   }
+  if(navigator.onLine)await sheriSyncOutbox();
   render();
   status.textContent=`Import done: ${added} new product(s) added, ${merged} merged into existing stock${skipped?`, ${skipped} skipped`:''}. Review prices/categories in Inventory — imported items may need a quick check.`;
 }
@@ -1467,12 +1610,13 @@ async function addCustomer(){
   const name=document.getElementById('cName').value.trim();
   const phone=document.getElementById('cPhone').value.trim();
   const notes=document.getElementById('cNotes').value.trim();
+  const credit_limit=Number(document.getElementById('cCreditLimit')?.value||0);
   if(!name)return alert('Enter a customer name.');
-  const data={id:sheriUuid(),merchant_id:state.merchant.id,name,phone:phone||null,notes:notes||null,created_at:sheriNow(),deleted:false};
+  const data={id:sheriUuid(),merchant_id:state.merchant.id,name,phone:phone||null,notes:notes||null,credit_limit,created_at:sheriNow(),deleted:false};
   state.customers.push(data);await sheriSaveSnapshot();
   await sheriQueue({type:'customer_upsert',record:data});
   if(navigator.onLine)await sheriSyncOutbox();
-  document.getElementById('cName').value=document.getElementById('cPhone').value=document.getElementById('cNotes').value='';
+  document.getElementById('cName').value=document.getElementById('cPhone').value=document.getElementById('cNotes').value='';if(document.getElementById('cCreditLimit'))document.getElementById('cCreditLimit').value='0';
   render();
 }
 async function deleteCustomer(id){
@@ -1485,7 +1629,7 @@ async function deleteCustomer(id){
 }
 function renderCustomers(){
   const rows=customerStats();
-  document.getElementById('customerTable').innerHTML=rows.length?`<table class="table"><tr><th>Name</th><th>Phone</th><th>Revenue</th><th>Visits</th><th>Last purchase</th><th></th></tr>${rows.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.phone||'—')}</td><td>${money(c.revenue)}</td><td>${c.visits}</td><td>${c.lastPurchase?new Date(c.lastPurchase).toLocaleDateString():'—'}</td><td><button class="btn small danger" onclick="deleteCustomer('${c.id}')">Remove</button></td></tr>`).join('')}</table>`:'<div class="empty">No customers added yet — most sales can stay anonymous, add a customer here only when you want Shericeri to track them individually.</div>';
+  document.getElementById('customerTable').innerHTML=rows.length?`<table class="table"><tr><th>Name</th><th>Phone</th><th>Revenue</th><th>Credit limit</th><th>Visits</th><th>Last purchase</th><th></th></tr>${rows.map(c=>`<tr><td>${esc(c.name)}</td><td>${esc(c.phone||'—')}</td><td>${money(c.revenue)}</td><td>${money(customer(c.id)?.credit_limit||0)}</td><td>${c.visits}</td><td>${c.lastPurchase?new Date(c.lastPurchase).toLocaleDateString():'—'}</td><td><button class="btn small danger" onclick="deleteCustomer('${c.id}')">Remove</button></td></tr>`).join('')}</table>`:'<div class="empty">No customers added yet — most sales can stay anonymous, add a customer here only when you want Shericeri to track them individually.</div>';
 }
 function renderForecast(){
   const rev=revenueTrend(),prof=dailyProfitTrend();
@@ -1512,11 +1656,14 @@ async function seedDemoData(){
     {name:'T-Shirt',cat:'Clothing & Shoes',cost:7000,sell:11000,stock:7,reorder:3}
   ];
   for(const it of items){
-    const {data,error}=await sb.from('products').insert({merchant_id:state.merchant.id,...it}).select().single();
-    if(!error)state.products.push(data);
+    const data={id:sheriUuid(),merchant_id:state.merchant.id,...it,created_at:sheriNow(),updated_at:sheriNow(),deleted:false};
+    state.products.push(data);
+    await sheriPut('products',data.id,{merchant_id:state.merchant.id,record:{...data}});
+    await sheriQueue({type:'product_upsert',record:{...data}});
   }
+  if(navigator.onLine)await sheriSyncOutbox();
   render();
-  alert('Sample products added.');
+  alert(navigator.onLine?'Sample products added.':'Sample products added offline — they will sync automatically when connected.');
 }
 
 // ── Backup / restore ─────────────────────────────────────────────────────
@@ -2055,13 +2202,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.0.0 PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.1.2 PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V14.0.0');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V14.1.2');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -2553,7 +2700,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V14.0.0');
+  sheriDiagSet('Runtime version','V14.1.2');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
@@ -3338,7 +3485,7 @@ async function shericeriRespond(transcript){
     ensureVoicesLoaded(350).catch(()=>{});
   }
 })();
-(async function boot(){await sheriOfflineInit();initProfileSelectors();initRecoveryForm();probeAuthProviders().catch(()=>{});try{const u=new URL(window.location.href);const hash=new URLSearchParams((u.hash||'').replace(/^#/,'').replace(/^\?/,'&'));const errCode=hash.get('error_code');const errDesc=hash.get('error_description');if(errCode||errDesc){const code=String(errCode||'').toLowerCase();const desc=decodeURIComponent(String(errDesc||'').replace(/\+/g,' '));const msg=code==='otp_expired'||desc.toLowerCase().includes('otp_expired')?'That password-reset link has expired or has already been used. Request a new password-reset link.':desc||'The authentication link could not be completed. Please try again.';switchAuthMode('forgot-password');setAuthStatus(msg,true);history.replaceState({},document.title,u.pathname+u.search)}else if((u.hash||'').toLowerCase().includes('type=recovery')){switchAuthMode('reset-password')}}catch(_){}const {data:{session:existing}}=await sb.auth.getSession();if(existing)await onAuthed(existing);sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
+(async function boot(){await sheriOfflineInit();initProfileSelectors();initRecoveryForm();probeAuthProviders().catch(()=>{});setTimeout(sheriTurnstileRender,800);setTimeout(sheriTurnstileRender,2000);try{const u=new URL(window.location.href);const hash=new URLSearchParams((u.hash||'').replace(/^#/,'').replace(/^\?/,'&'));const errCode=hash.get('error_code');const errDesc=hash.get('error_description');if(errCode||errDesc){const code=String(errCode||'').toLowerCase();const desc=decodeURIComponent(String(errDesc||'').replace(/\+/g,' '));const msg=code==='otp_expired'||desc.toLowerCase().includes('otp_expired')?'That password-reset link has expired or has already been used. Request a new password-reset link.':desc||'The authentication link could not be completed. Please try again.';switchAuthMode('forgot-password');setAuthStatus(msg,true);history.replaceState({},document.title,u.pathname+u.search)}else if((u.hash||'').toLowerCase().includes('type=recovery')){switchAuthMode('reset-password')}}catch(_){}const {data:{session:existing}}=await sb.auth.getSession();if(existing)await onAuthed(existing);sheriHideInternalAccountingUi();sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
 
 function sheriDiagAudioIntegrity(body){try{if(!body||typeof body!=='object')return;if(body.first_bytes)sheriDiagSet('Whisper first bytes',String(body.first_bytes));if(body.webm_signature)sheriDiagSet('Whisper WebM signature',String(body.webm_signature));if(body.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(body.audio_bytes));if(body.audio_mime)sheriDiagSet('Whisper audio MIME',String(body.audio_mime));}catch(_){}}
 
@@ -3382,10 +3529,10 @@ async function addOSPurchase(){
   const p=product(productId);if(!p||qty<1||unitCost<0)return alert('Choose a product and enter a valid quantity and unit cost.');
   const now=sheriNow();const data={id:sheriUuid(),merchant_id:state.merchant.id,supplier_id:supplierId,product_id:p.id,product_name_snapshot:p.name,qty,unit_cost:unitCost,total:qty*unitCost,status,purchased_at:now,due_date:document.getElementById('osPurchaseDue').value||null,created_at:now};
   state.purchases.push(data);await sheriPut('purchases',data.id,{merchant_id:state.merchant.id,record:{...data}});await sheriQueue({type:'purchase_upsert',record:data});
-  if(status!=='ordered'){p.stock=(Number(p.stock)||0)+qty;p.cost=unitCost; p.updated_at=now;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}})}
+  if(status!=='ordered'){const oldStock=Number(p.stock)||0,oldCost=Number(p.cost)||0;const received=oldStock+qty;p.stock=received;p.cost=received>0?((oldStock*oldCost)+(qty*unitCost))/received:unitCost; p.updated_at=now;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}})}
   if(navigator.onLine)await sheriSyncOutbox();document.getElementById('osPurchaseQty').value=1;document.getElementById('osPurchaseCost').value='';document.getElementById('osPurchaseDue').value='';render();
 }
-async function deleteOSPurchase(id){if(!confirm('Delete this purchase record? Stock will not be reversed automatically.'))return;state.purchases=state.purchases.filter(x=>x.id!==id);await sheriSaveSnapshot();await sheriQueue({type:'purchase_delete',id});if(navigator.onLine)await sheriSyncOutbox();render()}
+async function deleteOSPurchase(id){const x=state.purchases.find(p=>p.id===id);if(!x)return;if(x.status!=='ordered')return alert('Received purchases cannot be deleted because they affect inventory and accounting. Record a purchase return/adjustment instead.');if(!confirm('Delete this ordered purchase?'))return;state.purchases=state.purchases.filter(p=>p.id!==id);await sheriSaveSnapshot();await sheriQueue({type:'purchase_delete',id});if(navigator.onLine)await sheriSyncOutbox();render()}
 async function addOSCashEntry(){
   const kind=document.getElementById('osCashKind').value,amount=Number(document.getElementById('osCashAmount').value),category=document.getElementById('osCashCategory').value.trim()||'Other',description=document.getElementById('osCashDescription').value.trim();if(amount<=0||!description)return alert('Enter an amount and description.');
   const data={id:sheriUuid(),merchant_id:state.merchant.id,kind,amount,category,description,occurred_at:sheriNow(),created_at:sheriNow()};state.cashEntries.push(data);await sheriPut('cashEntries',data.id,{merchant_id:state.merchant.id,record:{...data}});await sheriQueue({type:'cash_upsert',record:data});if(navigator.onLine)await sheriSyncOutbox();document.getElementById('osCashAmount').value='';document.getElementById('osCashDescription').value='';render()
@@ -3415,6 +3562,133 @@ async function generateOSInsight(){
   if(!navigator.onLine||advisorAvailable===false){box.innerHTML='<b>Offline intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>');return}
   try{const context={merchantName:state.merchant.name,merchantCategory:state.merchant.category,country:merchantCountry(),currency:merchantCurrency(),revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),inventoryValue:osInventoryValue(),supplierSpend:osPurchasesTotal(),cashNet:osCashNet(),salesCount:state.sales.length,customerCount:activeCustomers().length,repeatCustomers:repeatCustomerCount(),lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),suppliers:osActiveSuppliers().map(s=>({name:s.name,spend:osSupplierSpend(s.id)})),purchases:state.purchases.slice(0,20).map(x=>({supplierId:x.supplier_id,total:x.total||x.qty*x.unit_cost,status:x.status})),forecast30:osForecast30()};const {data,error}=await sb.functions.invoke('advisor',{body:{question:'Give me the three most useful business decisions I should consider now, based strictly on my recorded business data. Mention risks and opportunities. Keep it practical.',context}});if(error||!data?.answer)throw error||new Error('No AI answer');box.innerHTML='<b>AI intelligence</b><br>'+esc(data.answer).replace(/\n/g,'<br>');await sheriQueueMemory('insight',data.answer.slice(0,1800))}catch(e){box.innerHTML='<b>Local intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>')+'<div class="sub" style="margin-top:8px">Cloud AI was unavailable, so the app used its offline analysis.</div>'}
 }
+
+
+// ── V14.1 Accounting engine: simple QuickBooks-style double entry ─────────
+const ACC_DEFAULT_ACCOUNTS=[
+  ['1000','Cash on hand','asset','debit'],['1010','Bank accounts','asset','debit'],['1020','Mobile money','asset','debit'],['1100','Accounts receivable','asset','debit'],['1200','Inventory','asset','debit'],
+  ['2000','Accounts payable','liability','credit'],['2100','Tax payable','liability','credit'],['2110','Input tax receivable','asset','debit'],['2200','Other liabilities','liability','credit'],
+  ['3000','Owner equity','equity','credit'],['3100','Owner drawings','equity','debit'],['4000','Sales revenue','income','credit'],['4050','Sales returns & discounts','income','debit'],['4100','Other income','income','credit'],
+  ['5000','Cost of goods sold','cogs','debit'],['6000','Operating expenses','expense','debit'],['6100','Tax expense','expense','debit']
+];
+function accToday(){return new Date().toISOString().slice(0,10)}
+function accAccount(id){return (state.accounts||[]).find(a=>a.id===id)}
+function accAccountCode(code){return (state.accounts||[]).find(a=>a.code===code)}
+function accLinesForEntry(id){return (state.journalLines||[]).filter(x=>x.journal_entry_id===id)}
+function accBalance(accountId){let n=0;const voided=new Set((state.journalEntries||[]).filter(e=>e.voided).map(e=>e.id));for(const l of state.journalLines||[]){if(l.account_id!==accountId||voided.has(l.journal_entry_id))continue;n+=Number(l.debit||0)-Number(l.credit||0)}return n}
+function accNormalAmount(a){const b=accBalance(a.id);return ['liability','equity','income'].includes(a.type)?-b:b}
+function accPeriodLocked(date){const lock=state.accountingSettings?.locked_through;return !!(lock&&date&&date<=lock)}
+async function accUpsert(table,record){
+  const clean={...record,merchant_id:state.merchant.id};
+  await sheriPut(table,clean.id||clean.merchant_id,{merchant_id:state.merchant.id,record:clean});
+  state[({chart_of_accounts:'accounts',journal_entries:'journalEntries',journal_lines:'journalLines',invoices:'invoices',bills:'bills',payments:'payments',bank_accounts:'bankAccounts',tax_rates:'taxRates',recurring_transactions:'recurringTransactions'}[table]||table)]?.push(clean);
+  await sheriQueue({type:'accounting_upsert',table,record:clean});
+}
+async function accUpdate(table,record,collection){
+  await sheriPut(table,record.id,{merchant_id:state.merchant.id,record:{...record}}); await sheriQueue({type:'accounting_upsert',table,record:{...record}});
+}
+async function accEnsureBase(){
+  if(!state.merchant)return;
+  if(!Array.isArray(state.accounts))state.accounts=[];
+  const now=sheriNow();
+  for(const [code,name,type,normal] of ACC_DEFAULT_ACCOUNTS){if(!state.accounts.some(a=>a.code===code)){const a={id:sheriUuid(),merchant_id:state.merchant.id,code,name,type,normal_balance:normal,active:true,created_at:now};state.accounts.push(a);await sheriPut('accounts',a.id,{merchant_id:state.merchant.id,record:{...a}});await sheriQueue({type:'accounting_upsert',table:'chart_of_accounts',record:a})}}
+  if(!state.accountingSettings){state.accountingSettings={id:sheriUuid(),merchant_id:state.merchant.id,locked_through:null,created_at:now,updated_at:now};await sheriPut('accountingSettings','settings',{merchant_id:state.merchant.id,record:{...state.accountingSettings}});await sheriQueue({type:'accounting_settings_upsert',record:state.accountingSettings})}
+  if(!(state.taxRates||[]).length){const t={id:sheriUuid(),merchant_id:state.merchant.id,name:'No tax',rate:0,type:'output',active:true,created_at:now};state.taxRates=[t];await sheriPut('taxRates',t.id,{merchant_id:state.merchant.id,record:{...t}});await sheriQueue({type:'accounting_upsert',table:'tax_rates',record:t})}
+  await sheriSaveAccountingSnapshot();
+}
+async function accPostEntry({date,description,sourceType,sourceId,lines}){
+  if(!state.merchant)throw new Error('Business not loaded');
+  if(accPeriodLocked(date))throw new Error('This date is inside a locked accounting period. Unlock the period before editing it.');
+  if(!Array.isArray(lines)||lines.length<2)throw new Error('Accounting entry needs at least two ledger lines.');
+  for(const x of lines){const d=Number(x.debit||0),c=Number(x.credit||0);if(!x.accountId||!Number.isFinite(d)||!Number.isFinite(c)||d<0||c<0||((d===0)===(c===0))||(!d&&!c))throw new Error('Invalid debit/credit line. No ledger entry was saved.');if(!accAccount(x.accountId))throw new Error('Ledger account is missing. No ledger entry was saved.');}
+  const debit=lines.reduce((s,x)=>s+Number(x.debit||0),0),credit=lines.reduce((s,x)=>s+Number(x.credit||0),0);
+  if(!Number.isFinite(debit)||!Number.isFinite(credit)||Math.abs(debit-credit)>0.005||debit<=0)throw new Error('Accounting entry is not balanced. No ledger entry was saved.');
+  if(sourceType&&sourceId&&state.journalEntries.some(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided))return state.journalEntries.find(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided);
+  const now=sheriNow(),entry={id:sheriUuid(),merchant_id:state.merchant.id,entry_date:date||accToday(),description,source_type:sourceType||null,source_id:sourceId||null,created_at:now,voided:false};
+  state.journalEntries.push(entry);await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});await sheriQueue({type:'accounting_upsert',table:'journal_entries',record:entry});
+  for(const x of lines){const line={id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now};state.journalLines.push(line);await sheriPut('journalLines',line.id,{merchant_id:state.merchant.id,record:{...line}});await sheriQueue({type:'accounting_upsert',table:'journal_lines',record:line})}
+  await sheriSaveAccountingSnapshot();
+  return entry;
+}
+async function accAudit(action,entityType,entityId,details){
+  const row={id:sheriUuid(),merchant_id:state.merchant.id,action,entity_type:entityType,entity_id:entityId||null,details:details||{},created_at:sheriNow()};state.auditLog.unshift(row);
+  await sheriPut('auditLog',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'audit_log',record:row});
+}
+function accInvoiceTotal(i){return Number(i.total||0)}
+function accBillTotal(b){return Number(b.total||0)}
+function accInvoicePaid(i){return (state.payments||[]).filter(p=>p.source_type==='invoice'&&p.source_id===i.id&&p.direction==='receipt').reduce((s,p)=>s+Number(p.amount||0),0)}
+function accBillPaid(b){return (state.payments||[]).filter(p=>p.source_type==='bill'&&p.source_id===b.id&&p.direction==='payment').reduce((s,p)=>s+Number(p.amount||0),0)}
+function accInvoiceStatus(i){const p=accInvoicePaid(i);return p<=0?'open':p+0.005>=i.total?'paid':'partial'}
+function accBillStatus(b){const p=accBillPaid(b);return p<=0?'open':p+0.005>=b.total?'paid':'partial'}
+function accTax(tid){return (state.taxRates||[]).find(t=>t.id===tid)||{rate:0}}
+function accCustomer(id){return state.customers.find(c=>c.id===id)}
+function accSupplier(id){return state.suppliers.find(c=>c.id===id)}
+async function accCreateInvoice(){
+  await accEnsureBase();const customerId=document.getElementById('accInvoiceCustomer').value||null,date=document.getElementById('accInvoiceDate').value||accToday(),due=document.getElementById('accInvoiceDue').value||date,desc=document.getElementById('accInvoiceDesc').value.trim(),qty=Number(document.getElementById('accInvoiceQty').value),price=Number(document.getElementById('accInvoicePrice').value),tax=accTax(document.getElementById('accInvoiceTax').value);if(!desc||qty<=0||price<=0)return alert('Complete the invoice line with a positive price.');if(due<date)return alert('Due date cannot be before the invoice date.');if(accPeriodLocked(date))return alert('This invoice date is inside a locked accounting period.');const gross=qty*price,discount=Math.min(Math.max(0,Number(document.getElementById('accInvoiceDiscount').value)||0),gross),subtotal=gross-discount,taxAmount=subtotal*(Number(tax.rate||0)/100),total=subtotal+taxAmount,id=sheriUuid(),now=sheriNow();if(customerId){const c=accCustomer(customerId),limit=Number(c?.credit_limit||0),outstanding=(state.invoices||[]).filter(x=>x.customer_id===customerId&&accInvoiceStatus(x)!=='paid').reduce((sum,x)=>sum+(x.total-accInvoicePaid(x)),0);if(limit>0&&outstanding+total>limit&&!confirm('This invoice will exceed the customer credit limit of '+money(limit)+'. Continue?'))return;}const inv={id,merchant_id:state.merchant.id,invoice_number:'INV-'+new Date().getFullYear()+'-'+String((state.invoices||[]).length+1).padStart(4,'0'),customer_id:customerId,issue_date:date,due_date:due,subtotal,tax_amount:taxAmount,total,status:'open',notes:document.getElementById('accInvoiceNotes').value.trim()||null,items:[{description,qty,unit_price:price,tax_rate:Number(tax.rate||0),discount}],created_at:now};state.invoices.push(inv);await sheriPut('invoices',id,{merchant_id:state.merchant.id,record:{...inv}});await sheriQueue({type:'accounting_upsert',table:'invoices',record:inv});const ar=accAccountCode('1100'),sales=accAccountCode('4000'),taxPay=accAccountCode('2100');await accPostEntry({date,description:'Invoice '+inv.invoice_number,sourceType:'invoice',sourceId:id,lines:[{accountId:ar.id,debit:total,memo:inv.invoice_number},{accountId:sales.id,credit:subtotal,memo:desc},...(discount?[{accountId:accAccountCode('4050').id,debit:discount,memo:'Sales discount'}]:[]),...(taxAmount?[{accountId:taxPay.id,credit:taxAmount,memo:'Output tax'}]:[])]});await accAudit('create','invoice',id,{total});document.getElementById('accInvoiceDesc').value='';document.getElementById('accInvoicePrice').value='';render();alert('Invoice created.');
+}
+async function accCreateBill(){
+  await accEnsureBase();const supplierId=document.getElementById('accBillSupplier').value||null,date=document.getElementById('accBillDate').value||accToday(),due=document.getElementById('accBillDue').value||date,desc=document.getElementById('accBillDesc').value.trim(),qty=Number(document.getElementById('accBillQty').value),cost=Number(document.getElementById('accBillCost').value),tax=accTax(document.getElementById('accBillTax').value);if(!desc||qty<=0||cost<=0)return alert('Complete the bill line with a positive cost.');if(due<date)return alert('Due date cannot be before the bill date.');if(accPeriodLocked(date))return alert('This bill date is inside a locked accounting period.');const gross=qty*cost,discount=Math.min(Math.max(0,Number(document.getElementById('accBillDiscount').value)||0),gross),subtotal=gross-discount,taxAmount=subtotal*(Number(tax.rate||0)/100),total=subtotal+taxAmount,id=sheriUuid(),now=sheriNow();const bill={id,merchant_id:state.merchant.id,bill_number:'BILL-'+new Date().getFullYear()+'-'+String((state.bills||[]).length+1).padStart(4,'0'),supplier_id:supplierId,issue_date:date,due_date:due,subtotal,tax_amount:taxAmount,total,status:'open',notes:document.getElementById('accBillNotes').value.trim()||null,items:[{description,qty,unit_cost:cost,tax_rate:Number(tax.rate||0),discount}],created_at:now};state.bills.push(bill);await sheriPut('bills',id,{merchant_id:state.merchant.id,record:{...bill}});await sheriQueue({type:'accounting_upsert',table:'bills',record:bill});const inv=accAccountCode('1200'),ap=accAccountCode('2000'),taxInput=accAccountCode('2110');await accPostEntry({date,description:'Bill '+bill.bill_number,sourceType:'bill',sourceId:id,lines:[{accountId:inv.id,debit:subtotal,memo:desc},{accountId:ap.id,credit:total,memo:bill.bill_number},...(taxAmount?[{accountId:taxInput.id,debit:taxAmount,memo:'Input tax'}]:[])]});await accAudit('create','bill',id,{total});document.getElementById('accBillDesc').value='';document.getElementById('accBillCost').value='';render();alert('Bill created.');
+}
+function accPaymentSourceOptions(){const type=document.getElementById('accPaymentType')?.value;const sel=document.getElementById('accPaymentSource');if(!sel)return;const rows=type==='supplier_payment'?state.bills.filter(x=>accBillStatus(x)!=='paid'):type==='customer_receipt'?state.invoices.filter(x=>accInvoiceStatus(x)!=='paid'):[];sel.innerHTML='<option value="">— No linked document —</option>'+rows.map(x=>`<option value="${x.id}">${esc(x.invoice_number||x.bill_number)} — ${money((x.total||0)-(type==='supplier_payment'?accBillPaid(x):accInvoicePaid(x)))}</option>`).join('')}
+async function accCreatePayment(){
+  await accEnsureBase();const type=document.getElementById('accPaymentType').value,sourceId=document.getElementById('accPaymentSource').value||null,amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,date=document.getElementById('accPaymentDate').value||accToday();if(amount<=0||!accountId)return alert('Enter an amount and choose a cash/bank account.');if(accPeriodLocked(date))return alert('This payment date is inside a locked accounting period.');if(sourceId){const doc=type==='supplier_payment'?state.bills.find(x=>x.id===sourceId):type==='customer_receipt'?state.invoices.find(x=>x.id===sourceId):null;if(doc){const outstanding=Math.max(0,Number(doc.total||0)-(type==='supplier_payment'?accBillPaid(doc):accInvoicePaid(doc)));if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding balance of '+money(outstanding)+'.')}}let debitId,creditId,sourceType=null; if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100').id;sourceType='invoice'}else if(type==='supplier_payment'){debitId=accAccountCode('2000').id;creditId=accountId;sourceType='bill'}else if(type==='other_income'){debitId=accountId;creditId=accAccountCode('4100').id}else{debitId=accAccountCode('6000').id;creditId=accountId}const row={id:sheriUuid(),merchant_id:state.merchant.id,direction:type==='customer_receipt'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,amount,payment_date:date,reference:document.getElementById('accPaymentRef').value.trim()||null,created_at:sheriNow()};state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'payments',record:row});await accPostEntry({date,description:(type==='customer_receipt'?'Customer receipt':type==='supplier_payment'?'Supplier payment':type==='other_income'?'Other income':'Expense payment'),sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});await accAudit('create','payment',row.id,{amount,type});document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';render();alert('Payment recorded.');
+}
+async function accCreateBankAccount(){await accEnsureBase();const name=document.getElementById('accBankName').value.trim(),type=document.getElementById('accBankType').value,opening=Number(document.getElementById('accBankOpening').value)||0;if(!name)return alert('Enter an account name.');const baseCode={cash:'1000',bank:'1010',mobile_money:'1020'}[type];let acct=accAccountCode(baseCode);if(acct&&state.bankAccounts.some(x=>x.account_id===acct.id)){let n=2;while(accAccountCode(baseCode+'-'+n))n++;acct={id:sheriUuid(),merchant_id:state.merchant.id,code:baseCode+'-'+n,name:name,type:'asset',normal_balance:'debit',active:true,created_at:sheriNow()};await accUpsert('chart_of_accounts',acct)}if(!acct)return alert('Could not create the ledger account for this cash/bank account.');const row={id:sheriUuid(),merchant_id:state.merchant.id,name,type,opening_balance:opening,account_id:acct.id,current_balance:opening,last_reconciled_at:null,reconciled_balance:null,reconciled_difference:null,created_at:sheriNow()};state.bankAccounts.push(row);await sheriPut('bankAccounts',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'bank_accounts',record:row});if(opening>0){const eq=accAccountCode('3000');await accPostEntry({date:accToday(),description:'Opening balance — '+name,sourceType:'bank_opening',sourceId:row.id,lines:[{accountId:acct.id,debit:opening},{accountId:eq.id,credit:opening}]})}document.getElementById('accBankName').value='';document.getElementById('accBankOpening').value='0';render();}
+async function accReconcileBank(id){const b=state.bankAccounts.find(x=>x.id===id);if(!b)return;const d=prompt('Reconciled through date (YYYY-MM-DD):',accToday());if(!d||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d))return alert('Use YYYY-MM-DD.');const statement=Number(prompt('Statement balance:',String(accNormalAmount(accAccount(b.account_id))||0)));if(!Number.isFinite(statement))return;const ledger=accNormalAmount(accAccount(b.account_id));b.last_reconciled_at=d;b.reconciled_balance=statement;b.reconciled_difference=statement-ledger;await accUpdate('bank_accounts',b);await accAudit('reconcile','bank_account',b.id,{statement,ledger,difference:b.reconciled_difference});render();}
+async function accCreateTaxRate(){const name=document.getElementById('accTaxName').value.trim(),rate=Number(document.getElementById('accTaxRate').value),type=document.getElementById('accTaxType').value;if(!name||rate<0)return alert('Enter a tax name and rate.');const row={id:sheriUuid(),merchant_id:state.merchant.id,name,rate,type,active:true,created_at:sheriNow()};state.taxRates.push(row);await sheriPut('taxRates',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'tax_rates',record:row});document.getElementById('accTaxName').value='';document.getElementById('accTaxRate').value='';render();}
+async function accCreateRecurring(){const description=document.getElementById('accRecDesc').value.trim(),amount=Number(document.getElementById('accRecAmount').value),frequency=document.getElementById('accRecFreq').value,next_run=document.getElementById('accRecNext').value||accToday();if(!description||amount<=0)return alert('Enter recurring transaction details.');const row={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,frequency,next_run,active:true,created_at:sheriNow()};state.recurringTransactions.push(row);await sheriPut('recurringTransactions',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'recurring_transactions',record:row});render();}
+function accNextDate(date,freq){const d=new Date(date+'T12:00:00');if(freq==='daily')d.setDate(d.getDate()+1);else if(freq==='weekly')d.setDate(d.getDate()+7);else d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)}
+async function accRunDueRecurring(){const expense=accAccountCode('6000'),cash=accAccountCode('1000');for(const r of state.recurringTransactions.filter(x=>x.active&&x.next_run<=accToday())){await accPostEntry({date:r.next_run,description:r.description,sourceType:'recurring',sourceId:r.id+'-'+r.next_run,lines:[{accountId:expense.id,debit:r.amount},{accountId:cash.id,credit:r.amount}]});r.next_run=accNextDate(r.next_run,r.frequency);await accUpdate('recurring_transactions',r)}render();}
+async function accPostOpeningBalance(){const accountId=document.getElementById('accOpeningAccount').value,amount=Number(document.getElementById('accOpeningAmount').value),side=document.getElementById('accOpeningSide').value,date=document.getElementById('accOpeningDate').value||accToday();if(!accountId||amount<=0)return alert('Enter an opening balance.');const equity=accAccountCode('3000');await accPostEntry({date,description:'Opening balance',sourceType:'opening_balance',sourceId:sheriUuid(),lines:[{accountId,debit:side==='debit'?amount:0,credit:side==='credit'?amount:0},{accountId:equity.id,debit:side==='credit'?amount:0,credit:side==='debit'?amount:0}]});document.getElementById('accOpeningAmount').value='';render();}
+async function accSaveLockDate(){const date=document.getElementById('accLockDate').value||null;state.accountingSettings=state.accountingSettings||{id:sheriUuid(),merchant_id:state.merchant.id};state.accountingSettings.locked_through=date;state.accountingSettings.updated_at=sheriNow();await sheriPut('accountingSettings','settings',{merchant_id:state.merchant.id,record:{...state.accountingSettings}});await sheriQueue({type:'accounting_settings_upsert',record:{...state.accountingSettings}});render();}
+async function accRebuildFromOperations(){if(!confirm('Rebuild missing accounting entries from existing sales, purchases and expenses? Existing entries will be preserved; duplicates are skipped.'))return;await accEnsureBase();for(const s of state.sales){const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000'),total=s.qty*s.price,c=s.qty*(s.cost||0);await accPostEntry({date:String(s.created_at).slice(0,10),description:'Sale '+(s.product_name_snapshot||''),sourceType:'sale',sourceId:s.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});if(c>0)await accPostEntry({date:String(s.created_at).slice(0,10),description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:c},{accountId:inv.id,credit:c}]})}for(const p of state.purchases.filter(x=>x.status!=='ordered')){const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||p.qty*p.unit_cost);await accPostEntry({date:String(p.purchased_at||p.created_at).slice(0,10),description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]})}for(const e of state.expenses){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:String(e.created_at).slice(0,10),description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:Number(e.amount||0)},{accountId:cash.id,credit:Number(e.amount||0)}]})}alert('Accounting rebuild completed for records that did not already have ledger entries.');render();}
+async function accValidateLedger(){let bad=0;for(const e of state.journalEntries.filter(x=>!x.voided)){const ls=accLinesForEntry(e.id),d=ls.reduce((s,x)=>s+Number(x.debit||0),0),c=ls.reduce((s,x)=>s+Number(x.credit||0),0);if(!ls.length||Math.abs(d-c)>0.005)bad++}const orphan=(state.journalLines||[]).filter(l=>!state.journalEntries.some(e=>e.id===l.journal_entry_id)).length;const msg=bad||orphan?`Ledger check found ${bad} unbalanced entries and ${orphan} orphan lines.`:'Ledger integrity check passed: every active journal entry is balanced and every journal line has a parent entry.';document.getElementById('accAccountingStatus').textContent=msg;alert(msg);return !bad&&!orphan;}
+
+async function accCreateAdjustment(){
+  await accEnsureBase();const type=document.getElementById('accAdjType').value,amount=Number(document.getElementById('accAdjAmount').value),accountId=document.getElementById('accAdjAccount').value,date=document.getElementById('accAdjDate').value||accToday(),desc=document.getElementById('accAdjDesc').value.trim()||type,qty=Number(document.getElementById('accAdjQty').value)||0,productId=document.getElementById('accAdjProduct').value||null;if(amount<=0||!accountId)return alert('Enter an amount and account.');const salesRet=accAccountCode('4050'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');let lines;if(type==='sales_return'){lines=[{accountId:salesRet.id,debit:amount},{accountId:accountId,credit:amount}];if(qty>0&&productId){const p=product(productId),cost=(Number(p?.cost)||0)*qty;if(cost>0)lines.push({accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost});if(p){p.stock=(Number(p.stock)||0)+qty;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}})}}}else if(type==='sales_discount'){lines=[{accountId:salesRet.id,debit:amount},{accountId:accountId,credit:amount}]}else{lines=[{accountId:accAccountCode('2000').id,debit:amount},{accountId:inv.id,credit:amount}];if(qty>0&&productId){const p=product(productId);if(p){p.stock=Math.max(0,(Number(p.stock)||0)-qty);await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}})}}}await accPostEntry({date,description:desc,sourceType:type,sourceId:sheriUuid(),lines});await accAudit('create','adjustment',null,{type,amount});document.getElementById('accAdjAmount').value='';document.getElementById('accAdjDesc').value='';render();}
+function accInvoicePdf(id){const i=state.invoices.find(x=>x.id===id);if(!i||!window.jspdf)return alert('PDF engine is not available.');const {jsPDF}=window.jspdf;const d=new jsPDF();d.text(state.merchant.name||'Business',20,20);d.text(i.invoice_number,150,20);d.text('Customer: '+(accCustomer(i.customer_id)?.name||'Walk-in'),20,32);d.text('Issue: '+i.issue_date+'  Due: '+i.due_date,20,40);if(d.autoTable)d.autoTable({startY:50,head:[['Description','Qty','Unit','Total']],body:(i.items||[]).map(x=>[x.description,x.qty,money(x.unit_price),money(x.qty*x.unit_price)]).concat([['','','Subtotal',money(i.subtotal)],['','','Tax',money(i.tax_amount)],['','','Total',money(i.total)]] )});d.save(i.invoice_number+'.pdf')}
+function accReceiptPdf(id){const p=state.payments.find(x=>x.id===id);if(!p||!window.jspdf)return alert('PDF engine is not available.');const {jsPDF}=window.jspdf;const d=new jsPDF();d.text(state.merchant.name||'Business',20,20);d.text('PAYMENT RECEIPT',20,32);d.text('Date: '+p.payment_date,20,42);d.text('Amount: '+money(p.amount),20,52);d.text('Type: '+p.direction,20,62);d.text('Reference: '+(p.reference||'—'),20,72);d.save('receipt-'+p.id+'.pdf')}
+function accBillPdf(id){const b=state.bills.find(x=>x.id===id);if(!b||!window.jspdf)return alert('PDF engine is not available.');const {jsPDF}=window.jspdf;const d=new jsPDF();d.text(state.merchant.name||'Business',20,20);d.text(b.bill_number,150,20);d.text('Supplier: '+(accSupplier(b.supplier_id)?.name||'Supplier'),20,32);d.text('Issue: '+b.issue_date+'  Due: '+b.due_date,20,40);if(d.autoTable)d.autoTable({startY:50,head:[['Description','Qty','Unit','Total']],body:(b.items||[]).map(x=>[x.description,x.qty,money(x.unit_cost),money(x.qty*x.unit_cost)]).concat([['','','Subtotal',money(b.subtotal)],['','','Tax',money(b.tax_amount)],['','','Total',money(b.total)]] )});d.save(b.bill_number+'.pdf')}
+function accPopulateSelects(){
+  const c=document.getElementById('accInvoiceCustomer');if(c)c.innerHTML='<option value="">— Walk-in / no customer —</option>'+activeCustomers().map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  const s=document.getElementById('accBillSupplier');if(s)s.innerHTML='<option value="">— Supplier —</option>'+osActiveSuppliers().map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
+  const taxOptions=(kind)=>'<option value="">No tax</option>'+(state.taxRates||[]).filter(x=>x.active&&x.type===kind).map(x=>`<option value="${x.id}">${esc(x.name)} (${x.rate}%)</option>`).join('');
+  const it=document.getElementById('accInvoiceTax');if(it)it.innerHTML=taxOptions('output');
+  const bt=document.getElementById('accBillTax');if(bt)bt.innerHTML=taxOptions('input');
+  const cash=(state.bankAccounts||[]).map(x=>`<option value="${x.account_id}">${esc(x.name)} — ${money(accBalance(x.account_id))}</option>`).join('');const pa=document.getElementById('accPaymentAccount');if(pa)pa.innerHTML=cash||'<option value="">Add a cash/bank account first</option>';
+  const aa=document.getElementById('accAdjAccount');if(aa)aa.innerHTML=cash||'<option value="">Add a cash/bank account first</option>';const apd=document.getElementById('accAdjProduct');if(apd)apd.innerHTML='<option value="">— Product optional —</option>'+activeProducts().map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');const oa=document.getElementById('accOpeningAccount');if(oa)oa.innerHTML=(state.accounts||[]).filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.code)} — ${esc(x.name)}</option>`).join('');
+  accPaymentSourceOptions();
+}
+function renderMoney(){if(!state.merchant)return;accPopulateSelects();const ar=accAccountCode('1100'),ap=accAccountCode('2000'),cash=accAccountCode('1000');const receivable=(ar?accNormalAmount(ar):0),payable=(ap?accNormalAmount(ap):0);document.getElementById('accMetrics').innerHTML=[['Receivables',money(receivable),''],['Payables',money(payable),''],['Cash on hand',money(cash?accNormalAmount(cash):0),cash&&accNormalAmount(cash)>=0?'good':'bad'],['Unpaid invoices',(state.invoices||[]).filter(x=>accInvoiceStatus(x)!=='paid').length,'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');
+  document.getElementById('accInvoiceTable').innerHTML=state.invoices.length?`<table class="table"><tr><th>Invoice</th><th>Customer</th><th>Total</th><th>Paid</th><th>Status</th></tr>${state.invoices.slice().reverse().slice(0,20).map(x=>`<tr><td>${esc(x.invoice_number)}</td><td>${esc(accCustomer(x.customer_id)?.name||'Walk-in')}</td><td>${money(x.total)}</td><td>${money(accInvoicePaid(x))}</td><td>${accInvoiceStatus(x)} <button class="btn small secondary" onclick="accInvoicePdf('${x.id}')">PDF</button></td></tr>`).join('')}</table>`:'<div class="empty">No invoices yet.</div>';
+  document.getElementById('accBillTable').innerHTML=state.bills.length?`<table class="table"><tr><th>Bill</th><th>Supplier</th><th>Total</th><th>Paid</th><th>Status</th></tr>${state.bills.slice().reverse().slice(0,20).map(x=>`<tr><td>${esc(x.bill_number)}</td><td>${esc(accSupplier(x.supplier_id)?.name||'Supplier')}</td><td>${money(x.total)}</td><td>${money(accBillPaid(x))}</td><td>${accBillStatus(x)} <button class="btn small secondary" onclick="accBillPdf('${x.id}')">PDF</button></td></tr>`).join('')}</table>`:'<div class="empty">No bills yet.</div>';
+  document.getElementById('accPaymentTable').innerHTML=state.payments.length?`<table class="table"><tr><th>Date</th><th>Type</th><th>Amount</th><th>Reference</th></tr>${state.payments.slice().reverse().slice(0,15).map(x=>`<tr><td>${esc(x.payment_date)}</td><td>${esc(x.direction)}</td><td>${money(x.amount)}</td><td>${esc(x.reference||'—')} <button class="btn small secondary" onclick="accReceiptPdf('${x.id}')">Receipt</button></td></tr>`).join('')}</table>`:'<div class="empty">No payments yet.</div>';
+  document.getElementById('accBankTable').innerHTML=state.bankAccounts.length?`<table class="table"><tr><th>Account</th><th>Type</th><th>Balance</th><th>Reconciled</th><th>Difference</th><th></th></tr>${state.bankAccounts.map(x=>`<tr><td>${esc(x.name)}</td><td>${esc(x.type)}</td><td>${money(accNormalAmount(accAccount(x.account_id)))}</td><td>${esc(x.last_reconciled_at||'Never')}</td><td>${x.reconciled_difference==null?'—':money(x.reconciled_difference)}</td><td><button class="btn small secondary" onclick="accReconcileBank('${x.id}')">Reconcile</button></td></tr>`).join('')}</table>`:'<div class="empty">No cash/bank accounts yet.</div>';
+  document.getElementById('accTaxTable').innerHTML=(state.taxRates||[]).map(x=>`<div class="row"><span>${esc(x.name)} (${x.rate}%)</span><span>${esc(x.type)}</span></div>`).join('')||'<div class="empty">No tax rates.</div>';
+  const ad=document.getElementById('accAdjTable');if(ad)ad.innerHTML='<div class="sub">Adjustments are posted directly to the double-entry ledger and inventory quantity is changed only when a product and return quantity are supplied.</div>';document.getElementById('accRecurringTable').innerHTML=(state.recurringTransactions||[]).map(x=>`<div class="row"><span>${esc(x.description)} — ${money(x.amount)}</span><span>Next: ${esc(x.next_run)}</span></div>`).join('')||'<div class="empty">No recurring transactions.</div>';
+  document.getElementById('accLockDate').value=state.accountingSettings?.locked_through||'';['accInvoiceDate','accBillDate','accPaymentDate','accAdjDate','accOpeningDate'].forEach(id=>{const e=document.getElementById(id);if(e&&!e.value)e.value=accToday()});
+}
+function accReportTotals(){const by={};for(const a of state.accounts){const n=accNormalAmount(a);by[a.code]=n}return by}
+
+const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
+const _v14_1_voidSale=voidSale;voidSale=async function(id){const s=state.sales.find(x=>x.id===id);if(!s)return;const entryDate=String(s.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This sale cannot be voided while its accounting period is locked.');await _v14_1_voidSale(id);try{await accEnsureBase();const total=Number(s.qty||0)*Number(s.price||0),cost=Number(s.qty||0)*Number(s.cost||0),cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');if(total>0)await accPostEntry({date:entryDate,description:'Reverse sale '+(s.product_name_snapshot||''),sourceType:'sale_void',sourceId:s.id,lines:[{accountId:sales.id,debit:total},{accountId:cash.id,credit:total}]});if(cost>0)await accPostEntry({date:entryDate,description:'Reverse COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs_void',sourceId:s.id,lines:[{accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost}]});await accAudit('void','sale',s.id,{total,cogs:cost})}catch(err){console.warn('[Sheri accounting] sale reversal failed',err);alert('Sale voided, but the accounting reversal could not be posted: '+(err.message||err))}render()};
+const _v14_1_addOSCashEntry=addOSCashEntry;addOSCashEntry=async function(){const before=state.cashEntries.length;await _v14_1_addOSCashEntry();if(state.cashEntries.length>before){const x=state.cashEntries[state.cashEntries.length-1];try{await accEnsureBase();const cash=accAccountCode('1000'),amount=Number(x.amount||0);if(amount>0&&x.kind==='income')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash income',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:cash.id,debit:amount},{accountId:accAccountCode('4100').id,credit:amount}]});else if(amount>0&&x.kind==='expense')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash expense',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:accAccountCode('6000').id,debit:amount},{accountId:cash.id,credit:amount}]});if(x.kind!=='transfer')await accAudit('create','cash_entry',x.id,{amount,kind:x.kind})}catch(err){console.warn('[Sheri accounting] cash entry failed',err);alert('Cash movement saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
+function sheriHideInternalAccountingUi(){
+  const hideSelectors=['#money .top .btn[onclick="accRebuildFromOperations()"]','#accAccountingStatus','#reports .top .btn[onclick="accValidateLedger()"]'];
+  hideSelectors.forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.style.display='none'));
+  document.querySelectorAll('#money > .card.section').forEach(card=>{
+    if(card.querySelector('#accOpeningAccount'))card.style.display='none';
+  });
+  document.querySelectorAll('#reports .card.section').forEach(card=>{
+    if(card.querySelector('#accTB,#accGL,#accAudit'))card.style.display='none';
+  });
+}
+function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!document.getElementById('reports'))return;const b=accReportTotals(),income=(state.accounts||[]).filter(a=>a.type==='income').reduce((s,a)=>s+b[a.code],0),cogs=(state.accounts||[]).filter(a=>a.type==='cogs').reduce((s,a)=>s+b[a.code],0),exp=(state.accounts||[]).filter(a=>a.type==='expense').reduce((s,a)=>s+b[a.code],0),net=income-cogs-exp,assets=(state.accounts||[]).filter(a=>a.type==='asset').reduce((s,a)=>s+b[a.code],0),liab=(state.accounts||[]).filter(a=>a.type==='liability').reduce((s,a)=>s+b[a.code],0),equity=(state.accounts||[]).filter(a=>a.type==='equity').reduce((s,a)=>s+b[a.code],0)+net;document.getElementById('reportMetrics').innerHTML=[['Revenue',money(income),''],['Net profit',money(net),net>=0?'good':'bad'],['Assets',money(assets),''],['Liabilities',money(liab),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');document.getElementById('accPL').innerHTML=`<div class="row"><span>Revenue</span><b>${money(income)}</b></div><div class="row"><span>COGS</span><b>${money(cogs)}</b></div><div class="row"><span>Gross profit</span><b>${money(income-cogs)}</b></div><div class="row"><span>Operating expenses</span><b>${money(exp)}</b></div><div class="row"><span>Output tax payable</span><b>${money(Math.max(0,accNormalAmount(accAccountCode('2100'))))}</b></div><div class="row"><span>Input tax receivable</span><b>${money(Math.max(0,accNormalAmount(accAccountCode('2110'))))}</b></div><div class="row"><span>Net profit</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Overdue receivables: ${money((state.invoices||[]).filter(x=>x.due_date<accToday()&&accInvoiceStatus(x)!=='paid').reduce((s,x)=>s+x.total-accInvoicePaid(x),0))} • Overdue payables: ${money((state.bills||[]).filter(x=>x.due_date<accToday()&&accBillStatus(x)!=='paid').reduce((s,x)=>s+x.total-accBillPaid(x),0))}</div>`;document.getElementById('accBS').innerHTML=`<div class="row"><span>Total assets</span><b>${money(assets)}</b></div><div class="row"><span>Total liabilities</span><b>${money(liab)}</b></div><div class="row"><span>Equity incl. current profit</span><b>${money(equity)}</b></div><div class="sub" style="margin-top:8px">${Math.abs(assets-(liab+equity))<0.01?'✓ Balance sheet balances.':'⚠ Balance sheet is not yet balanced — check opening balances and historical entries.'}</div>`;document.getElementById('accCF').innerHTML=`<div class="row"><span>Cash & bank ledger balance</span><b>${money((state.bankAccounts||[]).reduce((s,x)=>s+(accAccount(x.account_id)?accNormalAmount(accAccount(x.account_id)):0),0))}</b></div><div class="row"><span>Customer receipts</span><b>${money(state.payments.filter(x=>x.direction==='receipt').reduce((s,x)=>s+x.amount,0))}</b></div><div class="row"><span>Supplier / expense payments</span><b>${money(state.payments.filter(x=>x.direction==='payment').reduce((s,x)=>s+x.amount,0))}</b></div>`;const tb=(state.accounts||[]).filter(a=>Math.abs(b[a.code])>0.005).map(a=>`<tr><td>${esc(a.code)}</td><td>${esc(a.name)}</td><td>${money(a.normal_balance==='debit'?Math.max(0,b[a.code]):0)}</td><td>${money(a.normal_balance==='credit'?Math.max(0,b[a.code]):0)}</td></tr>`).join('');document.getElementById('accTB').innerHTML=`<table class="table"><tr><th>Code</th><th>Account</th><th>Debit</th><th>Credit</th></tr>${tb}</table>`;const gl=(state.journalEntries||[]).slice().sort((a,b)=>String(b.entry_date).localeCompare(String(a.entry_date))).slice(0,30);document.getElementById('accGL').innerHTML=gl.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr>${gl.map(e=>{const ls=accLinesForEntry(e.id);return ls.map(l=>`<tr><td>${esc(e.entry_date)}</td><td>${esc(e.description)} — ${esc(accAccount(l.account_id)?.name||'')}</td><td>${l.debit?money(l.debit):''}</td><td>${l.credit?money(l.credit):''}</td></tr>`).join('')}).join('')}</table>`:'<div class="empty">No journal entries yet.</div>';document.getElementById('accAudit').innerHTML=state.auditLog.length?`<table class="table"><tr><th>Time</th><th>Action</th><th>Entity</th><th>Details</th></tr>${state.auditLog.slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,20).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audit events yet.</div>';}
+// Ensure operational records create accounting entries exactly once when rebuilt or newly entered.
+const _v14_1_recordSale=recordSale;recordSale=async function(){const before=state.sales.length;await _v14_1_recordSale();const s=state.sales[before];if(s){try{await accEnsureBase();const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000'),total=s.qty*s.price,c=s.qty*(s.cost||0);await accPostEntry({date:String(s.created_at).slice(0,10),description:'Sale '+(s.product_name_snapshot||''),sourceType:'sale',sourceId:s.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});if(c>0)await accPostEntry({date:String(s.created_at).slice(0,10),description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:c},{accountId:inv.id,credit:c}]});await accAudit('create','sale',s.id,{total,cogs:c})}catch(e){console.warn('[Sheri accounting] sale ledger failed',e)}}render()};
+const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const before=state.purchases.length;await _v14_1_addOSPurchase();const p=state.purchases[before];if(p&&p.status!=='ordered'){try{await accEnsureBase();const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||p.qty*p.unit_cost);await accPostEntry({date:String(p.purchased_at||p.created_at).slice(0,10),description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});await accAudit('create','purchase',p.id,{total})}catch(e){console.warn('[Sheri accounting] purchase ledger failed',e)}}render()};
+// Expense wrapper: locate newly added expense after original operation and post cash/expense entry.
+const _v14_1_addExpense=addExpense;addExpense=async function(){const before=state.expenses.length;await _v14_1_addExpense();if(state.expenses.length>before){const e=state.expenses[state.expenses.length-1];try{await accEnsureBase();const ex=accAccountCode('6000'),cash=accAccountCode('1000'),amount=Number(e.amount||0);if(amount<=0)throw new Error('Expense amount must be positive.');await accPostEntry({date:String(e.created_at||sheriNow()).slice(0,10),description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});await accAudit('create','expense',e.id,{amount})}catch(err){console.warn('[Sheri accounting] expense ledger failed',err);alert('Expense was saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
 
 </script>
 </body>
