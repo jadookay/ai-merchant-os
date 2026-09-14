@@ -8,9 +8,8 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS</title>
-<meta name="app-version" content="V14.1.5 AIBOS + OFFLINE SYNC">
+<meta name="app-version" content="V14.2.2 AIBOS + INHERITANCE-SAFE OFFLINE SYNC">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
@@ -53,7 +52,7 @@
 
 
 <style id="sheriMerchantSimplicityV1412">
-/* V14.1.5: accounting engine remains active, but implementation mechanics stay out of the merchant UI. */
+/* V14.2.2: accounting engine remains active, but implementation mechanics stay out of the merchant UI. */
 #money .sheri-internal-accounting, #reports .sheri-internal-accounting { display:none !important; }
 #accTB, #accGL, #accAudit { display:none !important; }
 .legacy-os{display:none!important}
@@ -66,7 +65,7 @@
 
 <div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" onclick="switchAuthMode('signup')">Create account</button></div><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" onclick="togglePassword('authPassword',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignIn()">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" onclick="togglePassword('signupPassword',this)">👁</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" onclick="togglePassword('signupConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPassword',this)">👁</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPasswordConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div><div id="onboardingScreen" class="onboard-wrap" style="display:none"><div class="onboard-card"><div class="brand" style="margin-left:0">AI Business OS</div><h1>Set up your business</h1><p class="sub">This profile powers your dashboard, accounting, inventory, forecasts and AI features. Country and currency are required.</p><div class="profile-badge" style="margin-top:10px">⚡ One business profile across the whole app</div><div class="formgrid"><div style="grid-column:1/-1"><label>Business name <span class="required-mark">*</span></label><input id="onboardName" autocomplete="organization" placeholder="e.g. Jean’s General Store"></div><div><label>TIN number <span class="sub">(optional)</span></label><input id="onboardTin" inputmode="numeric" placeholder="Optional"></div><div><label>Fiscal year <span class="sub">(optional)</span></label><select id="onboardFiscalYear"></select></div><div><label>Country <span class="required-mark">*</span></label><select id="onboardCountry"></select></div><div><label>Currency <span class="required-mark">*</span></label><select id="onboardCurrency"></select></div></div><div id="onboardStatus" class="sub auth-status"></div><div class="onboard-actions"><button class="btn" onclick="completeOnboarding()">Continue to my business</button></div></div></div>
 
-<meta name="shericeri-version" content="V14.1.5 AIBOS + OFFLINE SYNC">
+<meta name="shericeri-version" content="V14.2.2 AIBOS + INHERITANCE-SAFE OFFLINE SYNC">
 <div class="app" id="appRoot" style="display:none">
   <aside class="side">
   <div class="brand">AI Business OS</div>
@@ -421,7 +420,7 @@ let advisorAvailable=null; // null=unknown, true/false once tested
 // Durable local cache: IndexedDB is used instead of localStorage so business
 // records can survive offline sessions without bloating the synchronous store.
 const SHERI_LOCAL_DB='shericeri_offline_v13';
-const SHERI_LOCAL_DB_VERSION=13;
+const SHERI_LOCAL_DB_VERSION=14;
 let sheriOfflineDb=null;
 let sheriConnectivity=navigator.onLine?'online':'offline';
 let sheriSyncBusy=false;
@@ -434,7 +433,7 @@ function sheriIsOffline(){return !navigator.onLine||sheriConnectivity==='offline
 function sheriSetConnectivity(mode,reason=''){
   sheriConnectivity=mode;
   const dot=mode==='online'?'🟢':mode==='degraded'?'🟠':'🔴';
-  const label=mode==='online'?'Online':mode==='degraded'?'Weak connection':'Offline';
+  const label=mode==='online'?'Online':mode==='degraded'?'Syncing with retry':'Offline';
   const el=document.getElementById('sheriConnectivityLabel'); if(el)el.textContent=`${dot} ${label}`;
   const bar=document.getElementById('sheriOfflineBar'); if(bar)bar.style.background=mode==='offline'?'#fef2f2':mode==='degraded'?'#fffbeb':'#f8fafc';
   const sync=document.getElementById('sheriSyncLabel'); if(sync)sync.textContent=reason||`${sheriSyncQueued} pending local change(s)`;
@@ -449,11 +448,11 @@ function sheriOpenLocalDb(){
       for(const store of ['meta','merchants','products','sales','expenses','outbox','conflicts','memory','customers','suppliers','purchases','cashEntries','budgets','accounts','journalEntries','journalLines','invoices','bills','payments','bankAccounts','taxRates','recurringTransactions','accountingSettings','auditLog']){
         if(!db.objectStoreNames.contains(store))db.createObjectStore(store,{keyPath:'key'});
       }
-      // V14.1.5 schema migration marker. Future versions must add an explicit
+      // V14.2.2 schema migration marker. Future versions must add an explicit
       // migration block here rather than silently changing record shapes.
       // V12.14.1: added 'memory' store (shericeri_memory table mirror).
       // V12.14.1: added 'customers' store (customers table mirror).
-      try{tx.objectStore('meta').put({key:'schema',version:13,migrated_at:new Date().toISOString()})}catch(_){/* ignore */}
+      try{tx.objectStore('meta').put({key:'schema',version:14,migrated_at:new Date().toISOString()})}catch(_){/* ignore */}
     };
     req.onsuccess=()=>{sheriOfflineDb=req.result;resolve(req.result)};
     req.onerror=()=>reject(req.error||new Error('Could not open local offline database'));
@@ -529,11 +528,16 @@ async function sheriLoadLocalSnapshot(merchantId){
   await sheriLoadAccountingSnapshot(merchantId);
   return true;
 }
+function sherriSyncKick(){
+  Promise.resolve().then(()=>sheriSyncOutbox()).catch(()=>{});
+  sheriRegisterBackgroundSync().catch(()=>{});
+}
 async function sheriQueue(op){
   const key=sheriUuid();
-  await sheriPut('outbox',key,{created_at:sheriNow(),op});
-  sheriSyncQueued=(await sheriGetAll('outbox')).length;
+  await sheriPut('outbox',key,{created_at:sheriNow(),op,attempts:0,blocked:false});
+  await sheriQueueCount();
   sheriSetConnectivity(sheriConnectivity);
+  if(navigator.onLine)sherriSyncKick();
   return key;
 }
 async function sheriQueueMemory(category,content){
@@ -586,7 +590,20 @@ function sheriRecentMemoryForPrompt(){
     .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))
     .map(m=>({category:m.category,content:m.content}));
 }
-async function sheriQueueCount(){sheriSyncQueued=(await sheriGetAll('outbox')).length;return sheriSyncQueued}
+async function sheriRegisterBackgroundSync(){
+  try{
+    if(!('serviceWorker' in navigator)||!('SyncManager' in window))return false;
+    const reg=await navigator.serviceWorker.ready;
+    await reg.sync.register('shericeri-outbox-sync');
+    return true;
+  }catch(_){return false}
+}
+async function sheriQueueCount(){
+  const items=await sheriGetAll('outbox');
+  sheriSyncQueued=items.filter(x=>!x.blocked).length;
+  return sheriSyncQueued;
+}
+
 async function sheriRecordConflict(info){
   const key=sheriUuid(); await sheriPut('conflicts',key,{created_at:sheriNow(),info});
 }
@@ -681,15 +698,37 @@ async function sheriSyncChartAccount(record){
   const {data:inserted,error:insertErr}=await sb.from('chart_of_accounts').insert({...clean,id:record.id}).select().single();
   return {data:inserted,error:insertErr};
 }
+function sheriSyncErrorInfo(err){
+  const message=String(err?.message||err||'Sync failed').slice(0,240);
+  const status=Number(err?.status||err?.code||0)||0;
+  const lower=message.toLowerCase();
+  const permanent=status>=400&&status<500&&![401,408,409,425,429].includes(status) || /permission denied|row-level security|violates .*constraint|invalid input syntax|does not exist/.test(lower);
+  return {message,status,permanent};
+}
+function sheriSyncDelayMs(attempts){return Math.min(60000,Math.max(5000,5000*Math.pow(2,Math.min(Number(attempts)||0,4))))}
 async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy)return;
   sheriSyncBusy=true;
   try{
+    // Inheritance-safe auth guard: an expired access token must never turn a
+    // perfectly valid offline queue into a permanent blocked queue item.
+    try{
+      const refreshed=await sb.auth.getSession();
+      if(refreshed?.data?.session){session=refreshed.data.session;}
+    }catch(_){/* Supabase auto-refresh may still be completing; continue below. */}
     await sheriReconcileMerchantId();
-    const items=(await sheriGetAll('outbox')).sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
-    sheriSyncQueued=items.length;
-    sheriSetConnectivity('online',items.length?`Syncing ${items.length} local change(s)…`:'Checking server…');
-    let failed=null;
+    const now=Date.now();
+    const items=(await sheriGetAll('outbox'))
+      .filter(item=>!item.blocked)
+      .filter(item=>!item.next_retry_at||new Date(item.next_retry_at).getTime()<=now)
+      .sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+    sheriSyncQueued=await sheriQueueCount();
+    if(!items.length){
+      sheriSetConnectivity('online',sheriSyncQueued?`${sheriSyncQueued} pending local change(s) — waiting to retry`:'Server data synced');
+      return;
+    }
+    sheriSetConnectivity('online',`Syncing ${sheriSyncQueued} local change(s)…`);
+    let successCount=0,failedCount=0,firstFailure=null;
     for(const item of items){
       const op=item.op||{};
       try{
@@ -712,11 +751,8 @@ async function sheriSyncOutbox(){
         else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='budget_delete'){const {error}=await sb.from('budgets').delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='accounting_upsert'){
-          if(op.table==='chart_of_accounts'){
-            const r=await sheriSyncChartAccount(op.record); if(r?.error)throw r.error;
-          }else{
-            const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error
-          }
+          if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}
+          else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         }
         else if(op.type==='accounting_settings_upsert'){const {error}=await sb.from('accounting_settings').upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'});if(error)throw error}
         else if(op.type==='accounting_delete'){const {error}=await sb.from(op.table).delete().eq('id',op.id);if(error)throw error}
@@ -725,26 +761,73 @@ async function sheriSyncOutbox(){
         else if(op.type==='customer_delete'){const {error}=await sb.from('customers').update({deleted:true}).eq('id',op.id);if(error)throw error}
         else throw new Error('Unsupported sync operation: '+String(op.type||'unknown'));
         await sheriDelete('outbox',item.key);
-      }catch(err){failed={op,error:err};console.warn('[Shericeri sync] pending operation failed',op,err);break}
+        successCount++;
+      }catch(err){
+        // A 401 is an authentication-expiry condition, not a bad business row.
+        // Refresh once and retry this same operation before recording a failure.
+        if(Number(err?.status||err?.code||0)===401){
+          try{
+            const refreshed=await sb.auth.refreshSession();
+            if(refreshed?.data?.session){
+              session=refreshed.data.session;
+              // Re-run this operation exactly once with the fresh token.
+              if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='product_upsert'){const {error}=await sb.from('products').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='customer_upsert'){const {error}=await sb.from('customers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='supplier_upsert'){const {error}=await sb.from('suppliers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='purchase_upsert'){const {error}=await sb.from('purchases').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='cash_upsert'){const {error}=await sb.from('cash_entries').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
+              else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else throw err;
+              await sheriDelete('outbox',item.key);
+              successCount++;
+              continue;
+            }
+          }catch(refreshErr){
+            err=refreshErr;
+          }
+        }
+        failedCount++;
+        const info=sheriSyncErrorInfo(err);
+        const attempts=(Number(item.attempts)||0)+1;
+        const retryAt=new Date(Date.now()+sheriSyncDelayMs(attempts)).toISOString();
+        await sheriPut('outbox',item.key,{...item,attempts,last_error:info.message,last_status:info.status||null,last_failed_at:sheriNow(),next_retry_at:retryAt,blocked:!!info.permanent});
+        if(!firstFailure)firstFailure={op,error:err,info};
+        console.warn('[Shericeri sync] operation failed; continuing with remaining queue',op,info);
+        // A bad row must never freeze unrelated offline work. Leave this operation
+        // durable and retry it later while the rest of the queue continues.
+        continue;
+      }
     }
     await sheriQueueCount();
-    if(failed){
-      const msg=String(failed.error?.message||failed.error||'Sync failed').slice(0,180);
-      sheriSetConnectivity('degraded',`${sheriSyncQueued} pending — sync blocked: ${msg}`);
-      return;
+    if(successCount)await loadAll(true);
+    if(firstFailure){
+      const blockedCount=(await sheriGetAll('outbox')).filter(x=>x.blocked).length;
+      const suffix=failedCount>1?` (${failedCount} failed this pass)`:''; 
+      const attention=blockedCount?` ${blockedCount} need attention.`:'';
+      sheriSetConnectivity('degraded',`${sheriSyncQueued} pending — sync continues${suffix}.${attention} First issue: ${firstFailure.info.message}`);
+    }else{
+      sheriSetConnectivity('online',sheriSyncQueued?`${sheriSyncQueued} pending local change(s) — continuing automatically`:'All local changes synced');
     }
-    // A successful sync is followed by a server refresh. Local records that
-    // have not reached the server yet are retained instead of being erased.
-    await loadAll(true);
-    sheriSetConnectivity('online',sheriSyncQueued?`${sheriSyncQueued} pending local change(s)`:'Server data synced');
   }catch(e){
     const msg=String(e?.message||e||'Connection failed').slice(0,180);
-    sheriSetConnectivity('degraded',`Sync unavailable: ${msg}`);
+    sheriSetConnectivity('degraded',`Sync service unavailable — local changes remain safe: ${msg}`);
   }finally{sheriSyncBusy=false}
 }
+
 function sheriOnlineEvents(){
-  window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');setTimeout(sheriSyncOutbox,250)});
+  window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');setTimeout(sherriSyncKick,250)});
+  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)setTimeout(sherriSyncKick,100)});
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
+}
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',event=>{
+    if(event.data?.type==='SHERICERI_SYNC_REQUEST'&&navigator.onLine)setTimeout(sherriSyncKick,0);
+    if(event.data?.type==='SHERICERI_SW_READY')sheriDiagSet?.('Service Worker version',event.data.version);
+  });
 }
 async function sheriServerHeartbeat(){
   if(!session?.user?.id||!navigator.onLine)return false;
@@ -765,7 +848,7 @@ async function sheriServerHeartbeat(){
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
   (async()=>{
     try{
-      const expected='./shericeri_v14_1_4_aibos_sync_sw.js';
+      const expected='./shericeri_v14_2_2_aibos_sync_sw.js';
       const reg=await navigator.serviceWorker.register(expected,{updateViaCache:'none'});
       sheriDiagSet?.('Service Worker registration','REGISTERED — '+expected);
       const reportSw=()=>{const w=reg.installing||reg.waiting||reg.active;if(w)sheriDiagSet?.('Service Worker lifecycle',String(w.state||'unknown').toUpperCase())};
@@ -775,8 +858,9 @@ if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostn
       // If an older controller is still attached, let the new registration take
       // over on the next navigation rather than silently reporting a stale shell.
       if(reg.waiting)try{reg.waiting.postMessage({type:'SKIP_WAITING'})}catch(_){}
-      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v14_1_4_aibos_sync_sw.js')){
-        sheriDiagSet?.('Service Worker update','V14.1.5 worker registered');
+      if(reg.active)try{reg.active.postMessage({type:'CLIENT_READY'})}catch(_){}
+      if(navigator.serviceWorker.controller && !navigator.serviceWorker.controller.scriptURL.endsWith('shericeri_v14_2_2_aibos_sync_sw.js')){
+        sheriDiagSet?.('Service Worker update','V14.2.2 worker registered');
       }
     }catch(e){ console.warn('[Shericeri SW] registration/update failed',e); }
   })();
@@ -787,14 +871,28 @@ async function sheriOfflineInit(){
   await sheriQueueCount();
   sheriSetConnectivity(navigator.onLine?'online':'offline',navigator.onLine?'Checking server…':'Using on-device business data');
   if(!window._sheriOfflineEventsBound){ sheriOnlineEvents(); window._sheriOfflineEventsBound=true; }
-  if(!window._sheriSyncTimer)window._sheriSyncTimer=setInterval(()=>{if(navigator.onLine){sheriSyncOutbox();sheriServerHeartbeat()}},5000);
+  if(!window._sheriSyncTimer)window._sheriSyncTimer=setInterval(()=>{if(navigator.onLine){sherriSyncKick();sheriServerHeartbeat()}},10000);
+}
+async function sheriRetryBlockedSync(){
+  const items=await sheriGetAll('outbox');
+  let n=0;
+  for(const item of items){
+    if(item.blocked){
+      await sheriPut('outbox',item.key,{...item,blocked:false,attempts:0,next_retry_at:null,last_error:null,last_status:null});
+      n++;
+    }
+  }
+  await sheriQueueCount();
+  if(n)sherriSyncKick();
+  return n;
 }
 async function sheriOfflineDiagnostics(){
-  const q=await sheriQueueCount(),conf=(await sheriGetAll('conflicts')).length;
+  const allOutbox=await sheriGetAll('outbox');
+  const q=allOutbox.filter(x=>!x.blocked).length,blocked=allOutbox.filter(x=>x.blocked).length,conf=(await sheriGetAll('conflicts')).length;
   const localReady=!!sheriOfflineDb;
   const rwTts=!!window.SHERPA_ONNX_TTS_BRIDGE?.speak;
   const rwStt=!!window.SHERPA_ONNX_STT_BRIDGE?.transcribeBlob;
-  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nRecorded conflicts: ${conf}\nKinyarwanda offline STT bridge: ${rwStt?'READY':'NOT INSTALLED'}\nKinyarwanda offline TTS bridge: ${rwTts?'READY':'NOT INSTALLED'}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
+  const msg=`Connectivity: ${sheriConnectivity}\nLocal database: ${localReady?'ready':'not ready'}\nPending sync: ${q}\nBlocked sync items needing attention: ${blocked}\nRecorded conflicts: ${conf}\nKinyarwanda offline STT bridge: ${rwStt?'READY':'NOT INSTALLED'}\nKinyarwanda offline TTS bridge: ${rwTts?'READY':'NOT INSTALLED'}\nLocal TTS: ${window.speechSynthesis?'browser SpeechSynthesis available':'not available'}\nLocal STT: ${window.SpeechRecognition||window.webkitSpeechRecognition?'browser speech recognition available (offline support depends on browser/device)':'not available'}\nCloud Whisper: ${navigator.onLine?'available when connected':'offline/unavailable'}\nCloud Groq brain: ${navigator.onLine?'available when connected':'offline/unavailable'}`;
   alert(msg);
 }
 function sheriOfflineLocalAnswer(q){
@@ -891,17 +989,17 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.1.5';
+const SHERI_RELEASE='V14.2.2';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=(SHERI_IS_LOCAL?window.location.origin+window.location.pathname:SHERI_PRODUCTION_URL).replace(/\/$/,'');
-const SHERI_CACHE_BUSTER='sheri_v=14.1.4';
+const SHERI_CACHE_BUSTER='sheri_v=14.2.0';
 function sheriEnsureFreshRelease(){
   try{
     if(window.top!==window.self)return;
     const u=new URL(window.location.href);
     if(!u.searchParams.has('sheri_v')){
-      u.searchParams.set('sheri_v','14.1.4');
+      u.searchParams.set('sheri_v','14.2.0');
       window.location.replace(u.toString());
     }
   }catch(_){/* keep app usable if URL APIs are restricted */}
@@ -918,7 +1016,7 @@ function populateFiscalYear(id,value){const el=document.getElementById(id);if(!e
 function initProfileSelectors(){populateCountrySelect('onboardCountry');populateCurrencySelect('onboardCurrency');populateFiscalYear('onboardFiscalYear');populateCountrySelect('setCountry');populateCurrencySelect('setCurrency');populateFiscalYear('setFiscalYear');const c=document.getElementById('onboardCountry');if(c)c.onchange=()=>{const suggested=SHERI_COUNTRY_CURRENCY[c.value];if(suggested)document.getElementById('onboardCurrency').value=suggested}}
 function isAppleDevice(){return /iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)||/Mac|iPhone|iPad|iPod/.test(navigator.platform||'')}
 function setAuthStatus(msg,isError=false){const el=document.getElementById('authStatus');if(el){el.textContent=msg;el.className='sub auth-status '+(isError?'bad':'')}}
-function switchAuthMode(mode){document.querySelectorAll('.auth-panel').forEach(x=>x.classList.remove('active'));const map={signin:'signinPanel',signup:'signupPanel','forgot-password':'forgotPasswordPanel','forgot-email':'forgotEmailPanel','reset-password':'resetPasswordPanel'};const target=document.getElementById(map[mode]||'signinPanel');if(target)target.classList.add('active');document.getElementById('authTabSignIn').classList.toggle('active',mode==='signin');document.getElementById('authTabSignUp').classList.toggle('active',mode==='signup');document.getElementById('authTitle').textContent=mode==='signup'?'Create your account':mode==='reset-password'?'Recover your account':'Welcome back';document.getElementById('authSubtitle').textContent=mode==='signup'?'Create one account for your business workspace.':mode==='reset-password'?'Set a new secure password.':'Sign in to access your business workspace.';if(mode==='forgot-email')initRecoveryForm();setAuthStatus('');setTimeout(sheriTurnstileRender,50)}
+function switchAuthMode(mode){document.querySelectorAll('.auth-panel').forEach(x=>x.classList.remove('active'));const map={signin:'signinPanel',signup:'signupPanel','forgot-password':'forgotPasswordPanel','forgot-email':'forgotEmailPanel','reset-password':'resetPasswordPanel'};const target=document.getElementById(map[mode]||'signinPanel');if(target)target.classList.add('active');document.getElementById('authTabSignIn').classList.toggle('active',mode==='signin');document.getElementById('authTabSignUp').classList.toggle('active',mode==='signup');document.getElementById('authTitle').textContent=mode==='signup'?'Create your account':mode==='reset-password'?'Recover your account':'Welcome back';document.getElementById('authSubtitle').textContent=mode==='signup'?'Create one account for your business workspace.':mode==='reset-password'?'Set a new secure password.':'Sign in to access your business workspace.';if(mode==='forgot-email')initRecoveryForm();setAuthStatus('');}
 function showForgotPassword(){switchAuthMode('forgot-password');document.getElementById('resetEmail').value=document.getElementById('authEmail').value.trim()}
 function showForgotEmail(){switchAuthMode('forgot-email')}
 function togglePassword(id,btn){const el=document.getElementById(id);if(!el)return;el.type=el.type==='password'?'text':'password';if(btn)btn.textContent=el.type==='password'?'👁':'🙈'}
@@ -926,18 +1024,33 @@ const SHERI_TURNSTILE_SITE_KEY='0x4AAAAAAEu6H87iXa9cExGa';
 let sheriTurnstileWidgetId=null;
 let sheriTurnstileToken='';
 let sheriTurnstileBusy=false;
-function sheriTurnstileRender(){
+let sheriTurnstileLoadPromise=null;
+function sheriLoadTurnstile(){
+  if(window.turnstile)return Promise.resolve(true);
+  if(sheriTurnstileLoadPromise)return sheriTurnstileLoadPromise;
+  sheriTurnstileLoadPromise=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');
+    script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+    script.async=true;script.defer=true;
+    script.onload=()=>resolve(true);script.onerror=()=>reject(new Error('Security check could not be loaded.'));
+    document.head.appendChild(script);
+  });
+  return sheriTurnstileLoadPromise;
+}
+async function sheriTurnstileRender(){
   const wrap=document.getElementById('sheriTurnstileWrap'),host=document.getElementById('sheriTurnstile');
-  if(!wrap||!host)return; wrap.style.display='block';
+  if(!wrap||!host)return;
+  wrap.style.display='block';
   if(sheriTurnstileWidgetId!==null)return;
-  if(!window.turnstile){setAuthStatus('Security check is still loading. Please wait a moment and try again.',true);return}
+  try{await sheriLoadTurnstile();}catch(e){setAuthStatus('Security check could not be loaded. Please check your connection and try again.',true);return}
+  if(!window.turnstile){setAuthStatus('Security check is unavailable right now. Please try again.',true);return}
   try{
     sheriTurnstileWidgetId=window.turnstile.render(host,{sitekey:SHERI_TURNSTILE_SITE_KEY,theme:'auto',callback:t=>{sheriTurnstileToken=t},'expired-callback':()=>{sheriTurnstileToken=''},'timeout-callback':()=>{sheriTurnstileToken='';setAuthStatus('Security check timed out. Please try again.',true)},'error-callback':()=>{sheriTurnstileToken='';setAuthStatus('Security check could not be completed. Refresh and try again.',true)}});
   }catch(e){sheriTurnstileWidgetId=null;setAuthStatus('Security check could not be loaded. Please refresh and try again.',true)}
 }
-function sheriTurnstileReset(){sheriTurnstileToken='';try{if(window.turnstile&&sheriTurnstileWidgetId!==null)window.turnstile.reset(sheriTurnstileWidgetId)}catch(_){}}
+function sheriTurnstileReset(){sheriTurnstileToken='';try{if(window.turnstile&&sheriTurnstileWidgetId!==null)window.turnstile.reset(sheriTurnstileWidgetId)}catch(_){} }
 async function sheriGetCaptchaToken(){
-  sheriTurnstileRender();
+  await sheriTurnstileRender();
   for(let i=0;i<50&&!sheriTurnstileToken;i++)await new Promise(r=>setTimeout(r,100));
   if(!sheriTurnstileToken)throw new Error('Complete the security check, then try again.');
   return sheriTurnstileToken;
@@ -1053,17 +1166,23 @@ async function loadAll(silent=false){
         sb.from('accounting_settings').select('*').eq('merchant_id',mId).maybeSingle(),
         sb.from('audit_log').select('*').eq('merchant_id',mId).order('created_at',{ascending:false}).limit(100)
       ]);
-      if(!q[0].error)state.accounts=q[0].data||[];
-      if(!q[1].error)state.journalEntries=q[1].data||[];
-      if(!q[2].error)state.journalLines=q[2].data||[];
-      if(!q[3].error)state.invoices=q[3].data||[];
-      if(!q[4].error)state.bills=q[4].data||[];
-      if(!q[5].error)state.payments=q[5].data||[];
-      if(!q[6].error)state.bankAccounts=q[6].data||[];
-      if(!q[7].error)state.taxRates=q[7].data||[];
-      if(!q[8].error)state.recurringTransactions=q[8].data||[];
-      if(!q[9].error)state.accountingSettings=q[9].data;
-      if(!q[10].error)state.auditLog=q[10].data||[];
+      // Accounting is also local-first. A temporary empty/partial server response
+      // must never erase an offline journal, invoice, bill, payment, or bank snapshot
+      // that is still pending synchronization.
+      const accountingMerges=[
+        ['accounts',q[0].data,q[0].error],['journalEntries',q[1].data,q[1].error],['journalLines',q[2].data,q[2].error],
+        ['invoices',q[3].data,q[3].error],['bills',q[4].data,q[4].error],['payments',q[5].data,q[5].error],
+        ['bankAccounts',q[6].data,q[6].error],['taxRates',q[7].data,q[7].error],['recurringTransactions',q[8].data,q[8].error],
+        ['auditLog',q[10].data,q[10].error]
+      ];
+      for(const [key,rows,error] of accountingMerges){
+        if(!error)state[key]=mergeKeepLocal(rows,state[key]);
+      }
+      if(!q[9].error){
+        const localSetting=state.accountingSettings;
+        const serverSetting=q[9].data;
+        state.accountingSettings=serverSetting||localSetting||null;
+      }
       await sheriSaveAccountingSnapshot();
     }catch(e){console.warn('[Sheri accounting] server refresh failed; local accounting retained',e)}
     await accEnsureBase();
@@ -2277,13 +2396,13 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.1.5 PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.2.2 PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
   return d;
 }
-function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V14.1.5');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
+function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V14.2.2');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
 function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
@@ -2775,7 +2894,7 @@ async function shericeriTranscribeAndRespond(blob,mimeType){
   sheriDiagClearTurn();
   sheriResetTurnDiagnostics();
   sheriDiagSet('Diagnostics turn','new pipeline turn');
-  sheriDiagSet('Runtime version','V14.1.5');
+  sheriDiagSet('Runtime version','V14.2.2');
   const whisperRequestStarted=performance.now();
 if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDiagSet('Recording stopped → Whisper request',Math.round(whisperRequestStarted-sheriRecordingStoppedAt)+' ms');
   if(blob.size<800){
@@ -3560,7 +3679,7 @@ async function shericeriRespond(transcript){
     ensureVoicesLoaded(350).catch(()=>{});
   }
 })();
-(async function boot(){await sheriOfflineInit();initProfileSelectors();initRecoveryForm();probeAuthProviders().catch(()=>{});setTimeout(sheriTurnstileRender,800);setTimeout(sheriTurnstileRender,2000);try{const u=new URL(window.location.href);const hash=new URLSearchParams((u.hash||'').replace(/^#/,'').replace(/^\?/,'&'));const errCode=hash.get('error_code');const errDesc=hash.get('error_description');if(errCode||errDesc){const code=String(errCode||'').toLowerCase();const desc=decodeURIComponent(String(errDesc||'').replace(/\+/g,' '));const msg=code==='otp_expired'||desc.toLowerCase().includes('otp_expired')?'That password-reset link has expired or has already been used. Request a new password-reset link.':desc||'The authentication link could not be completed. Please try again.';switchAuthMode('forgot-password');setAuthStatus(msg,true);history.replaceState({},document.title,u.pathname+u.search)}else if((u.hash||'').toLowerCase().includes('type=recovery')){switchAuthMode('reset-password')}}catch(_){}const {data:{session:existing}}=await sb.auth.getSession();if(existing)await onAuthed(existing);sheriHideInternalAccountingUi();sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
+(async function boot(){await sheriOfflineInit();initProfileSelectors();initRecoveryForm();probeAuthProviders().catch(()=>{});try{const u=new URL(window.location.href);const hash=new URLSearchParams((u.hash||'').replace(/^#/,'').replace(/^\?/,'&'));const errCode=hash.get('error_code');const errDesc=hash.get('error_description');if(errCode||errDesc){const code=String(errCode||'').toLowerCase();const desc=decodeURIComponent(String(errDesc||'').replace(/\+/g,' '));const msg=code==='otp_expired'||desc.toLowerCase().includes('otp_expired')?'That password-reset link has expired or has already been used. Request a new password-reset link.':desc||'The authentication link could not be completed. Please try again.';switchAuthMode('forgot-password');setAuthStatus(msg,true);history.replaceState({},document.title,u.pathname+u.search)}else if((u.hash||'').toLowerCase().includes('type=recovery')){switchAuthMode('reset-password')}}catch(_){}const {data:{session:existing}}=await sb.auth.getSession();if(existing)await onAuthed(existing);sheriHideInternalAccountingUi();sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
 
 function sheriDiagAudioIntegrity(body){try{if(!body||typeof body!=='object')return;if(body.first_bytes)sheriDiagSet('Whisper first bytes',String(body.first_bytes));if(body.webm_signature)sheriDiagSet('Whisper WebM signature',String(body.webm_signature));if(body.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(body.audio_bytes));if(body.audio_mime)sheriDiagSet('Whisper audio MIME',String(body.audio_mime));}catch(_){}}
 
