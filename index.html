@@ -437,6 +437,12 @@ const SUPABASE_URL = 'https://bhtodxjhgucgwarpaqzy.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_zRtqPyHL9Gqjck1hoAZibQ_KD9TiazY';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+function sheriWithTimeout(promise,ms,label='Operation timed out'){
+  let timer=null;
+  const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label+' — please check your connection and try again.')),ms)});
+  return Promise.race([promise,timeout]).finally(()=>{if(timer)clearTimeout(timer)});
+}
+
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function merchantCurrency(){return state?.merchant?.currency||'RWF'}
 function merchantCountry(){return state?.merchant?.country||'RW'}
@@ -1023,17 +1029,19 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4 Cross-Platform Voice';
+const SHERI_RELEASE='V14.4.3';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=(SHERI_IS_LOCAL?window.location.origin+window.location.pathname:SHERI_PRODUCTION_URL).replace(/\/$/,'');
-const SHERI_CACHE_BUSTER='sheri_v=14.2.0';
+const SHERI_CACHE_VERSION='14.4.3';
+const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
     if(window.top!==window.self)return;
     const u=new URL(window.location.href);
-    if(!u.searchParams.has('sheri_v')){
-      u.searchParams.set('sheri_v','14.2.0');
+    const current=u.searchParams.get('sheri_v');
+    if(current!==SHERI_CACHE_VERSION){
+      u.searchParams.set('sheri_v',SHERI_CACHE_VERSION);
       window.location.replace(u.toString());
     }
   }catch(_){/* keep app usable if URL APIs are restricted */}
@@ -1066,7 +1074,9 @@ function sheriLoadTurnstile(){
     const script=document.createElement('script');
     script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
     script.async=true;script.defer=true;
-    script.onload=()=>resolve(true);script.onerror=()=>reject(new Error('Security check could not be loaded.'));
+    const timer=setTimeout(()=>reject(new Error('Security check could not be loaded within 8 seconds.')),8000);
+    script.onload=()=>{clearTimeout(timer);resolve(true)};
+    script.onerror=()=>{clearTimeout(timer);reject(new Error('Security check could not be loaded.'))};
     document.head.appendChild(script);
   });
   return sheriTurnstileLoadPromise;
@@ -1084,9 +1094,9 @@ async function sheriTurnstileRender(){
 }
 function sheriTurnstileReset(){sheriTurnstileToken='';try{if(window.turnstile&&sheriTurnstileWidgetId!==null)window.turnstile.reset(sheriTurnstileWidgetId)}catch(_){} }
 async function sheriGetCaptchaToken(){
-  await sheriTurnstileRender();
-  for(let i=0;i<50&&!sheriTurnstileToken;i++)await new Promise(r=>setTimeout(r,100));
-  if(!sheriTurnstileToken)throw new Error('Complete the security check, then try again.');
+  await sheriWithTimeout(sheriTurnstileRender(),9000,'Security check initialization timed out');
+  for(let i=0;i<100&&!sheriTurnstileToken;i++)await new Promise(r=>setTimeout(r,100));
+  if(!sheriTurnstileToken)throw new Error('Complete the security check above, then try again.');
   return sheriTurnstileToken;
 }
 function friendlyAuthError(error){const m=String(error?.message||error||'Authentication failed.'),x=m.toLowerCase();if(x.includes('invalid login credentials')||x.includes('invalid login'))return 'Incorrect email or password. If you do not have an account yet, choose Create account.';if(x.includes('email not confirmed'))return 'Your email is not confirmed yet. Check your inbox or resend the confirmation email.';if(x.includes('user already registered')||x.includes('email_exists')||x.includes('email address already exists'))return 'This email is already registered. Sign in instead, or use Forgot password.';if(x.includes('unsupported provider')||x.includes('provider is not enabled'))return 'This social sign-in is not enabled in the Shericeri Supabase project yet. Enable the provider in Supabase Auth, then try again.';if(x.includes('otp_expired')||x.includes('otp expired')||x.includes('expired'))return 'That recovery link has expired or has already been used. Request a new password-reset link.';return m}
@@ -1103,7 +1113,10 @@ async function handleSignIn(){if(sheriTurnstileBusy)return setAuthStatus('Please
   if(!email||!password)return setAuthStatus('Enter your email and password.',true);
   if(!navigator.onLine)return setAuthStatus('You are offline. Reconnect to sign in, or use an already active saved session.',true);
   try{ sheriTurnstileBusy=true; setAuthStatus('Complete the security check…'); const captchaToken=await sheriGetCaptchaToken(); setAuthStatus('Signing in…');
-    const {data,error}=await sb.auth.signInWithPassword({email,password,options:{captchaToken}}); if(error)return setAuthStatus(friendlyAuthError(error),true); setAuthStatus('Signed in. Loading your business…');
+    const authResult=await sheriWithTimeout(sb.auth.signInWithPassword({email,password,options:{captchaToken}}),12000,'Sign-in request timed out');
+    const {data,error}=authResult;
+    if(error)return setAuthStatus(friendlyAuthError(error),true);
+    setAuthStatus(data?.session?'Signed in. Loading your business…':'Authentication completed. Loading your business…');
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
 async function probeAuthProviders(){try{const res=await fetch(`${SUPABASE_URL}/auth/v1/settings`,{headers:{apikey:SUPABASE_ANON_KEY}});if(!res.ok)return;const cfg=await res.json();const ext=cfg?.external||{};for(const [provider,id] of [['google','googleOAuthBtn'],['apple','appleOAuthBtn']]){const enabled=ext[provider]===true;document.querySelectorAll(`[onclick="signInOAuth('${provider}')"]`).forEach(btn=>{btn.disabled=!enabled;btn.style.opacity=enabled?'1':'.55';btn.title=enabled?'Continue with '+provider[0].toUpperCase()+provider.slice(1):provider[0].toUpperCase()+provider.slice(1)+' sign-in is not enabled in Supabase yet';});}return ext}catch(_){return null}}
@@ -1120,9 +1133,46 @@ function initRecoveryForm(){const c=document.getElementById('recoveryCountry');i
 async function submitBusinessRecovery(){const businessName=document.getElementById('recoveryBusinessName').value.trim(),tin=document.getElementById('recoveryTin').value.trim()||null,country=document.getElementById('recoveryCountry').value,merchantCode=document.getElementById('recoveryMerchantCode').value.trim()||null,contact=document.getElementById('recoveryContact').value.trim();if(!businessName||!country||!contact)return setAuthStatus('Business name, country and a reachable contact are required for recovery.',true);if(!navigator.onLine)return setAuthStatus('Recovery requests require internet.',true);setAuthStatus('Submitting recovery request…');try{const {error}=await sb.from('account_recovery_requests').insert({business_name:businessName,tin,country,merchant_code:merchantCode,contact,source:'forgot_email'});if(error)throw error;setAuthStatus('Recovery request submitted. Support can verify your business details and contact you using the contact information you provided. Shericeri will not reveal the stored account email in the browser.')}catch(e){setAuthStatus('Could not submit the recovery request right now. Please try again when online.',true)}}
 function merchantProfileComplete(m){return !!(m&&m.name&&m.name!=='My Business'&&m.country&&m.currency)}
 function showOnboarding(){document.getElementById('authScreen').style.display='none';document.getElementById('appRoot').style.display='none';document.getElementById('onboardingScreen').style.display='flex';initProfileSelectors();document.getElementById('onboardCountry').value=state.merchant?.country||'RW';document.getElementById('onboardCurrency').value=state.merchant?.currency||SHERI_COUNTRY_CURRENCY[document.getElementById('onboardCountry').value]||'RWF';document.getElementById('onboardName').value=state.merchant?.name&&state.merchant.name!=='My Business'?state.merchant.name:'';document.getElementById('onboardTin').value=state.merchant?.tin||'';populateFiscalYear('onboardFiscalYear',state.merchant?.fiscal_year)}
-async function ensureMerchant(){if(!navigator.onLine){const cached=await sheriGetAll('merchants');const mine=cached.find(x=>x.record?.user_id===session.user.id||x.user_id===session.user.id);if(mine){state.merchant=mine.record||mine;return true}return false}let {data,error}=await sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle();if(error){const cached=await sheriGetAll('merchants');const mine=cached.find(x=>x.record?.user_id===session.user.id||x.user_id===session.user.id);if(mine){state.merchant=mine.record||mine;sheriSetConnectivity('degraded','Using cached business profile');return true}throw error}if(data){state.merchant=data;await sheriPut('merchants',data.id,{user_id:data.user_id,record:{...data}});return true}return false}
+async function ensureMerchant(){
+  const cached=await sheriGetAll('merchants');
+  const mine=cached.find(x=>x.record?.user_id===session.user.id||x.user_id===session.user.id);
+  if(mine){
+    state.merchant=mine.record||mine;
+    if(!navigator.onLine){sheriSetConnectivity('offline','Using saved business profile');return true}
+    try{
+      const result=await sheriWithTimeout(sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle(),7000,'Business profile refresh timed out');
+      if(result.error)throw result.error;
+      if(result.data){state.merchant=result.data;await sheriPut('merchants',result.data.id,{user_id:result.data.user_id,record:{...result.data}})}
+    }catch(e){sheriSetConnectivity('degraded','Using saved business profile — server refresh is slow.')}
+    return true;
+  }
+  if(!navigator.onLine)return false;
+  const result=await sheriWithTimeout(sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle(),7000,'Business profile lookup timed out');
+  if(result.error)throw result.error;
+  if(result.data){state.merchant=result.data;await sheriPut('merchants',result.data.id,{user_id:result.data.user_id,record:{...result.data}});return true}
+  return false;
+}
 async function completeOnboarding(){const name=document.getElementById('onboardName').value.trim(),tin=document.getElementById('onboardTin').value.trim()||null,fy=document.getElementById('onboardFiscalYear').value||null,country=document.getElementById('onboardCountry').value,currency=document.getElementById('onboardCurrency').value,status=document.getElementById('onboardStatus');if(!name||!country||!currency){status.textContent='Business name, country and currency are required.';status.className='sub auth-status bad';return}status.textContent='Saving your business profile…';const record={user_id:session.user.id,name,category:state.merchant?.category||'Other',tin,fiscal_year:fy?Number(fy):null,country,currency};try{let result;if(navigator.onLine){result=state.merchant?.id&&!state.merchant._localOnly?await sb.from('merchants').update(record).eq('id',state.merchant.id).select().single():await sb.from('merchants').insert(record).select().single();if(result.error)throw result.error;state.merchant=result.data}else{state.merchant={id:state.merchant?.id||sheriUuid(),...record,_localOnly:true};await sheriQueue({type:'merchant_upsert',record:{...state.merchant}})}await sheriSaveSnapshot();document.getElementById('onboardingScreen').style.display='none';document.getElementById('appRoot').style.display='';await loadAll();render();if(navigator.onLine)checkAdvisor()}catch(e){status.textContent='Could not save your business profile: '+String(e.message||e);status.className='sub auth-status bad'}}
-async function onAuthed(sess){session=sess;await sheriOfflineInit();const complete=await ensureMerchant();if(complete&&merchantProfileComplete(state.merchant)){document.getElementById('authScreen').style.display='none';document.getElementById('onboardingScreen').style.display='none';document.getElementById('appRoot').style.display='';await loadAll();render();if(navigator.onLine){await sheriServerHeartbeat();await sheriSyncOutbox();checkAdvisor();}else{const n=document.getElementById('shericeriNotice');if(n)n.textContent='Offline mode — saved business data is still available.'}}else showOnboarding()}
+async function onAuthed(sess){
+  session=sess;
+  await sheriWithTimeout(sheriOfflineInit(),5000,'Local workspace initialization timed out');
+  let complete=false;
+  try{complete=await ensureMerchant()}catch(e){console.warn('[Shericeri auth] merchant lookup failed',e);setAuthStatus('Signed in, but your business profile could not be refreshed yet. Please try again in a moment.',true);return}
+  if(complete&&merchantProfileComplete(state.merchant)){
+    document.getElementById('authScreen').style.display='none';
+    document.getElementById('onboardingScreen').style.display='none';
+    document.getElementById('appRoot').style.display='';
+    render();
+    sheriWithTimeout(loadAll(true),9000,'Business data refresh timed out').then(()=>render()).catch(e=>{
+      console.warn('[Shericeri login] background data refresh failed',e);
+      const n=document.getElementById('shericeriNotice');
+      if(n)n.textContent='Signed in. Using saved business data while the server reconnects.';
+      render();
+    });
+    if(navigator.onLine){sheriServerHeartbeat();sheriSyncOutbox();checkAdvisor()}
+    else{const n=document.getElementById('shericeriNotice');if(n)n.textContent='Offline mode — saved business data is still available.'}
+  }else showOnboarding()
+}
 async function signOut(){await sb.auth.signOut();session=null;location.reload()}
 
 // ── Data loading ─────────────────────────────────────────────────────────
