@@ -170,7 +170,7 @@ window.ensurePdfJs=async function(){
           sitekey:'0x4AAAAAAEu6H87iXa9cExGa',
           theme:'auto',
           callback:t=>finish(resolve,t),
-          'error-callback':()=>finish(reject,new Error('Security check could not be completed. Refresh and try again.')),
+          'error-callback':(code)=>finish(reject,new Error('Cloudflare security check failed'+(code?' (code '+code+')':'')+'. Check that this Turnstile sitekey authorizes this website.')),
           'timeout-callback':()=>finish(reject,new Error('Security check timed out.')),
           'expired-callback':()=>{}
         });
