@@ -185,18 +185,15 @@
     status('Signing in…');
     try{
       const c=await client();
+      // This project has Supabase CAPTCHA protection enabled. Obtain the token
+      // before the password request so we do not intentionally make a doomed
+      // CAPTCHA-less request first.
+      status('Security verification…');
+      const token=await captchaToken();
       let result=await Promise.race([
-        c.auth.signInWithPassword({email,password}),
+        c.auth.signInWithPassword({email,password,options:{captchaToken:token}}),
         new Promise((_,reject)=>setTimeout(()=>reject(new Error('Sign-in request timed out.')),12000))
       ]);
-      if(result.error&&/captcha|turnstile|challenge/i.test(String(result.error.message||''))){
-        status('Security verification required…');
-        const token=await captchaToken();
-        result=await Promise.race([
-          c.auth.signInWithPassword({email,password,options:{captchaToken:token}}),
-          new Promise((_,reject)=>setTimeout(()=>reject(new Error('Verified sign-in request timed out.')),12000))
-        ]);
-      }
       if(result.error)throw result.error;
       if(result.data?.session){
         status('Signed in. Loading your business…');
@@ -212,8 +209,14 @@
     status('Opening Google sign-in…');
     try{
       const c=await client();
-      const {error}=await c.auth.signInWithOAuth({provider:'google',options:{redirectTo:REDIRECT,scopes:'openid email profile'}});
-      if(error)throw error;
+      const oauth=await Promise.race([
+        c.auth.signInWithOAuth({provider:'google',options:{redirectTo:REDIRECT,scopes:'openid email profile'}}),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('Google sign-in request timed out.')),12000))
+      ]);
+      if(oauth?.error)throw oauth.error;
+      // supabase-js normally redirects automatically in the browser. If a
+      // browser/webview returns the OAuth URL instead, explicitly navigate to it.
+      if(oauth?.data?.url && location.href===REDIRECT)location.assign(oauth.data.url);
     }catch(e){
       status(String(e?.message||e||'Google sign-in could not be started.'),true);
       buttons.forEach(b=>{b.disabled=false;b.textContent='G  Google'});
