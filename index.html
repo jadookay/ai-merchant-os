@@ -96,7 +96,116 @@
 </head>
 <body>
 
-<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" onclick="switchAuthMode('signup')">Create account</button></div><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" onclick="togglePassword('authPassword',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignIn()">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" onclick="togglePassword('signupPassword',this)">👁</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" onclick="togglePassword('signupConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button class="oauth-btn" onclick="signInOAuth('google')">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPassword',this)">👁</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPasswordConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div><div id="onboardingScreen" class="onboard-wrap" style="display:none"><div class="onboard-card"><div class="brand" style="margin-left:0">AI Business OS</div><h1>Set up your business</h1><p class="sub">This profile powers your dashboard, accounting, inventory, forecasts and AI features. Country and currency are required.</p><div class="profile-badge" style="margin-top:10px">⚡ One business profile across the whole app</div><div class="formgrid"><div style="grid-column:1/-1"><label>Business name <span class="required-mark">*</span></label><input id="onboardName" autocomplete="organization" placeholder="e.g. Jean’s General Store"></div><div><label>TIN number <span class="sub">(optional)</span></label><input id="onboardTin" inputmode="numeric" placeholder="Optional"></div><div><label>Fiscal year <span class="sub">(optional)</span></label><select id="onboardFiscalYear"></select></div><div><label>Country <span class="required-mark">*</span></label><select id="onboardCountry"></select></div><div><label>Currency <span class="required-mark">*</span></label><select id="onboardCurrency"></select></div></div><div id="onboardStatus" class="sub auth-status"></div><div class="onboard-actions"><button class="btn" onclick="completeOnboarding()">Continue to my business</button></div></div></div>
+<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" onclick="switchAuthMode('signup')">Create account</button></div><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" onclick="togglePassword('authPassword',this)">👁</button></div><button id="authSignInBtn" class="btn" type="button" style="width:100%;margin-top:14px">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" onclick="togglePassword('signupPassword',this)">👁</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" onclick="togglePassword('signupConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn2" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPassword',this)">👁</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" onclick="togglePassword('newPasswordConfirm',this)">👁</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div>
+<script>
+/* SHERI AUTH SAFETY NET — deliberately independent of the main application boot. */
+(function(){
+  const URL='https://bhtodxjhgucgwarpaqzy.supabase.co';
+  const KEY='sb_publishable_zRtqPyHL9Gqjck1hoAZibQ_KD9TiazY';
+  const REDIRECT='https://jadookay.github.io/ai-merchant-os/';
+  function status(msg,bad){
+    const el=document.getElementById('authStatus');
+    if(el){el.textContent=msg;el.className='sub auth-status'+(bad?' bad':'');}
+  }
+  function client(){
+    try{
+      if(!window.supabase?.createClient)throw new Error('Authentication library did not load.');
+      return window.__SHERI_EARLY_CLIENT||(window.__SHERI_EARLY_CLIENT=window.supabase.createClient(URL,KEY));
+    }catch(e){status(e.message||String(e),true);throw e}
+  }
+  async function captchaToken(){
+    const wrap=document.getElementById('sheriTurnstileWrap'),host=document.getElementById('sheriTurnstile');
+    if(wrap)wrap.style.display='block';
+    if(!window.turnstile){
+      await new Promise((resolve,reject)=>{
+        const script=document.createElement('script');
+        script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
+        script.async=true;script.defer=true;
+        const t=setTimeout(()=>reject(new Error('Security check could not be loaded.')),8000);
+        script.onload=()=>{clearTimeout(t);resolve()};script.onerror=()=>{clearTimeout(t);reject(new Error('Security check could not be loaded.'))};
+        document.head.appendChild(script);
+      });
+    }
+    if(!window.turnstile||!host)throw new Error('Security check is unavailable.');
+    return await new Promise((resolve,reject)=>{
+      let done=false;
+      const finish=(fn,v)=>{if(done)return;done=true;fn(v)};
+      try{
+        const id=window.turnstile.render(host,{
+          sitekey:'0x4AAAAAAEu6H87iXa9cExGa',
+          theme:'auto',
+          callback:t=>finish(resolve,t),
+          'error-callback':()=>finish(reject,new Error('Security check could not be completed. Refresh and try again.')),
+          'timeout-callback':()=>finish(reject,new Error('Security check timed out.')),
+          'expired-callback':()=>{}
+        });
+        setTimeout(()=>{try{window.turnstile.reset(id)}catch(_){}},30000);
+      }catch(e){finish(reject,e)}
+    });
+  }
+  async function passwordLogin(){
+    const email=String(document.getElementById('authEmail')?.value||'').trim().toLowerCase();
+    const password=String(document.getElementById('authPassword')?.value||'');
+    if(!email||!password)return status('Enter your email and password.',true);
+    if(!navigator.onLine)return status('You are offline. Reconnect to sign in.',true);
+    const btn=document.getElementById('authSignInBtn');
+    if(btn){btn.disabled=true;btn.textContent='Signing in…'}
+    status('Signing in…');
+    try{
+      const c=client();
+      let result=await Promise.race([
+        c.auth.signInWithPassword({email,password}),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('Sign-in request timed out.')),12000))
+      ]);
+      if(result.error&&/captcha|turnstile|challenge/i.test(String(result.error.message||''))){
+        status('Security verification required…');
+        const token=await captchaToken();
+        result=await Promise.race([
+          c.auth.signInWithPassword({email,password,options:{captchaToken:token}}),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error('Verified sign-in request timed out.')),12000))
+        ]);
+      }
+      if(result.error)throw result.error;
+      if(result.data?.session){
+        status('Signed in. Loading your business…');
+        setTimeout(()=>location.reload(),50);
+      }else status('Authentication completed. Please wait…');
+    }catch(e){status(String(e?.message||e||'Authentication failed.'),true)}
+    finally{if(btn){btn.disabled=false;btn.textContent='Sign in'}}
+  }
+  async function googleLogin(){
+    if(!navigator.onLine)return status('Social sign-in requires internet.',true);
+    const buttons=[document.getElementById('authGoogleBtn'),document.getElementById('authGoogleBtn2')].filter(Boolean);
+    buttons.forEach(b=>{b.disabled=true;b.textContent='Opening Google…'});
+    status('Opening Google sign-in…');
+    try{
+      const {error}=await client().auth.signInWithOAuth({provider:'google',options:{redirectTo:REDIRECT,scopes:'email profile'}});
+      if(error)throw error;
+    }catch(e){
+      status(String(e?.message||e||'Google sign-in could not be started.'),true);
+      buttons.forEach(b=>{b.disabled=false;b.textContent='G  Google'});
+    }
+  }
+  window.__SHERI_EARLY_AUTH={passwordLogin,googleLogin};
+  window.addEventListener('error',e=>{
+    if(!document.getElementById('authScreen'))return;
+    const msg=String(e?.error?.message||e?.message||'Unexpected application error');
+    console.error('[Shericeri early auth]',msg);
+    if(!document.getElementById('authStatus')?.textContent)status('The app encountered an error before authentication could start: '+msg,true);
+  });
+  window.addEventListener('unhandledrejection',e=>{
+    const msg=String(e?.reason?.message||e?.reason||'Unexpected authentication error');
+    console.error('[Shericeri early auth rejection]',msg);
+  });
+  const bind=()=>{
+    document.getElementById('authSignInBtn')?.addEventListener('click',passwordLogin);
+    document.getElementById('authGoogleBtn')?.addEventListener('click',googleLogin);
+    document.getElementById('authGoogleBtn2')?.addEventListener('click',googleLogin);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
+})();
+</script>
+<div id="onboardingScreen" class="onboard-wrap" style="display:none"><div class="onboard-card"><div class="brand" style="margin-left:0">AI Business OS</div><h1>Set up your business</h1><p class="sub">This profile powers your dashboard, accounting, inventory, forecasts and AI features. Country and currency are required.</p><div class="profile-badge" style="margin-top:10px">⚡ One business profile across the whole app</div><div class="formgrid"><div style="grid-column:1/-1"><label>Business name <span class="required-mark">*</span></label><input id="onboardName" autocomplete="organization" placeholder="e.g. Jean’s General Store"></div><div><label>TIN number <span class="sub">(optional)</span></label><input id="onboardTin" inputmode="numeric" placeholder="Optional"></div><div><label>Fiscal year <span class="sub">(optional)</span></label><select id="onboardFiscalYear"></select></div><div><label>Country <span class="required-mark">*</span></label><select id="onboardCountry"></select></div><div><label>Currency <span class="required-mark">*</span></label><select id="onboardCurrency"></select></div></div><div id="onboardStatus" class="sub auth-status"></div><div class="onboard-actions"><button class="btn" onclick="completeOnboarding()">Continue to my business</button></div></div></div>
 
 <meta name="shericeri-version" content="V14.4 Cross-Platform Voice + Kinyarwanda AIBOS + INHERITANCE-SAFE OFFLINE SYNC">
 <div class="app" id="appRoot" style="display:none">
@@ -435,7 +544,7 @@
 // Paste your own project's values here (Project Settings → API in Supabase).
 const SUPABASE_URL = 'https://bhtodxjhgucgwarpaqzy.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_zRtqPyHL9Gqjck1hoAZibQ_KD9TiazY';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.__SHERI_EARLY_CLIENT || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 function sheriWithTimeout(promise,ms,label='Operation timed out'){
   let timer=null;
@@ -3824,7 +3933,7 @@ async function shericeriRespond(transcript){
     ensureVoicesLoaded(350).catch(()=>{});
   }
 })();
-(async function boot(){await sheriOfflineInit();initProfileSelectors();initRecoveryForm();probeAuthProviders().catch(()=>{});try{const u=new URL(window.location.href);const hash=new URLSearchParams((u.hash||'').replace(/^#/,'').replace(/^\?/,'&'));const errCode=hash.get('error_code');const errDesc=hash.get('error_description');if(errCode||errDesc){const code=String(errCode||'').toLowerCase();const desc=decodeURIComponent(String(errDesc||'').replace(/\+/g,' '));const msg=code==='otp_expired'||desc.toLowerCase().includes('otp_expired')?'That password-reset link has expired or has already been used. Request a new password-reset link.':desc||'The authentication link could not be completed. Please try again.';switchAuthMode('forgot-password');setAuthStatus(msg,true);history.replaceState({},document.title,u.pathname+u.search)}else if((u.hash||'').toLowerCase().includes('type=recovery')){switchAuthMode('reset-password')}}catch(_){}const {data:{session:existing}}=await sb.auth.getSession();if(existing)await onAuthed(existing);sheriHideInternalAccountingUi();sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
+(async function boot(){sheriWithTimeout(sheriOfflineInit(),5000,'Local workspace initialization timed out').catch(e=>console.warn('[Shericeri boot]',e));initProfileSelectors();initRecoveryForm();probeAuthProviders().catch(()=>{});try{const u=new URL(window.location.href);const hash=new URLSearchParams((u.hash||'').replace(/^#/,'').replace(/^\?/,'&'));const errCode=hash.get('error_code');const errDesc=hash.get('error_description');if(errCode||errDesc){const code=String(errCode||'').toLowerCase();const desc=decodeURIComponent(String(errDesc||'').replace(/\+/g,' '));const msg=code==='otp_expired'||desc.toLowerCase().includes('otp_expired')?'That password-reset link has expired or has already been used. Request a new password-reset link.':desc||'The authentication link could not be completed. Please try again.';switchAuthMode('forgot-password');setAuthStatus(msg,true);history.replaceState({},document.title,u.pathname+u.search)}else if((u.hash||'').toLowerCase().includes('type=recovery')){switchAuthMode('reset-password')}}catch(_){}const sessionResult=await sheriWithTimeout(sb.auth.getSession(),8000,'Session check timed out');const existing=sessionResult?.data?.session;if(existing)await onAuthed(existing);sheriHideInternalAccountingUi();sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
 
 function sheriDiagAudioIntegrity(body){try{if(!body||typeof body!=='object')return;if(body.first_bytes)sheriDiagSet('Whisper first bytes',String(body.first_bytes));if(body.webm_signature)sheriDiagSet('Whisper WebM signature',String(body.webm_signature));if(body.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(body.audio_bytes));if(body.audio_mime)sheriDiagSet('Whisper audio MIME',String(body.audio_mime));}catch(_){}}
 
