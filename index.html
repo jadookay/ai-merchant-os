@@ -1202,11 +1202,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.13';
+const SHERI_RELEASE='V14.4.14';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.13';
+const SHERI_CACHE_VERSION='14.4.14';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -2922,6 +2922,8 @@ function sheriPrimeAndroidTts(){
 }
 
 async function startShericeriLoop(){
+  // Unlock HTML audio during the user's tap so later Pindo audio is not blocked by Android autoplay policy.
+  sheriUnlockKinyaAudio();
   sheriPrimeAndroidTts();
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.MediaRecorder){
     setSheriStatus('Voice input is not supported in this browser. Try Chrome.');
@@ -3592,12 +3594,31 @@ function sheriScheduleNextListen(turnId){
   },100);
 }
 
+let sheriKinyaAudioEl=null;
+function sheriUnlockKinyaAudio(){
+  try{
+    if(!sheriKinyaAudioEl){
+      sheriKinyaAudioEl=new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA=');
+      sheriKinyaAudioEl.preload='auto';
+      sheriKinyaAudioEl.volume=1;
+    }
+    const p=sheriKinyaAudioEl.play();
+    if(p?.catch)p.catch(()=>{});
+    sheriKinyaAudioEl.pause();
+    sheriKinyaAudioEl.currentTime=0;
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Kinyarwanda audio','HTML audio playback unlocked');
+  }catch(e){
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Kinyarwanda audio unlock',String(e?.message||e).slice(0,180));
+  }
+}
 async function sheriOnlineKinyaTts(text,lang,turnId,finish){
   const playAudioUrl=async(url,provider)=>{
     if(turnId!==sheriTurnId)return true;
-    const audio=new Audio();
+    sheriKinyaAudioEl=sheriKinyaAudioEl||new Audio();
+    const audio=sheriKinyaAudioEl;
     audio.preload='auto';
     audio.src=url;
+    audio.load();
     await new Promise((resolve,reject)=>{
       audio.onended=resolve;
       audio.onerror=()=>reject(new Error(`Kinyarwanda TTS audio playback failed (${audio.error?.code||'MEDIA_ERR_UNKNOWN'})`));
