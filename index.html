@@ -1029,11 +1029,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.5';
+const SHERI_RELEASE='V14.4.6';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=SHERI_IS_LOCAL?(window.location.origin+window.location.pathname):SHERI_PRODUCTION_URL;
-const SHERI_CACHE_VERSION='14.4.5';
+const SHERI_CACHE_VERSION='14.4.6';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -1149,12 +1149,16 @@ async function signInOAuth(provider){
   if(provider!=='google'&&provider!=='apple')return setAuthStatus('Unsupported social sign-in provider.',true);
   setAuthStatus(`Opening ${provider==='apple'?'Apple':'Google'} sign-in…`);
   try{
-    // Use the standard Supabase browser OAuth redirect directly. This avoids
-    // any client-side provider/settings probe that can stall before navigation.
-    const u=new URL(`${SUPABASE_URL}/auth/v1/authorize`);
-    u.searchParams.set('provider',provider);
-    u.searchParams.set('redirect_to',SHERI_AUTH_REDIRECT);
-    window.location.assign(u.toString());
+    // Let supabase-js create and handle the OAuth flow, including its PKCE
+    // state and callback/session processing. Do not hand-build /authorize URLs.
+    const {error}=await sb.auth.signInWithOAuth({
+      provider,
+      options:{
+        redirectTo:SHERI_AUTH_REDIRECT,
+        scopes:provider==='google'?'email profile':undefined
+      }
+    });
+    if(error)setAuthStatus(friendlyAuthError(error),true);
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}
 }
 async function sendPasswordReset(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
