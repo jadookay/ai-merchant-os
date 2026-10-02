@@ -3773,7 +3773,7 @@ function sheriDrainSpeakQueue(){
       speechSynthesis.speak(utt);
       if(retryTimer)clearTimeout(retryTimer);
       retryTimer=setTimeout(()=>{
-        if(turnId===sheriTurnId&&!started&&!finished&&!sheriIsSpeaking){
+        if(turnId===sheriTurnId&&!started&&!finished){
           retrySpeech('no onstart within 1200 ms');
         }
       },1200);
