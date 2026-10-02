@@ -1202,11 +1202,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.12';
+const SHERI_RELEASE='V14.4.13';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.12';
+const SHERI_CACHE_VERSION='14.4.13';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -2751,7 +2751,7 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.4.12 Cross-Platform Voice PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.4.13 Cross-Platform Voice PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
@@ -3593,7 +3593,77 @@ function sheriScheduleNextListen(turnId){
 }
 
 async function sheriOnlineKinyaTts(text,lang,turnId,finish){
-  try{const {data:{session:existingSession}}=await sb.auth.getSession();let currentSession=existingSession;if(!currentSession?.access_token){const {data:{session:refreshedSession},error}=await sb.auth.refreshSession();if(error||!refreshedSession?.access_token)throw error||new Error('No valid Supabase session');currentSession=refreshedSession;}const call=()=>fetch(`${SUPABASE_URL}/functions/v1/advisor`,{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},body:JSON.stringify({mode:'kinya_tts',text:String(text),language:'rw'})});let res=await call();if(res.status===401){const {data:{session:refreshedSession},error}=await sb.auth.refreshSession();if(error||!refreshedSession?.access_token)throw error||new Error('Session refresh failed after Kinyarwanda TTS 401');currentSession=refreshedSession;res=await call();}const raw=await res.text();let body=null;try{body=raw?JSON.parse(raw):null}catch(_){}if(!res.ok||!body?.audio_base64)throw new Error(body?.error||`Kinyarwanda TTS HTTP ${res.status}`);if(turnId!==sheriTurnId)return true;const audio=new Audio(`data:${body.mime_type||'audio/wav'};base64,${body.audio_base64}`);audio.preload='auto';await new Promise((resolve,reject)=>{audio.onended=resolve;audio.onerror=()=>reject(new Error('Kinyarwanda TTS audio playback failed'));audio.play().catch(reject)});finish('online-kinya-tts');return true;}catch(e){if(typeof sheriDiagSet==='function')sheriDiagSet('Online Kinyarwanda TTS',String(e?.message||e).slice(0,220));return false;}}
+  const playAudioUrl=async(url,provider)=>{
+    if(turnId!==sheriTurnId)return true;
+    const audio=new Audio();
+    audio.preload='auto';
+    audio.src=url;
+    await new Promise((resolve,reject)=>{
+      audio.onended=resolve;
+      audio.onerror=()=>reject(new Error(`Kinyarwanda TTS audio playback failed (${audio.error?.code||'MEDIA_ERR_UNKNOWN'})`));
+      audio.play().catch(reject);
+    });
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Kinyarwanda TTS provider',provider);
+    finish(provider);
+    return true;
+  };
+  try{
+    // Primary: the Kinyarwanda VoiceAI endpoint we identified earlier.
+    // It returns a generated female Kinyarwanda audio URL and avoids an extra
+    // round-trip through the AI advisor, keeping voice response latency low.
+    const pindo=await fetch('https://api.pindo.io/ai/tts/rw/public',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:String(text),lang:'rw',speech_rate:1})
+    });
+    const raw=await pindo.text();
+    let body=null;try{body=raw?JSON.parse(raw):null}catch(_){}
+    const audioUrl=body?.data?.generated_audio_url||body?.generated_audio_url;
+    if(pindo.ok&&audioUrl){
+      const url=new URL(audioUrl,'https://api.pindo.io/').toString();
+      return await playAudioUrl(url,'pindo-kinya-tts');
+    }
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Pindo Kinyarwanda TTS',String(body?.error||raw||`HTTP ${pindo.status}`).slice(0,220));
+  }catch(e){
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Pindo Kinyarwanda TTS',String(e?.message||e).slice(0,220));
+  }
+
+  // Fallback: preserve the existing authenticated Supabase advisor TTS route.
+  try{
+    const {data:{session:existingSession}}=await sb.auth.getSession();
+    let currentSession=existingSession;
+    if(!currentSession?.access_token){
+      const {data:{session:refreshedSession},error}=await sb.auth.refreshSession();
+      if(error||!refreshedSession?.access_token)throw error||new Error('No valid Supabase session');
+      currentSession=refreshedSession;
+    }
+    const call=()=>fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},
+      body:JSON.stringify({mode:'kinya_tts',text:String(text),language:'rw'})
+    });
+    let res=await call();
+    if(res.status===401){
+      const {data:{session:refreshedSession},error}=await sb.auth.refreshSession();
+      if(error||!refreshedSession?.access_token)throw error||new Error('Session refresh failed after Kinyarwanda TTS 401');
+      currentSession=refreshedSession;
+      res=await call();
+    }
+    const raw=await res.text();
+    let body=null;try{body=raw?JSON.parse(raw):null}catch(_){}
+    if(!res.ok||!body?.audio_base64)throw new Error(body?.error||`Kinyarwanda TTS HTTP ${res.status}`);
+    const bin=atob(body.audio_base64);
+    const bytes=new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    const blob=new Blob([bytes],{type:body.mime_type||'audio/wav'});
+    const objectUrl=URL.createObjectURL(blob);
+    try{return await playAudioUrl(objectUrl,'online-kinya-tts');}
+    finally{setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);}
+  }catch(e){
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Online Kinyarwanda TTS',String(e?.message||e).slice(0,220));
+    return false;
+  }
+}
 
 function sheriDrainSpeakQueue(){
   if(sheriIsSpeaking)return;
