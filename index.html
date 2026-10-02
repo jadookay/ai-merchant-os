@@ -1202,11 +1202,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.15';
+const SHERI_RELEASE='V14.4.16';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.15';
+const SHERI_CACHE_VERSION='14.4.16';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -2751,7 +2751,7 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.4.15 Cross-Platform Voice PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.4.16 Cross-Platform Voice PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
@@ -3725,7 +3725,7 @@ function sheriDrainSpeakQueue(){
   const utt=new SpeechSynthesisUtterance(next);
   utt.lang=lang;
   const isAndroid=/Android/i.test(navigator.userAgent||'');
-  const voice=isAndroid?null:pickVoice(lang);
+  const voice=pickVoice(lang);
   if(/^rw/i.test(lang) && !window.SHERICERI_VOICE_BRIDGE?.speak){
     // Do not suppress a valid Kinyarwanda answer merely because no named
     // rw-RW voice is exposed. Attempt platform/default SpeechSynthesis.
@@ -3845,10 +3845,8 @@ function sheriDrainSpeakQueue(){
     }
     try{
       let selectedVoice=null;
-      if(!isAndroid){
-        selectedVoice=pickVoice(lang);
-        if(selectedVoice && utt.voice!==selectedVoice) utt.voice=selectedVoice;
-      }
+      selectedVoice=pickVoice(lang);
+      if(selectedVoice && utt.voice!==selectedVoice) utt.voice=selectedVoice;
       if(typeof sheriDiagSet==='function')sheriDiagSet('TTS selected voice',selectedVoice?`${selectedVoice.name} (${selectedVoice.lang})`:(isAndroid?'Android platform/OS default voice':'none for requested language'));
       if(/^rw/i.test(lang) && navigator.onLine){
         sheriDiagSet('Kinyarwanda TTS route','ONLINE Pindo VoiceAI');
