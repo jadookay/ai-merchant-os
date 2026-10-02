@@ -224,7 +224,7 @@ window.ensurePdfJs=async function(){
       if(oauth?.error)throw oauth.error;
       // supabase-js normally redirects automatically in the browser. If a
       // browser/webview returns the OAuth URL instead, explicitly navigate to it.
-      if(oauth?.data?.url && location.href===REDIRECT)location.assign(oauth.data.url);
+      if(oauth?.data?.url)location.assign(oauth.data.url);
     }catch(e){
       status(String(e?.message||e||'Google sign-in could not be started.'),true);
       buttons.forEach(b=>{b.disabled=false;b.textContent='G  Google'});
