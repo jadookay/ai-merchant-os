@@ -1202,11 +1202,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.11';
+const SHERI_RELEASE='V14.4.12';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.11';
+const SHERI_CACHE_VERSION='14.4.12';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -2434,7 +2434,7 @@ async function sheriDiagSpeaker(){
     utt.lang=lang;utt.rate=1.03;utt.pitch=1;utt.volume=SHERI_TTS_VOLUME;
     const isAndroid=/Android/i.test(navigator.userAgent||'');
     const voices=speechSynthesis.getVoices();
-    const voice=isAndroid?null:pickVoice(lang);
+    const voice=pickVoice(lang);
     if(voice)utt.voice=voice;
     if(isAndroid){ utt.rate=SHERI_ANDROID_TTS_RATE; utt.pitch=SHERI_ANDROID_TTS_PITCH; }
     const defaultCandidate=voices.find(v=>v.default);
@@ -2673,13 +2673,13 @@ let sheriNextListenTimer=null;
 
 const SHERI_SPEECH_THRESHOLD=14;
 const SHERI_ANDROID_SPEECH_THRESHOLD=7; // Android phones commonly expose lower analyser averages.
-const SHERI_ANDROID_SILENCE_STOP_MS=320;
-const SHERI_ANDROID_MIN_SPEECH_MS=150;
-const SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS=2200;   // legacy threshold retained; now treated as a timing hint, not a hard speech gate
-const SHERI_SILENCE_STOP_MS=350; // keep the successful faster conversational timeout
-const SHERI_MIN_SPEECH_MS=180; // keep the successful minimum confirmation window
-const SHERI_NO_SPEECH_TIMEOUT_MS=2200; // uncertain-speech safety window; Whisper still decides
-const SHERI_MAX_RECORD_MS=20000;   // hard safety cap per turn
+const SHERI_ANDROID_SILENCE_STOP_MS=240;
+const SHERI_ANDROID_MIN_SPEECH_MS=120;
+const SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS=1500;
+const SHERI_SILENCE_STOP_MS=260;
+const SHERI_MIN_SPEECH_MS=140;
+const SHERI_NO_SPEECH_TIMEOUT_MS=1500;
+const SHERI_MAX_RECORD_MS=12000;   // hard safety cap per turn
 
 function toggleShericeriSearch(){
   shericeriSearchOn=!shericeriSearchOn;
@@ -2751,7 +2751,7 @@ function sheriDiagEnsure(){
   const d=document.createElement('div');
   d.id='sheriPhoneDiag';
   d.style.cssText='position:fixed;left:10px;right:10px;bottom:12px;z-index:99999;background:rgba(15,23,42,.96);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:14px;padding:10px 12px;font:12px/1.45 system-ui,sans-serif;box-shadow:0 8px 30px rgba(0,0,0,.35);max-height:42vh;overflow:auto;display:none;';
-  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.4 Cross-Platform Voice PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
+  d.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><b>🔧 Shericeri Voice Diagnostics — V14.4.12 Cross-Platform Voice PREFLIGHT</b><button id="sheriDiagClose" style="background:none;border:0;color:#fff;font-size:18px">×</button></div><div id="sheriDiagRows"></div>';
   document.body.appendChild(d);
   d.querySelector('#sheriDiagClose').onclick=()=>{d.style.display='none'};
   sheriDiagEl=d;
@@ -3568,7 +3568,7 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
 const SHERI_TTS_VOLUME=1.0;
 const SHERI_ANDROID_TTS_RATE=1.03;
 const SHERI_ANDROID_TTS_PITCH=1.0;
-const SHERI_ANDROID_TTS_VOICE_POLICY='platform/default voice (V10.1-compatible)';
+const SHERI_ANDROID_TTS_VOICE_POLICY='best available female/quality voice matching the selected language; platform default fallback';
 
 function sheriScheduleNextListen(turnId){
   if(turnId!==sheriTurnId)return;
@@ -3646,6 +3646,24 @@ function sheriDrainSpeakQueue(){
   utt.volume=SHERI_TTS_VOLUME;
   let started=false;
   let finished=false;
+  let retryCount=0;
+  let retryTimer=null;
+  const retrySpeech=(reason)=>{
+    if(finished||turnId!==sheriTurnId||retryCount>=1)return false;
+    retryCount++;
+    finished=true;
+    try{if(retryTimer)clearTimeout(retryTimer);if(window.speechSynthesis)speechSynthesis.cancel();}catch(_){}
+    sheriIsSpeaking=false;
+    sheriResponsePhase='tts_retrying';
+    sheriTurnFailed=false;
+    sheriSpeakQueue.unshift({text:next,turnId});
+    if(typeof sheriDiagSet==='function'){
+      sheriDiagSet('TTS retry','1/1 — '+String(reason||'playback did not start'));
+      sheriDiagSet('TTS retry voice','fresh utterance / best matching voice');
+    }
+    setTimeout(()=>{if(turnId===sheriTurnId&&!sheriIsSpeaking)sheriDrainSpeakQueue()},80);
+    return true;
+  };
 
   const finish=(reason='ended')=>{
     if(finished)return;
@@ -3719,6 +3737,7 @@ function sheriDrainSpeakQueue(){
       return;
     }
     if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e?.error||'unknown'));
+    if(retrySpeech('engine error: '+(e?.error||'unknown')))return;
     sheriIsSpeaking=false;
     sheriTurnFailed=true;
     sheriSpeakQueue=sheriSpeakQueue.filter(x=>x.turnId!==turnId);
@@ -3750,7 +3769,14 @@ function sheriDrainSpeakQueue(){
       if(window.SHERICERI_VOICE_BRIDGE?.speak){await window.SHERICERI_VOICE_BRIDGE.speak(next,lang);finish('local-bridge-complete');return;}
       if(/^rw/i.test(lang))throw new Error('Kinyarwanda TTS native bridge is not installed');
       speechSynthesis.resume();
+      speechSynthesis.cancel();
       speechSynthesis.speak(utt);
+      if(retryTimer)clearTimeout(retryTimer);
+      retryTimer=setTimeout(()=>{
+        if(turnId===sheriTurnId&&!started&&!finished&&!sheriIsSpeaking){
+          retrySpeech('no onstart within 1200 ms');
+        }
+      },1200);
     }catch(e){
       if(turnId!==sheriTurnId)return;
       if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e.message||String(e)));
