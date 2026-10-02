@@ -9,10 +9,38 @@
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS</title>
 <meta name="app-version" content="V14.4 Cross-Platform Voice + Kinyarwanda AIBOS + INHERITANCE-SAFE OFFLINE SYNC">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<script>
+/* Non-blocking Supabase loader with CDN fallback.
+   A stalled CDN must never prevent the login screen from rendering. */
+(function(){
+  const sources=[
+    'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2',
+    'https://unpkg.com/@supabase/supabase-js@2'
+  ];
+  window.__SHERI_SUPABASE_READY=(async function(){
+    if(window.supabase?.createClient)return true;
+    for(const src of sources){
+      try{
+        await new Promise((resolve,reject)=>{
+          const script=document.createElement('script');
+          let settled=false;
+          const finish=(fn,v)=>{if(settled)return;settled=true;clearTimeout(timer);fn(v)};
+          const timer=setTimeout(()=>finish(reject,new Error('Supabase CDN timeout')),7000);
+          script.src=src;script.async=true;script.defer=true;
+          script.onload=()=>finish(resolve,true);
+          script.onerror=()=>finish(reject,new Error('Supabase CDN load failed'));
+          document.head.appendChild(script);
+        });
+        if(window.supabase?.createClient)return true;
+      }catch(_){}
+    }
+    throw new Error('Supabase authentication library could not be loaded.');
+  })();
+})();
+</script>
+<script defer src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 <script type="module">
   import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.mjs';
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.worker.min.mjs';
@@ -107,10 +135,14 @@
     const el=document.getElementById('authStatus');
     if(el){el.textContent=msg;el.className='sub auth-status'+(bad?' bad':'');}
   }
-  function client(){
+  async function client(){
     try{
+      if(window.__SHERI_SUPABASE_READY)await Promise.race([
+        window.__SHERI_SUPABASE_READY,
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('Authentication library timed out.')),9000))
+      ]);
       if(!window.supabase?.createClient)throw new Error('Authentication library did not load.');
-      return window.__SHERI_EARLY_CLIENT||(window.__SHERI_EARLY_CLIENT=window.supabase.createClient(URL,KEY));
+      return window.__SHERI_EARLY_CLIENT||(window.__SHERI_EARLY_CLIENT=window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}));
     }catch(e){status(e.message||String(e),true);throw e}
   }
   async function captchaToken(){
@@ -152,7 +184,7 @@
     if(btn){btn.disabled=true;btn.textContent='Signing in…'}
     status('Signing in…');
     try{
-      const c=client();
+      const c=await client();
       let result=await Promise.race([
         c.auth.signInWithPassword({email,password}),
         new Promise((_,reject)=>setTimeout(()=>reject(new Error('Sign-in request timed out.')),12000))
@@ -179,7 +211,8 @@
     buttons.forEach(b=>{b.disabled=true;b.textContent='Opening Google…'});
     status('Opening Google sign-in…');
     try{
-      const {error}=await client().auth.signInWithOAuth({provider:'google',options:{redirectTo:REDIRECT,scopes:'email profile'}});
+      const c=await client();
+      const {error}=await c.auth.signInWithOAuth({provider:'google',options:{redirectTo:REDIRECT,scopes:'openid email profile'}});
       if(error)throw error;
     }catch(e){
       status(String(e?.message||e||'Google sign-in could not be started.'),true);
@@ -544,7 +577,19 @@
 // Paste your own project's values here (Project Settings → API in Supabase).
 const SUPABASE_URL = 'https://bhtodxjhgucgwarpaqzy.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_zRtqPyHL9Gqjck1hoAZibQ_KD9TiazY';
-const sb = window.__SHERI_EARLY_CLIENT || window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let sb = window.__SHERI_EARLY_CLIENT || null;
+async function sheriInitSupabase(){
+  if(sb)return sb;
+  if(window.__SHERI_SUPABASE_READY){
+    await Promise.race([
+      window.__SHERI_SUPABASE_READY,
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('Supabase authentication library timed out')),10000))
+    ]);
+  }
+  if(!window.supabase?.createClient)throw new Error('Supabase authentication library could not be loaded.');
+  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  return sb;
+}
 
 function sheriWithTimeout(promise,ms,label='Operation timed out'){
   let timer=null;
@@ -1141,7 +1186,7 @@ async function sheriOfflineRouteText(text){
 const SHERI_RELEASE='V14.4.6';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
-const SHERI_AUTH_REDIRECT=SHERI_IS_LOCAL?(window.location.origin+window.location.pathname):SHERI_PRODUCTION_URL;
+const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
 const SHERI_CACHE_VERSION='14.4.6';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
@@ -1264,7 +1309,7 @@ async function signInOAuth(provider){
       provider,
       options:{
         redirectTo:SHERI_AUTH_REDIRECT,
-        scopes:provider==='google'?'email profile':undefined
+        scopes:provider==='google'?'openid email profile':undefined
       }
     });
     if(error)setAuthStatus(friendlyAuthError(error),true);
@@ -3933,7 +3978,7 @@ async function shericeriRespond(transcript){
     ensureVoicesLoaded(350).catch(()=>{});
   }
 })();
-(async function boot(){sheriWithTimeout(sheriOfflineInit(),5000,'Local workspace initialization timed out').catch(e=>console.warn('[Shericeri boot]',e));initProfileSelectors();initRecoveryForm();probeAuthProviders().catch(()=>{});try{const u=new URL(window.location.href);const hash=new URLSearchParams((u.hash||'').replace(/^#/,'').replace(/^\?/,'&'));const errCode=hash.get('error_code');const errDesc=hash.get('error_description');if(errCode||errDesc){const code=String(errCode||'').toLowerCase();const desc=decodeURIComponent(String(errDesc||'').replace(/\+/g,' '));const msg=code==='otp_expired'||desc.toLowerCase().includes('otp_expired')?'That password-reset link has expired or has already been used. Request a new password-reset link.':desc||'The authentication link could not be completed. Please try again.';switchAuthMode('forgot-password');setAuthStatus(msg,true);history.replaceState({},document.title,u.pathname+u.search)}else if((u.hash||'').toLowerCase().includes('type=recovery')){switchAuthMode('reset-password')}}catch(_){}const sessionResult=await sheriWithTimeout(sb.auth.getSession(),8000,'Session check timed out');const existing=sessionResult?.data?.session;if(existing)await onAuthed(existing);sheriHideInternalAccountingUi();sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
+(async function boot(){try{await sheriInitSupabase();}catch(e){setAuthStatus('Authentication service is still loading. Please wait a few seconds and refresh once.',true);console.error('[Shericeri auth init]',e);return;}sheriWithTimeout(sheriOfflineInit(),5000,'Local workspace initialization timed out').catch(e=>console.warn('[Shericeri boot]',e));initProfileSelectors();initRecoveryForm();probeAuthProviders().catch(()=>{});try{const u=new URL(window.location.href);const hash=new URLSearchParams((u.hash||'').replace(/^#/,'').replace(/^\?/,'&'));const errCode=hash.get('error_code');const errDesc=hash.get('error_description');if(errCode||errDesc){const code=String(errCode||'').toLowerCase();const desc=decodeURIComponent(String(errDesc||'').replace(/\+/g,' '));const msg=code==='otp_expired'||desc.toLowerCase().includes('otp_expired')?'That password-reset link has expired or has already been used. Request a new password-reset link.':desc||'The authentication link could not be completed. Please try again.';switchAuthMode('forgot-password');setAuthStatus(msg,true);history.replaceState({},document.title,u.pathname+u.search)}else if((u.hash||'').toLowerCase().includes('type=recovery')){switchAuthMode('reset-password')}}catch(_){}const sessionResult=await sheriWithTimeout(sb.auth.getSession(),8000,'Session check timed out');const existing=sessionResult?.data?.session;if(existing)await onAuthed(existing);sheriHideInternalAccountingUi();sb.auth.onAuthStateChange((event,sess)=>{if(sess)session=sess;if(event==='SIGNED_IN'&&sess)onAuthed(sess);if(event==='PASSWORD_RECOVERY'){switchAuthMode('reset-password');setAuthStatus('Enter your new password.')}if(event==='SIGNED_OUT')location.reload()});})();
 
 function sheriDiagAudioIntegrity(body){try{if(!body||typeof body!=='object')return;if(body.first_bytes)sheriDiagSet('Whisper first bytes',String(body.first_bytes));if(body.webm_signature)sheriDiagSet('Whisper WebM signature',String(body.webm_signature));if(body.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(body.audio_bytes));if(body.audio_mime)sheriDiagSet('Whisper audio MIME',String(body.audio_mime));}catch(_){}}
 
