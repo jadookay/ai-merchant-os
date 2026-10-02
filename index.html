@@ -238,9 +238,21 @@ window.ensurePdfJs=async function(){
     console.error('[Shericeri early auth rejection]',msg);
   });
   const bind=()=>{
-    document.getElementById('authSignInBtn')?.addEventListener('click',passwordLogin);
-    document.getElementById('authGoogleBtn')?.addEventListener('click',googleLogin);
-    document.getElementById('authGoogleBtn2')?.addEventListener('click',googleLogin);
+    const signIn=document.getElementById('authSignInBtn');
+    const google1=document.getElementById('authGoogleBtn');
+    const google2=document.getElementById('authGoogleBtn2');
+    if(signIn){
+      if(typeof window.handleSignIn==='function') signIn.addEventListener('click',window.handleSignIn);
+      else signIn.addEventListener('click',passwordLogin);
+    }
+    if(google1){
+      if(typeof window.signInOAuth==='function') google1.addEventListener('click',()=>window.signInOAuth('google'));
+      else google1.addEventListener('click',googleLogin);
+    }
+    if(google2){
+      if(typeof window.signInOAuth==='function') google2.addEventListener('click',()=>window.signInOAuth('google'));
+      else google2.addEventListener('click',googleLogin);
+    }
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
 })();
@@ -1190,11 +1202,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.9';
+const SHERI_RELEASE='V14.4.10';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.9';
+const SHERI_CACHE_VERSION='14.4.10';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -1263,10 +1275,33 @@ async function sheriGetCaptchaToken(){
 function friendlyAuthError(error){const m=String(error?.message||error||'Authentication failed.'),x=m.toLowerCase();if(x.includes('invalid login credentials')||x.includes('invalid login'))return 'Incorrect email or password. If you do not have an account yet, choose Create account.';if(x.includes('email not confirmed'))return 'Your email is not confirmed yet. Check your inbox or resend the confirmation email.';if(x.includes('user already registered')||x.includes('email_exists')||x.includes('email address already exists'))return 'This email is already registered. Sign in instead, or use Forgot password.';if(x.includes('unsupported provider')||x.includes('provider is not enabled'))return 'This social sign-in is not enabled in the Shericeri Supabase project yet. Enable the provider in Supabase Auth, then try again.';if(x.includes('otp_expired')||x.includes('otp expired')||x.includes('expired'))return 'That recovery link has expired or has already been used. Request a new password-reset link.';return m}
 function normalizeAuthEmail(v){return String(v||'').trim().toLowerCase()}
 function markSignupExistingEmail(message){const el=document.getElementById('signupEmail');if(el)el.setAttribute('aria-invalid','true');setAuthStatus(message,true)}
-async function handleSignUp(){if(!sb)await sheriInitSupabase();if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
-  const email=normalizeAuthEmail(document.getElementById('signupEmail').value),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;document.getElementById('signupEmail').value=email;
-  if(!email||!password||!confirm)return setAuthStatus('Enter your email, password and password confirmation.',true);if(password.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);if(password!==confirm)return setAuthStatus('Passwords do not match.',true);if(!navigator.onLine)return setAuthStatus('Creating an account requires internet. After first sign-in, your business workspace can continue offline.',true);
-  try{if(!sb)await sheriInitSupabase();sheriTurnstileBusy=true;setAuthStatus('Creating account…');let result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT}}),12000,'Sign-up request timed out');if(result.error&&/captcha|turnstile|challenge/i.test(String(result.error.message||''))){setAuthStatus('Security verification…');const captchaToken=await sheriWithTimeout(sheriGetCaptchaToken(),9000,'Security check timed out');result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,captchaToken}}),12000,'Verified sign-up request timed out')}const {data,error}=result;if(error)return markSignupExistingEmail(friendlyAuthError(error));const returnedUser=data?.user,identities=Array.isArray(returnedUser?.identities)?returnedUser.identities:[];if(returnedUser&&identities.length===0&&!data?.session)return markSignupExistingEmail('This email is already associated with an account. Please use Sign in or Forgot password instead.');if(data.session)setAuthStatus('Account created. Let’s set up your business…');else setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.');}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
+async function handleSignUp(){
+  if(!sb)await sheriInitSupabase();
+  if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
+  const email=normalizeAuthEmail(document.getElementById('signupEmail').value),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;
+  document.getElementById('signupEmail').value=email;
+  if(!email||!password||!confirm)return setAuthStatus('Enter your email, password and password confirmation.',true);
+  if(password.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);
+  if(password!==confirm)return setAuthStatus('Passwords do not match.',true);
+  if(!navigator.onLine)return setAuthStatus('Creating an account requires internet. After first sign-in, your business workspace can continue offline.',true);
+  try{
+    sheriTurnstileBusy=true;
+    setAuthStatus('Creating account…');
+    let result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT}}),12000,'Account creation timed out');
+    let {data,error}=result;
+    if(error && /captcha|turnstile|challenge/i.test(String(error?.message||''))){
+      setAuthStatus('Security verification required…');
+      const captchaToken=await sheriWithTimeout(sheriGetCaptchaToken(),9000,'Security check timed out');
+      result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,captchaToken}}),12000,'Verified account creation timed out');
+      ({data,error}=result);
+    }
+    if(error)return markSignupExistingEmail(friendlyAuthError(error));
+    const returnedUser=data?.user,identities=Array.isArray(returnedUser?.identities)?returnedUser.identities:[];
+    if(returnedUser&&identities.length===0&&!data?.session)return markSignupExistingEmail('This email is already associated with an account. Please use Sign in or Forgot password instead.');
+    if(data.session)setAuthStatus('Account created. Let’s set up your business…');
+    else setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.');
+  }catch(e){setAuthStatus(friendlyAuthError(e),true)}
+  finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
 async function resendSignupConfirmation(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);const email=normalizeAuthEmail(document.getElementById('signupEmail')?.value);if(!email)return setAuthStatus('Enter the email you used to create the account.',true);if(!navigator.onLine)return setAuthStatus('Resending the confirmation email requires internet.',true);try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();const {error}=await sb.auth.resend({type:'signup',email,options:{captchaToken}});if(error)throw error;setAuthStatus('Confirmation email sent again. Check your inbox and spam.')}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}}
 async function handleSignIn(){
