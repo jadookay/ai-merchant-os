@@ -1029,11 +1029,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.4';
+const SHERI_RELEASE='V14.4.5';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=(SHERI_IS_LOCAL?window.location.origin+window.location.pathname:SHERI_PRODUCTION_URL).replace(/\/$/,'');
-const SHERI_CACHE_VERSION='14.4.4';
+const SHERI_CACHE_VERSION='14.4.5';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -1117,44 +1117,46 @@ async function handleSignIn(){
   if(!navigator.onLine)return setAuthStatus('You are offline. Reconnect to sign in, or use an already active saved session.',true);
   try{
     sheriTurnstileBusy=true;
-    let captchaToken='';
-    try{
-      setAuthStatus('Preparing the security check…');
-      captchaToken=await sheriWithTimeout(sheriGetCaptchaToken(),5000,'Security check timed out');
-    }catch(captchaError){
-      console.warn('[Shericeri Auth] Turnstile unavailable; attempting server-side sign-in:',captchaError);
-      setAuthStatus('Security check is slow. Trying sign-in…');
-    }
     setAuthStatus('Signing in…');
-    const authResult=await sheriWithTimeout(
-      captchaToken
-        ? sb.auth.signInWithPassword({email,password,options:{captchaToken}})
-        : sb.auth.signInWithPassword({email,password}),
-      12000,
+    // First attempt the actual Auth request immediately. CAPTCHA must never
+    // sit in front of the login request or make the button appear frozen.
+    let authResult=await sheriWithTimeout(
+      sb.auth.signInWithPassword({email,password}),
+      10000,
       'Sign-in request timed out'
     );
-    const {data,error}=authResult;
-    if(error){
-      const raw=String(error?.message||error||'');
-      if(!captchaToken && /captcha|turnstile|challenge/i.test(raw)){
-        return setAuthStatus('Supabase requires CAPTCHA verification, but the browser security check did not return a token. Please refresh once and try again.',true);
-      }
-      return setAuthStatus(friendlyAuthError(error),true);
+    let {data,error}=authResult;
+    // If this project enforces CAPTCHA for password sign-in, obtain a token
+    // only after Supabase explicitly asks for it, then retry once.
+    if(error && /captcha|turnstile|challenge/i.test(String(error?.message||''))){
+      setAuthStatus('Security verification required…');
+      const captchaToken=await sheriWithTimeout(sheriGetCaptchaToken(),9000,'Security check timed out');
+      authResult=await sheriWithTimeout(
+        sb.auth.signInWithPassword({email,password,options:{captchaToken}}),
+        10000,
+        'Verified sign-in request timed out'
+      );
+      ({data,error}=authResult);
     }
+    if(error)return setAuthStatus(friendlyAuthError(error),true);
     setAuthStatus(data?.session?'Signed in. Loading your business…':'Authentication completed. Loading your business…');
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}
   finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
-async function probeAuthProviders(){
+function probeAuthProviders(){return null}
+async function signInOAuth(provider){
+  if(!navigator.onLine)return setAuthStatus('Social sign-in requires internet.',true);
+  if(provider!=='google'&&provider!=='apple')return setAuthStatus('Unsupported social sign-in provider.',true);
+  setAuthStatus(`Opening ${provider==='apple'?'Apple':'Google'} sign-in…`);
   try{
-    const res=await sheriWithTimeout(
-      fetch(`${SUPABASE_URL}/auth/v1/settings`,{headers:{apikey:SUPABASE_ANON_KEY}}),
-      4000,
-      'Auth provider probe timed out'
-    );
-    if(!res.ok)return;
-    const cfg=await res.json();const ext=cfg?.external||{};for(const [provider,id] of [['google','googleOAuthBtn'],['apple','appleOAuthBtn']]){const enabled=ext[provider]===true;document.querySelectorAll(`[onclick="signInOAuth('${provider}')"]`).forEach(btn=>{btn.disabled=!enabled;btn.style.opacity=enabled?'1':'.55';btn.title=enabled?'Continue with '+provider[0].toUpperCase()+provider.slice(1):provider[0].toUpperCase()+provider.slice(1)+' sign-in is not enabled in Supabase yet';});}return ext}catch(_){return null}}
-async function signInOAuth(provider){if(!navigator.onLine)return setAuthStatus('Social sign-in requires internet.',true);setAuthStatus(`Opening ${provider==='apple'?'Apple':'Google'} sign-in…`);const {error}=await sb.auth.signInWithOAuth({provider,options:{redirectTo:SHERI_AUTH_REDIRECT}});if(error)setAuthStatus(friendlyAuthError(error),true)}
+    // Use the standard Supabase browser OAuth redirect directly. This avoids
+    // any client-side provider/settings probe that can stall before navigation.
+    const u=new URL(`${SUPABASE_URL}/auth/v1/authorize`);
+    u.searchParams.set('provider',provider);
+    u.searchParams.set('redirect_to',SHERI_AUTH_REDIRECT);
+    window.location.assign(u.toString());
+  }catch(e){setAuthStatus(friendlyAuthError(e),true)}
+}
 async function sendPasswordReset(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
   const email=normalizeAuthEmail(document.getElementById('resetEmail').value); document.getElementById('resetEmail').value=email;
   if(!email)return setAuthStatus('Enter the email on your account.',true); if(!navigator.onLine)return setAuthStatus('Password recovery requires internet.',true);
