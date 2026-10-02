@@ -1202,11 +1202,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.10';
+const SHERI_RELEASE='V14.4.11';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.10';
+const SHERI_CACHE_VERSION='14.4.11';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -1298,8 +1298,12 @@ async function handleSignUp(){
     if(error)return markSignupExistingEmail(friendlyAuthError(error));
     const returnedUser=data?.user,identities=Array.isArray(returnedUser?.identities)?returnedUser.identities:[];
     if(returnedUser&&identities.length===0&&!data?.session)return markSignupExistingEmail('This email is already associated with an account. Please use Sign in or Forgot password instead.');
-    if(data.session)setAuthStatus('Account created. Let’s set up your business…');
-    else setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.');
+    if(data.session){
+      setAuthStatus('Account created. Let’s set up your business…');
+      await onAuthed(data.session);
+    }else{
+      setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.');
+    }
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}
   finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
@@ -1336,7 +1340,14 @@ async function handleSignIn(){
       ({data,error}=authResult);
     }
     if(error)return setAuthStatus(friendlyAuthError(error),true);
-    setAuthStatus(data?.session?'Signed in. Loading your business…':'Authentication completed. Loading your business…');
+    if(data?.session){
+      setAuthStatus('Signed in. Loading your business…');
+      // Do not depend on SIGNED_IN firing after this request. Supabase has
+      // already returned a valid session, so take the user into the app now.
+      await onAuthed(data.session);
+    }else{
+      setAuthStatus('Authentication completed. Loading your business…');
+    }
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}
   finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
@@ -1392,10 +1403,32 @@ async function ensureMerchant(){
 }
 async function completeOnboarding(){const name=document.getElementById('onboardName').value.trim(),tin=document.getElementById('onboardTin').value.trim()||null,fy=document.getElementById('onboardFiscalYear').value||null,country=document.getElementById('onboardCountry').value,currency=document.getElementById('onboardCurrency').value,status=document.getElementById('onboardStatus');if(!name||!country||!currency){status.textContent='Business name, country and currency are required.';status.className='sub auth-status bad';return}status.textContent='Saving your business profile…';const record={user_id:session.user.id,name,category:state.merchant?.category||'Other',tin,fiscal_year:fy?Number(fy):null,country,currency};try{let result;if(navigator.onLine){result=state.merchant?.id&&!state.merchant._localOnly?await sb.from('merchants').update(record).eq('id',state.merchant.id).select().single():await sb.from('merchants').insert(record).select().single();if(result.error)throw result.error;state.merchant=result.data}else{state.merchant={id:state.merchant?.id||sheriUuid(),...record,_localOnly:true};await sheriQueue({type:'merchant_upsert',record:{...state.merchant}})}await sheriSaveSnapshot();document.getElementById('onboardingScreen').style.display='none';document.getElementById('appRoot').style.display='';await loadAll();render();if(navigator.onLine)checkAdvisor()}catch(e){status.textContent='Could not save your business profile: '+String(e.message||e);status.className='sub auth-status bad'}}
 async function onAuthed(sess){
+  if(!sess?.user)return;
   session=sess;
-  await sheriWithTimeout(sheriOfflineInit(),5000,'Local workspace initialization timed out');
+  // A valid Supabase session is the authentication boundary. Never leave the
+  // user trapped on the login screen because a merchant-data request is slow.
+  document.getElementById('authScreen').style.display='none';
+  document.getElementById('resetPasswordPanel').style.display='none';
+  try{await sheriWithTimeout(sheriOfflineInit(),5000,'Local workspace initialization timed out')}catch(e){console.warn('[Shericeri auth] offline init delayed',e)}
   let complete=false;
-  try{complete=await ensureMerchant()}catch(e){console.warn('[Shericeri auth] merchant lookup failed',e);setAuthStatus('Signed in, but your business profile could not be refreshed yet. Please try again in a moment.',true);return}
+  try{
+    complete=await ensureMerchant();
+  }catch(e){
+    console.warn('[Shericeri auth] merchant lookup failed',e);
+    // Keep the authenticated user in the app. Existing local business data
+    // can still be used, while the server profile is retried later.
+    if(state.merchant&&merchantProfileComplete(state.merchant)){
+      document.getElementById('onboardingScreen').style.display='none';
+      document.getElementById('appRoot').style.display='';
+      render();
+      const n=document.getElementById('shericeriNotice');
+      if(n)n.textContent='Signed in. Using your saved business profile while the server reconnects.';
+      return;
+    }
+    document.getElementById('onboardingScreen').style.display='flex';
+    initProfileSelectors();
+    return;
+  }
   if(complete&&merchantProfileComplete(state.merchant)){
     document.getElementById('authScreen').style.display='none';
     document.getElementById('onboardingScreen').style.display='none';
