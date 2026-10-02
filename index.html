@@ -38,9 +38,6 @@
   })();
 })();
 </script>
-<script defer src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 <script>
 /* PDF.js is optional. Never load it during authentication/app bootstrap.
    It is fetched only when the user imports a PDF. */
@@ -191,15 +188,20 @@ window.ensurePdfJs=async function(){
     status('Signing in…');
     try{
       const c=await client();
-      // This project has Supabase CAPTCHA protection enabled. Obtain the token
-      // before the password request so we do not intentionally make a doomed
-      // CAPTCHA-less request first.
-      status('Security verification…');
-      const token=await captchaToken();
+      // Try the real password request immediately. If Supabase says CAPTCHA is
+      // required, obtain a Turnstile token and retry exactly once.
       let result=await Promise.race([
-        c.auth.signInWithPassword({email,password,options:{captchaToken:token}}),
+        c.auth.signInWithPassword({email,password}),
         new Promise((_,reject)=>setTimeout(()=>reject(new Error('Sign-in request timed out.')),12000))
       ]);
+      if(result.error && /captcha|turnstile|challenge/i.test(String(result.error.message||''))){
+        status('Security verification…');
+        const token=await captchaToken();
+        result=await Promise.race([
+          c.auth.signInWithPassword({email,password,options:{captchaToken:token}}),
+          new Promise((_,reject)=>setTimeout(()=>reject(new Error('Verified sign-in request timed out.')),12000))
+        ]);
+      }
       if(result.error)throw result.error;
       if(result.data?.session){
         status('Signed in. Loading your business…');
@@ -229,12 +231,8 @@ window.ensurePdfJs=async function(){
     }
   }
   window.__SHERI_EARLY_AUTH={passwordLogin,googleLogin};
-  window.addEventListener('error',e=>{
-    if(!document.getElementById('authScreen'))return;
-    const msg=String(e?.error?.message||e?.message||'Unexpected application error');
-    console.error('[Shericeri early auth]',msg);
-    if(!document.getElementById('authStatus')?.textContent)status('The app encountered an error before authentication could start: '+msg,true);
-  });
+  // Do not turn unrelated CDN/resource parse errors into a misleading
+  // authentication error. Auth actions below report their own failures.
   window.addEventListener('unhandledrejection',e=>{
     const msg=String(e?.reason?.message||e?.reason||'Unexpected authentication error');
     console.error('[Shericeri early auth rejection]',msg);
@@ -1192,11 +1190,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.8';
+const SHERI_RELEASE='V14.4.9';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.8';
+const SHERI_CACHE_VERSION='14.4.9';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -1265,13 +1263,14 @@ async function sheriGetCaptchaToken(){
 function friendlyAuthError(error){const m=String(error?.message||error||'Authentication failed.'),x=m.toLowerCase();if(x.includes('invalid login credentials')||x.includes('invalid login'))return 'Incorrect email or password. If you do not have an account yet, choose Create account.';if(x.includes('email not confirmed'))return 'Your email is not confirmed yet. Check your inbox or resend the confirmation email.';if(x.includes('user already registered')||x.includes('email_exists')||x.includes('email address already exists'))return 'This email is already registered. Sign in instead, or use Forgot password.';if(x.includes('unsupported provider')||x.includes('provider is not enabled'))return 'This social sign-in is not enabled in the Shericeri Supabase project yet. Enable the provider in Supabase Auth, then try again.';if(x.includes('otp_expired')||x.includes('otp expired')||x.includes('expired'))return 'That recovery link has expired or has already been used. Request a new password-reset link.';return m}
 function normalizeAuthEmail(v){return String(v||'').trim().toLowerCase()}
 function markSignupExistingEmail(message){const el=document.getElementById('signupEmail');if(el)el.setAttribute('aria-invalid','true');setAuthStatus(message,true)}
-async function handleSignUp(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
+async function handleSignUp(){if(!sb)await sheriInitSupabase();if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
   const email=normalizeAuthEmail(document.getElementById('signupEmail').value),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;document.getElementById('signupEmail').value=email;
   if(!email||!password||!confirm)return setAuthStatus('Enter your email, password and password confirmation.',true);if(password.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);if(password!==confirm)return setAuthStatus('Passwords do not match.',true);if(!navigator.onLine)return setAuthStatus('Creating an account requires internet. After first sign-in, your business workspace can continue offline.',true);
   try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();setAuthStatus('Creating account…');const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,captchaToken}});if(error)return markSignupExistingEmail(friendlyAuthError(error));const returnedUser=data?.user,identities=Array.isArray(returnedUser?.identities)?returnedUser.identities:[];if(returnedUser&&identities.length===0&&!data?.session)return markSignupExistingEmail('This email is already associated with an account. Please use Sign in or Forgot password instead.');if(data.session)setAuthStatus('Account created. Let’s set up your business…');else setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.');}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
 async function resendSignupConfirmation(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);const email=normalizeAuthEmail(document.getElementById('signupEmail')?.value);if(!email)return setAuthStatus('Enter the email you used to create the account.',true);if(!navigator.onLine)return setAuthStatus('Resending the confirmation email requires internet.',true);try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();const {error}=await sb.auth.resend({type:'signup',email,options:{captchaToken}});if(error)throw error;setAuthStatus('Confirmation email sent again. Check your inbox and spam.')}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}}
 async function handleSignIn(){
+  if(!sb)await sheriInitSupabase();
   if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
   const email=normalizeAuthEmail(document.getElementById('authEmail').value);
   const password=document.getElementById('authPassword').value;
@@ -1308,6 +1307,7 @@ async function handleSignIn(){
 }
 function probeAuthProviders(){return null}
 async function signInOAuth(provider){
+  if(!sb)await sheriInitSupabase();
   if(!navigator.onLine)return setAuthStatus('Social sign-in requires internet.',true);
   if(provider!=='google'&&provider!=='apple')return setAuthStatus('Unsupported social sign-in provider.',true);
   setAuthStatus(`Opening ${provider==='apple'?'Apple':'Google'} sign-in…`);
