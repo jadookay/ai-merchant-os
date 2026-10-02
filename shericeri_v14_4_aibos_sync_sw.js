@@ -8,7 +8,7 @@ async function patchAppResponse(response){
   try{
     let html=await response.text();
     html=html.replace(
-      "if(/^rw/i.test(queuedLang) && !window.SHERICERI_VOICE_BRIDGE?.speak && !navigator.onLine){setSheriStatus('Kinyarwanda offline voice is not installed on this device.');sheriDiagSet('TTS','Kinyarwanda native bridge NOT INSTALLED');return;}",
+      "if(/^rw/i.test(queuedLang) && !navigator.onLine && !window.SHERICERI_VOICE_BRIDGE?.capabilities?.tts){setSheriStatus('Kinyarwanda offline voice is not installed on this device.');sheriDiagSet('TTS','Kinyarwanda native bridge NOT INSTALLED');return;}",
       "if(/^rw/i.test(queuedLang) && !navigator.onLine){const localTtsReady=!!(window.SHERICERI_VOICE_BRIDGE?.capabilities?.tts || window.SHERICERI_VOICE_BRIDGE?.isReady&&await window.SHERICERI_VOICE_BRIDGE.isReady(queuedLang));if(!localTtsReady){setSheriStatus('Kinyarwanda offline voice is not installed on this device.');sheriDiagSet('TTS','Kinyarwanda native bridge NOT INSTALLED');return;}}"
     );
     html=html.replace(
