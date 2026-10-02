@@ -41,10 +41,16 @@
 <script defer src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
-<script type="module">
-  import * as pdfjsLib from 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.mjs';
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.worker.min.mjs';
-  window.pdfjsLib = pdfjsLib;
+<script>
+/* PDF.js is optional. Never load it during authentication/app bootstrap.
+   It is fetched only when the user imports a PDF. */
+window.ensurePdfJs=async function(){
+  if(window.pdfjsLib?.getDocument)return window.pdfjsLib;
+  const mod=await import('https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.mjs');
+  mod.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.0.269/build/pdf.worker.min.mjs';
+  window.pdfjsLib=mod;
+  return mod;
+};
 </script>
 <script>
 /* Shericeri V14.4 Cross-Platform Voice Bridge
@@ -1186,11 +1192,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.7';
+const SHERI_RELEASE='V14.4.8';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.7';
+const SHERI_CACHE_VERSION='14.4.8';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -1937,7 +1943,7 @@ async function handleImportFile(input){
       if(!window.pdfjsLib){status.textContent='PDF reading library did not load. Check your connection and try again.';input.value='';return}
       status.textContent='Rendering PDF page…';
       const buf=await file.arrayBuffer();
-      const pdf=await window.pdfjsLib.getDocument({data:buf}).promise;
+      const pdf=await (await window.ensurePdfJs()).getDocument({data:buf}).promise;
       const page=await pdf.getPage(1);
       const viewport=page.getViewport({scale:2});
       const canvas=document.createElement('canvas');
