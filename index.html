@@ -1108,18 +1108,52 @@ async function handleSignUp(){if(sheriTurnstileBusy)return setAuthStatus('Please
   try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();setAuthStatus('Creating account…');const {data,error}=await sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,captchaToken}});if(error)return markSignupExistingEmail(friendlyAuthError(error));const returnedUser=data?.user,identities=Array.isArray(returnedUser?.identities)?returnedUser.identities:[];if(returnedUser&&identities.length===0&&!data?.session)return markSignupExistingEmail('This email is already associated with an account. Please use Sign in or Forgot password instead.');if(data.session)setAuthStatus('Account created. Let’s set up your business…');else setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.');}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
 async function resendSignupConfirmation(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);const email=normalizeAuthEmail(document.getElementById('signupEmail')?.value);if(!email)return setAuthStatus('Enter the email you used to create the account.',true);if(!navigator.onLine)return setAuthStatus('Resending the confirmation email requires internet.',true);try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();const {error}=await sb.auth.resend({type:'signup',email,options:{captchaToken}});if(error)throw error;setAuthStatus('Confirmation email sent again. Check your inbox and spam.')}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}}
-async function handleSignIn(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
-  const email=normalizeAuthEmail(document.getElementById('authEmail').value),password=document.getElementById('authPassword').value; document.getElementById('authEmail').value=email;
+async function handleSignIn(){
+  if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
+  const email=normalizeAuthEmail(document.getElementById('authEmail').value);
+  const password=document.getElementById('authPassword').value;
+  document.getElementById('authEmail').value=email;
   if(!email||!password)return setAuthStatus('Enter your email and password.',true);
   if(!navigator.onLine)return setAuthStatus('You are offline. Reconnect to sign in, or use an already active saved session.',true);
-  try{ sheriTurnstileBusy=true; setAuthStatus('Complete the security check…'); const captchaToken=await sheriGetCaptchaToken(); setAuthStatus('Signing in…');
-    const authResult=await sheriWithTimeout(sb.auth.signInWithPassword({email,password,options:{captchaToken}}),12000,'Sign-in request timed out');
+  try{
+    sheriTurnstileBusy=true;
+    let captchaToken='';
+    try{
+      setAuthStatus('Preparing the security check…');
+      captchaToken=await sheriWithTimeout(sheriGetCaptchaToken(),5000,'Security check timed out');
+    }catch(captchaError){
+      console.warn('[Shericeri Auth] Turnstile unavailable; attempting server-side sign-in:',captchaError);
+      setAuthStatus('Security check is slow. Trying sign-in…');
+    }
+    setAuthStatus('Signing in…');
+    const authResult=await sheriWithTimeout(
+      captchaToken
+        ? sb.auth.signInWithPassword({email,password,options:{captchaToken}})
+        : sb.auth.signInWithPassword({email,password}),
+      12000,
+      'Sign-in request timed out'
+    );
     const {data,error}=authResult;
-    if(error)return setAuthStatus(friendlyAuthError(error),true);
+    if(error){
+      const raw=String(error?.message||error||'');
+      if(!captchaToken && /captcha|turnstile|challenge/i.test(raw)){
+        return setAuthStatus('Supabase requires CAPTCHA verification, but the browser security check did not return a token. Please refresh once and try again.',true);
+      }
+      return setAuthStatus(friendlyAuthError(error),true);
+    }
     setAuthStatus(data?.session?'Signed in. Loading your business…':'Authentication completed. Loading your business…');
-  }catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
+  }catch(e){setAuthStatus(friendlyAuthError(e),true)}
+  finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
-async function probeAuthProviders(){try{const res=await fetch(`${SUPABASE_URL}/auth/v1/settings`,{headers:{apikey:SUPABASE_ANON_KEY}});if(!res.ok)return;const cfg=await res.json();const ext=cfg?.external||{};for(const [provider,id] of [['google','googleOAuthBtn'],['apple','appleOAuthBtn']]){const enabled=ext[provider]===true;document.querySelectorAll(`[onclick="signInOAuth('${provider}')"]`).forEach(btn=>{btn.disabled=!enabled;btn.style.opacity=enabled?'1':'.55';btn.title=enabled?'Continue with '+provider[0].toUpperCase()+provider.slice(1):provider[0].toUpperCase()+provider.slice(1)+' sign-in is not enabled in Supabase yet';});}return ext}catch(_){return null}}
+async function probeAuthProviders(){
+  try{
+    const res=await sheriWithTimeout(
+      fetch(`${SUPABASE_URL}/auth/v1/settings`,{headers:{apikey:SUPABASE_ANON_KEY}}),
+      4000,
+      'Auth provider probe timed out'
+    );
+    if(!res.ok)return;
+    const cfg=await res.json();const ext=cfg?.external||{};for(const [provider,id] of [['google','googleOAuthBtn'],['apple','appleOAuthBtn']]){const enabled=ext[provider]===true;document.querySelectorAll(`[onclick="signInOAuth('${provider}')"]`).forEach(btn=>{btn.disabled=!enabled;btn.style.opacity=enabled?'1':'.55';btn.title=enabled?'Continue with '+provider[0].toUpperCase()+provider.slice(1):provider[0].toUpperCase()+provider.slice(1)+' sign-in is not enabled in Supabase yet';});}return ext}catch(_){return null}}
 async function signInOAuth(provider){if(!navigator.onLine)return setAuthStatus('Social sign-in requires internet.',true);setAuthStatus(`Opening ${provider==='apple'?'Apple':'Google'} sign-in…`);const {error}=await sb.auth.signInWithOAuth({provider,options:{redirectTo:SHERI_AUTH_REDIRECT}});if(error)setAuthStatus(friendlyAuthError(error),true)}
 async function sendPasswordReset(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
   const email=normalizeAuthEmail(document.getElementById('resetEmail').value); document.getElementById('resetEmail').value=email;
