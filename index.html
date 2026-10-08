@@ -8,7 +8,9 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS</title>
-<meta name="app-version" content="V14.4 Cross-Platform Voice + Kinyarwanda AIBOS + INHERITANCE-SAFE OFFLINE SYNC">
+<meta name="app-version" content="V14.4.17 Kinyarwanda Low-Latency Voice + Female Voice + Loud Playback + Punctuation-Safe TTS">
+<link rel="preconnect" href="https://api.pindo.io" crossorigin>
+<link rel="dns-prefetch" href="//api.pindo.io">
 <script>
 /* Non-blocking Supabase loader with CDN fallback.
    A stalled CDN must never prevent the login screen from rendering. */
@@ -3528,8 +3530,22 @@ function sheriResetSpeechState(){
   if(window.speechSynthesis)try{speechSynthesis.cancel()}catch(_){}
 }
 
+function sheriPrepareSpeechText(text,lang){
+  let out=String(text||'').trim();
+  if(/^rw/i.test(String(lang||''))){
+    out=out
+      .replace(/[“”„‟"‘’]/g,'')
+      .replace(/[.,!?;:…]+/g,' ')
+      .replace(/[()[\]{}]/g,' ')
+      .replace(/\s+/g,' ')
+      .trim();
+  }
+  return out;
+}
+
 function sheriEnqueueSpeech(text,turnId=sheriTurnId){
-  text=(text||'').trim();
+  const queuedLang=currentShericeriLang();
+  text=sheriPrepareSpeechText(text,queuedLang);
   if(!text)return;
   // An old streamed turn may finish after a new turn has already started.
   // Never allow its audio to enter the current turn's queue.
@@ -3546,7 +3562,6 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
     sheriDiagSet('TTS queue length',String(sheriSpeakQueue.length+1));
     sheriDiagSet('TTS turn ID',String(turnId));
   }
-  const queuedLang=currentShericeriLang();
   if(/^rw/i.test(queuedLang) && !window.SHERICERI_VOICE_BRIDGE?.speak && !navigator.onLine){setSheriStatus('Kinyarwanda offline voice is not installed on this device.');sheriDiagSet('TTS','Kinyarwanda native bridge NOT INSTALLED');return;}
   if(!window.speechSynthesis&&!window.SHERICERI_VOICE_BRIDGE?.speak){
     setSheriStatus('(Text-to-speech not supported in this browser — reading only.)');
@@ -3568,7 +3583,7 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
 
 // V9.5 TTS volume: explicitly request the browser's maximum SpeechSynthesis volume.
 const SHERI_TTS_VOLUME=1.0;
-const SHERI_ANDROID_TTS_RATE=1.03;
+const SHERI_ANDROID_TTS_RATE=1.05;
 const SHERI_ANDROID_TTS_PITCH=1.0;
 const SHERI_ANDROID_TTS_VOICE_POLICY='best available female/quality voice matching the selected language; platform default fallback';
 
@@ -3635,7 +3650,7 @@ async function sheriOnlineKinyaTts(text,lang,turnId,finish){
     const pindo=await fetch('https://api.pindo.io/ai/tts/rw/public',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:String(text),lang:'rw',speech_rate:1})
+      body:JSON.stringify({text:String(text),lang:'rw',speech_rate:1.06})
     });
     const raw=await pindo.text();
     let body=null;try{body=raw?JSON.parse(raw):null}catch(_){}
@@ -3849,7 +3864,7 @@ function sheriDrainSpeakQueue(){
       if(selectedVoice && utt.voice!==selectedVoice) utt.voice=selectedVoice;
       if(typeof sheriDiagSet==='function')sheriDiagSet('TTS selected voice',selectedVoice?`${selectedVoice.name} (${selectedVoice.lang})`:(isAndroid?'Android platform/OS default voice':'none for requested language'));
       if(/^rw/i.test(lang) && navigator.onLine){
-        sheriDiagSet('Kinyarwanda TTS route','ONLINE Pindo VoiceAI');
+        sheriDiagSet('Kinyarwanda TTS route','ONLINE Pindo VoiceAI — single female voice');
         const onlineOk=await sheriOnlineKinyaTts(next,lang,turnId,finish);
         if(onlineOk)return;
         if(window.SHERICERI_VOICE_BRIDGE?.speak){sheriDiagSet('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE');await window.SHERICERI_VOICE_BRIDGE.speak(next,lang);finish('local-bridge-fallback');return;}
@@ -3884,15 +3899,25 @@ function sheriDrainSpeakQueue(){
 
 // Splits a growing text buffer into complete sentences plus a leftover tail
 // that's still being written — used to feed the speak queue progressively.
-function sheriSplitCompleteSentences(buffer){
-  const matches=[...buffer.matchAll(/[^.!?]*[.!?]+(?=\s|$)/g)];
-  if(!matches.length)return{complete:[],remainder:buffer};
-  const last=matches[matches.length-1];
-  const endIdx=last.index+last[0].length;
-  const completeText=buffer.slice(0,endIdx);
-  const remainder=buffer.slice(endIdx);
-  const complete=(completeText.match(/[^.!?]*[.!?]+/g)||[]).map(s=>s.trim()).filter(Boolean);
-  return{complete,remainder};
+function sheriSplitCompleteSentences(buffer,lang=currentShericeriLang()){
+  const text=String(buffer||'');
+  const matches=[...text.matchAll(/[^.!?]*[.!?]+(?=\s|$)/g)];
+  if(matches.length){
+    const last=matches[matches.length-1];
+    const endIdx=last.index+last[0].length;
+    const completeText=text.slice(0,endIdx);
+    const remainder=text.slice(endIdx);
+    const complete=(completeText.match(/[^.!?]*[.!?]+/g)||[]).map(s=>s.trim()).filter(Boolean);
+    return{complete,remainder};
+  }
+  if(/^rw/i.test(String(lang||'')) && text.length>=72){
+    const cutWindow=text.slice(0,96);
+    const cut=cutWindow.lastIndexOf(' ');
+    if(cut>=48){
+      return{complete:[text.slice(0,cut).trim()],remainder:text.slice(cut+1)};
+    }
+  }
+  return{complete:[],remainder:text};
 }
 
 // V11: explicit server-side deterministic orchestrator is exposed via response headers.
@@ -4115,7 +4140,7 @@ async function shericeriRespond(transcript){
         streamingEl.textContent=fullAnswer;
         box.scrollTop=box.scrollHeight;
       }
-      const{complete,remainder}=sheriSplitCompleteSentences(buffer);
+      const{complete,remainder}=sheriSplitCompleteSentences(buffer,currentShericeriLang());
       complete.forEach(s=>sheriEnqueueSpeech(s,thisTurnId));
       buffer=remainder;
     }
