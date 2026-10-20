@@ -1204,11 +1204,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.16';
+const SHERI_RELEASE='V14.4.18';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.16';
+const SHERI_CACHE_VERSION='14.4.18';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -3647,19 +3647,32 @@ async function sheriOnlineKinyaTts(text,lang,turnId,finish){
     // Primary: the Kinyarwanda VoiceAI endpoint we identified earlier.
     // It returns a generated female Kinyarwanda audio URL and avoids an extra
     // round-trip through the AI advisor, keeping voice response latency low.
-    const pindo=await fetch('https://api.pindo.io/ai/tts/rw/public',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:String(text),lang:'rw',speech_rate:1.06})
-    });
-    const raw=await pindo.text();
-    let body=null;try{body=raw?JSON.parse(raw):null}catch(_){}
+    let pindo=null,raw='',body=null;
+    // A transient Pindo 5xx can occur; retry once only, then use the local
+    // single-utterance fallback rather than calling the same provider twice.
+    for(let attempt=0;attempt<2;attempt++){
+      pindo=await fetch('https://api.pindo.io/ai/tts/rw/public',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({text:String(text),lang:'rw',speech_rate:1.06})
+      });
+      raw=await pindo.text();
+      body=null;try{body=raw?JSON.parse(raw):null}catch(_){}
+      if(pindo.status<500||attempt===1)break;
+      await new Promise(resolve=>setTimeout(resolve,250));
+    }
     const audioUrl=body?.data?.generated_audio_url||body?.generated_audio_url;
-    if(pindo.ok&&audioUrl){
+    if(pindo?.ok&&audioUrl){
       const url=new URL(audioUrl,'https://api.pindo.io/').toString();
       return await playAudioUrl(url,'pindo-kinya-tts');
     }
-    if(typeof sheriDiagSet==='function')sheriDiagSet('Pindo Kinyarwanda TTS',String(body?.error||raw||`HTTP ${pindo.status}`).slice(0,220));
+    const pindoError=body?.error
+      ?(typeof body.error==='string'?body.error:JSON.stringify(body.error))
+      :(raw||`HTTP ${pindo?.status||'unknown'}`);
+    if(typeof sheriDiagSet==='function')sheriDiagSet('Pindo Kinyarwanda TTS',pindoError.slice(0,220));
+    // A 5xx is a provider failure; the advisor TTS route uses the same Pindo
+    // backend, so avoid a redundant round-trip and let the caller fall back. 
+    if(pindo&&pindo.status>=500)return false;
   }catch(e){
     if(typeof sheriDiagSet==='function')sheriDiagSet('Pindo Kinyarwanda TTS',String(e?.message||e).slice(0,220));
   }
@@ -3868,7 +3881,14 @@ function sheriDrainSpeakQueue(){
         const onlineOk=await sheriOnlineKinyaTts(next,lang,turnId,finish);
         if(onlineOk)return;
         if(window.SHERICERI_VOICE_BRIDGE?.speak){sheriDiagSet('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE');await window.SHERICERI_VOICE_BRIDGE.speak(next,lang);finish('local-bridge-fallback');return;}
-        throw new Error('No Kinyarwanda TTS engine available after online provider failure');
+        // Last-resort playback: one browser utterance for the whole answer.
+        // This keeps a response audible if Pindo is temporarily unavailable;
+        // browser language/voice quality depends on voices installed on-device.
+        sheriDiagSet('Kinyarwanda TTS fallback','BROWSER SPEECH SYNTHESIS — single utterance; device voice may not support Kinyarwanda');
+        speechSynthesis.resume();
+        speechSynthesis.cancel();
+        speechSynthesis.speak(utt);
+        return;
       }
       if(window.SHERICERI_VOICE_BRIDGE?.speak){await window.SHERICERI_VOICE_BRIDGE.speak(next,lang);finish('local-bridge-complete');return;}
       if(/^rw/i.test(lang))throw new Error('Kinyarwanda TTS native bridge is not installed');
