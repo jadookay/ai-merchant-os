@@ -4140,9 +4140,10 @@ async function shericeriRespond(transcript){
         streamingEl.textContent=fullAnswer;
         box.scrollTop=box.scrollHeight;
       }
-      const{complete,remainder}=sheriSplitCompleteSentences(buffer,currentShericeriLang());
-      complete.forEach(s=>sheriEnqueueSpeech(s,thisTurnId));
-      buffer=remainder;
+      // One audio segment per assistant turn: sentence-level synthesis caused
+      // long punctuation pauses and inconsistent voice timbre between segments.
+      // Text still streams in the UI; synthesize speech once after the answer completes.
+      buffer=fullAnswer;
     }
   }catch(err){
     console.error('[Sheri advisor] stream failed:',err);
