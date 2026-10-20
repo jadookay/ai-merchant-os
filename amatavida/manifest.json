@@ -1,0 +1,16 @@
+{
+  "id": "./",
+  "name": "Amatavida — Voice-first AI Companion",
+  "short_name": "Amatavida",
+  "description": "A warm, voice-first AI companion. Not a doctor or emergency service.",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#45265f",
+  "background_color": "#f8f2fb",
+  "icons": [
+    {"src":"./icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
