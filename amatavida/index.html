@@ -97,6 +97,7 @@ main{flex:1;display:flex;flex-direction:column;gap:14px}.intro{background:var(--
  async function finishRecording(){if(!recorder||recorder.state==='inactive')return;status.textContent='Processing your voice…';hint.textContent='Sending audio for transcription…';recorder.stop()}
  $('composer').addEventListener('submit',e=>{e.preventDefault();send(box.value)});
  box.addEventListener('input',()=>{box.style.height='auto';box.style.height=Math.min(box.scrollHeight,140)+'px'});
+ box.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('composer').requestSubmit()}});
  document.querySelectorAll('[data-prompt]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.prompt)));
  $('voiceToggle').addEventListener('click',()=>{voiceReplies=!voiceReplies;$('voiceToggle').textContent='Voice replies: '+(voiceReplies?'on':'off');if(!voiceReplies){if('speechSynthesis'in window)speechSynthesis.cancel();if(currentAudio)currentAudio.pause()}});
  $('memoryButton').addEventListener('click',manageMemories);
