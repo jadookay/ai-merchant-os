@@ -57,14 +57,14 @@ main{flex:1;display:flex;flex-direction:column;gap:14px}.intro{background:var(--
  let speechRequestId=0;
  async function speak(text){
    if(!voiceReplies)return;
-   const requestId=++speechRequestId;
+   const requestId=++speechRequestId;let voiceTiming='';
    status.textContent='Preparing voice…';
    if(language.value==='rw'){
      try{
        // Use the existing public Pindo TTS endpoint through Amatavida's backend.
        // This avoids consuming the user's private PINDO_API_TOKEN balance.
        const ttsStarted=performance.now();const r=await fetch('https://bhtodxjhgucgwarpaqzy.supabase.co/functions/v1/amatavida',{method:'POST',headers,body:JSON.stringify({mode:'speak',text}),signal:AbortSignal.timeout(24000)});const ttsRequestMs=Math.round(performance.now()-ttsStarted);
-       let data={};try{data=await r.json()}catch{}
+       let data={};try{data=await r.json()}catch{}voiceTiming=' Voice request: '+ttsRequestMs+' ms; Pindo: '+(Number.isFinite(data.pindo_ms)?data.pindo_ms+' ms':'not reported')+'.';
        if(!r.ok)throw new Error(data.error||'Kinyarwanda voice service is unavailable.');
        if(requestId!==speechRequestId||!voiceReplies)return;
        if(data.audio_url||data.audio_base64){hint.textContent='Voice request: '+ttsRequestMs+' ms; Pindo generation: '+(Number.isFinite(data.pindo_ms)?data.pindo_ms+' ms':'not reported')+'. Starting audio…';
@@ -86,7 +86,7 @@ main{flex:1;display:flex;flex-direction:column;gap:14px}.intro{background:var(--
        throw new Error(data.error||'Kinyarwanda voice service returned no audio.');
      }catch(e){
        if(requestId!==speechRequestId)return;
-       hint.textContent='Kinyarwanda voice did not start: '+(e.message||'please retry')+'. Tap Hear reply or Retry voice. Browser fallback remains disabled to preserve Amatavida’s voice identity.';
+       hint.textContent='Kinyarwanda voice did not start: '+(e.message||'please retry')+'.'+voiceTiming+' Tap Hear reply or Retry voice. Browser fallback remains disabled to preserve Amatavida’s voice identity.';
        status.textContent='Ready to talk';
        return;
      }
