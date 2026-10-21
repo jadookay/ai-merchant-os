@@ -129,9 +129,7 @@
 (function(){
 'use strict';
 var API_URL='https://bhtodxjhgucgwarpaqzy.supabase.co/functions/v1/amatavida';
-var PUBLIC_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiaHRvZHhqaGd1Y2d3YXJwYXFxenl5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc1MDA1MzAsImV4cCI6MjEwMzA3NjUzMH0.BGXX9lUojYKhWi74rgmTUmpM04Ul_LI7umhnhfe6w00';
-/* Match the existing app's published anon key exactly; it is not a service-role secret. */
-PUBLIC_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiaHRvZHhqaGd1Y2d3YXJwYXF6eXkiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4NzUwMDUzMCwiZXhwIjoyMTAzMDc2NTMwMH0.BGXX9lUojYKhWi74rgmTUmpM04Ul_LI7umhnhfe6w00';
+var PUBLIC_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiaHRvZHhqaGd1Y2d3YXJwYXF6eXkiLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc4NzUwMDUzMCwiZXhwIjoyMTAzMDc2NTMwfQ.BGXX9lUojYKhWi74rgmTUmpM04Ul_LI7umhnhfe6w00';
 var $=function(id){return document.getElementById(id);};
 var history=[],busy=false,recorder=null,stream=null,chunks=[],recording=false,lastResponse=null,lastRequest=null,currentAudio=null,latestSttProvider='Not run',latestTtsProvider='Not run';
 var RESULTS_KEY='amatavida_lab_results_v1',BASELINE_KEY='amatavida_lab_baseline_v1';
