@@ -79,7 +79,7 @@ main{flex:1;display:flex;flex-direction:column;gap:14px}.intro{background:var(--
          currentAudio=new Audio(audioUrl);
          currentAudio.preload='auto';
          const audioReadyAt=performance.now();currentAudio.onplaying=()=>{if(requestId===speechRequestId){status.textContent='Speaking…';const playbackStartMs=Math.round(performance.now()-audioReadyAt);hint.textContent='Voice request: '+ttsRequestMs+' ms; Pindo: '+(Number.isFinite(data.pindo_ms)?data.pindo_ms+' ms':'not reported')+'; playback start: '+playbackStartMs+' ms.'}};currentAudio.onended=()=>{if(requestId===speechRequestId)status.textContent='Ready to talk';if(isBlobUrl)URL.revokeObjectURL(audioUrl)};
-         currentAudio.onerror=()=>{if(requestId===speechRequestId){status.textContent='Ready to talk';hint.textContent='Kinyarwanda audio could not play. Tap Hear reply or Retry reply to try again.';if(isBlobUrl)URL.revokeObjectURL(audioUrl)}};
+         currentAudio.onerror=()=>{if(requestId===speechRequestId){status.textContent='Ready to talk';hint.textContent='Kinyarwanda audio could not play. Tap Hear reply or Retry voice to try again.';if(isBlobUrl)URL.revokeObjectURL(audioUrl)}};
          try{await currentAudio.play();status.textContent='Speaking…';return}
          catch(e){if(requestId!==speechRequestId)return;hint.textContent='Kinyarwanda audio is ready but automatic playback was blocked. Tap Hear reply to retry.';status.textContent='Ready to talk';return}
        }
