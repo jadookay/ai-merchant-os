@@ -67,15 +67,19 @@ main{flex:1;display:flex;flex-direction:column;gap:14px}.intro{background:var(--
        let data={};try{data=await r.json()}catch{}
        if(!r.ok)throw new Error(data.error||'Kinyarwanda voice service is unavailable.');
        if(requestId!==speechRequestId||!voiceReplies)return;
-       if(data.audio_base64){
+       if(data.audio_url||data.audio_base64){
          if(currentAudio){currentAudio.pause();currentAudio=null}
-         const raw=atob(data.audio_base64),bytes=new Uint8Array(raw.length);
-         for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-         const blob=new Blob([bytes],{type:data.mime_type||'audio/wav'});
-         const audioUrl=URL.createObjectURL(blob);
+         let audioUrl=data.audio_url||'';
+         const isBlobUrl=!audioUrl;
+         if(isBlobUrl){
+           const raw=atob(data.audio_base64),bytes=new Uint8Array(raw.length);
+           for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+           audioUrl=URL.createObjectURL(new Blob([bytes],{type:data.mime_type||'audio/wav'}));
+         }
          currentAudio=new Audio(audioUrl);
-         currentAudio.onended=()=>{if(requestId===speechRequestId)status.textContent='Ready to talk';URL.revokeObjectURL(audioUrl)};
-         currentAudio.onerror=()=>{if(requestId===speechRequestId){status.textContent='Ready to talk';hint.textContent='Kinyarwanda audio could not play. Tap Hear reply to try again.';URL.revokeObjectURL(audioUrl)}};
+         currentAudio.preload='auto';
+         currentAudio.onended=()=>{if(requestId===speechRequestId)status.textContent='Ready to talk';if(isBlobUrl)URL.revokeObjectURL(audioUrl)};
+         currentAudio.onerror=()=>{if(requestId===speechRequestId){status.textContent='Ready to talk';hint.textContent='Kinyarwanda audio could not play. Tap Hear reply to try again.';if(isBlobUrl)URL.revokeObjectURL(audioUrl)}};
          try{await currentAudio.play();status.textContent='Speaking…';return}
          catch(e){if(requestId!==speechRequestId)return;hint.textContent='Kinyarwanda audio is ready but automatic playback was blocked. Tap Hear reply to retry.';status.textContent='Ready to talk';return}
        }
