@@ -1,5 +1,5 @@
 /* Amatavida standalone PWA service worker — shell cache only; no conversation data is stored. */
-const CACHE_NAME = 'amatavida-pwa-v7';
+const CACHE_NAME = 'amatavida-pwa-v8';
 const APP_SHELL = ['./', './index.html', './manifest.json', './icon.svg'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
