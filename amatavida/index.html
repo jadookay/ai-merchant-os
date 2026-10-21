@@ -61,22 +61,28 @@ main{flex:1;display:flex;flex-direction:column;gap:14px}.intro{background:var(--
    status.textContent='Preparing voice…';
    if(language.value==='rw'){
      try{
-       const data=await callApi({mode:'speak',text,language:'rw'});
+       const r=await fetch('https://bhtodxjhgucgwarpaqzy.supabase.co/functions/v1/kinya-tts',{method:'POST',headers,body:JSON.stringify({text,lang:'rw'})});
+       let data={};try{data=await r.json()}catch{}
+       if(!r.ok)throw new Error(data.error||'Kinyarwanda voice service is unavailable.');
        if(requestId!==speechRequestId||!voiceReplies)return;
        if(data.audio_base64){
          if(currentAudio){currentAudio.pause();currentAudio=null}
          const raw=atob(data.audio_base64),bytes=new Uint8Array(raw.length);
          for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
          const blob=new Blob([bytes],{type:data.mime_type||'audio/wav'});
-         currentAudio=new Audio(URL.createObjectURL(blob));
-         currentAudio.onended=()=>{if(requestId===speechRequestId)status.textContent='Ready to talk'};
-         currentAudio.onerror=()=>{if(requestId===speechRequestId){status.textContent='Ready to talk';hint.textContent='Kinyarwanda audio could not play. Tap Hear reply to try again.'}};
+         const audioUrl=URL.createObjectURL(blob);
+         currentAudio=new Audio(audioUrl);
+         currentAudio.onended=()=>{if(requestId===speechRequestId)status.textContent='Ready to talk';URL.revokeObjectURL(audioUrl)};
+         currentAudio.onerror=()=>{if(requestId===speechRequestId){status.textContent='Ready to talk';hint.textContent='Kinyarwanda audio could not play. Tap Hear reply to try again.';URL.revokeObjectURL(audioUrl)}};
          try{await currentAudio.play();status.textContent='Speaking…';return}
-         catch(e){if(requestId!==speechRequestId)return;hint.textContent='Automatic audio playback was blocked or unavailable. Tap Hear reply to play this answer.';status.textContent='Ready to talk';return}
+         catch(e){if(requestId!==speechRequestId)return;hint.textContent='Kinyarwanda audio is ready but automatic playback was blocked. Tap Hear reply to retry.';status.textContent='Ready to talk';return}
        }
+       throw new Error('Kinyarwanda voice service returned no audio.');
      }catch(e){
        if(requestId!==speechRequestId)return;
-       hint.textContent='Kinyarwanda voice provider unavailable; trying your browser voice.';
+       hint.textContent='Kinyarwanda feminine voice service unavailable: '+(e.message||'please retry')+'. Browser fallback is disabled to preserve Amatavida’s voice identity.';
+       status.textContent='Ready to talk';
+       return;
      }
    }
    if(requestId===speechRequestId&&voiceReplies)browserSpeak(text);
