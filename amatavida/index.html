@@ -61,7 +61,8 @@ main{flex:1;display:flex;flex-direction:column;gap:14px}.intro{background:var(--
  box.addEventListener('input',()=>{box.style.height='auto';box.style.height=Math.min(box.scrollHeight,140)+'px'});
  document.querySelectorAll('[data-prompt]').forEach(b=>b.addEventListener('click',()=>send(b.dataset.prompt)));
  $('voiceToggle').addEventListener('click',()=>{voiceReplies=!voiceReplies;$('voiceToggle').textContent='Voice replies: '+(voiceReplies?'on':'off');if(!voiceReplies){if('speechSynthesis'in window)speechSynthesis.cancel();if(currentAudio)currentAudio.pause()}});
- $('memoryButton').addEventListener('click',manageMemories);\n $('clear').addEventListener('click',()=>{if(recording)finishRecording();chat.innerHTML='<div class="message amatavida"><small>AMATAVIDA</small>Welcome back. Fresh page, no pressure. What would you like to talk about?</div>';history=[];$('intro').style.display='block';box.value='';status.textContent='Ready to talk';if('speechSynthesis'in window)speechSynthesis.cancel();if(currentAudio)currentAudio.pause()});
+ $('memoryButton').addEventListener('click',manageMemories);
+ $('clear').addEventListener('click',()=>{if(recording)finishRecording();chat.innerHTML='<div class="message amatavida"><small>AMATAVIDA</small>Welcome back. Fresh page, no pressure. What would you like to talk about?</div>';history=[];$('intro').style.display='block';box.value='';status.textContent='Ready to talk';if('speechSynthesis'in window)speechSynthesis.cancel();if(currentAudio)currentAudio.pause()});
  language.addEventListener('change',()=>{$('voiceMode').textContent=language.value==='rw'?'Kinyarwanda voice enabled when available':language.value==='auto'?'Voice follows your language where supported':'Browser voice replies for '+(language.value==='fr'?'French':'English')});
  mic.addEventListener('click',async()=>{
    if(recording){recording=false;mic.classList.remove('listening');mic.textContent='🎙';await finishRecording();return}
