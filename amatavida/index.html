@@ -54,7 +54,33 @@ main{flex:1;display:flex;flex-direction:column;gap:14px}.intro{background:var(--
  function b64(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');reader.onerror=reject;reader.readAsDataURL(blob)})}
  async function callApi(body){const r=await fetch(API_URL,{method:'POST',headers,body:JSON.stringify(body)});let data={};try{data=await r.json()}catch{}if(!r.ok)throw new Error(data.error||'The conversation service is temporarily unavailable.');return data}
  function browserSpeak(text){if(!('speechSynthesis'in window)){hint.textContent='This browser cannot play spoken replies. You can still read the answer.';return}speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);const v=language.value;u.lang=v==='rw'?'rw-RW':v==='fr'?'fr-FR':v==='en'?'en-US':(navigator.language||'en-US');u.rate=.96;u.pitch=1.04;u.onstart=()=>status.textContent='Speaking…';u.onend=()=>status.textContent='Ready to talk';u.onerror=()=>{status.textContent='Ready to talk';hint.textContent='The browser voice could not play this reply.'};speechSynthesis.speak(u)}
- async function speak(text){if(!voiceReplies)return;status.textContent='Preparing voice…';if(language.value==='rw'){try{const data=await callApi({mode:'speak',text,language:'rw'});if(data.audio_base64){if(currentAudio){currentAudio.pause();currentAudio=null}const raw=atob(data.audio_base64),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);const blob=new Blob([bytes],{type:data.mime_type||'audio/wav'});currentAudio=new Audio(URL.createObjectURL(blob));currentAudio.onended=()=>{status.textContent='Ready to talk'};currentAudio.onerror=()=>browserSpeak(text);await currentAudio.play();status.textContent='Speaking…';return}}catch(e){hint.textContent='Kinyarwanda voice provider unavailable; trying your browser voice.'}}browserSpeak(text)}
+ let speechRequestId=0;
+ async function speak(text){
+   if(!voiceReplies)return;
+   const requestId=++speechRequestId;
+   status.textContent='Preparing voice…';
+   if(language.value==='rw'){
+     try{
+       const data=await callApi({mode:'speak',text,language:'rw'});
+       if(requestId!==speechRequestId||!voiceReplies)return;
+       if(data.audio_base64){
+         if(currentAudio){currentAudio.pause();currentAudio=null}
+         const raw=atob(data.audio_base64),bytes=new Uint8Array(raw.length);
+         for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+         const blob=new Blob([bytes],{type:data.mime_type||'audio/wav'});
+         currentAudio=new Audio(URL.createObjectURL(blob));
+         currentAudio.onended=()=>{if(requestId===speechRequestId)status.textContent='Ready to talk'};
+         currentAudio.onerror=()=>{if(requestId===speechRequestId){status.textContent='Ready to talk';hint.textContent='Kinyarwanda audio could not play. Tap Hear reply to try again.'}};
+         try{await currentAudio.play();status.textContent='Speaking…';return}
+         catch(e){if(requestId!==speechRequestId)return;hint.textContent='Automatic audio playback was blocked or unavailable. Tap Hear reply to play this answer.';status.textContent='Ready to talk';return}
+       }
+     }catch(e){
+       if(requestId!==speechRequestId)return;
+       hint.textContent='Kinyarwanda voice provider unavailable; trying your browser voice.';
+     }
+   }
+   if(requestId===speechRequestId&&voiceReplies)browserSpeak(text);
+ }
  async function send(text){text=(text||'').trim();if(!text||busy)return; $('intro').style.display='none';addMessage(text,'you');box.value='';box.style.height='auto';busy=true;status.textContent='Thinking…';const loading=addMessage('Mpa akanya gato…','amatavida');try{const lang=language.value==='auto'?'auto':language.value;const payload={message:text,language:lang,history:history.slice(-8)};const memories=getMemories();if(memories.length)payload.memory=memories;const data=await callApi(payload);const answer=data.reply||'Sorry, I could not complete that reply.';loading.remove();addMessage(answer,'amatavida',true);history.push({role:'user',content:text},{role:'assistant',content:answer});history=history.slice(-16);status.textContent='Ready to talk';if(voiceReplies)speak(answer).catch(()=>{})}catch(e){loading.remove();addMessage(e.message||'I am having trouble connecting. Please try again.','amatavida',true);status.textContent='Connection issue';hint.textContent='Check your connection. If this continues, you can still type or try again shortly.'}finally{busy=false}}
  async function finishRecording(){if(!recorder||recorder.state==='inactive')return;status.textContent='Processing your voice…';hint.textContent='Sending audio for transcription…';recorder.stop()}
  $('composer').addEventListener('submit',e=>{e.preventDefault();send(box.value)});
