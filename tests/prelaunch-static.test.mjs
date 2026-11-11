@@ -20,11 +20,24 @@ test("locally deleted expenses and sales are removed from IndexedDB", () => {
   assert.match(html, /state\.sales=state\.sales\.filter\(x=>x\.id!==id\);\s*await sheriDelete\('sales',id\)/);
 });
 
-test("journal entries synchronize as one atomic RPC batch", () => {
+test("journal entries synchronize as one atomic RPC batch on normal and auth-retry paths", () => {
   assert.match(html, /async function sheriSyncJournalBatch\(op\)[\s\S]*?sb\.rpc\('shericeri_sync_journal_batch'/);
   assert.match(html, /syncLines\.push\(line\)/);
   assert.match(html, /type:'accounting_journal_batch',entry,lines:syncLines/);
-  assert.equal((html.match(/op\.type==='accounting_journal_batch'/g) || []).length, 2);
+
+  const syncStart = html.indexOf("async function sheriSyncOutbox(){");
+  const syncEnd = html.indexOf("\nfunction sheriOnlineEvents(){", syncStart);
+  assert.ok(syncStart >= 0 && syncEnd > syncStart, "expected complete outbox sync function");
+  const sync = html.slice(syncStart, syncEnd);
+  const normalEnd = sync.indexOf("      }catch(err){");
+  const retryStart = sync.indexOf("// Re-run this operation exactly once");
+  const retryEnd = sync.indexOf("await sheriDelete('outbox',item.key);", retryStart);
+  assert.ok(normalEnd > 0 && retryStart > normalEnd && retryEnd > retryStart, "expected normal and 401 retry sections");
+
+  const countBatch = source => (source.match(/op\.type==='accounting_journal_batch'/g) || []).length;
+  assert.equal(countBatch(sync.slice(0, normalEnd)), 1, "normal outbox processing must handle journal batches exactly once");
+  assert.equal(countBatch(sync.slice(retryStart, retryEnd)), 1, "401 retry must handle journal batches exactly once");
+  assert.equal(countBatch(sync), 2, "there must be exactly two handlers total: normal path and auth retry");
 });
 
 test("AI Advisor, extraction and Shericeri use the deployed quick-service function", () => {
