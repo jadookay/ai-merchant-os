@@ -1772,7 +1772,7 @@ function clearProductForm(){pName.value=pCost.value=pSell.value=pStock.value=pRe
 function clearProductImage(){pendingProductImage=null;document.getElementById('productImagePreview').style.display='none';document.getElementById('productImageThumb').src=''}
 async function handleProductImage(input){
   const file=input.files[0];if(!file)return;
-  if(!file.type.startsWith('image/')){alert('Please choose an image file.');input.value='';return}
+  if(!['image/jpeg','image/png','image/webp','image/gif'].includes(file.type)){alert('Please choose a JPG, PNG, WebP or GIF image.');input.value='';return}
   if(file.size>4*1024*1024){alert('Please choose an image under 4MB.');input.value='';return}
   const reader=new FileReader();
   reader.onload=async e=>{
