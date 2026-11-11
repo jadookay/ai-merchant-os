@@ -37,6 +37,10 @@ test("AI Advisor, extraction and Shericeri use the deployed quick-service functi
   assert.doesNotMatch(html, /sb\.functions\.invoke\('advisor',\{body:\{mode:'(?:extract|barcode|extract_batch|organize_import)/);
 });
 
+test("product image picker matches the storage MIME allowlist", () => {
+  assert.match(html, /!\['image\/jpeg','image\/png','image\/webp','image\/gif'\]\.includes\(file\.type\)/);
+});
+
 test("cloud memory and product image access are represented by a reviewed SQL patch", () => {
   assert.match(schemaPatch, /create table if not exists public\.shericeri_memory/i);
   assert.match(schemaPatch, /enable row level security/i);
