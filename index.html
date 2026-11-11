@@ -3905,6 +3905,10 @@ function sheriDrainSpeakQueue(){
       return;
     }
     try{
+      // Match the proven standalone speaker test: wait for Android's voice list
+      // to initialize before selecting a voice or enqueueing an utterance.
+      await ensureVoicesLoaded(500);
+      if(turnId!==sheriTurnId)return;
       let selectedVoice=null;
       selectedVoice=pickVoice(lang);
       if(selectedVoice && utt.voice!==selectedVoice) utt.voice=selectedVoice;
@@ -3919,14 +3923,15 @@ function sheriDrainSpeakQueue(){
         // browser language/voice quality depends on voices installed on-device.
         sheriDiagSet('Kinyarwanda TTS fallback','BROWSER SPEECH SYNTHESIS — single utterance; device voice may not support Kinyarwanda');
         speechSynthesis.resume();
-        speechSynthesis.cancel();
         speechSynthesis.speak(utt);
         return;
       }
       if(window.SHERICERI_VOICE_BRIDGE?.hasTtsBridge){await window.SHERICERI_VOICE_BRIDGE.speak(next,lang);finish('local-bridge-complete');return;}
       if(/^rw/i.test(lang))throw new Error('Kinyarwanda TTS native bridge is not installed');
+      // A new turn already cancels the previous utterance in sheriResetSpeechState().
+      // Cancelling again immediately before speak() can interrupt this fresh utterance
+      // on Android Chrome; resume and enqueue without a second cancel.
       speechSynthesis.resume();
-      speechSynthesis.cancel();
       speechSynthesis.speak(utt);
       if(retryTimer)clearTimeout(retryTimer);
       retryTimer=setTimeout(()=>{
@@ -3946,7 +3951,9 @@ function sheriDrainSpeakQueue(){
   };
 
   // Explicit lifecycle: SPEAKING → ended → speaking=false → short guard → listen.
-  if(isAndroid)setTimeout(()=>{if(turnId===sheriTurnId)speakNow()},40);
+  // Android needs a short post-reset settle window; the standalone speaker
+  // test uses 90 ms and confirms that this delay works on the user's device.
+  if(isAndroid)setTimeout(()=>{if(turnId===sheriTurnId)speakNow()},90);
   else speakNow();
 }
 
