@@ -46,7 +46,7 @@ test("cloud memory and product image access are represented by a reviewed SQL pa
 });
 
 test("all inline application scripts parse without syntax errors", () => {
-  const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(match => match[1]);
+  const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
   assert.ok(scripts.length >= 1, "expected inline application scripts");
   for (const [index, source] of scripts.entries()) {
     assert.doesNotThrow(() => new vm.Script(source, { filename: `index.html:inline-script-${index + 1}` }));
