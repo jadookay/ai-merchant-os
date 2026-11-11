@@ -50,6 +50,13 @@ test("AI Advisor, extraction and Shericeri use the deployed quick-service functi
   assert.doesNotMatch(html, /sb\.functions\.invoke\('advisor',\{body:\{mode:'(?:extract|barcode|extract_batch|organize_import)/);
 });
 
+test("browser TTS fallback is used when the compatibility bridge is only a placeholder", () => {
+  assert.match(html, /hasTtsBridge:!!oldTTS\?\.speak/);
+  assert.match(html, /window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge/);
+  assert.match(html, /if\(!window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)[\s\S]{0,500}speechSynthesis\.speak\(utt\)/);
+  assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{[\s\S]{0,180}LOCAL NATIVE BRIDGE/);
+});
+
 test("product image picker matches the storage MIME allowlist", () => {
   assert.match(html, /!\['image\/jpeg','image\/png','image\/webp','image\/gif'\]\.includes\(file\.type\)/);
 });
