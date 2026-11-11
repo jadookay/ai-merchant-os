@@ -4388,8 +4388,9 @@ async function accPostEntry({date,description,sourceType,sourceId,lines}){
   if(sourceType&&sourceId&&state.journalEntries.some(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided))return state.journalEntries.find(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided);
   const now=sheriNow(),entry={id:sheriUuid(),merchant_id:state.merchant.id,entry_date:date||accToday(),description,source_type:sourceType||null,source_id:sourceId||null,created_at:now,voided:false};
   state.journalEntries.push(entry);await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});
-  for(const x of lines){const line={id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now};state.journalLines.push(line);await sheriPut('journalLines',line.id,{merchant_id:state.merchant.id,record:{...line}})}
-  await sheriQueue({type:'accounting_journal_batch',entry,lines:lines.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now}))});
+  const syncLines=[];
+  for(const x of lines){const line={id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now};state.journalLines.push(line);syncLines.push(line);await sheriPut('journalLines',line.id,{merchant_id:state.merchant.id,record:{...line}})}
+  await sheriQueue({type:'accounting_journal_batch',entry,lines:syncLines});
   await sheriSaveAccountingSnapshot();
   return entry;
 }
