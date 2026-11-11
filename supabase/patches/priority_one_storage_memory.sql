@@ -1,6 +1,15 @@
 -- AIBOS priority-one schema patch. REVIEW AND TEST BEFORE APPLYING TO PRODUCTION.
 -- Adds Shericeri cloud memory and owner-scoped product image uploads.
 
+-- The accounting RPCs are SECURITY DEFINER and enforce auth.uid() ownership
+-- internally. Remove inherited PUBLIC/anon execution; retain authenticated use.
+revoke execute on function public.shericeri_get_accounting_snapshot(uuid) from public, anon;
+grant execute on function public.shericeri_get_accounting_snapshot(uuid) to authenticated;
+
+revoke execute on function public.shericeri_sync_journal_batch(uuid, uuid, date, text, text, uuid, jsonb) from public, anon;
+grant execute on function public.shericeri_sync_journal_batch(uuid, uuid, date, text, text, uuid, jsonb) to authenticated;
+
+
 create table if not exists public.shericeri_memory (
   id uuid primary key default gen_random_uuid(),
   merchant_id uuid not null references public.merchants(id) on delete cascade,
