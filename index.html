@@ -1765,7 +1765,7 @@ async function handleProductImage(input){
     status.textContent='Reading photo…';
     if(advisorAvailable===false){status.textContent='Photo attached. (AI reading is offline — fill the form manually.)';return}
     try{
-      const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'extract',image:e.target.result}});
+      const {data,error}=await sb.functions.invoke('quick-service',{body:{mode:'extract',image:e.target.result}});
       if(error||!data){status.textContent='Photo attached. Could not read details automatically — fill the form manually.';return}
       if(data.error){status.textContent=data.error;return}
       const f=data.fields||{};
@@ -1843,7 +1843,7 @@ function stopBarcodeScan(){
 async function handleBarcodeResult(code){
   const status=document.getElementById('productVoiceStatus');
   try{
-    const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'barcode',barcode:code}});
+    const {data,error}=await sb.functions.invoke('quick-service',{body:{mode:'barcode',barcode:code}});
     stopBarcodeScan();
     document.getElementById('addProduct').style.display='block';
     pBarcode.value=code;
@@ -2044,7 +2044,7 @@ async function handleImportFile(input){
 function fileToDataUrl(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(file)})}
 async function extractBatchFromImage(dataUrl,status){
   status.textContent='AI is reading the product list from the photo…';
-  const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'extract_batch',image:dataUrl}});
+  const {data,error}=await sb.functions.invoke('quick-service',{body:{mode:'extract_batch',image:dataUrl}});
   if(error||!data?.items){status.textContent='Could not read a product list from that photo. Try a clearer, well-lit shot.';return []}
   return data.items;
 }
@@ -2060,7 +2060,7 @@ async function organizeImportRows(rows,status){
     return out;
   });
   status.textContent=`AI is organizing ${cleanRows.length} row(s) into your inventory format…`;
-  const {data,error}=await sb.functions.invoke('advisor',{body:{mode:'organize_import',rows:cleanRows.slice(0,300)}});
+  const {data,error}=await sb.functions.invoke('quick-service',{body:{mode:'organize_import',rows:cleanRows.slice(0,300)}});
   if(error||!data?.items){status.textContent='Could not interpret that spreadsheet\'s columns automatically.';return []}
   return data.items;
 }
@@ -2295,7 +2295,7 @@ async function checkAdvisor(){
   const notice=document.getElementById('advisorNotice');
   const sNotice=document.getElementById('shericeriNotice');
   try{
-    const {error}=await sb.functions.invoke('advisor',{body:{question:'ping',context:{}}});
+    const {error}=await sb.functions.invoke('quick-service',{body:{question:'ping',context:{}}});
     advisorAvailable=!error;
   }catch(e){advisorAvailable=false}
   notice.textContent=advisorAvailable
@@ -2342,7 +2342,7 @@ async function askAI(webSearch){
       const body=effectiveWebSearch
         ?{mode:'search',question:q}
         :{question:q||'What do you see in this photo, and does it relate to my business?',context,image:img?img.dataUrl:null};
-      const {data,error}=await sb.functions.invoke('advisor',{body});
+      const {data,error}=await sb.functions.invoke('quick-service',{body});
       if(!error&&data?.answer){
         document.getElementById(thinkingId).innerHTML=esc(data.answer).replace(/\n/g,'<br>');
         answered=true;advisorAvailable=true;
@@ -4101,7 +4101,7 @@ async function shericeriRespond(transcript){
      sheriDiagSet('Whisper → advisor request',Math.round(advisorStart-sheriWhisperFinishedAt)+' ms');
     sheriResponsePhase='advisor_request';
     if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','Advisor request started'); sheriDiagSet('Advisor question',transcript.slice(0,500)); }
-    let res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+    let res=await fetch(`${SUPABASE_URL}/functions/v1/quick-service`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},
       body:JSON.stringify({mode:'shericeri',question:transcript,context,memory:sheriMemoryPayload,webSearch:effectiveWebSearch,language:currentShericeriLang(),history:sheriHistorySnapshot()})
@@ -4112,7 +4112,7 @@ async function shericeriRespond(transcript){
       const {data:{session:refreshedSession},error:refreshError}=await sb.auth.refreshSession();
       if(refreshError||!refreshedSession?.access_token) throw refreshError||new Error('Session refresh failed after 401');
       session=refreshedSession;
-      res=await fetch(`${SUPABASE_URL}/functions/v1/advisor`,{
+      res=await fetch(`${SUPABASE_URL}/functions/v1/quick-service`,{
         method:'POST',
         headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+refreshedSession.access_token},
         body:JSON.stringify({mode:'shericeri',question:transcript,context,memory:sheriMemoryPayload,webSearch:effectiveWebSearch,language:currentShericeriLang(),history:sheriHistorySnapshot()})
@@ -4304,7 +4304,7 @@ function renderBusinessOS(){
 async function generateOSInsight(){
   const box=document.getElementById('osAIInsight');if(!box)return;box.textContent='Analyzing…';const local=osLocalInsights();
   if(!navigator.onLine||advisorAvailable===false){box.innerHTML='<b>Offline intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>');const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=local.slice(0,2).map(x=>`• ${esc(x)}`).join('<br>');return}
-  try{const context={merchantName:state.merchant.name,merchantCategory:state.merchant.category,country:merchantCountry(),currency:merchantCurrency(),revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),inventoryValue:osInventoryValue(),supplierSpend:osPurchasesTotal(),cashNet:osCashNet(),salesCount:state.sales.length,customerCount:activeCustomers().length,repeatCustomers:repeatCustomerCount(),lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),suppliers:osActiveSuppliers().map(s=>({name:s.name,spend:osSupplierSpend(s.id)})),purchases:state.purchases.slice(0,20).map(x=>({supplierId:x.supplier_id,total:x.total||x.qty*x.unit_cost,status:x.status})),forecast30:osForecast30()};const {data,error}=await sb.functions.invoke('advisor',{body:{question:'Give me the three most useful business decisions I should consider now, based strictly on my recorded business data. Mention risks and opportunities. Keep it practical.',context}});if(error||!data?.answer)throw error||new Error('No AI answer');box.innerHTML='<b>AI intelligence</b><br>'+esc(data.answer).replace(/\n/g,'<br>');const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=esc(data.answer).replace(/\n/g,'<br>');await sheriQueueMemory('insight',data.answer.slice(0,1800))}catch(e){box.innerHTML='<b>Local intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>')+'<div class="sub" style="margin-top:8px">Cloud AI was unavailable, so the app used its offline analysis.</div>';const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=local.slice(0,2).map(x=>`• ${esc(x)}`).join('<br>')}
+  try{const context={merchantName:state.merchant.name,merchantCategory:state.merchant.category,country:merchantCountry(),currency:merchantCurrency(),revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),inventoryValue:osInventoryValue(),supplierSpend:osPurchasesTotal(),cashNet:osCashNet(),salesCount:state.sales.length,customerCount:activeCustomers().length,repeatCustomers:repeatCustomerCount(),lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),suppliers:osActiveSuppliers().map(s=>({name:s.name,spend:osSupplierSpend(s.id)})),purchases:state.purchases.slice(0,20).map(x=>({supplierId:x.supplier_id,total:x.total||x.qty*x.unit_cost,status:x.status})),forecast30:osForecast30()};const {data,error}=await sb.functions.invoke('quick-service',{body:{question:'Give me the three most useful business decisions I should consider now, based strictly on my recorded business data. Mention risks and opportunities. Keep it practical.',context}});if(error||!data?.answer)throw error||new Error('No AI answer');box.innerHTML='<b>AI intelligence</b><br>'+esc(data.answer).replace(/\n/g,'<br>');const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=esc(data.answer).replace(/\n/g,'<br>');await sheriQueueMemory('insight',data.answer.slice(0,1800))}catch(e){box.innerHTML='<b>Local intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>')+'<div class="sub" style="margin-top:8px">Cloud AI was unavailable, so the app used its offline analysis.</div>';const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=local.slice(0,2).map(x=>`• ${esc(x)}`).join('<br>')}
 }
 
 
@@ -4434,8 +4434,8 @@ function renderMoney(){if(!state.merchant)return;accPopulateSelects();const ar=a
 }
 function accReportTotals(){const by={};for(const a of state.accounts){const n=accNormalAmount(a);by[a.code]=n}return by}
 
-const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
-const _v14_1_voidSale=voidSale;voidSale=async function(id){const s=state.sales.find(x=>x.id===id);if(!s)return;const entryDate=String(s.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This sale cannot be voided while its accounting period is locked.');await _v14_1_voidSale(id);try{await accEnsureBase();const total=Number(s.qty||0)*Number(s.price||0),cost=Number(s.qty||0)*Number(s.cost||0),cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');if(total>0)await accPostEntry({date:entryDate,description:'Reverse sale '+(s.product_name_snapshot||''),sourceType:'sale_void',sourceId:s.id,lines:[{accountId:sales.id,debit:total},{accountId:cash.id,credit:total}]});if(cost>0)await accPostEntry({date:entryDate,description:'Reverse COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs_void',sourceId:s.id,lines:[{accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost}]});await accAudit('void','sale',s.id,{total,cogs:cost})}catch(err){console.warn('[Sheri accounting] sale reversal failed',err);alert('Sale voided, but the accounting reversal could not be posted: '+(err.message||err))}render()};
+const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);if(state.expenses.some(x=>x.id===id))return;try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
+const _v14_1_voidSale=voidSale;voidSale=async function(id){const s=state.sales.find(x=>x.id===id);if(!s)return;const entryDate=String(s.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This sale cannot be voided while its accounting period is locked.');await _v14_1_voidSale(id);if(state.sales.some(x=>x.id===id))return;try{await accEnsureBase();const total=Number(s.qty||0)*Number(s.price||0),cost=Number(s.qty||0)*Number(s.cost||0),cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');if(total>0)await accPostEntry({date:entryDate,description:'Reverse sale '+(s.product_name_snapshot||''),sourceType:'sale_void',sourceId:s.id,lines:[{accountId:sales.id,debit:total},{accountId:cash.id,credit:total}]});if(cost>0)await accPostEntry({date:entryDate,description:'Reverse COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs_void',sourceId:s.id,lines:[{accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost}]});await accAudit('void','sale',s.id,{total,cogs:cost})}catch(err){console.warn('[Sheri accounting] sale reversal failed',err);alert('Sale voided, but the accounting reversal could not be posted: '+(err.message||err))}render()};
 const _v14_1_addOSCashEntry=addOSCashEntry;addOSCashEntry=async function(){const before=state.cashEntries.length;await _v14_1_addOSCashEntry();if(state.cashEntries.length>before){const x=state.cashEntries[state.cashEntries.length-1];try{await accEnsureBase();const cash=accAccountCode('1000'),amount=Number(x.amount||0);if(amount>0&&x.kind==='income')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash income',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:cash.id,debit:amount},{accountId:accAccountCode('4100').id,credit:amount}]});else if(amount>0&&x.kind==='expense')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash expense',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:accAccountCode('6000').id,debit:amount},{accountId:cash.id,credit:amount}]});if(x.kind!=='transfer')await accAudit('create','cash_entry',x.id,{amount,kind:x.kind})}catch(err){console.warn('[Sheri accounting] cash entry failed',err);alert('Cash movement saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
 function sheriHideInternalAccountingUi(){
   const hideSelectors=['#money .top .btn[onclick="accRebuildFromOperations()"]','#accAccountingStatus','#reports .top .btn[onclick="accValidateLedger()"]'];
