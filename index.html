@@ -985,6 +985,7 @@ async function sheriSyncOutbox(){
         }
         else if(op.type==='accounting_settings_upsert'){const {error}=await sb.from('accounting_settings').upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'});if(error)throw error}
         else if(op.type==='accounting_delete'){const {error}=await sb.from(op.table).delete().eq('id',op.id);if(error)throw error}
+        else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
         else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='customer_upsert'){const {error}=await sb.from('customers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='customer_delete'){const {error}=await sb.from('customers').update({deleted:true}).eq('id',op.id);if(error)throw error}
@@ -1009,7 +1010,6 @@ async function sheriSyncOutbox(){
               else if(op.type==='cash_upsert'){const {error}=await sb.from('cash_entries').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
-        else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
               else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
               else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else throw err;
