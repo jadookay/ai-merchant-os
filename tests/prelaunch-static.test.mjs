@@ -61,6 +61,19 @@ test("browser TTS fallback is used when the compatibility bridge is only a place
   assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{sheriDiagSet\('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE'\)/);
 });
 
+
+test("normal Android TTS waits for voices and does not cancel its fresh utterance", () => {
+  const start = html.indexOf("  const speakNow=async()=>{");
+  const end = html.indexOf("\n  // Explicit lifecycle:", start);
+  assert.ok(start >= 0 && end > start, "expected normal speakNow implementation");
+  const speakNow = html.slice(start, end);
+  assert.match(speakNow, /await ensureVoicesLoaded\(500\)/);
+  assert.match(speakNow, /speechSynthesis\.resume\(\);\s*speechSynthesis\.speak\(utt\)/);
+  assert.doesNotMatch(speakNow, /speechSynthesis\.cancel\(\)/,
+    "do not cancel the new utterance immediately before speaking");
+  assert.match(html, /if\(isAndroid\)setTimeout\(\(\)=>\{if\(turnId===sheriTurnId\)speakNow\(\)\},90\)/);
+});
+
 test("product image picker matches the storage MIME allowlist", () => {
   assert.match(html, /!\['image\/jpeg','image\/png','image\/webp','image\/gif'\]\.includes\(file\.type\)/);
 });
