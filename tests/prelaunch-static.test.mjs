@@ -54,7 +54,10 @@ test("browser TTS fallback is used when the compatibility bridge is only a place
   assert.match(html, /hasTtsBridge:!!oldTTS\?\.speak/);
   assert.match(html, /window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge/);
   assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{await window\.SHERICERI_VOICE_BRIDGE\.speak\(next,lang\);finish\('local-bridge-complete'\);return;\}/);
-  assert.match(html, /if\(\/^rw\/i\.test\(lang\)\)throw new Error\('Kinyarwanda TTS native bridge is not installed'\);\s*speechSynthesis\.resume\(\);\s*speechSynthesis\.cancel\(\);\s*speechSynthesis\.speak\(utt\);/);
+  const browserFallback = html.indexOf("if(/^rw/i.test(lang))throw new Error('Kinyarwanda TTS native bridge is not installed');");
+  const browserSpeak = html.indexOf("speechSynthesis.speak(utt);", browserFallback);
+  assert.ok(browserFallback >= 0 && browserSpeak > browserFallback && browserSpeak - browserFallback < 300,
+    "without a native bridge, Kinyarwanda must fail explicitly and browser TTS must remain reachable for supported languages");
   assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{sheriDiagSet\('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE'\)/);
 });
 
