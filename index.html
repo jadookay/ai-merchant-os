@@ -920,6 +920,21 @@ function sheriSyncErrorInfo(err){
   return {message,status,permanent};
 }
 function sheriSyncDelayMs(attempts){return Math.min(60000,Math.max(5000,5000*Math.pow(2,Math.min(Number(attempts)||0,4))))}
+async function sheriSyncJournalBatch(op){
+  const entry=op.entry||{};
+  const lines=Array.isArray(op.lines)?op.lines:[];
+  const {data,error}=await sb.rpc('shericeri_sync_journal_batch',{
+    p_merchant_id:entry.merchant_id,
+    p_entry_id:entry.id,
+    p_entry_date:entry.entry_date,
+    p_description:entry.description,
+    p_source_type:entry.source_type||null,
+    p_source_id:entry.source_id||null,
+    p_lines:lines.map(line=>({id:line.id,account_id:line.account_id,debit:line.debit,credit:line.credit,memo:line.memo||null}))
+  });
+  if(error)throw error;
+  if(data!==entry.id)throw new Error('Atomic journal synchronization returned an unexpected entry ID.');
+}
 async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy)return;
   sheriSyncBusy=true;
@@ -993,6 +1008,8 @@ async function sheriSyncOutbox(){
               else if(op.type==='purchase_upsert'){const {error}=await sb.from('purchases').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='cash_upsert'){const {error}=await sb.from('cash_entries').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
+        else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
               else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
               else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else throw err;
@@ -1740,6 +1757,7 @@ async function voidSale(id){
   if(!confirm('Void this sale? Its stock will be added back to inventory.'))return;
   const p=product(s.product_id); if(p)p.stock+=s.qty;
   state.sales=state.sales.filter(x=>x.id!==id);
+  await sheriDelete('sales',id);
   await sheriSaveSnapshot();
   await sheriQueue({type:'sale_delete',id});
   if(p)await sheriQueue({type:'product_upsert',record:{...p}});
@@ -2149,7 +2167,7 @@ async function addExpense(){
 }
 async function deleteExpense(id){
   if(!confirm('Delete this expense?'))return;
-  state.expenses=state.expenses.filter(x=>x.id!==id);await sheriSaveSnapshot();
+  state.expenses=state.expenses.filter(x=>x.id!==id);await sheriDelete('expenses',id);await sheriSaveSnapshot();
   await sheriQueue({type:'expense_delete',id});
   if(navigator.onLine)await sheriSyncOutbox();
   render();
@@ -4369,8 +4387,9 @@ async function accPostEntry({date,description,sourceType,sourceId,lines}){
   if(!Number.isFinite(debit)||!Number.isFinite(credit)||Math.abs(debit-credit)>0.005||debit<=0)throw new Error('Accounting entry is not balanced. No ledger entry was saved.');
   if(sourceType&&sourceId&&state.journalEntries.some(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided))return state.journalEntries.find(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided);
   const now=sheriNow(),entry={id:sheriUuid(),merchant_id:state.merchant.id,entry_date:date||accToday(),description,source_type:sourceType||null,source_id:sourceId||null,created_at:now,voided:false};
-  state.journalEntries.push(entry);await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});await sheriQueue({type:'accounting_upsert',table:'journal_entries',record:entry});
-  for(const x of lines){const line={id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now};state.journalLines.push(line);await sheriPut('journalLines',line.id,{merchant_id:state.merchant.id,record:{...line}});await sheriQueue({type:'accounting_upsert',table:'journal_lines',record:line})}
+  state.journalEntries.push(entry);await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});
+  for(const x of lines){const line={id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now};state.journalLines.push(line);await sheriPut('journalLines',line.id,{merchant_id:state.merchant.id,record:{...line}})}
+  await sheriQueue({type:'accounting_journal_batch',entry,lines:lines.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now}))});
   await sheriSaveAccountingSnapshot();
   return entry;
 }
