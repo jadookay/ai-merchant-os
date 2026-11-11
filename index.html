@@ -2318,7 +2318,7 @@ async function checkAdvisor(){
   }catch(e){advisorAvailable=false}
   notice.textContent=advisorAvailable
     ?'Connected to the AI advisor.'
-    :'AI advisor function not reachable yet — using offline calculations. Deploy the "advisor" edge function and set GROQ_API_KEY to enable live AI answers.';
+    :'AI advisor function not reachable yet — using offline calculations. Deploy the "quick-service" edge function and set GROQ_API_KEY to enable live AI answers.';
   if(sNotice)sNotice.textContent=advisorAvailable
     ?'Shericeri is connected and ready to talk.'
     :'Shericeri isn\'t reachable yet — same fix as the AI Advisor: deploy the "advisor" function and set GROQ_API_KEY.';
@@ -4118,7 +4118,7 @@ async function shericeriRespond(transcript){
     const advisorStart=performance.now();
      sheriDiagSet('Whisper → advisor request',Math.round(advisorStart-sheriWhisperFinishedAt)+' ms');
     sheriResponsePhase='advisor_request';
-    if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','Advisor request started'); sheriDiagSet('Advisor question',transcript.slice(0,500)); }
+    if(typeof sheriDiagSet==='function'){ sheriDiagSet('Response phase','Advisor request started'); sheriDiagSet('AI service question',transcript.slice(0,500)); }
     let res=await fetch(`${SUPABASE_URL}/functions/v1/quick-service`,{
       method:'POST',
       headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},
@@ -4138,7 +4138,7 @@ async function shericeriRespond(transcript){
     }
     const advisorMs=Math.round(performance.now()-advisorStart);
     sheriResponsePhase=res.ok?'advisor_streaming':'advisor_failed';
-    sheriDiagSet('Advisor HTTP',res.status+(res.ok?' OK':' FAILED'));
+    sheriDiagSet('AI service HTTP',res.status+(res.ok?' OK':' FAILED'));
     sheriDiagSet('Response phase',res.ok?'Advisor streaming':'Advisor failed');
     if(res.ok){
       const usedModel=res.headers.get('X-Sheri-Model');
