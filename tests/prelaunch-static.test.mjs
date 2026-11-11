@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const quickService = await readFile(new URL("../supabase/functions/quick-service/index.ts", import.meta.url), "utf8");
@@ -42,4 +43,12 @@ test("cloud memory and product image access are represented by a reviewed SQL pa
   assert.match(schemaPatch, /product_images_owner_insert/i);
   assert.match(schemaPatch, /file_size_limit = 4194304/i);
   assert.match(schemaPatch, /revoke execute on function public\.shericeri_sync_journal_batch/i);
+});
+
+test("all inline application scripts parse without syntax errors", () => {
+  const scripts = [...html.matchAll(/<script\\b[^>]*>([\\s\\S]*?)<\\/script>/gi)].map(match => match[1]);
+  assert.ok(scripts.length >= 1, "expected inline application scripts");
+  for (const [index, source] of scripts.entries()) {
+    assert.doesNotThrow(() => new vm.Script(source, { filename: `index.html:inline-script-${index + 1}` }));
+  }
 });
