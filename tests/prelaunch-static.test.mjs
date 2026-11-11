@@ -53,8 +53,9 @@ test("AI Advisor, extraction and Shericeri use the deployed quick-service functi
 test("browser TTS fallback is used when the compatibility bridge is only a placeholder", () => {
   assert.match(html, /hasTtsBridge:!!oldTTS\?\.speak/);
   assert.match(html, /window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge/);
-  assert.match(html, /if\(!window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)[\s\S]{0,500}speechSynthesis\.speak\(utt\)/);
-  assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{[\s\S]{0,180}LOCAL NATIVE BRIDGE/);
+  assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{await window\.SHERICERI_VOICE_BRIDGE\.speak\(next,lang\);finish\('local-bridge-complete'\);return;\}/);
+  assert.match(html, /if\(\/^rw\/i\.test\(lang\)\)throw new Error\('Kinyarwanda TTS native bridge is not installed'\);\s*speechSynthesis\.resume\(\);\s*speechSynthesis\.cancel\(\);\s*speechSynthesis\.speak\(utt\);/);
+  assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{sheriDiagSet\('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE'\)/);
 });
 
 test("product image picker matches the storage MIME allowlist", () => {
