@@ -1353,7 +1353,7 @@ async function handleSignIn(){
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}
   finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
-function probeAuthProviders(){return null}
+async function probeAuthProviders(){return null}
 async function signInOAuth(provider){
   if(!sb)await sheriInitSupabase();
   if(!navigator.onLine)return setAuthStatus('Social sign-in requires internet.',true);
