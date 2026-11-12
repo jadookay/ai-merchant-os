@@ -107,15 +107,22 @@ Deno.serve(async (req: Request) => {
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
 
       let canManage = merchant.user_id === callerData.user.id;
+      let callerRole = canManage ? "owner" : null;
       if (!canManage) {
         const { data: membership, error: memberError } = await admin
           .from("merchant_members").select("role,permissions,status")
           .eq("merchant_id", merchantId).eq("user_id", callerData.user.id).maybeSingle();
         if (memberError) throw memberError;
+        callerRole = membership?.role || null;
         canManage = membership?.status === "active" &&
           (membership.role === "admin" || membership.permissions?.manage_team === true);
       }
       if (!canManage) return json({ error: "You do not have permission to manage this team." }, 403);
+      // Team managers may administer ordinary staff, but only the merchant owner
+      // or an existing administrator may grant administrator-level access.
+      if (role === "admin" && callerRole !== "owner" && callerRole !== "admin") {
+        return json({ error: "Only the business owner or an administrator can create another administrator." }, 403);
+      }
 
       const authEmail = email || ("staff-" + crypto.randomUUID() + "@example.com");
       const { data: created, error: createError } = await admin.auth.admin.createUser({
