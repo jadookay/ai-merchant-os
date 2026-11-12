@@ -407,3 +407,51 @@ end;
 $$;
 revoke all on function public.shericeri_void_sale(uuid,text,uuid) from public,anon;
 grant execute on function public.shericeri_void_sale(uuid,text,uuid) to authenticated;
+
+
+-- Seed only the standard chart identifiers needed by operational staff posting.
+-- This does not expose journal balances or financial reports to those roles.
+create or replace function public.shericeri_ensure_operational_accounts(p_merchant_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+begin
+  if not (
+    private.user_can_access_merchant(p_merchant_id,'create_sale')
+    or private.user_can_access_merchant(p_merchant_id,'manage_expenses')
+    or private.user_can_access_merchant(p_merchant_id,'manage_inventory')
+    or private.user_can_access_merchant(p_merchant_id,'manage_finance')
+    or private.user_can_access_merchant(p_merchant_id,'view_financial_reports')
+  ) then
+    raise exception 'Not authorized to initialize operational accounting accounts';
+  end if;
+  insert into public.chart_of_accounts(merchant_id,code,name,type,normal_balance,active)
+  values
+    (p_merchant_id,'1000','Cash on hand','asset','debit',true),
+    (p_merchant_id,'1010','Bank accounts','asset','debit',true),
+    (p_merchant_id,'1020','Mobile money','asset','debit',true),
+    (p_merchant_id,'1100','Accounts receivable','asset','debit',true),
+    (p_merchant_id,'1200','Inventory','asset','debit',true),
+    (p_merchant_id,'2000','Accounts payable','liability','credit',true),
+    (p_merchant_id,'2100','Tax payable','liability','credit',true),
+    (p_merchant_id,'2110','Input tax receivable','asset','debit',true),
+    (p_merchant_id,'2200','Other liabilities','liability','credit',true),
+    (p_merchant_id,'3000','Owner equity','equity','credit',true),
+    (p_merchant_id,'3100','Owner drawings','equity','debit',true),
+    (p_merchant_id,'4000','Sales revenue','income','credit',true),
+    (p_merchant_id,'4050','Sales returns & discounts','income','debit',true),
+    (p_merchant_id,'4100','Other income','income','credit',true),
+    (p_merchant_id,'5000','Cost of goods sold','cogs','debit',true),
+    (p_merchant_id,'6000','Operating expenses','expense','debit',true),
+    (p_merchant_id,'6100','Tax expense','expense','debit',true)
+  on conflict (merchant_id,code) do nothing;
+  return jsonb_build_object(
+    'accounts',
+    coalesce((select jsonb_agg(x order by x.code) from (select id,merchant_id,code,name,type,normal_balance,active,created_at from public.chart_of_accounts where merchant_id=p_merchant_id) x),'[]'::jsonb)
+  );
+end;
+$$;
+revoke all on function public.shericeri_ensure_operational_accounts(uuid) from public,anon;
+grant execute on function public.shericeri_ensure_operational_accounts(uuid) to authenticated;
