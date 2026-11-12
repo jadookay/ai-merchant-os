@@ -315,7 +315,7 @@ window.ensurePdfJs=async function(){
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="recordSale()">Record sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
     <div id="voiceStatus" class="sub" style="margin-top:8px"></div>
   </div>
-  <div class="card section"><h2>Sales history</h2><div id="salesTable"></div></div>
+  <div class="card section"><h2>Sales history</h2><div id="salesSearchHost"></div><div id="salesTable"></div></div>
 </section>
 
 <section id="inventory" class="view">
@@ -362,7 +362,7 @@ window.ensurePdfJs=async function(){
       </div>
     </div>
   </div>
-  <div class="card section"><div id="inventoryTable"></div></div>
+  <div class="card section"><div id="inventorySearchHost"></div><div id="inventoryTable"></div></div>
   <div class="card section"><h2>Revenue by category</h2><div id="categoryTable"></div></div>
   <div class="card section">
     <h2>Import / Export</h2>
@@ -388,7 +388,7 @@ window.ensurePdfJs=async function(){
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="addExpense()">Add expense</button><button class="btn secondary" onclick="sheriStartFormVoice('expenseVoiceStatus',parseVoiceExpense,'Say expense description and amount')">🎙 Voice entry</button><button class="btn secondary" onclick="clearExpenseForm()">Discard</button></div><div id="expenseVoiceStatus" class="sub" style="margin-top:8px"></div>
   </div>
-  <div class="card section"><h2>Expense history</h2><div id="expenseTable"></div></div>
+  <div class="card section"><h2>Expense history</h2><div id="expenseSearchHost"></div><div id="expenseTable"></div></div>
 </section>
 
 <section id="customers" class="view">
@@ -1828,7 +1828,17 @@ async function voidSale(id){
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
-function renderSales(){document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).map(s=>{const p=product(s.product_id);const c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
+const sheriSearchValues={};
+function sheriSearchControl(key,target,placeholder,values){
+  const listId=key+'Suggestions',value=esc(sheriSearchValues[key]||''),options=[...new Set((values||[]).filter(Boolean).map(String))].slice(0,100);
+  return '<input class="sheri-search" type="search" aria-label="'+esc(placeholder)+'" placeholder="'+esc(placeholder)+'" value="'+value+'" list="'+listId+'" data-target="'+target+'" data-search-key="'+key+'" oninput="sheriSearchTable(this)"><datalist id="'+listId+'">'+options.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>';
+}
+function sheriSearchTable(input){
+  const key=input.dataset.searchKey,target=document.getElementById(input.dataset.target),query=String(input.value||'').trim().toLowerCase();
+  if(key)sheriSearchValues[key]=input.value;if(!target)return;
+  target.querySelectorAll('tr').forEach((row,index)=>{row.style.display=index===0||!query||row.textContent.toLowerCase().includes(query)?'':'none';});
+}
+function renderSales(){const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).map(s=>{const p=product(s.product_id);const c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
 
 // ── Products ─────────────────────────────────────────────────────────────
 let pendingProductImage=null; // {dataUrl, mimeType, file}
@@ -2032,7 +2042,7 @@ function expiryPill(p){
   return `<br><span class="sub">Exp: ${p.expiry_date}</span>`;
 }
 function renderInventory(){
-  const list=activeProducts();
+  const list=activeProducts();const search=document.getElementById('inventorySearchHost');if(search)search.innerHTML=sheriSearchControl('inventory','inventoryTable','Search products by name, category or barcode',list.flatMap(p=>[p.name,p.cat,p.barcode]));
   document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions"><button class="btn small secondary" onclick="editProduct('${p.id}')">Edit</button><button class="btn small danger" onclick="deleteProduct('${p.id}')">Delete</button></div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
   renderCategory();
 }
@@ -2239,7 +2249,7 @@ async function deleteExpense(id){
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
-function renderExpenses(){document.getElementById('expenseTable').innerHTML=state.expenses.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${state.expenses.filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses recorded.</div>'}
+function renderExpenses(){const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount or date',state.expenses.flatMap(e=>[e.description,e.cat]));document.getElementById('expenseTable').innerHTML=state.expenses.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${state.expenses.filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses recorded.</div>'}
 
 // ── Customers ────────────────────────────────────────────────────────────
 async function addCustomer(){
