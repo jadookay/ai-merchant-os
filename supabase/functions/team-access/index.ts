@@ -68,7 +68,7 @@ Deno.serve(async (req: Request) => {
         ok: true,
         token_hash: tokenHash,
         type: "magiclink",
-        email: verified.email || null,
+        email: loginEmail,
         phone: verified.phone || null,
         merchant_id: verified.merchant_id,
       });
