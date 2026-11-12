@@ -349,7 +349,9 @@ grant execute on function public.shericeri_sync_sale_stock(jsonb,uuid,integer,in
 -- Voiding a cart invoice restores stock, reverses its journal entries, preserves
 -- the reason and actor in the audit log, and removes the sale rows atomically.
 create or replace function public.shericeri_void_sale(
+  p_merchant_id uuid,
   p_sale_id uuid,
+  p_transaction_id uuid,
   p_reason text,
   p_audit_id uuid default gen_random_uuid()
 )
@@ -369,10 +371,16 @@ declare
   v_lock date;
 begin
   if p_sale_id is null or coalesce(length(trim(p_reason)),0)<3 then raise exception 'A clear void reason is required'; end if;
-  select merchant_id,transaction_id,invoice_number,created_at::date
-    into v_merchant_id,v_transaction_id,v_invoice_number,v_sale_date
-  from public.sales where id=p_sale_id;
+  v_merchant_id:=coalesce(p_merchant_id,(select merchant_id from public.sales where id=p_sale_id));
   if v_merchant_id is null then return jsonb_build_object('ok',true,'already_voided',true); end if;
+  select coalesce(transaction_id,p_transaction_id),invoice_number,created_at::date
+    into v_transaction_id,v_invoice_number,v_sale_date
+  from public.sales
+  where merchant_id=v_merchant_id
+    and (id=p_sale_id or (p_transaction_id is not null and transaction_id=p_transaction_id))
+  order by case when id=p_sale_id then 0 else 1 end
+  limit 1;
+  if not found then return jsonb_build_object('ok',true,'already_voided',true); end if;
   if not private.user_can_access_merchant(v_merchant_id,'manage_team') then
     raise exception 'Not authorized to void sales';
   end if;
@@ -412,8 +420,8 @@ begin
     'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids);
 end;
 $$;
-revoke all on function public.shericeri_void_sale(uuid,text,uuid) from public,anon;
-grant execute on function public.shericeri_void_sale(uuid,text,uuid) to authenticated;
+revoke all on function public.shericeri_void_sale(uuid,uuid,uuid,text,uuid) from public,anon;
+grant execute on function public.shericeri_void_sale(uuid,uuid,uuid,text,uuid) to authenticated;
 
 
 -- Seed only the standard chart identifiers needed by operational staff posting.
