@@ -153,3 +153,8 @@ test("sync retries are scheduled and connectivity restoration kicks immediately"
   assert.match(html, /addEventListener\('online',[\s\S]*?sherriSyncKick\(\)/);
   assert.match(html, /if\(navigator\.onLine\)sherriSyncKick\(\)/);
 });
+
+test("microphone waits briefly after playback to avoid capturing speaker echo", () => {
+  assert.match(html, /Listen guard','400 ms post-playback echo guard'/);
+  assert.match(html, /\},400\);\n\}\n\nlet sheriKinyaAudioEl=null/);
+});
