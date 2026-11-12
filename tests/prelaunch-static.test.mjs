@@ -8,9 +8,11 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 
-test("team managers cannot create administrator accounts", () => {
-  assert.match(teamAccess, /if \(role === "admin" && callerRole !== "owner" && callerRole !== "admin"\)/);
+test("team managers cannot create administrator accounts or grant permissions they do not hold", () => {
+  assert.match(teamAccess, /if \(role === "admin" && !isPrivilegedGrantor\)/);
   assert.match(teamAccess, /Only the business owner or an administrator can create another administrator/);
+  assert.match(teamAccess, /callerPermissions\[permission\] !== true/);
+  assert.match(teamAccess, /You cannot grant a permission you do not have/);
 });
 
 test("team permission delegation cannot exceed the manager's own permissions", () => {
