@@ -234,7 +234,7 @@ begin
   on conflict(id) do nothing;
   return p_audit_id;
 end;
-$;
+$$;
 revoke all on function public.shericeri_write_audit(uuid,uuid,text,text,uuid,text,jsonb) from public,anon;
 grant execute on function public.shericeri_write_audit(uuid,uuid,text,text,uuid,text,jsonb) to authenticated;
 
@@ -272,7 +272,7 @@ begin
   delete from public.purchases where id=p_purchase_id and merchant_id=p_merchant_id;
   return jsonb_build_object('ok',true,'purchase_id',p_purchase_id);
 end;
-$;
+$$;
 revoke all on function public.shericeri_delete_ordered_purchase(uuid,uuid,text,uuid) from public,anon;
 grant execute on function public.shericeri_delete_ordered_purchase(uuid,uuid,text,uuid) to authenticated;
 
