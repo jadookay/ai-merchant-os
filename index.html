@@ -1073,13 +1073,14 @@ async function sheriSyncOutbox(){
         else if(op.type==='supplier_upsert'){const {error}=await sb.from('suppliers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='supplier_delete'){const {error}=await sb.from('suppliers').update({deleted:true}).eq('id',op.id);if(error)throw error}
         else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
-        else if(op.type==='purchase_delete'){const {error}=await sb.from('purchases').delete().eq('id',op.id);if(error)throw error}
+        else if(op.type==='purchase_delete'){const {error}=await sb.rpc('shericeri_delete_ordered_purchase',{p_merchant_id:op.merchant_id,p_purchase_id:op.id,p_reason:op.reason,p_audit_id:op.audit_id});if(error)throw error}
         else if(op.type==='cash_upsert'){const {error}=await sb.from('cash_entries').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='cash_delete'){const {error}=await sb.from('cash_entries').delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='budget_delete'){const {error}=await sb.from('budgets').delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='accounting_upsert'){
           if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}
+          else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}
           else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         }
         else if(op.type==='accounting_settings_upsert'){const {error}=await sb.from('accounting_settings').upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'});if(error)throw error}
@@ -1112,7 +1113,7 @@ async function sheriSyncOutbox(){
               else if(op.type==='cash_upsert'){const {error}=await sb.from('cash_entries').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
-              else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
+              else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
               else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else throw err;
               await sheriDelete('outbox',item.key);
@@ -4632,7 +4633,7 @@ async function addOSPurchase(){
   if(navigator.onLine)await sheriSyncOutbox();
   document.getElementById('osPurchaseQty').value=1;document.getElementById('osPurchaseCost').value='';document.getElementById('osPurchaseDue').value='';render();
 }
-async function deleteOSPurchase(id){if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('Only a Manager, Admin or Owner with inventory access can delete purchases.','error');const x=state.purchases.find(p=>p.id===id);if(!x)return;if(x.status!=='ordered')return alert('Received purchases cannot be deleted because they affect inventory and accounting. Record a purchase return/adjustment instead.');const reason=prompt('Reason for deleting this ordered purchase (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');if(!confirm('Delete this ordered purchase?\\nReason: '+reason.trim()))return;state.purchases=state.purchases.filter(p=>p.id!==id);await sheriSaveSnapshot();await sheriQueue({type:'purchase_delete',id});await accAudit('delete','purchase',id,{reason:reason.trim(),total:x.total||x.qty*x.unit_cost});if(navigator.onLine)await sheriSyncOutbox();render()}
+async function deleteOSPurchase(id){if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('Only a Manager, Admin or Owner with inventory access can delete purchases.','error');const x=state.purchases.find(p=>p.id===id);if(!x)return;if(x.status!=='ordered')return alert('Received purchases cannot be deleted because they affect inventory and accounting. Record a purchase return/adjustment instead.');const reason=prompt('Reason for deleting this ordered purchase (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');if(!confirm('Delete this ordered purchase?\\nReason: '+reason.trim()))return;state.purchases=state.purchases.filter(p=>p.id!==id);await sheriSaveSnapshot();await sheriQueue({type:'purchase_delete',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:sheriUuid()});if(navigator.onLine)await sheriSyncOutbox();render()}
 async function addOSCashEntry(){
   if(!sheriCan('manage_finance'))return sheriToast('You do not have permission to record cash movements.','error');
   const kind=document.getElementById('osCashKind').value,amount=Number(document.getElementById('osCashAmount').value),category=document.getElementById('osCashCategory').value.trim()||'Other',description=document.getElementById('osCashDescription').value.trim();if(amount<=0||!description)return alert('Enter an amount and description.');
