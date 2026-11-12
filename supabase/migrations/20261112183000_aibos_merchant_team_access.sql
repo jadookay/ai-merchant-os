@@ -11,6 +11,7 @@ create table if not exists public.merchant_members (
   role text not null default 'cashier'
     check (role in ('admin','manager','cashier','inventory','accountant','custom')),
   permissions jsonb not null default '{}'::jsonb,
+  responsibility text,
   pin_hash text,
   status text not null default 'active' check (status in ('active','suspended','invited')),
   created_by uuid references auth.users(id) on delete set null,
@@ -112,7 +113,7 @@ begin
       and (lower(coalesce(mm.email,''))=v_identifier
         or lower(coalesce(mm.username,''))=v_identifier
         or lower(mm.full_name)=v_identifier
-        or regexp_replace(coalesce(mm.phone,''),'[^0-9+]','','g')=regexp_replace(v_identifier,'[^0-9+]','','g'));
+        or (coalesce(mm.phone,'')<>'' and regexp_replace(mm.phone,'[^0-9+]','','g')=regexp_replace(v_identifier,'[^0-9+]','','g')));
   if v_count<>1 then
     insert into public.team_login_attempts(attempt_key,attempt_count,window_started_at,blocked_until)
       values(v_key,1,now(),null)
