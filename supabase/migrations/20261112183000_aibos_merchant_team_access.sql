@@ -48,7 +48,10 @@ as $$
     where mm.merchant_id=p_merchant_id and mm.user_id=(select auth.uid()) and mm.status='active'
     and (
       (mm.role='admin' and p_permission<>'manage_owner')
-      or coalesce((mm.permissions->>p_permission)::boolean,false)
+      or (
+        coalesce((mm.permissions->>p_permission)::boolean,false)
+        and (p_permission not in ('manage_team','manage_sales') or mm.role='manager')
+      )
       or p_permission in ('view_dashboard','member_active')
       or (p_permission='view_inventory' and coalesce((mm.permissions->>'create_sale')::boolean,false))
     )
@@ -149,11 +152,11 @@ begin
       when 'suppliers' then 'view_suppliers' when 'purchases' then 'view_inventory'
       when 'audit_log' then 'view_audit_log' else 'view_financial_reports' end;
     write_perm:=case t.table_name
-      when 'products' then 'manage_inventory' when 'sales' then 'manage_sales'
-      when 'expenses' then 'manage_expenses' when 'customers' then 'manage_customers'
+      when 'products' then 'manage_team' when 'sales' then 'manage_team'
+      when 'expenses' then 'manage_team' when 'customers' then 'manage_customers'
       when 'suppliers' then 'manage_suppliers' when 'purchases' then 'manage_inventory'
       else 'manage_finance' end;
-    insert_perm:=case when t.table_name='sales' then 'create_sale' when t.table_name='audit_log' then 'view_dashboard' else write_perm end;
+    insert_perm:=case when t.table_name='sales' then 'create_sale' when t.table_name='products' then 'manage_inventory' when t.table_name='expenses' then 'manage_expenses' when t.table_name='audit_log' then 'view_dashboard' else write_perm end;
     execute format('create policy %I on public.%I for select to authenticated using (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_select',t.table_name,read_perm);
     execute format('create policy %I on public.%I for insert to authenticated with check (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_insert',t.table_name,insert_perm);
     if t.table_name<>'audit_log' then
@@ -365,7 +368,7 @@ begin
     into v_merchant_id,v_transaction_id,v_invoice_number,v_sale_date
   from public.sales where id=p_sale_id;
   if v_merchant_id is null then return jsonb_build_object('ok',true,'already_voided',true); end if;
-  if not private.user_can_access_merchant(v_merchant_id,'manage_sales')
+  if not private.user_can_access_merchant(v_merchant_id,'manage_team')
      and not private.user_can_access_merchant(v_merchant_id,'manage_finance') then
     raise exception 'Not authorized to void sales';
   end if;
