@@ -311,6 +311,7 @@ declare
   v_qty integer;
   v_current_stock integer;
   v_inserted integer;
+  v_stock_applied boolean;
 begin
   v_merchant_id:=nullif(p_sale->>'merchant_id','')::uuid;
   v_sale_id:=nullif(p_sale->>'id','')::uuid;
@@ -324,14 +325,18 @@ begin
   select stock into v_current_stock from public.products where id=p_product_id and merchant_id=v_merchant_id for update;
   if not found then raise exception 'Product was not found for this business'; end if;
   insert into public.sales
-  select (jsonb_populate_record(null::public.sales,p_sale)).*
+  select (jsonb_populate_record(null::public.sales,p_sale || jsonb_build_object('stock_applied',false))).*
   on conflict (id) do nothing;
   get diagnostics v_inserted = row_count;
-  if v_inserted=0 then return jsonb_build_object('ok',true,'already_recorded',true,'stock_conflict',false); end if;
+  if v_inserted=0 then
+    select stock_applied into v_stock_applied from public.sales where id=v_sale_id and merchant_id=v_merchant_id;
+    return jsonb_build_object('ok',true,'already_recorded',true,'stock_conflict',not coalesce(v_stock_applied,false),'server_stock',v_current_stock);
+  end if;
   if v_current_stock<>p_expected_server_stock then
     return jsonb_build_object('ok',true,'stock_conflict',true,'server_stock',v_current_stock,'local_stock',p_local_stock);
   end if;
   update public.products set stock=p_local_stock where id=p_product_id and merchant_id=v_merchant_id;
+  update public.sales set stock_applied=true where id=v_sale_id and merchant_id=v_merchant_id;
   return jsonb_build_object('ok',true,'stock_conflict',false,'server_stock',p_local_stock);
 end;
 $$;
@@ -381,7 +386,7 @@ begin
     from public.sales
     where merchant_id=v_merchant_id
       and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
-      and product_id is not null
+      and product_id is not null and stock_applied=true
     group by product_id
   ) x
   where p.id=x.product_id and p.merchant_id=v_merchant_id;
