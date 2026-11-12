@@ -49,6 +49,7 @@ as $$
     and (
       (mm.role='admin' and p_permission<>'manage_owner')
       or coalesce((mm.permissions->>p_permission)::boolean,false)
+      or p_permission in ('view_dashboard','member_active')
       or (p_permission='view_inventory' and coalesce((mm.permissions->>'create_sale')::boolean,false))
     )
   );
