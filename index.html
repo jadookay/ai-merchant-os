@@ -1867,21 +1867,36 @@ async function recordSale(){
 }
 async function voidSale(id){
   if(!sheriCan('manage_sales'))return sheriToast('You do not have permission to void sales.','error');
-  const s=state.sales.find(x=>x.id===id); if(!s)return;
-  const reason=prompt('Enter the reason for voiding this sale (required):');if(!reason||!reason.trim()){sheriToast('A reason is required to void a sale.','error');return}window.__sheriVoidReasons=window.__sheriVoidReasons||{};window.__sheriVoidReasons[id]=reason.trim();
-  if(!confirm('Void this sale? Its stock will be added back to inventory.\\nReason: '+reason.trim()))return;
-  // Preserve a durable audit record before removing the active sale from operational totals.
-  // The audit row stores the reason, actor, invoice and transaction identifiers.
-  await accAudit('void','sale',id,{reason:reason.trim(),invoice_number:s.invoice_number||null,transaction_id:s.transaction_id||null,amount:Number(s.qty||0)*Number(s.price||0),product:s.product_name_snapshot||product(s.product_id)?.name||null});
-  const p=product(s.product_id); if(p)p.stock+=s.qty;
-  state.sales=state.sales.filter(x=>x.id!==id);
-  await sheriDelete('sales',id);
-  await sheriSaveSnapshot();
-  await sheriQueue({type:'sale_delete',id});
-  if(p)await sheriQueue({type:'product_upsert',record:{...p}});
+  const selected=state.sales.find(x=>x.id===id);if(!selected)return;
+  const transactionId=selected.transaction_id||null;
+  const rows=transactionId?state.sales.filter(x=>x.transaction_id===transactionId):[selected];
+  const invoice=selected.invoice_number||'';
+  const total=rows.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0);
+  const reason=prompt('Enter the reason for voiding this sale (required):');
+  if(!reason||reason.trim().length<3)return sheriToast('A clear void reason is required.','error');
+  const confirmText='Void '+(invoice?'entire invoice '+invoice:'this sale')+'?\\n'+rows.map(x=>(x.qty||0)+' × '+(x.product_name_snapshot||product(x.product_id)?.name||'Product')+' — '+money((x.qty||0)*(x.price||0))).join('\\n')+'\\nTotal: '+money(total)+'\\nReason: '+reason.trim();
+  if(!confirm(confirmText))return;
+  const auditId=sheriUuid(),saleIds=rows.map(x=>x.id);
+  const auditRow={id:auditId,merchant_id:state.merchant.id,actor_user_id:session?.user?.id||null,action:'void',entity_type:'sale',entity_id:id,reason:reason.trim(),details:{reason:reason.trim(),invoice_number:invoice||null,transaction_id:transactionId,amount:total,sale_ids:saleIds,line_count:rows.length},created_at:sheriNow()};
+  state.auditLog.unshift(auditRow);
+  await sheriPut('auditLog',auditId,{merchant_id:state.merchant.id,record:{...auditRow}});
+  for(const row of rows){
+    const p=product(row.product_id);if(p)p.stock=Number(p.stock||0)+Number(row.qty||0);
+    await sheriDelete('sales',row.id);
+  }
+  state.sales=state.sales.filter(x=>!saleIds.includes(x.id));
+  for(const entry of state.journalEntries||[]){
+    if(saleIds.includes(entry.source_id)&&['sale','sale_cogs'].includes(entry.source_type)&&!entry.voided){
+      entry.voided=true;entry.void_reason=reason.trim();entry.voided_at=sheriNow();entry.voided_by=session?.user?.id||null;
+      await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});
+    }
+  }
+  await sheriSaveSnapshot();await sheriSaveAccountingSnapshot();
+  await sheriQueue({type:'sale_void',id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId});
   if(navigator.onLine)await sheriSyncOutbox();
-  render();
+  render();sheriToast((invoice?'Invoice '+invoice:'Sale')+' voided with stock and accounting reversal recorded.');
 }
+
 const sheriSearchValues={};
 function sheriSearchControl(key,target,placeholder,values){
   const listId=key+'Suggestions',value=esc(sheriSearchValues[key]||''),options=[...new Set((values||[]).filter(Boolean).map(String))].slice(0,100);
