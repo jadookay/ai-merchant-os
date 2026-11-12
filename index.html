@@ -2568,7 +2568,7 @@ async function sheriStartFormVoice(statusId,onTranscript,hint){
       try{const transcript=await sheriTranscribeFormAudio(blob);window.__sheriPendingVoice={transcript,onTranscript,statusId};status.innerHTML='Heard: “'+esc(transcript)+'” <div class="actions" style="margin-top:7px"><button class="btn small" onclick="sheriConfirmVoiceEntry()">Use this recording</button><button class="btn small secondary" onclick="sheriDiscardVoiceEntry()">Discard</button></div>';}
       catch(err){status.textContent=(err?.message||String(err))+' You can type the details instead.';}
     };
-    recorder.start(250);status.textContent='🔴 Recording… '+(hint||'Speak now')+' Tap the Voice button again to finish.';
+    recorder.start(250);status.innerHTML='🔴 Recording… '+esc(hint||'Speak now')+' <button class="btn small" onclick="sheriStopFormVoice()">Done recording</button>';
     sheriFormVoiceTimer=setTimeout(()=>{if(recorder.state==='recording'){status.textContent='Recording time limit reached. Processing…';sheriStopFormVoice();}},12000);
   }catch(err){if(sheriFormVoiceStream){sheriFormVoiceStream.getTracks().forEach(t=>t.stop());sheriFormVoiceStream=null;}status.textContent=(err?.name==='NotAllowedError'?'Microphone permission was denied. Allow microphone access for this site in Chrome settings. ':err?.message||String(err))+' You can still type the details.';}
 }
