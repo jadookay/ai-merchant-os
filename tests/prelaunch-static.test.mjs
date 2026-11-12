@@ -443,3 +443,21 @@ test("destructive controls require both a manager-level role and the relevant re
       fn+" must require both manager role and the relevant permission");
   }
 });
+
+
+test("staff sales, purchases, journal entries and audit records must use trusted RPCs", () => {
+  assert.ok(teamMigration.includes("t.table_name not in ('audit_log','sales','purchases','journal_entries','journal_lines')"));
+  assert.ok(teamMigration.includes("t.table_name not in ('audit_log','sales','journal_entries','journal_lines')"));
+  assert.ok(teamMigration.includes("shericeri_write_audit"));
+  assert.ok(teamMigration.includes("shericeri_delete_ordered_purchase"));
+  assert.ok(html.includes("sb.rpc('shericeri_write_audit'"));
+  assert.ok(html.includes("sb.rpc('shericeri_delete_ordered_purchase'"));
+  assert.ok(!html.includes("op.table==='audit_log'){const {error}=await sb.from(op.table).upsert"));
+});
+
+test("ordered purchase deletion carries its reason and is checked server-side", () => {
+  assert.ok(html.includes("type:'purchase_delete',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:sheriUuid()"));
+  assert.ok(teamMigration.includes("v_purchase.status<>'ordered'"));
+  assert.ok(teamMigration.includes("Received purchases cannot be deleted"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_team')"));
+});
