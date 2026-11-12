@@ -470,3 +470,81 @@ end;
 $$;
 revoke all on function public.shericeri_ensure_operational_accounts(uuid) from public,anon;
 grant execute on function public.shericeri_ensure_operational_accounts(uuid) to authenticated;
+
+
+-- Received purchases update inventory through a permission-checked RPC; staff do not
+-- need broad UPDATE access to product names, prices, barcodes or expiry metadata.
+create or replace function public.shericeri_sync_purchase_stock(
+  p_purchase jsonb,
+  p_product_id uuid,
+  p_expected_server_stock integer,
+  p_expected_server_cost integer,
+  p_local_stock integer,
+  p_local_cost integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_merchant_id uuid;
+  v_purchase_id uuid;
+  v_qty integer;
+  v_unit_cost integer;
+  v_current_stock integer;
+  v_current_cost integer;
+  v_stock_applied boolean;
+  v_inserted integer;
+  v_expected_cost integer;
+  v_status text;
+  v_supplier_id uuid;
+begin
+  v_merchant_id:=nullif(p_purchase->>'merchant_id','')::uuid;
+  v_purchase_id:=nullif(p_purchase->>'id','')::uuid;
+  v_qty:=nullif(p_purchase->>'qty','')::integer;
+  v_unit_cost:=nullif(p_purchase->>'unit_cost','')::integer;
+  v_status:=coalesce(p_purchase->>'status','received');
+  v_supplier_id:=nullif(p_purchase->>'supplier_id','')::uuid;
+  if v_merchant_id is null or v_purchase_id is null or v_qty is null or v_qty<1 or v_unit_cost is null or v_unit_cost<0 then
+    raise exception 'Purchase identity, quantity or unit cost is invalid';
+  end if;
+  if not private.user_can_access_merchant(v_merchant_id,'manage_inventory') then raise exception 'Not authorized to record inventory purchases'; end if;
+  if nullif(p_purchase->>'product_id','')::uuid is distinct from p_product_id then raise exception 'Purchase product does not match the stock operation'; end if;
+  if v_supplier_id is not null and not exists(select 1 from public.suppliers where id=v_supplier_id and merchant_id=v_merchant_id) then
+    raise exception 'Supplier does not belong to this business';
+  end if;
+  select stock,cost into v_current_stock,v_current_cost from public.products
+  where id=p_product_id and merchant_id=v_merchant_id for update;
+  if not found then raise exception 'Product was not found for this business'; end if;
+  insert into public.purchases
+  select (jsonb_populate_record(null::public.purchases,p_purchase || jsonb_build_object('stock_applied',v_status='ordered'))).*
+  on conflict (id) do nothing;
+  get diagnostics v_inserted = row_count;
+  if v_inserted=0 then
+    select stock_applied into v_stock_applied from public.purchases where id=v_purchase_id and merchant_id=v_merchant_id;
+    return jsonb_build_object('ok',true,'already_recorded',true,'stock_conflict',not coalesce(v_stock_applied,false),'server_stock',v_current_stock);
+  end if;
+  if v_status='ordered' then
+    return jsonb_build_object('ok',true,'stock_conflict',false,'ordered',true);
+  end if;
+  if p_expected_server_stock is null or p_expected_server_cost is null or p_local_stock is null or p_local_cost is null
+     or p_local_stock<>p_expected_server_stock+v_qty then
+    raise exception 'Purchase stock values are invalid';
+  end if;
+  if v_current_stock+v_qty>0 then
+    v_expected_cost:=round(((v_current_stock*v_current_cost)+(v_qty*v_unit_cost))::numeric/(v_current_stock+v_qty))::integer;
+  else
+    v_expected_cost:=v_unit_cost;
+  end if;
+  if v_current_stock<>p_expected_server_stock or v_current_cost<>p_expected_server_cost then
+    return jsonb_build_object('ok',true,'stock_conflict',true,'server_stock',v_current_stock,'server_cost',v_current_cost);
+  end if;
+  if p_local_cost<>v_expected_cost then raise exception 'Weighted average purchase cost does not match the server calculation'; end if;
+  update public.products set stock=p_local_stock,cost=p_local_cost where id=p_product_id and merchant_id=v_merchant_id;
+  update public.purchases set stock_applied=true where id=v_purchase_id and merchant_id=v_merchant_id;
+  return jsonb_build_object('ok',true,'stock_conflict',false,'server_stock',p_local_stock,'server_cost',p_local_cost);
+end;
+$$;
+revoke all on function public.shericeri_sync_purchase_stock(jsonb,uuid,integer,integer,integer,integer) from public,anon;
+grant execute on function public.shericeri_sync_purchase_stock(jsonb,uuid,integer,integer,integer,integer) to authenticated;
