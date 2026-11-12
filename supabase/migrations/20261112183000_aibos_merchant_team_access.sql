@@ -325,7 +325,7 @@ begin
   if p_product_id is null or p_local_stock is null or p_expected_server_stock is null or p_local_stock<0 or p_local_stock<>p_expected_server_stock-v_qty then
     raise exception 'Sale stock values are invalid';
   end if;
-  select stock into v_current_stock from public.products where id=p_product_id and merchant_id=v_merchant_id for update;
+  select coalesce(stock,0) into v_current_stock from public.products where id=p_product_id and merchant_id=v_merchant_id for update;
   if not found then raise exception 'Product was not found for this business'; end if;
   insert into public.sales
   select (jsonb_populate_record(null::public.sales,p_sale || jsonb_build_object('stock_applied',false))).*
@@ -514,7 +514,7 @@ begin
   if v_supplier_id is not null and not exists(select 1 from public.suppliers where id=v_supplier_id and merchant_id=v_merchant_id) then
     raise exception 'Supplier does not belong to this business';
   end if;
-  select stock,cost into v_current_stock,v_current_cost from public.products
+  select coalesce(stock,0),coalesce(cost,0) into v_current_stock,v_current_cost from public.products
   where id=p_product_id and merchant_id=v_merchant_id for update;
   if not found then raise exception 'Product was not found for this business'; end if;
   insert into public.purchases
