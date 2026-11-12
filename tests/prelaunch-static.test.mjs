@@ -6,6 +6,12 @@ import vm from "node:vm";
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const quickService = await readFile(new URL("../supabase/functions/quick-service/index.ts", import.meta.url), "utf8");
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
+const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
+
+test("team managers cannot create administrator accounts", () => {
+  assert.match(teamAccess, /if \(role === "admin" && callerRole !== "owner" && callerRole !== "admin"\)/);
+  assert.match(teamAccess, /Only the business owner or an administrator can create another administrator/);
+});
 
 test("cancelled expense deletion does not post an accounting reversal", () => {
   assert.match(html, /await _v14_1_deleteExpense\(id\);if\(state\.expenses\.some\(x=>x\.id===id\)\)return;/);
