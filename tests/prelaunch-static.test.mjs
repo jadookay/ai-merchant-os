@@ -220,3 +220,27 @@ test("operational transaction lists are ordered by occurrence timestamp", () => 
   assert.match(html, /state\.expenses\.filter\(e=>sheriDateInReportRange\(e\.created_at\)\)\.slice\(\)\.sort\(\(a,b\)=>String\(b\.created_at/);
   assert.match(html, /state\.payments\.slice\(\)\.sort\(\(a,b\)=>String\(b\.payment_date/);
 });
+test("recent activity combines business transactions and sorts them by occurrence time", () => {
+  assert.match(html, /function sheriRecentActivitiesHtml\(\)/);
+  assert.match(html, /for\(const s of state\.sales/);
+  assert.match(html, /for\(const e of state\.expenses/);
+  assert.match(html, /for\(const p of state\.purchases/);
+  assert.match(html, /for\(const c of state\.cashEntries/);
+  assert.match(html, /for\(const p of state\.payments/);
+  assert.match(html, /sort\(\(a,b\)=>String\(b\.when/);
+});
+
+test("new product opening inventory and explicit stock gain/write-off adjustments post balanced journal entries", () => {
+  assert.match(html, /sourceType:'product_opening_stock',sourceId:openingStockProduct\.id/);
+  assert.match(html, /option value="stock_writeoff"/);
+  assert.match(html, /option value="stock_gain"/);
+  assert.match(html, /type==='stock_writeoff'\)\{lines=\[\{accountId:accAccountCode\('6000'\)\.id,debit:amount\}/);
+  assert.match(html, /type==='stock_gain'\)\{lines=\[\{accountId:inv\.id,debit:amount\},\{accountId:accAccountCode\('3000'\)\.id,credit:amount\}/);
+  assert.match(html, /function accAdjustTypeChanged\(\)/);
+});
+
+test("customer records support shared voice entry and confirmation before saving", () => {
+  assert.match(html, /sheriStartFormVoice\('customerVoiceStatus',parseVoiceCustomer/);
+  assert.match(html, /function parseVoiceCustomer\(transcript\)/);
+  assert.match(html, /Add this customer\?/);
+});
