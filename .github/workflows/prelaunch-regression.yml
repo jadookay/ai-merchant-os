@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - fix/prelaunch-priority-one-2026-11-11
+      - feat/aibos-team-controls-cart-expiry-sheri-context
   pull_request:
     branches:
       - main
+      - fix/prelaunch-priority-one-2026-11-11
+  workflow_dispatch:
 
 jobs:
   static-regression:
