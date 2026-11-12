@@ -262,6 +262,26 @@ test("operational staff receive only chart identifiers while financial reports a
   assert.match(teamMigration, /shericeri_ensure_operational_accounts/);
 });
 
+test("manager-only destructive actions require reasons and are protected by backend policies", () => {
+  for (const fn of ["deleteProduct","deleteExpense","deleteCustomer","deleteOSSupplier","deleteOSPurchase","deleteOSCash","deleteOSBudget"]) {
+    const start = html.indexOf("async function "+fn+"(");
+    assert.ok(start >= 0, "missing "+fn);
+    const block = html.slice(start, start + 1100);
+    assert.match(block, /sheriCan\('manage_team'\)/, fn+" must be manager-gated");
+    assert.match(block, /reason=prompt\(/, fn+" must require a reason");
+  }
+  assert.match(html, /if\(!sheriCan\('manage_team'\)\)return sheriToast\('Only a Manager, Admin or Owner can void sales/);
+  assert.match(teamMigration, /write_perm:='manage_team'/);
+  assert.match(teamMigration, /if not private\.user_can_access_merchant\(v_merchant_id,'manage_team'\) then/);
+});
+
+test("cashier accounting setup and journal posting are permission-scoped", () => {
+  assert.match(html, /sb\.rpc\('shericeri_ensure_operational_accounts'/);
+  assert.match(teamMigration, /private\.user_can_access_merchant\(p_merchant_id,'create_sale'\)/);
+  assert.match(teamMigration, /p_source_type in \('sale','sale_cogs'\)/);
+  assert.match(teamMigration, /'journalEntries',case when v_can_view_reports/);
+});
+
 test("multi-product sales support add, remove, confirmation, transaction IDs and printable receipts", () => {
   assert.ok(html.includes("function addSaleToCart()"));
   assert.ok(html.includes("function removeSaleCartItem(i)"));
