@@ -29,7 +29,7 @@ test("cancelled expense deletion does not post an accounting reversal", () => {
 });
 
 test("sale void reason and transaction references are persisted to the audit trail", () => {
-  assert.match(html, /type:'sale_void',id,reason:reason\.trim\(\),audit_id:auditId/);
+  assert.match(html, /type:'sale_void',id,merchant_id:state\.merchant\.id,reason:reason\.trim\(\),audit_id:auditId/);
   assert.match(html, /p_merchant_id:op\.merchant_id,p_sale_id:op\.id,p_transaction_id:op\.transaction_id\|\|null,p_reason:op\.reason,p_audit_id:op\.audit_id/);
   assert.ok(html.includes("invoice_number:invoice||null,transaction_id:transactionId"));
   assert.match(teamMigration, /create or replace function public\.shericeri_void_sale/);
