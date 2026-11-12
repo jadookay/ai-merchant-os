@@ -991,6 +991,25 @@ async function sheriSyncJournalBatch(op){
   if(error)throw error;
   if(data!==entry.id)throw new Error('Atomic journal synchronization returned an unexpected entry ID.');
 }
+async function sheriSyncSaleOperation(op){
+  const {data,error}=await sb.rpc('shericeri_sync_sale_stock',{
+    p_sale:sheriServerRecord(op.record),
+    p_product_id:op.productId,
+    p_local_stock:op.localStock,
+    p_expected_server_stock:op.expectedServerStock
+  });
+  if(error)throw error;
+  if(data?.stock_conflict)await sheriRecordConflict({
+    type:'stock_conflict',product_id:op.productId,local_stock:op.localStock,
+    server_stock:data.server_stock,sale_id:op.record.id,operation:op
+  });
+}
+async function sheriSyncVoidSale(op){
+  const {error}=await sb.rpc('shericeri_void_sale',{
+    p_sale_id:op.id,p_reason:op.reason,p_audit_id:op.audit_id
+  });
+  if(error)throw error;
+}
 async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy)return;
   sheriSyncBusy=true;
@@ -1020,10 +1039,8 @@ async function sheriSyncOutbox(){
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_upsert'){const {error}=await sb.from('products').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_delete'){const {error}=await sb.from('products').update({deleted:true}).eq('id',op.id);if(error)throw error}
-        else if(op.type==='sale_upsert'){
-          const {error}=await sb.from('sales').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error;
-          if(op.productId!=null){const {data:sp,error:pe}=await sb.from('products').select('id,stock').eq('id',op.productId).maybeSingle();if(pe)throw pe;const conflict=!!(sp&&op.expectedServerStock!=null&&Number(sp.stock)!==Number(op.expectedServerStock));if(conflict)await sheriRecordConflict({type:'stock_conflict',product_id:op.productId,local_stock:op.localStock,server_stock:sp.stock,sale_id:op.record.id,operation:op});else{const {error:se}=await sb.from('products').update({stock:op.localStock}).eq('id',op.productId);if(se)throw se}}
-        }
+        else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
+        else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
         else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='expense_delete'){const {error}=await sb.from('expenses').delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='sale_delete'){const {error}=await sb.from('sales').delete().eq('id',op.id);if(error)throw error}
@@ -1059,6 +1076,8 @@ async function sheriSyncOutbox(){
               // Re-run this operation exactly once with the fresh token.
               if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='product_upsert'){const {error}=await sb.from('products').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
+              else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
               else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='customer_upsert'){const {error}=await sb.from('customers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='supplier_upsert'){const {error}=await sb.from('suppliers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
