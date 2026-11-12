@@ -74,7 +74,7 @@ language plpgsql security definer
 set search_path = ''
 as $$
 begin
-  if auth.role() <> 'service_role' then
+  if coalesce(auth.jwt()->>'role','') <> 'service_role' then
     raise exception 'not authorized';
   end if;
   if p_pin !~ '^[0-9]{6,8}$' then raise exception 'PIN must contain 6 to 8 digits'; end if;
@@ -99,7 +99,7 @@ declare
   v_member public.merchant_members%rowtype;
   v_count integer;
 begin
-  if auth.role() <> 'service_role' then raise exception 'not authorized'; end if;
+  if coalesce(auth.jwt()->>'role','') <> 'service_role' then raise exception 'not authorized'; end if;
   if length(v_identifier)<2 or p_pin !~ '^[0-9]{6,8}$' then return jsonb_build_object('ok',false); end if;
   v_key := encode(extensions.digest(v_identifier||':'||coalesce(p_ip_hash,''),'sha256'),'hex');
   select * into v_attempt from public.team_login_attempts where attempt_key=v_key for update;
