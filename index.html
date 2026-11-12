@@ -1010,6 +1010,16 @@ async function sheriSyncVoidSale(op){
   });
   if(error)throw error;
 }
+async function sheriSyncProductOperation(op){
+  const record=sheriServerRecord(op.record);
+  if(sheriCan('manage_team')){
+    const {error}=await sb.from('products').upsert(record,{onConflict:'id'});if(error)throw error;return;
+  }
+  const {data,error}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
+  if(error)throw error;
+  if(data)return; // Non-managers may create a product, but never overwrite an existing one.
+  const {error:insertError}=await sb.from('products').insert(record);if(insertError)throw insertError;
+}
 async function sheriSyncPurchaseOperation(op){
   const {data,error}=await sb.rpc('shericeri_sync_purchase_stock',{
     p_purchase:sheriServerRecord(op.record),
@@ -1053,7 +1063,7 @@ async function sheriSyncOutbox(){
       const op=item.op||{};
       try{
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
-        else if(op.type==='product_upsert'){const {error}=await sb.from('products').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+        else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
         else if(op.type==='product_delete'){const {error}=await sb.from('products').update({deleted:true}).eq('id',op.id);if(error)throw error}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
         else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
@@ -1091,7 +1101,7 @@ async function sheriSyncOutbox(){
               session=refreshed.data.session;
               // Re-run this operation exactly once with the fresh token.
               if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
-              else if(op.type==='product_upsert'){const {error}=await sb.from('products').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
               else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
               else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
               else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
