@@ -3935,11 +3935,16 @@ function sheriDrainSpeakQueue(){
       speechSynthesis.resume();
       speechSynthesis.speak(utt);
       if(retryTimer)clearTimeout(retryTimer);
+      // Android's speech engine can take more than 10 seconds to initialize
+      // on this device. A 1.2-second watchdog cancelled valid utterances and
+      // produced a misleading "interrupted" error. Give Android 20 seconds;
+      // keep a shorter recovery window on other platforms.
+      const startTimeoutMs=isAndroid?20000:5000;
       retryTimer=setTimeout(()=>{
         if(turnId===sheriTurnId&&!started&&!finished){
-          retrySpeech('no onstart within 1200 ms');
+          retrySpeech('no onstart within '+startTimeoutMs+' ms');
         }
-      },1200);
+      },startTimeoutMs);
     }catch(e){
       if(turnId!==sheriTurnId)return;
       if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e.message||String(e)));
