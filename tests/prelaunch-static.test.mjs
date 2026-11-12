@@ -163,3 +163,60 @@ test("deterministic business fast-lane answers are added to recent memory", () =
   assert.match(html, /sheriCommitAssistantHistory\(thisTurnId,localizedFast\);\s*const fastMemory=sheriDecideMemoryWrite\(transcript,localizedFast,'local_business'\)/);
   assert.match(html, /if\(fastMemory\)sheriQueueMemory\(fastMemory\.category,fastMemory\.content\)/);
 });
+
+test("pending sync button shows each queued activity, its status, failure reason and retry time", () => {
+  assert.match(html, /onclick="sheriTogglePendingSync\(\)">Pending activity/);
+  assert.match(html, /async function sheriTogglePendingSync\(\)/);
+  assert.match(html, /item\.last_error/);
+  assert.match(html, /item\.blocked/);
+  assert.match(html, /item\.next_retry_at/);
+});
+
+test("all transaction tables scroll horizontally on small screens", () => {
+  assert.match(html, /\[id\$="Table"\]\{max-width:100%;overflow-x:auto/);
+  assert.match(html, /\[id\$="Table"\] \.table\{min-width:620px/);
+});
+
+test("each navigated page receives a back button and navigation history", () => {
+  assert.match(html, /function sheriEnsureViewBack\(v\)/);
+  assert.match(html, /function sheriGoBack\(\)/);
+  assert.match(html, /sheriViewHistory\.push\(sheriCurrentView\)/);
+  assert.match(html, /sheriEnsureViewBack\(v\);render\(\)/);
+});
+
+test("sale, product, advisor and expense voice entry share MediaRecorder and authenticated Whisper transcription", () => {
+  assert.match(html, /async function sheriStartFormVoice\(statusId,onTranscript,hint\)/);
+  assert.match(html, /new MediaRecorder\(sheriFormVoiceStream/);
+  assert.match(html, /mode:lang==='rw'\?'kinya_transcribe':'transcribe'/);
+  assert.match(html, /function startVoice\(\)\{sheriStartFormVoice\('voiceStatus',parseVoiceSale/);
+  assert.match(html, /function startProductVoice\(\)\{sheriStartFormVoice\('productVoiceStatus',parseVoiceProduct/);
+  assert.match(html, /function startAdvisorVoice\(\)\{sheriStartFormVoice\('advisorVoiceStatus'/);
+  assert.match(html, /sheriStartFormVoice\('expenseVoiceStatus',parseVoiceExpense/);
+});
+
+test("sales and expenses confirm before saving and post balanced journal entries immediately", () => {
+  assert.match(html, /Confirm sale\?[\\s\\S]*?sourceType:'sale',sourceId:saleRow\.id/);
+  assert.match(html, /Record this expense\?[\\s\\S]*?sourceType:'expense',sourceId:data\.id/);
+  assert.match(html, /sourceType:'sale_cogs',sourceId:saleRow\.id/);
+  assert.match(html, /sheriToast\('Expense recorded\.'/);
+});
+
+test("sales, expenses and reports support daily, weekly, monthly and custom calendar date ranges", () => {
+  for (const id of ['reportPeriod','salesPeriod','expensePeriod']) assert.match(html, new RegExp('id="'+id+'"'));
+  assert.match(html, /function sheriApplyDateRange\(mode,fromId,toId\)/);
+  assert.match(html, /function accReportTotals\(startDate=null,endDate=null\)/);
+  assert.match(html, /accReportTotals\(reportStart,reportEnd\),bs=accReportTotals\(null,reportEnd\)/);
+  assert.match(html, /function accCashFlowForPeriod\(startDate,endDate\)/);
+});
+
+test("search suggestions are available for products, sales, expenses, invoices, bills and payments", () => {
+  for (const host of ['salesSearchHost','inventorySearchHost','expenseSearchHost','accInvoiceSearchHost','accBillSearchHost','accPaymentSearchHost']) assert.ok(html.includes(host), 'missing '+host);
+  assert.match(html, /function sheriSearchControl\(key,target,placeholder,values\)/);
+  assert.match(html, /function sheriSearchTable\(input\)/);
+});
+
+test("operational transaction lists are ordered by occurrence timestamp", () => {
+  assert.match(html, /state\.sales\.filter\(s=>sheriDateInReportRange\(s\.created_at\)\)\.slice\(\)\.sort\(\(a,b\)=>String\(b\.created_at/);
+  assert.match(html, /state\.expenses\.filter\(e=>sheriDateInReportRange\(e\.created_at\)\)\.slice\(\)\.sort\(\(a,b\)=>String\(b\.created_at/);
+  assert.match(html, /state\.payments\.slice\(\)\.sort\(\(a,b\)=>String\(b\.payment_date/);
+});
