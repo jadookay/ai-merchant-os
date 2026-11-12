@@ -1006,7 +1006,7 @@ async function sheriSyncSaleOperation(op){
 }
 async function sheriSyncVoidSale(op){
   const {error}=await sb.rpc('shericeri_void_sale',{
-    p_sale_id:op.id,p_reason:op.reason,p_audit_id:op.audit_id
+    p_merchant_id:op.merchant_id,p_sale_id:op.id,p_transaction_id:op.transaction_id||null,p_reason:op.reason,p_audit_id:op.audit_id
   });
   if(error)throw error;
 }
@@ -1892,7 +1892,7 @@ async function voidSale(id){
     }
   }
   await sheriSaveSnapshot();await sheriSaveAccountingSnapshot();
-  await sheriQueue({type:'sale_void',id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId});
+  await sheriQueue({type:'sale_void',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId});
   if(navigator.onLine)await sheriSyncOutbox();
   render();sheriToast((invoice?'Invoice '+invoice:'Sale')+' voided with stock and accounting reversal recorded.');
 }
