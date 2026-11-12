@@ -53,17 +53,14 @@ Deno.serve(async (req: Request) => {
 
       const { data: authUser, error: userError } = await admin.auth.admin.getUserById(verified.user_id);
       if (userError || !authUser?.user) throw userError || new Error("User account not found");
-      const target = verified.email
-        ? { email: verified.email }
-        : verified.phone
-          ? { phone: verified.phone }
-          : null;
-      if (!target) return json({ error: "This team member needs a verified email address or phone number before PIN sign-in." }, 409);
-
+      // Supabase magic links are email-only. Phone-only staff receive a non-deliverable
+      // internal Auth alias; the PIN was already verified against their phone identity.
+      const loginEmail = authUser.user.email;
+      if (!loginEmail) return json({ error: "This staff account needs an email-based Auth identity." }, 409);
       const { data: link, error: linkError } = await admin.auth.admin.generateLink({
         type: "magiclink",
-        ...target,
-      } as any);
+        email: loginEmail,
+      });
       if (linkError) throw linkError;
       const tokenHash = link?.properties?.hashed_token;
       if (!tokenHash) throw new Error("Secure sign-in token could not be created.");
@@ -120,11 +117,12 @@ Deno.serve(async (req: Request) => {
       }
       if (!canManage) return json({ error: "You do not have permission to manage this team." }, 403);
 
+      const authEmail = email || ("staff-" + crypto.randomUUID() + "@example.com");
       const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email: email || undefined,
+        email: authEmail,
         phone: phone || undefined,
         password: randomPassword(),
-        email_confirm: !!email,
+        email_confirm: true,
         phone_confirm: !!phone,
         user_metadata: { full_name: fullName },
       });
