@@ -4592,12 +4592,22 @@ async function addOSSupplier(){
 }
 async function deleteOSSupplier(id){if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can remove suppliers.','error');const x=state.suppliers.find(s=>s.id===id);if(!x)return;const reason=prompt('Reason for removing this supplier (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');if(!confirm('Remove '+x.name+'? Existing purchase history will stay.\\nReason: '+reason.trim()))return;x.deleted=true;await sheriPut('suppliers',id,{merchant_id:state.merchant.id,record:{...x}});await sheriQueue({type:'supplier_delete',id});await accAudit('delete','supplier',id,{reason:reason.trim(),name:x.name});if(navigator.onLine)await sheriSyncOutbox();render()}
 async function addOSPurchase(){
+  if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to record purchases.','error');
   const supplierId=document.getElementById('osPurchaseSupplier').value||null,productId=document.getElementById('osPurchaseProduct').value,qty=Number(document.getElementById('osPurchaseQty').value),unitCost=Number(document.getElementById('osPurchaseCost').value),status=document.getElementById('osPurchaseStatus').value;
-  const p=product(productId);if(!p||qty<1||unitCost<0)return alert('Choose a product and enter a valid quantity and unit cost.');
-  const now=sheriNow();const data={id:sheriUuid(),merchant_id:state.merchant.id,supplier_id:supplierId,product_id:p.id,product_name_snapshot:p.name,qty,unit_cost:unitCost,total:qty*unitCost,status,purchased_at:now,due_date:document.getElementById('osPurchaseDue').value||null,created_at:now};
-  state.purchases.push(data);await sheriPut('purchases',data.id,{merchant_id:state.merchant.id,record:{...data}});await sheriQueue({type:'purchase_upsert',record:data});
-  if(status!=='ordered'){const oldStock=Number(p.stock)||0,oldCost=Number(p.cost)||0;const received=oldStock+qty;p.stock=received;p.cost=received>0?((oldStock*oldCost)+(qty*unitCost))/received:unitCost; p.updated_at=now;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}})}
-  if(navigator.onLine)await sheriSyncOutbox();document.getElementById('osPurchaseQty').value=1;document.getElementById('osPurchaseCost').value='';document.getElementById('osPurchaseDue').value='';render();
+  const p=product(productId);if(!p||!Number.isInteger(qty)||qty<1||!Number.isInteger(unitCost)||unitCost<0)return alert('Choose a product and enter a whole-number quantity and valid unit cost.');
+  const now=sheriNow(),oldStock=Number(p.stock)||0,oldCost=Number(p.cost)||0;
+  const data={id:sheriUuid(),merchant_id:state.merchant.id,supplier_id:supplierId,product_id:p.id,product_name_snapshot:p.name,qty,unit_cost:unitCost,total:qty*unitCost,status,purchased_at:now,due_date:document.getElementById('osPurchaseDue').value||null,created_at:now};
+  let localStock=null,localCost=null;
+  if(status!=='ordered'){
+    localStock=oldStock+qty;
+    localCost=localStock>0?Math.round(((oldStock*oldCost)+(qty*unitCost))/localStock):unitCost;
+    p.stock=localStock;p.cost=localCost;p.updated_at=now;
+  }
+  state.purchases.push(data);
+  await sheriPut('purchases',data.id,{merchant_id:state.merchant.id,record:{...data}});
+  await sheriQueue({type:'purchase_upsert',record:data,productId:p.id,expectedServerStock:status==='ordered'?null:oldStock,expectedServerCost:status==='ordered'?null:oldCost,localStock,localCost});
+  if(navigator.onLine)await sheriSyncOutbox();
+  document.getElementById('osPurchaseQty').value=1;document.getElementById('osPurchaseCost').value='';document.getElementById('osPurchaseDue').value='';render();
 }
 async function deleteOSPurchase(id){if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can delete purchases.','error');const x=state.purchases.find(p=>p.id===id);if(!x)return;if(x.status!=='ordered')return alert('Received purchases cannot be deleted because they affect inventory and accounting. Record a purchase return/adjustment instead.');const reason=prompt('Reason for deleting this ordered purchase (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');if(!confirm('Delete this ordered purchase?\\nReason: '+reason.trim()))return;state.purchases=state.purchases.filter(p=>p.id!==id);await sheriSaveSnapshot();await sheriQueue({type:'purchase_delete',id});await accAudit('delete','purchase',id,{reason:reason.trim(),total:x.total||x.qty*x.unit_cost});if(navigator.onLine)await sheriSyncOutbox();render()}
 async function addOSCashEntry(){
