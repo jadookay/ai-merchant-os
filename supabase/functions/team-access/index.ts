@@ -108,19 +108,39 @@ Deno.serve(async (req: Request) => {
 
       let canManage = merchant.user_id === callerData.user.id;
       let callerRole = canManage ? "owner" : null;
+      let callerPermissions: Record<string, boolean> = {};
       if (!canManage) {
         const { data: membership, error: memberError } = await admin
           .from("merchant_members").select("role,permissions,status")
           .eq("merchant_id", merchantId).eq("user_id", callerData.user.id).maybeSingle();
         if (memberError) throw memberError;
         callerRole = membership?.role || null;
+        callerPermissions = membership?.permissions && typeof membership.permissions === "object" ? membership.permissions : {};
         canManage = membership?.status === "active" &&
-          (membership.role === "admin" || membership.permissions?.manage_team === true);
+          (membership.role === "admin" || callerPermissions.manage_team === true);
       }
       if (!canManage) return json({ error: "You do not have permission to manage this team." }, 403);
-      // Team managers may administer ordinary staff, but only the merchant owner
-      // or an existing administrator may grant administrator-level access.
-      if (role === "admin" && callerRole !== "owner" && callerRole !== "admin") {
+      const isPrivilegedGrantor = callerRole === "owner" || callerRole === "admin";
+      // A manager can delegate only permissions they personally hold. Otherwise a
+      // manager could create a custom account with finance/admin rights and escalate.
+      const grantablePermissions = new Set([
+        "view_sales", "create_sale", "manage_sales", "view_inventory", "manage_inventory",
+        "view_expenses", "manage_expenses", "view_financial_reports", "manage_finance",
+        "view_customers", "manage_customers", "view_suppliers", "manage_suppliers",
+        "view_audit_log", "manage_team"
+      ]);
+      for (const [permission, enabled] of Object.entries(permissions)) {
+        if (!grantablePermissions.has(permission) && enabled === true) {
+          return json({ error: "The requested permission is not recognized." }, 400);
+        }
+        if (enabled === true && !isPrivilegedGrantor &&
+            callerPermissions[permission] !== true &&
+            !(permission === "view_inventory" && callerPermissions.create_sale === true)) {
+          return json({ error: "You cannot grant a permission you do not have." }, 403);
+        }
+      }
+      // Only the owner or an existing administrator may create an administrator.
+      if (role === "admin" && !isPrivilegedGrantor) {
         return json({ error: "Only the business owner or an administrator can create another administrator." }, 403);
       }
 
