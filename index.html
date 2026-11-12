@@ -1851,6 +1851,9 @@ async function voidSale(id){
   const s=state.sales.find(x=>x.id===id); if(!s)return;
   const reason=prompt('Enter the reason for voiding this sale (required):');if(!reason||!reason.trim()){sheriToast('A reason is required to void a sale.','error');return}window.__sheriVoidReasons=window.__sheriVoidReasons||{};window.__sheriVoidReasons[id]=reason.trim();
   if(!confirm('Void this sale? Its stock will be added back to inventory.\\nReason: '+reason.trim()))return;
+  // Preserve a durable audit record before removing the active sale from operational totals.
+  // The audit row stores the reason, actor, invoice and transaction identifiers.
+  await accAudit('void','sale',id,{reason:reason.trim(),invoice_number:s.invoice_number||null,transaction_id:s.transaction_id||null,amount:Number(s.qty||0)*Number(s.price||0),product:s.product_name_snapshot||product(s.product_id)?.name||null});
   const p=product(s.product_id); if(p)p.stock+=s.qty;
   state.sales=state.sales.filter(x=>x.id!==id);
   await sheriDelete('sales',id);
