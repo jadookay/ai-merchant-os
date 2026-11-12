@@ -1840,7 +1840,8 @@ async function voidSale(id){
 const sheriSearchValues={};
 function sheriSearchControl(key,target,placeholder,values){
   const listId=key+'Suggestions',value=esc(sheriSearchValues[key]||''),options=[...new Set((values||[]).filter(Boolean).map(String))].slice(0,100);
-  return '<input class="sheri-search" type="search" aria-label="'+esc(placeholder)+'" placeholder="'+esc(placeholder)+'" value="'+value+'" list="'+listId+'" data-target="'+target+'" data-search-key="'+key+'" oninput="sheriSearchTable(this)"><datalist id="'+listId+'">'+options.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>';
+  const markup='<input class="sheri-search" type="search" aria-label="'+esc(placeholder)+'" placeholder="'+esc(placeholder)+'" value="'+value+'" list="'+listId+'" data-target="'+target+'" data-search-key="'+key+'" oninput="sheriSearchTable(this)"><datalist id="'+listId+'">'+options.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>';
+  setTimeout(()=>{const input=document.querySelector('[data-search-key="'+key+'"]');if(input)sheriSearchTable(input);},0);return markup;
 }
 function sheriSearchTable(input){
   const key=input.dataset.searchKey,target=document.getElementById(input.dataset.target),query=String(input.value||'').trim().toLowerCase();
