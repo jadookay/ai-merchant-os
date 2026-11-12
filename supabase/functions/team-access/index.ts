@@ -201,16 +201,15 @@ Deno.serve(async (req: Request) => {
       const merchantId = String(body?.merchant_id || "");
       const memberId = String(body?.member_id || "");
       const fullName = String(body?.full_name || "").trim();
-      const email = String(body?.email || "").trim().toLowerCase() || null;
-      const phone = String(body?.phone || "").replace(/[^0-9+]/g, "") || null;
-      const username = String(body?.username || "").trim().toLowerCase() || null;
+      const email = body?.email === undefined ? undefined : (String(body.email || "").trim().toLowerCase() || null);
+      const phone = body?.phone === undefined ? undefined : (String(body.phone || "").replace(/[^0-9+]/g, "") || null);
+      const username = body?.username === undefined ? undefined : (String(body.username || "").trim().toLowerCase() || null);
       const responsibility = String(body?.responsibility || "").trim() || null;
       const role = String(body?.role || "cashier");
       const status = String(body?.status || "active");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
       const pin = String(body?.pin || "");
       if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
-      if (!email && !phone && !username) return json({ error: "Keep at least one staff login identifier: email, phone or username." }, 400);
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       if (phone && !/^\+?\d{7,15}$/.test(phone)) return json({ error: "Enter a phone number in international format." }, 400);
       if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
@@ -237,6 +236,10 @@ Deno.serve(async (req: Request) => {
         .select("id,user_id,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
+      const nextEmail = email === undefined ? target.email : email;
+      const nextPhone = phone === undefined ? target.phone : phone;
+      const nextUsername = username === undefined ? target.username : username;
+      if (!nextEmail && !nextPhone && !nextUsername) return json({ error: "Keep at least one staff login identifier: email, phone or username." }, 400);
       if (target.user_id === callerData.user.id) return json({ error: "Use the owner account to change another administrator's access; self-edits are disabled here." }, 403);
       if (target.role === "admin" && !privileged) return json({ error: "Only the owner or an administrator can change an administrator account." }, 403);
       if ((permissions.manage_team === true || permissions.manage_sales === true) && role !== "manager" && role !== "admin") return json({ error: "Manager-level controls can only be assigned to a manager or administrator role." }, 400);
@@ -251,8 +254,12 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status, updated_at: new Date().toISOString() };
+      if (email !== undefined) memberPatch.email = email;
+      if (phone !== undefined) memberPatch.phone = phone;
+      if (username !== undefined) memberPatch.username = username;
       const { data: updated, error: updateError } = await admin.from("merchant_members")
-        .update({ full_name: fullName, email, phone, username, responsibility, role, permissions, status, updated_at: new Date().toISOString() })
+        .update(memberPatch)
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
