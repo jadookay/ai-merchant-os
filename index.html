@@ -2361,7 +2361,22 @@ async function loadTeamMembers(force=false){
 function renderTeamMembers(){
  const host=document.getElementById('teamMembersTable');if(!host)return;
  const rows=state.teamMembers||[];
- host.innerHTML=rows.length?'<table class="table" style="min-width:850px"><tr><th>Name</th><th>Login details</th><th>Role</th><th>Responsibilities</th><th>Status</th><th>Actions</th></tr>'+rows.map(m=>'<tr><td>'+esc(m.full_name)+'</td><td>'+esc([m.email,m.phone,m.username].filter(Boolean).join(' · ')||'—')+'</td><td>'+esc(m.role)+'</td><td>'+esc(m.responsibility||'—')+'</td><td>'+esc(m.status)+'</td><td><div class="actions"><button class="btn small secondary" onclick="editTeamMember(\\''+m.id+'\\')">Edit access</button><button class="btn small '+(m.status==='active'?'danger':'secondary')+'" onclick="toggleTeamMemberStatus(\\''+m.id+'\\')">'+(m.status==='active'?'Suspend':'Reactivate')+'</button></div></td></tr>').join('')+'</table><div class="field-help">Suspending a staff account preserves its historical sales and audit records. Reactivation restores its assigned permissions.</div>':'<div class="empty">No team members added yet.</div>';
+ host.innerHTML=rows.length?`
+ <table class="table" style="min-width:850px">
+ <tr><th>Name</th><th>Login details</th><th>Role</th><th>Responsibilities</th><th>Status</th><th>Actions</th></tr>
+ ${rows.map(m=>`<tr>
+ <td>${esc(m.full_name)}</td>
+ <td>${esc([m.email,m.phone,m.username].filter(Boolean).join(' · ')||'—')}</td>
+ <td>${esc(m.role)}</td>
+ <td>${esc(m.responsibility||'—')}</td>
+ <td>${esc(m.status)}</td>
+ <td><div class="actions">
+ <button class="btn small secondary" onclick="editTeamMember('${esc(m.id)}')">Edit access</button>
+ <button class="btn small ${m.status==='active'?'danger':'secondary'}" onclick="toggleTeamMemberStatus('${esc(m.id)}')">${m.status==='active'?'Suspend':'Reactivate'}</button>
+ </div></td>
+ </tr>`).join('')}
+ </table>
+ <div class="field-help">Suspending a staff account preserves its historical sales and audit records. Reactivation restores its assigned permissions.</div>`:'<div class="empty">No team members added yet.</div>';
 }
 async function editTeamMember(id){
  const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
