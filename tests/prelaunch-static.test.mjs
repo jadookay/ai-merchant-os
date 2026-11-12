@@ -462,3 +462,21 @@ test("ordered purchase deletion carries its reason and is checked server-side", 
   assert.ok(teamMigration.includes("Received purchases cannot be deleted"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_team')"));
 });
+
+
+test("team status changes preserve omitted email, phone and username login identifiers", () => {
+  assert.ok(teamAccess.includes('body?.email === undefined ? undefined'));
+  assert.ok(teamAccess.includes('body?.phone === undefined ? undefined'));
+  assert.ok(teamAccess.includes('body?.username === undefined ? undefined'));
+  assert.ok(teamAccess.includes('const nextEmail = email === undefined ? target.email : email'));
+  assert.ok(teamAccess.includes('if (email !== undefined) memberPatch.email = email'));
+  assert.ok(teamAccess.includes('if (phone !== undefined) memberPatch.phone = phone'));
+  assert.ok(teamAccess.includes('if (username !== undefined) memberPatch.username = username'));
+});
+
+test("team account creation validates email, phone, username and PIN formats", () => {
+  assert.ok(teamAccess.includes('if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
+  assert.ok(teamAccess.includes('if (phone && !/^\\+?\\d{7,15}$/.test(phone))'));
+  assert.ok(teamAccess.includes('if (username && !/^[a-z0-9._-]{3,40}$/.test(username))'));
+  assert.ok(teamAccess.includes('!/^\\d{6,8}$/.test(pin)'));
+});
