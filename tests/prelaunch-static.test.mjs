@@ -105,3 +105,51 @@ test("all inline application scripts parse without syntax errors", () => {
     assert.doesNotThrow(() => new vm.Script(source, { filename: `index.html:inline-script-${index + 1}` }));
   }
 });
+
+
+test("Shericeri greets before opening the first recording and starts listening after playback", () => {
+  const start = html.indexOf("async function startShericeriLoop()");
+  const end = html.indexOf("\nfunction sheriSleepAfterGoodbye", start);
+  assert.ok(start >= 0 && end > start, "expected session start function");
+  const flow = html.slice(start, end);
+  assert.match(flow, /sheriEnqueueSpeech\(sheriTapGreeting\(\),sheriTurnId\)/);
+  assert.doesNotMatch(flow, /shericeriListenOnce\(\)/,
+    "the mic must not record while the initial greeting is playing");
+  assert.match(html, /function sheriTapGreeting\(\)[\s\S]*?Hello, how can I help you today\?/);
+  assert.match(html, /function sheriDrainSpeakQueue\(\)[\s\S]*?sheriScheduleNextListen\(sheriTurnId\)/);
+});
+
+test("farewell and end-of-task phrases trigger sleep without treating a plain thank-you as goodbye", () => {
+  const start = html.indexOf("function sheriIsGoodbyePhrase(q)");
+  const end = html.indexOf("\nfunction sheriLanguageKey", start);
+  assert.ok(start >= 0 && end > start);
+  const goodbye = html.slice(start, end);
+  assert.match(goodbye, /that's it/);
+  assert.match(goodbye, /that's all/);
+  assert.match(goodbye, /i'm done/);
+  assert.match(goodbye, /c'est tout/);
+  assert.match(goodbye, /birarangiye/);
+  assert.doesNotMatch(goodbye, /\^\(thanks\|thank you\)\[!\?\.\]\*\$/);
+});
+
+test("recent Shericeri history survives sleep and is sent with validated memory to the server", () => {
+  assert.doesNotMatch(html, /shericeriHistory=\[\];\s*sheriHistoryTurnId=0/,
+    "session sleep must not erase the last exchanges");
+  assert.match(html, /memory:sheriMemoryPayload/);
+  assert.match(quickService, /history, memory \} = await req\.json\(\)/);
+  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 10\)/);
+  assert.match(quickService, /grounding \+ memoryContext/);
+});
+
+test("mobile navigation wraps instead of forcing horizontal scrolling and dashboard metrics navigate", () => {
+  assert.match(html, /\.nav\{display:flex;flex-wrap:wrap;[^}]*overflow:visible/);
+  assert.match(html, /\.nav button\{white-space:normal;flex:1 1 calc\(33\.333% - 4px\)/);
+  assert.match(html, /class=\"card metric-card\" onclick=\"show\('\$\{x\[3\]\}'\)\"/);
+});
+
+test("sync retries are scheduled and connectivity restoration kicks immediately", () => {
+  assert.match(html, /async function sheriScheduleSyncRetry\(\)/);
+  assert.match(html, /finally\{sheriSyncBusy=false; sheriScheduleSyncRetry\(\);\}/);
+  assert.match(html, /addEventListener\('online',[\s\S]*?sherriSyncKick\(\)/);
+  assert.match(html, /if\(navigator\.onLine\)sherriSyncKick\(\)/);
+});
