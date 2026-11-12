@@ -34,12 +34,16 @@ Deno.serve(async (req: Request) => {
 
     if (action === "login_with_pin") {
       const identifier = String(body?.identifier || "").trim();
+      const merchantCode = String(body?.merchant_code || "").trim();
       const pin = String(body?.pin || "");
       if (!identifier || !/^\d{6,8}$/.test(pin)) return json({ error: "Enter your name, phone or email and a 6–8 digit PIN." }, 400);
 
       const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
       const ipHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))), b => b.toString(16).padStart(2, "0")).join("");
+      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id").eq("shericeri_id", Number(merchantCode)).maybeSingle();
+      if (merchantError || !merchant) return json({ error: "Business account ID was not recognized." }, 404);
       const { data: verified, error: verifyError } = await admin.rpc("verify_merchant_member_pin", {
+        p_merchant_id: merchant.id,
         p_identifier: identifier,
         p_pin: pin,
         p_ip_hash: ipHash,
@@ -135,6 +139,7 @@ Deno.serve(async (req: Request) => {
         phone,
         role,
         permissions,
+        responsibility: String(body?.responsibility || "").trim() || null,
         created_by: callerData.user.id,
       }).select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,status,created_at").single();
 
