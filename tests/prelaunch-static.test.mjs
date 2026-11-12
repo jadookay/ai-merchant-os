@@ -158,3 +158,8 @@ test("microphone waits briefly after playback to avoid capturing speaker echo", 
   assert.match(html, /Listen guard','400 ms post-playback echo guard'/);
   assert.match(html, /\},400\);\n\}\n\nlet sheriKinyaAudioEl=null/);
 });
+
+test("deterministic business fast-lane answers are added to recent memory", () => {
+  assert.match(html, /sheriCommitAssistantHistory\(thisTurnId,localizedFast\);\s*const fastMemory=sheriDecideMemoryWrite\(transcript,localizedFast,'local_business'\)/);
+  assert.match(html, /if\(fastMemory\)sheriQueueMemory\(fastMemory\.category,fastMemory\.content\)/);
+});
