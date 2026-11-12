@@ -195,8 +195,8 @@ test("sale, product, advisor and expense voice entry share MediaRecorder and aut
 });
 
 test("sales and expenses confirm before saving and post balanced journal entries immediately", () => {
-  assert.match(html, /Confirm sale\?[\\s\\S]*?sourceType:'sale',sourceId:saleRow\.id/);
-  assert.match(html, /Record this expense\?[\\s\\S]*?sourceType:'expense',sourceId:data\.id/);
+  assert.match(html, /Confirm sale\?[\s\S]*?sourceType:'sale',sourceId:saleRow\.id/);
+  assert.match(html, /Record this expense\?[\s\S]*?sourceType:'expense',sourceId:data\.id/);
   assert.match(html, /sourceType:'sale_cogs',sourceId:saleRow\.id/);
   assert.match(html, /sheriToast\('Expense recorded\.'/);
 });
