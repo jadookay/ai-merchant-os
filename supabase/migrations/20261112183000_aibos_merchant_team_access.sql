@@ -185,17 +185,18 @@ set search_path=''
 as $$
 declare
   v_can_view_reports boolean := private.user_can_access_merchant(p_merchant_id,'view_financial_reports');
+  v_can_view_audit boolean := private.user_can_access_merchant(p_merchant_id,'view_audit_log');
   v_can_post boolean :=
     private.user_can_access_merchant(p_merchant_id,'create_sale')
     or private.user_can_access_merchant(p_merchant_id,'manage_expenses')
     or private.user_can_access_merchant(p_merchant_id,'manage_inventory')
     or private.user_can_access_merchant(p_merchant_id,'manage_finance');
 begin
-  if not v_can_post and not v_can_view_reports then
+  if not v_can_post and not v_can_view_reports and not v_can_view_audit then
     raise exception 'Not authorized for merchant accounting data';
   end if;
   return jsonb_build_object(
-    'accounts',coalesce((select jsonb_agg(x order by x.code) from (select * from public.chart_of_accounts where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'accounts',case when v_can_post or v_can_view_reports then coalesce((select jsonb_agg(x order by x.code) from (select * from public.chart_of_accounts where merchant_id=p_merchant_id) x),'[]'::jsonb) else '[]'::jsonb end,
     'journalEntries',case when v_can_view_reports then coalesce((select jsonb_agg(x order by x.entry_date desc) from (select * from public.journal_entries where merchant_id=p_merchant_id) x),'[]'::jsonb) else '[]'::jsonb end,
     'journalLines',case when v_can_view_reports then coalesce((select jsonb_agg(x) from (select * from public.journal_lines where merchant_id=p_merchant_id) x),'[]'::jsonb) else '[]'::jsonb end,
     'invoices',case when v_can_view_reports then coalesce((select jsonb_agg(x order by x.issue_date desc) from (select * from public.invoices where merchant_id=p_merchant_id) x),'[]'::jsonb) else '[]'::jsonb end,
