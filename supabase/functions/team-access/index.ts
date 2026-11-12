@@ -98,6 +98,9 @@ Deno.serve(async (req: Request) => {
       if (!merchantId || fullName.length < 2 || (!email && !phone) || !/^\d{6,8}$/.test(pin)) {
         return json({ error: "Provide a business, full name, verified email or phone, and a 6–8 digit PIN." }, 400);
       }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+      if (phone && !/^\+?\d{7,15}$/.test(phone)) return json({ error: "Enter a phone number in international format." }, 400);
+      if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
       if (!["admin", "manager", "cashier", "inventory", "accountant", "custom"].includes(role)) {
         return json({ error: "Invalid team role." }, 400);
       }
