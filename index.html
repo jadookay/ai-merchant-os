@@ -1766,7 +1766,7 @@ function render(){
     ['Transactions',state.sales.length,'','sales','Open transactions'],
     ['Low-stock items',low,low?'warn':'good','inventory','Open inventory']
   ].map(x=>`<button type="button" class="card metric-card" onclick="show('${x[3]}')" aria-label="${x[4]}"><div class="label">${x[0]}</div><div class="metric ${x[2]}">${x[1]}</div><div class="sub" aria-hidden="true">View details →</div></button>`).join('');
-  document.getElementById('recent').innerHTML=state.sales.slice().reverse().slice(0,7).map(s=>{const p=product(s.product_id);return `<div class="row"><div><b>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</b><div class="sub">${s.qty} × ${money(s.price)}</div></div><b>${money(s.qty*s.price)}</b></div>`}).join('')||'<div class="empty">No sales yet.</div>';
+  document.getElementById('recent').innerHTML=state.sales.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).slice(0,7).map(s=>{const p=product(s.product_id);return `<div class="row"><div><b>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</b><div class="sub">${s.qty} × ${money(s.price)}</div></div><b>${money(s.qty*s.price)}</b></div>`}).join('')||'<div class="empty">No sales yet.</div>';
   let lowNames=activeProducts().filter(p=>p.stock<=p.reorder).map(p=>esc(p.name));
   let best=bestProducts()[0];
   document.getElementById('priorities').innerHTML=[
@@ -1828,7 +1828,7 @@ async function voidSale(id){
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
-function renderSales(){document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.slice().reverse().map(s=>{const p=product(s.product_id);const c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
+function renderSales(){document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).map(s=>{const p=product(s.product_id);const c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
 
 // ── Products ─────────────────────────────────────────────────────────────
 let pendingProductImage=null; // {dataUrl, mimeType, file}
@@ -2239,7 +2239,7 @@ async function deleteExpense(id){
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
-function renderExpenses(){document.getElementById('expenseTable').innerHTML=state.expenses.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${state.expenses.slice().reverse().map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses recorded.</div>'}
+function renderExpenses(){document.getElementById('expenseTable').innerHTML=state.expenses.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${state.expenses.slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses recorded.</div>'}
 
 // ── Customers ────────────────────────────────────────────────────────────
 async function addCustomer(){
