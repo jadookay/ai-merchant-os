@@ -276,6 +276,22 @@ test("manager-only destructive actions require reasons and are protected by back
   assert.match(teamMigration, /if not private\.user_can_access_merchant\(v_merchant_id,'manage_team'\) then/);
 });
 
+test("inventory staff can add products and receive purchases without editing existing product masters", () => {
+  assert.ok(html.includes("async function sheriSyncPurchaseOperation(op)"));
+  assert.ok(html.includes("sb.rpc('shericeri_sync_purchase_stock'"));
+  assert.ok(html.includes("sheriCan('manage_inventory')"));
+  assert.ok(html.includes("Only non-managers may create a product, but never overwrite an existing one.") || html.includes("Non-managers may create a product, but never overwrite an existing one."));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_sync_purchase_stock"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'manage_inventory')"));
+  assert.ok(teamMigration.includes("stock_applied"));
+});
+
+test("team administration requires the manager role, not only a delegated flag", () => {
+  assert.ok(teamAccess.includes("membership.role === \"manager\" && callerPermissions.manage_team === true"));
+  assert.ok(teamAccess.includes("callerRole === \"manager\" && callerPermissions.manage_team === true"));
+  assert.ok(teamAccess.includes("Team administration can only be assigned to a manager or administrator role."));
+});
+
 test("cashier accounting setup and journal posting are permission-scoped", () => {
   assert.match(html, /sb\.rpc\('shericeri_ensure_operational_accounts'/);
   assert.match(teamMigration, /private\.user_can_access_merchant\(p_merchant_id,'create_sale'\)/);
