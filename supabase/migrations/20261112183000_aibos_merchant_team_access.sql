@@ -254,6 +254,9 @@ begin
     v_authorized:=private.user_can_access_merchant(p_merchant_id,'manage_finance');
   end if;
   if not v_authorized then raise exception 'Not authorized to post this accounting entry'; end if;
+  if p_source_type in ('sale','sale_cogs') and not exists(select 1 from public.sales where id=p_source_id and merchant_id=p_merchant_id) then
+    return p_entry_id; -- A sale voided before its queued journal batch must never recreate revenue.
+  end if;
   if p_entry_id is null or p_entry_date is null or coalesce(trim(p_description),'')='' then raise exception 'Journal entry identity is incomplete'; end if;
   if jsonb_typeof(p_lines)<>'array' or jsonb_array_length(p_lines)<2 then raise exception 'Journal batch requires at least two lines'; end if;
   select locked_through into v_lock from public.accounting_settings where merchant_id=p_merchant_id;
