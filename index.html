@@ -4603,6 +4603,17 @@ async function accUpdate(table,record,collection){
 async function accEnsureBase(){
   if(!state.merchant)return;
   if(!Array.isArray(state.accounts))state.accounts=[];
+  if(!sheriCan('manage_finance')){
+    const missing=ACC_DEFAULT_ACCOUNTS.some(([code])=>!state.accounts.some(a=>a.code===code));
+    if(missing){
+      if(!navigator.onLine)throw new Error('Operational accounting accounts are not cached. Reconnect once so the secure setup can finish.');
+      const {data,error}=await sb.rpc('shericeri_ensure_operational_accounts',{p_merchant_id:state.merchant.id});
+      if(error)throw error;
+      state.accounts=Array.isArray(data?.accounts)?data.accounts:[];
+    }
+    await sheriSaveAccountingSnapshot();
+    return;
+  }
   const now=sheriNow();
   for(const [code,name,type,normal] of ACC_DEFAULT_ACCOUNTS){if(!state.accounts.some(a=>a.code===code)){const a={id:sheriUuid(),merchant_id:state.merchant.id,code,name,type,normal_balance:normal,active:true,created_at:now};state.accounts.push(a);await sheriPut('accounts',a.id,{merchant_id:state.merchant.id,record:{...a}});await sheriQueue({type:'accounting_upsert',table:'chart_of_accounts',record:a})}}
   if(!state.accountingSettings){state.accountingSettings={id:sheriUuid(),merchant_id:state.merchant.id,locked_through:null,created_at:now,updated_at:now};await sheriPut('accountingSettings','settings',{merchant_id:state.merchant.id,record:{...state.accountingSettings}});await sheriQueue({type:'accounting_settings_upsert',record:state.accountingSettings})}
