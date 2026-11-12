@@ -401,7 +401,7 @@ test("team migration preserves owner RLS, prevents forged staff audit inserts an
   assert.ok(teamMigration.includes("when t.table_name='sales' then 'manage_sales'"));
   assert.ok(teamMigration.includes("when t.table_name='products' then 'manage_inventory'"));
   assert.ok(teamMigration.includes("when t.table_name='expenses' then 'manage_expenses'"));
-  assert.ok(teamMigration.includes("private.user_can_access_merchant(merchant_id,'manage_team') and private.user_can_access_merchant(merchant_id,%L)"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L)"));
 });
 
 test("sale voiding retains source rows, reverses posted journals and is idempotent", () => {
