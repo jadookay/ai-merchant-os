@@ -189,7 +189,7 @@ Deno.serve(async (req: Request) => {
 
     if (action === "update_member") {
       const authHeader = req.headers.get("Authorization") || "";
-      const bearer = authHeader.match(/^Bearer\\s+(.+)$/i)?.[1];
+      const bearer = authHeader.match(/^Bearer\s+(.+)$/i)?.[1];
       if (!bearer) return json({ error: "Manager sign-in required." }, 401);
       const caller = createClient(url, anonKey, {
         global: { headers: { Authorization: "Bearer " + bearer } },
@@ -211,12 +211,12 @@ Deno.serve(async (req: Request) => {
       const pin = String(body?.pin || "");
       if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
       if (!email && !phone && !username) return json({ error: "Keep at least one staff login identifier: email, phone or username." }, 400);
-      if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
-      if (phone && !/^\\+?\\d{7,15}$/.test(phone)) return json({ error: "Enter a phone number in international format." }, 400);
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+      if (phone && !/^\+?\d{7,15}$/.test(phone)) return json({ error: "Enter a phone number in international format." }, 400);
       if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
       if (!["admin", "manager", "cashier", "inventory", "accountant", "custom"].includes(role)) return json({ error: "Invalid team role." }, 400);
       if (!["active", "suspended"].includes(status)) return json({ error: "Invalid team status." }, 400);
-      if (pin && !/^\\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
+      if (pin && !/^\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
 
       const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
