@@ -201,12 +201,18 @@ Deno.serve(async (req: Request) => {
       const merchantId = String(body?.merchant_id || "");
       const memberId = String(body?.member_id || "");
       const fullName = String(body?.full_name || "").trim();
+      const email = String(body?.email || "").trim().toLowerCase() || null;
+      const phone = String(body?.phone || "").replace(/[^0-9+]/g, "") || null;
+      const username = String(body?.username || "").trim().toLowerCase() || null;
       const responsibility = String(body?.responsibility || "").trim() || null;
       const role = String(body?.role || "cashier");
       const status = String(body?.status || "active");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
       const pin = String(body?.pin || "");
       if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
+      if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+      if (phone && !/^\\+?\\d{7,15}$/.test(phone)) return json({ error: "Enter a phone number in international format." }, 400);
+      if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
       if (!["admin", "manager", "cashier", "inventory", "accountant", "custom"].includes(role)) return json({ error: "Invalid team role." }, 400);
       if (!["active", "suspended"].includes(status)) return json({ error: "Invalid team status." }, 400);
       if (pin && !/^\\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
@@ -227,7 +233,7 @@ Deno.serve(async (req: Request) => {
       }
       const privileged = callerRole === "owner" || callerRole === "admin";
       const { data: target, error: targetError } = await admin.from("merchant_members")
-        .select("id,user_id,role,status").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
+        .select("id,user_id,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
       if (target.user_id === callerData.user.id) return json({ error: "Use the owner account to change another administrator's access; self-edits are disabled here." }, 403);
@@ -245,10 +251,17 @@ Deno.serve(async (req: Request) => {
       }
 
       const { data: updated, error: updateError } = await admin.from("merchant_members")
-        .update({ full_name: fullName, responsibility, role, permissions, status, updated_at: new Date().toISOString() })
+        .update({ full_name: fullName, email, phone, username, responsibility, role, permissions, status, updated_at: new Date().toISOString() })
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
+      if (email && email !== target.email) {
+        const { error: authEmailError } = await admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true });
+        if (authEmailError) {
+          await admin.from("merchant_members").update({ email: target.email, phone: target.phone, username: target.username }).eq("id", memberId).eq("merchant_id", merchantId);
+          throw authEmailError;
+        }
+      }
       if (pin) {
         const { error: pinError } = await admin.rpc("set_merchant_member_pin", { p_member_id: memberId, p_pin: pin });
         if (pinError) throw pinError;
