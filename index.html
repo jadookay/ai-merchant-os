@@ -315,7 +315,7 @@ window.ensurePdfJs=async function(){
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="recordSale()">Record sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
     <div id="voiceStatus" class="sub" style="margin-top:8px"></div>
   </div>
-  <div class="card section"><h2>Sales history</h2><div id="salesSearchHost"></div><div id="salesTable"></div></div>
+  <div class="card section"><h2>Sales history</h2><div class="formgrid"><div><label>View sales by</label><select id="salesPeriod" onchange="sheriApplySalesRange()"><option value="all">All time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="custom">Selected dates</option></select></div><div><label>From</label><input id="salesStartDate" type="date"></div><div><label>To</label><input id="salesEndDate" type="date"></div><div style="align-self:end"><button class="btn small" onclick="sheriApplySalesRange()">Apply dates</button></div></div><div id="salesSearchHost"></div><div id="salesTable"></div></div>
 </section>
 
 <section id="inventory" class="view">
@@ -388,7 +388,7 @@ window.ensurePdfJs=async function(){
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="addExpense()">Add expense</button><button class="btn secondary" onclick="sheriStartFormVoice('expenseVoiceStatus',parseVoiceExpense,'Say expense description and amount')">🎙 Voice entry</button><button class="btn secondary" onclick="clearExpenseForm()">Discard</button></div><div id="expenseVoiceStatus" class="sub" style="margin-top:8px"></div>
   </div>
-  <div class="card section"><h2>Expense history</h2><div id="expenseSearchHost"></div><div id="expenseTable"></div></div>
+  <div class="card section"><h2>Expense history</h2><div class="formgrid"><div><label>View expenses by</label><select id="expensePeriod" onchange="sheriApplyExpenseRange()"><option value="all">All time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="custom">Selected dates</option></select></div><div><label>From</label><input id="expenseStartDate" type="date"></div><div><label>To</label><input id="expenseEndDate" type="date"></div><div style="align-self:end"><button class="btn small" onclick="sheriApplyExpenseRange()">Apply dates</button></div></div><div id="expenseSearchHost"></div><div id="expenseTable"></div></div>
 </section>
 
 <section id="customers" class="view">
@@ -4575,17 +4575,18 @@ function renderMoney(){if(!state.merchant)return;accPopulateSelects();const ar=a
 let sheriReportStart=null,sheriReportEnd=null;
 function sheriLocalDateKey(date){const d=date instanceof Date?date:new Date(date);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function sheriDateInReportRange(value){const key=String(value||'').slice(0,10);if(!key)return true;if(sheriReportStart&&key<sheriReportStart)return false;if(sheriReportEnd&&key>sheriReportEnd)return false;return true;}
-function sheriApplyReportRange(){
-  const mode=document.getElementById('reportPeriod')?.value||'all',today=new Date();let start=null,end=sheriLocalDateKey(today);
-  if(mode==='daily')start=end;
-  else if(mode==='weekly'){const d=new Date(today);d.setDate(d.getDate()-6);start=sheriLocalDateKey(d);}
-  else if(mode==='monthly')start=sheriLocalDateKey(new Date(today.getFullYear(),today.getMonth(),1));
-  else if(mode==='custom'){start=document.getElementById('reportStartDate')?.value||null;end=document.getElementById('reportEndDate')?.value||end;if(start&&end&&start>end){sheriToast('The start date must be on or before the end date.','error');return;}}
+function sheriApplyDateRange(mode,fromId,toId){
+  const today=new Date();let start=null,end=sheriLocalDateKey(today);
+  if(mode==='daily')start=end;else if(mode==='weekly'){const d=new Date(today);d.setDate(d.getDate()-6);start=sheriLocalDateKey(d);}else if(mode==='monthly')start=sheriLocalDateKey(new Date(today.getFullYear(),today.getMonth(),1));
+  else if(mode==='custom'){start=document.getElementById(fromId)?.value||null;end=document.getElementById(toId)?.value||end;if(start&&end&&start>end){sheriToast('The start date must be on or before the end date.','error');return;}}
   sheriReportStart=start;sheriReportEnd=end;
-  const a=document.getElementById('reportStartDate'),b=document.getElementById('reportEndDate');if(a&&mode!=='custom')a.value=start||'';if(b)b.value=end||'';
+  for(const [a,b] of [['reportStartDate','reportEndDate'],['salesStartDate','salesEndDate'],['expenseStartDate','expenseEndDate']]){const x=document.getElementById(a),y=document.getElementById(b);if(x)x.value=start||'';if(y)y.value=end||'';}
   const label=document.getElementById('reportRangeLabel');if(label)label.textContent=start?('Showing '+start+' through '+end):('All recorded activity through '+end);
   render();
 }
+function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('reportPeriod')?.value||'all','reportStartDate','reportEndDate');}
+function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
+function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accReportTotals(startDate=null,endDate=null){const by={};for(const a of state.accounts)by[a.code]=0;const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));for(const line of state.journalLines||[]){const entry=entries.get(line.journal_entry_id);if(!entry||entry.voided)continue;const date=String(entry.entry_date||entry.created_at||'').slice(0,10);if(endDate&&date>endDate)continue;if(startDate&&date<startDate)continue;const account=state.accounts.find(a=>a.id===line.account_id);if(!account)continue;const raw=Number(line.debit||0)-Number(line.credit||0);by[account.code]+=['liability','equity','income'].includes(account.type)?-raw:raw;}return by}
 
 const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);if(state.expenses.some(x=>x.id===id))return;try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
