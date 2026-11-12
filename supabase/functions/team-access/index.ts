@@ -140,6 +140,7 @@ Deno.serve(async (req: Request) => {
         }
       }
       // Only the owner or an existing administrator may create an administrator.
+      if (permissions.manage_team === true && role !== "manager" && role !== "admin") return json({ error: "Team administration can only be assigned to a manager or administrator role." }, 400);
       if (role === "admin" && !isPrivilegedGrantor) {
         return json({ error: "Only the business owner or an administrator can create another administrator." }, 403);
       }
@@ -231,6 +232,7 @@ Deno.serve(async (req: Request) => {
       if (!target) return json({ error: "Team member not found." }, 404);
       if (target.user_id === callerData.user.id) return json({ error: "Use the owner account to change another administrator's access; self-edits are disabled here." }, 403);
       if (target.role === "admin" && !privileged) return json({ error: "Only the owner or an administrator can change an administrator account." }, 403);
+      if (permissions.manage_team === true && role !== "manager" && role !== "admin") return json({ error: "Team administration can only be assigned to a manager or administrator role." }, 400);
       if (role === "admin" && !privileged) return json({ error: "Only the owner or an administrator can assign administrator access." }, 403);
 
       const grantable = new Set(["view_sales","create_sale","manage_sales","view_inventory","manage_inventory","view_expenses","manage_expenses","view_financial_reports","manage_finance","view_customers","manage_customers","view_suppliers","manage_suppliers","view_audit_log","manage_team"]);
