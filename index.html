@@ -1803,11 +1803,18 @@ async function recordSale(){
   if(q>p.stock)return alert('Not enough stock.');
   const newStock=p.stock-q;
   const saleRow={id:sheriUuid(),merchant_id:state.merchant.id,product_id:p.id,product_name_snapshot:p.name,customer_id:custId,qty:q,price,cost:p.cost,created_at:sheriNow()};
-  p.stock=newStock;state.sales.push(saleRow);
-  await sheriSaveSnapshot();
+  if(!confirm('Confirm sale?\n'+q+' × '+p.name+' at '+money(price)+' each\nTotal: '+money(q*price)+'\nRemaining stock: '+newStock))return;
+  p.stock=newStock;state.sales.push(saleRow);await sheriSaveSnapshot();
   await sheriQueue({type:'sale_upsert',record:saleRow,productId:p.id,localStock:newStock,expectedServerStock:newStock+q});
-  if(navigator.onLine)await sheriSyncOutbox();
-  render(); alert(navigator.onLine?'Sale recorded.':'Sale recorded offline — it will sync automatically when connected.');
+  let warning='';
+  try{
+    await accEnsureBase();
+    const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000'),total=q*price,cost=q*Number(p.cost||0),date=saleRow.created_at.slice(0,10);
+    await accPostEntry({date,description:'Sale '+p.name,sourceType:'sale',sourceId:saleRow.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});
+    if(cost>0)await accPostEntry({date,description:'COGS '+p.name,sourceType:'sale_cogs',sourceId:saleRow.id,lines:[{accountId:cogs.id,debit:cost},{accountId:inv.id,credit:cost}]});
+  }catch(err){warning=' Sale saved, but ledger posting needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] sale posting failed',err);}
+  if(navigator.onLine)await sheriSyncOutbox();render();
+  sheriToast((navigator.onLine?'Sale recorded.':'Sale saved offline; sync will resume when connected.')+warning,warning?'warning':'success');
 }
 async function voidSale(id){
   const s=state.sales.find(x=>x.id===id); if(!s)return;
