@@ -11,6 +11,11 @@ test("cancelled expense deletion does not post an accounting reversal", () => {
   assert.match(html, /await _v14_1_deleteExpense\(id\);if\(state\.expenses\.some\(x=>x\.id===id\)\)return;/);
 });
 
+test("sale void reason and transaction references are persisted to the audit trail", () => {
+  assert.match(html, /await accAudit\('void','sale',id,\{reason:reason\.trim\(\),invoice_number:s\.invoice_number\|\|null,transaction_id:s\.transaction_id\|\|null/);
+  assert.match(html, /reason:details\?\.reason\|\|null/);
+});
+
 test("cancelled sale void does not post an accounting reversal", () => {
   assert.match(html, /await _v14_1_voidSale\(id\);if\(state\.sales\.some\(x=>x\.id===id\)\)return;/);
 });
