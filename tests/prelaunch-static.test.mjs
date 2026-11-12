@@ -79,6 +79,8 @@ test("normal Android TTS waits for voices and does not cancel its fresh utteranc
   const speakNow = html.slice(start, end);
   assert.match(speakNow, /await ensureVoicesLoaded\(500\)/);
   assert.match(speakNow, /speechSynthesis\.resume\(\);\s*speechSynthesis\.speak\(utt\)/);
+  assert.match(speakNow, /const startTimeoutMs=isAndroid\?20000:5000/);
+  assert.match(speakNow, /retrySpeech\('no onstart within '\+startTimeoutMs\+' ms'\)/);
   assert.doesNotMatch(speakNow, /speechSynthesis\.cancel\(\)/,
     "do not cancel the new utterance immediately before speaking");
   assert.match(html, /if\(isAndroid\)setTimeout\(\(\)=>\{if\(turnId===sheriTurnId\)speakNow\(\)\},90\)/);
