@@ -4091,6 +4091,8 @@ async function shericeriRespond(transcript){
     }
     if(box){box.innerHTML+=`<div class="msg ai">${esc(localizedFast)}</div>`;box.scrollTop=box.scrollHeight}
     sheriCommitAssistantHistory(thisTurnId,localizedFast);
+    const fastMemory=sheriDecideMemoryWrite(transcript,localizedFast,'local_business');
+    if(fastMemory)sheriQueueMemory(fastMemory.category,fastMemory.content).catch(e=>console.warn('[Sheri memory] fast-lane queue failed',e));
     sheriResetSpeechState();
     sheriStreamActive=false;
     sheriEnqueueSpeech(localizedFast,thisTurnId);
