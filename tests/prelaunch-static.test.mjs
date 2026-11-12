@@ -267,7 +267,7 @@ test("staff login identifiers can be edited without exposing PIN hashes", () => 
   assert.ok(html.includes("Email address (leave blank to remove email login)"));
   assert.ok(html.includes("Phone number in international format"));
   assert.ok(html.includes("Username (optional; leave blank to remove)"));
-  assert.ok(teamAccess.includes("update({ full_name: fullName, email, phone, username, responsibility"));
+  assert.ok(teamAccess.includes("const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status"));
   assert.ok(teamAccess.includes("admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true })"));
   assert.ok(teamAccess.includes("Keep at least one staff login identifier"));
   assert.doesNotMatch(teamAccess, /select\([^\n]*pin_hash/);
