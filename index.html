@@ -386,7 +386,7 @@ window.ensurePdfJs=async function(){
       <div><label>Amount (<span data-currency-label>RWF</span>)</label><input id="eAmt" type="number"></div>
       <div><label>Category</label><select id="eCat"><option>Transport</option><option>Rent</option><option>Utilities</option><option>Supplies</option><option>Other</option></select></div>
     </div>
-    <div class="actions" style="margin-top:14px"><button class="btn" onclick="addExpense()">Add expense</button></div>
+    <div class="actions" style="margin-top:14px"><button class="btn" onclick="addExpense()">Add expense</button><button class="btn secondary" onclick="sheriStartFormVoice('expenseVoiceStatus',parseVoiceExpense,'Say expense description and amount')">🎙 Voice entry</button><button class="btn secondary" onclick="clearExpenseForm()">Discard</button></div><div id="expenseVoiceStatus" class="sub" style="margin-top:8px"></div>
   </div>
   <div class="card section"><h2>Expense history</h2><div id="expenseTable"></div></div>
 </section>
@@ -2204,14 +2204,24 @@ async function mergeImportedProducts(items,status){
 const PRODUCT_CATEGORIES_LIST=["Food & Grocery","Cosmetics & Beauty","Clothing & Shoes","Phone Accessories","Other"];
 
 // ── Expenses ─────────────────────────────────────────────────────────────
+function parseVoiceExpense(transcript){
+  const t=String(transcript||'').trim();
+  const m=t.match(/(?:amount|for|of)?\s*(\d[\d,.]*)\s*(?:rwf|frw)?\s*$/i);
+  if(m)document.getElementById('eAmt').value=Number(m[1].replace(/,/g,''));
+  const description=m?t.slice(0,m.index).trim():t;
+  if(description)document.getElementById('eDesc').value=description.replace(/^(expense|spent|paid for)\s+/i,'');
+}
+function clearExpenseForm(){eDesc.value=eAmt.value='';const status=document.getElementById('expenseVoiceStatus');if(status)status.textContent='';}
 async function addExpense(){
   const description=eDesc.value.trim(),amount=+eAmt.value,cat=eCat.value;
-  if(!description||!amount)return alert('Complete expense details.');
+  if(!description||!Number.isFinite(amount)||amount<=0)return alert('Enter an expense description and a positive amount.');
+  if(!confirm('Record this expense?\n'+description+' — '+money(amount)+'\nCategory: '+cat))return;
   const data={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,cat,created_at:sheriNow()};
-  state.expenses.push(data);await sheriSaveSnapshot();
-  await sheriQueue({type:'expense_upsert',record:data});
-  if(navigator.onLine)await sheriSyncOutbox();
-  eDesc.value=eAmt.value='';render();
+  state.expenses.push(data);await sheriSaveSnapshot();await sheriQueue({type:'expense_upsert',record:data});
+  let warning='';
+  try{await accEnsureBase();const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:data.created_at.slice(0,10),description:'Expense '+description,sourceType:'expense',sourceId:data.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});}
+  catch(err){warning=' Saved, but ledger posting needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] expense posting failed',err);}
+  if(navigator.onLine)await sheriSyncOutbox();clearExpenseForm();render();sheriToast('Expense recorded.'+warning,warning?'warning':'success');
 }
 async function deleteExpense(id){
   if(!confirm('Delete this expense?'))return;
