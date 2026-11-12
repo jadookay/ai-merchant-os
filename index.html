@@ -2579,7 +2579,7 @@ async function askAI(webSearch){
     ...activeProducts().filter(p=>p.expiry_date).map(p=>({date:p.expiry_date,type:'product_expiry',title:'Product expiry: '+p.name,product_id:p.id,barcode:p.barcode||null})),
     ...(state.invoices||[]).filter(x=>x.due_date).map(x=>({date:x.due_date,type:'invoice_due',title:'Invoice due: '+(x.invoice_number||x.number||x.id),amount:x.total,reference:x.invoice_number||x.number||x.id})),
     ...(state.bills||[]).filter(x=>x.due_date).map(x=>({date:x.due_date,type:'bill_due',title:'Bill due: '+(x.bill_number||x.number||x.id),amount:x.total,reference:x.bill_number||x.number||x.id})),
-    ...(state.recurringTransactions||[]).filter(x=>x.next_run_at||x.next_run_date).map(x=>({date:x.next_run_at||x.next_run_date,type:'recurring_transaction',title:x.description||x.name||'Recurring transaction',amount:x.amount||null}))
+    ...(state.recurringTransactions||[]).filter(x=>x.next_run).map(x=>({date:x.next_run,type:'recurring_transaction',title:x.description||x.name||'Recurring transaction',amount:x.amount||null}))
   ].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   const context={
     currentDateTime,currentTimeZone,businessCalendar,
