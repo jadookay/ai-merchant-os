@@ -210,6 +210,7 @@ Deno.serve(async (req: Request) => {
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
       const pin = String(body?.pin || "");
       if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
+      if (!email && !phone && !username) return json({ error: "Keep at least one staff login identifier: email, phone or username." }, 400);
       if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       if (phone && !/^\\+?\\d{7,15}$/.test(phone)) return json({ error: "Enter a phone number in international format." }, 400);
       if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
