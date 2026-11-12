@@ -235,7 +235,7 @@ test("new product opening inventory and explicit stock gain/write-off adjustment
   assert.match(html, /option value="stock_writeoff"/);
   assert.match(html, /option value="stock_gain"/);
   assert.match(html, /type==='stock_writeoff'\)\{lines=\[\{accountId:accAccountCode\('6000'\)\.id,debit:amount\}/);
-  assert.match(html, /type==='stock_gain'\)\{lines=\[\{accountId:inv\.id,debit:amount\},\{accountId:accAccountCode\('3000'\)\.id,credit:amount\}/);
+  assert.match(html, /else\{lines=\[\{accountId:inv\.id,debit:amount\},\{accountId:accAccountCode\('3000'\)\.id,credit:amount\}/);
   assert.match(html, /function accAdjustTypeChanged\(\)/);
 });
 
