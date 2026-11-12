@@ -101,7 +101,7 @@ declare
   v_count integer;
 begin
   if coalesce(auth.jwt()->>'role','') <> 'service_role' then raise exception 'not authorized'; end if;
-  if p_merchant_id is null or length(v_identifier)<2 or p_pin !~ '^[0-9]{6,8}('ok',false); end if;
+  if p_merchant_id is null or length(v_identifier)<2 or p_pin !~ '^[0-9]{6,8}$' then return jsonb_build_object('ok',false); end if;
   v_key := encode(extensions.digest(p_merchant_id::text||':'||v_identifier||':'||coalesce(p_ip_hash,''),'sha256'),'hex');
   select * into v_attempt from public.team_login_attempts where attempt_key=v_key for update;
   if found and v_attempt.blocked_until is not null and v_attempt.blocked_until>now() then
