@@ -210,55 +210,55 @@ test("sales and expenses confirm before saving and post balanced journal entries
   const saleEnd = html.indexOf("\\nasync function voidSale", saleStart);
   assert.ok(saleStart >= 0 && saleEnd > saleStart, "expected the complete sale recording function");
   const sale = html.slice(saleStart, saleEnd);
-  assert.match(sale, /confirm\\('Confirm sale\\?/);
-  assert.match(sale, /sheriToast\\('Sale confirmed\\./);
-  assert.match(sale, /Promise\\.resolve\\(\\)\\.then\\(\\)=>sheriSyncOutbox\\(\\)/);
+  assert.ok(sale.includes("confirm('Confirm sale?"), "sale must be confirmed before it is recorded");
+  assert.ok(sale.includes("sheriToast('Sale confirmed."), "sale confirmation must be immediate");
+  assert.ok(sale.includes("Promise.resolve().then(()=>sheriSyncOutbox())"), "background sync must not delay the sale confirmation");
 
   const saleAccountingStart = html.indexOf("const _v14_1_recordSale=recordSale");
   const saleAccountingEnd = html.indexOf("const _v14_1_addOSPurchase", saleAccountingStart);
   assert.ok(saleAccountingStart >= 0 && saleAccountingEnd > saleAccountingStart, "expected the sale accounting wrapper");
   const saleAccounting = html.slice(saleAccountingStart, saleAccountingEnd);
-  assert.match(saleAccounting, /sourceType:'sale',sourceId:s\\.id/);
-  assert.match(saleAccounting, /sourceType:'sale_cogs',sourceId:s\\.id/);
+  assert.ok(saleAccounting.includes("sourceType:'sale',sourceId:s.id"));
+  assert.ok(saleAccounting.includes("sourceType:'sale_cogs',sourceId:s.id"));
 
   const expenseStart = html.indexOf("function addExpense()");
   const expenseEnd = html.indexOf("\\nasync function deleteExpense", expenseStart);
   assert.ok(expenseStart >= 0 && expenseEnd > expenseStart, "expected the complete expense recording function");
   const expense = html.slice(expenseStart, expenseEnd);
-  assert.match(expense, /confirm\\('Record this expense\\?/);
-  assert.match(expense, /sourceType:'expense',sourceId:data\\.id/);
-  assert.match(expense, /sheriToast\\('Expense recorded\\.'/);
+  assert.ok(expense.includes("confirm('Record this expense?"));
+  assert.ok(expense.includes("sourceType:'expense',sourceId:data.id"));
+  assert.ok(expense.includes("sheriToast('Expense recorded."));
 });
 
 test("multi-product sales support add, remove, confirmation, transaction IDs and printable receipts", () => {
-  assert.match(html, /function addSaleToCart\\(\\)/);
-  assert.match(html, /function removeSaleCartItem\\(i\\)/);
-  assert.match(html, /function clearSaleCart\\(\\)/);
-  assert.match(html, /function printLastReceipt\\(\\)/);
-  assert.match(html, /transactionId=sheriUuid\\(\\)/);
-  assert.match(html, /invoice='INV-'/);
+  assert.ok(html.includes("function addSaleToCart()"));
+  assert.ok(html.includes("function removeSaleCartItem(i)"));
+  assert.ok(html.includes("function clearSaleCart()"));
+  assert.ok(html.includes("function printLastReceipt()"));
+  assert.ok(html.includes("transactionId=sheriUuid()"));
+  assert.ok(html.includes("invoice='INV-'"));
 });
 
 test("favorite products are ordered before other products and expiry alerts reach the business snapshot", () => {
-  assert.match(html, /favorite\\s*\\?\\s*-/);
-  assert.match(html, /expiryAlerts=activeProducts\\(\\)/);
-  assert.match(html, /expiry_date/);
-  assert.match(html, /systemSnapshot:\\{merchant:state\\.merchant,products:state\\.products/);
+  assert.ok(html.includes("Number(!!b.favorite)-Number(!!a.favorite)"));
+  assert.ok(html.includes("expiryAlerts=activeProducts()"));
+  assert.ok(html.includes("expiry_date"));
+  assert.ok(html.includes("systemSnapshot:{merchant:state.merchant,products:state.products"));
 });
 
 test("voice entry requires an explicit stop, review, use or discard action", () => {
-  assert.match(html, /Done recording/);
-  assert.match(html, /sheriConfirmVoiceEntry\\(\\)/);
-  assert.match(html, /sheriDiscardVoiceEntry\\(\\)/);
-  assert.match(html, /window\\.__sheriPendingVoice/);
+  assert.ok(html.includes("Done recording"));
+  assert.ok(html.includes("function sheriConfirmVoiceEntry()"));
+  assert.ok(html.includes("function sheriDiscardVoiceEntry()"));
+  assert.ok(html.includes("window.__sheriPendingVoice"));
 });
 
 test("Shericeri receives operational, accounting, team, calendar, image and formula context", () => {
-  assert.match(html, /systemSnapshot:\\{[\\s\\S]*?teamMembers:state\\.teamMembers/);
-  assert.match(html, /calendar:state\\.calendar/);
-  assert.match(html, /accountingSettings:state\\.accountingSettings/);
-  assert.match(html, /products:state\\.products/);
-  assert.match(html, /formulas:\\{revenue:/);
+  assert.ok(html.includes("teamMembers:state.teamMembers||[]"));
+  assert.ok(html.includes("calendar:state.calendar||[]"));
+  assert.ok(html.includes("accountingSettings:state.accountingSettings"));
+  assert.ok(html.includes("products:state.products"));
+  assert.ok(html.includes("formulas:{revenue:"));
 });
 
 test("sales, expenses and reports support daily, weekly, monthly and custom calendar date ranges", () => {
