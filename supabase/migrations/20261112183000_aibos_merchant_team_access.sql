@@ -202,7 +202,7 @@ set search_path=''
 as $$
 declare
   v_permission text;
-  v_destructive boolean:=p_action in ('delete','update','void');
+  v_destructive boolean:=p_action in ('delete','update','edit','void');
   v_actor_name text;
 begin
   if p_merchant_id is null or p_audit_id is null or coalesce(trim(p_action),'')='' or coalesce(trim(p_entity_type),'')='' then
@@ -217,6 +217,7 @@ begin
     when 'supplier' then 'manage_suppliers'
     when 'cash_entry' then 'manage_finance'
     when 'budget' then 'manage_finance'
+    when 'adjustment' then 'manage_inventory'
     else 'manage_finance'
   end;
   if not private.user_can_access_merchant(p_merchant_id,v_permission)
