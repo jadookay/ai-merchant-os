@@ -7,6 +7,7 @@ const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const quickService = await readFile(new URL("../supabase/functions/quick-service/index.ts", import.meta.url), "utf8");
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
+const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
 
 test("team managers cannot create administrator accounts or grant permissions they do not hold", () => {
   assert.match(teamAccess, /if \(role === "admin" && !isPrivilegedGrantor\)/);
@@ -28,17 +29,23 @@ test("cancelled expense deletion does not post an accounting reversal", () => {
 });
 
 test("sale void reason and transaction references are persisted to the audit trail", () => {
-  assert.match(html, /await accAudit\('void','sale',id,\{reason:reason\.trim\(\),invoice_number:s\.invoice_number\|\|null,transaction_id:s\.transaction_id\|\|null/);
-  assert.match(html, /reason:details\?\.reason\|\|null/);
+  assert.match(html, /type:'sale_void',id,reason:reason\.trim\(\),audit_id:auditId/);
+  assert.match(html, /p_sale_id:op\.id,p_reason:op\.reason,p_audit_id:op\.audit_id/);
+  assert.match(html, /details:\{reason:reason\.trim\(\),invoice_number:invoice\|\|null,transaction_id:transactionId/);
+  assert.match(teamMigration, /create or replace function public\.shericeri_void_sale/);
+  assert.match(teamMigration, /void_reason=trim\(p_reason\),voided_at=now\(\),voided_by=auth\.uid\(\)/);
 });
 
-test("cancelled sale void does not post an accounting reversal", () => {
-  assert.match(html, /await _v14_1_voidSale\(id\);if\(state\.sales\.some\(x=>x\.id===id\)\)return;/);
+test("cancelled sale void leaves records and accounting untouched", () => {
+  assert.match(html, /if\(!confirm\(confirmText\)\)return;/);
+  assert.doesNotMatch(html, /sourceType:'sale_void'/);
+  assert.doesNotMatch(html, /const _v14_1_voidSale=voidSale/);
 });
 
-test("locally deleted expenses and sales are removed from IndexedDB", () => {
+test("locally deleted expenses and voided invoice sale rows are removed from IndexedDB", () => {
   assert.match(html, /state\.expenses=state\.expenses\.filter\(x=>x\.id!==id\);await sheriDelete\('expenses',id\)/);
-  assert.match(html, /state\.sales=state\.sales\.filter\(x=>x\.id!==id\);\s*await sheriDelete\('sales',id\)/);
+  assert.match(html, /for\(const row of rows\)[\s\S]*?await sheriDelete\('sales',row\.id\)/);
+  assert.match(html, /state\.sales=state\.sales\.filter\(x=>!saleIds\.includes\(x\.id\)\)/);
 });
 
 test("journal entries synchronize as one atomic RPC batch on normal and auth-retry paths", () => {
@@ -238,6 +245,21 @@ test("sales and expenses confirm before saving and post balanced journal entries
   assert.ok(expense.includes("confirm('Record this expense?"));
   assert.ok(expense.includes("sourceType:'expense',sourceId:data.id"));
   assert.ok(expense.includes("sheriToast('Expense recorded."));
+});
+
+test("cashier sales use an atomic stock RPC on normal sync and auth-retry paths", () => {
+  assert.match(html, /async function sheriSyncSaleOperation\(op\)[\\s\\S]*?sb\.rpc\('shericeri_sync_sale_stock'/);
+  assert.match(html, /op\.type==='sale_upsert'\)\{await sheriSyncSaleOperation\(op\)\}/);
+  assert.match(html, /op\.type==='sale_void'\)\{await sheriSyncVoidSale\(op\)\}/);
+  assert.match(teamMigration, /create or replace function public\.shericeri_sync_sale_stock/);
+  assert.match(teamMigration, /private\.user_can_access_merchant\(v_merchant_id,'create_sale'\)/);
+});
+
+test("operational staff receive only chart identifiers while financial reports and audit logs stay permission-gated", () => {
+  assert.match(teamMigration, /v_can_view_reports boolean/);
+  assert.match(teamMigration, /'journalEntries',case when v_can_view_reports/);
+  assert.match(teamMigration, /'auditLog',case when private\.user_can_access_merchant\(p_merchant_id,'view_audit_log'\)/);
+  assert.match(teamMigration, /shericeri_ensure_operational_accounts/);
 });
 
 test("multi-product sales support add, remove, confirmation, transaction IDs and printable receipts", () => {
