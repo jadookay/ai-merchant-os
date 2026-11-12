@@ -133,7 +133,7 @@ create policy merchant_members_manage on public.merchant_members for all to auth
 
 -- Add narrow staff policies without removing or replacing the existing owner policies.
 -- PostgreSQL combines permissive policies with OR, so the original owner access remains intact.
-do $
+do $$
 declare t record; read_perm text; write_perm text; insert_perm text;
 begin
   for t in select table_name from information_schema.columns
@@ -177,13 +177,13 @@ begin
     if t.table_name not in ('audit_log','sales','journal_entries','journal_lines') then
       execute format('drop policy if exists %I on public.%I',t.table_name||'_team_update',t.table_name);
       execute format('drop policy if exists %I on public.%I',t.table_name||'_team_delete',t.table_name);
-      execute format('create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,'manage_team') and private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,'manage_team') and private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_update',t.table_name,write_perm,write_perm);
+      execute format('create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_update',t.table_name,write_perm,write_perm);
       if t.table_name<>'purchases' then
-        execute format('create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,'manage_team') and private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_delete',t.table_name,write_perm);
+        execute format('create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_delete',t.table_name,write_perm);
       end if;
     end if;
   end loop;
-end $;
+end $$;
 
 -- Trusted audit writer: never trust client-supplied actor identity or role.
 create or replace function public.shericeri_write_audit(
@@ -199,7 +199,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path=''
-as $
+as $$
 declare
   v_permission text;
   v_destructive boolean:=p_action in ('delete','update','void');
@@ -250,7 +250,7 @@ returns jsonb
 language plpgsql
 security definer
 set search_path=''
-as $
+as $$
 declare
   v_purchase public.purchases%rowtype;
 begin
