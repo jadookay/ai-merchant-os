@@ -12,6 +12,15 @@ This branch is based on production commit 89c9c874bcda02b1ca84c4d5f217b8f29f77ca
 - Adds a reviewed-but-unapplied SQL patch for Shericeri memory, user-scoped product image uploads, bucket constraints, and authenticated-only execution of privileged accounting RPCs.
 - Adds Supabase function JWT configuration. In particular, `kinya-tts` must be redeployed with JWT verification enabled before production rollout.
 
+- Adds a detailed Pending activity panel showing each outbox operation, retry count, server error, blocked state, and next retry time; blocked items require an explicit retry confirmation.
+- Uses one MediaRecorder + authenticated Whisper transcription path for sale, product, expense, customer, and AI Advisor voice entry, with tap-to-stop, a recording limit, clear permission errors, and manual-entry fallback.
+- Adds a back button to navigated views and horizontally scrollable data tables without forcing the whole phone page to scroll.
+- Adds suggested searches for sales, products, expenses, invoices, bills, and payments.
+- Adds daily, weekly, monthly, and custom calendar date filters shared by sales, expenses, and reports. Income statement totals use the selected period; balance sheet and trial balance use the selected end date; cash flow uses cash/bank ledger movements in the selected period.
+- Sorts operational transaction histories and recent activity by their recorded occurrence timestamps; recent activity combines sales, expenses, purchases, cash movements, and payments.
+- Posts new sales and COGS, expenses, and opening stock to balanced journal entries at record time; adds explicit inventory gain and write-off adjustments with confirmation.
+- Adds confirmation and visible completion feedback for key save and adjustment actions.
+
 ## Static regression checks
 
 Run from the repository root:
