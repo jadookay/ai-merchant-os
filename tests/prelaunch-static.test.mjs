@@ -263,6 +263,16 @@ test("operational staff receive only chart identifiers while financial reports a
   assert.match(teamMigration, /shericeri_ensure_operational_accounts/);
 });
 
+test("staff login identifiers can be edited without exposing PIN hashes", () => {
+  assert.ok(html.includes("Email address (leave blank to remove email login)"));
+  assert.ok(html.includes("Phone number in international format"));
+  assert.ok(html.includes("Username (optional; leave blank to remove)"));
+  assert.ok(teamAccess.includes("update({ full_name: fullName, email, phone, username, responsibility"));
+  assert.ok(teamAccess.includes("admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true })"));
+  assert.ok(teamAccess.includes("Keep at least one staff login identifier"));
+  assert.doesNotMatch(teamAccess, /select\([^\n]*pin_hash/);
+});
+
 test("manager accounts receive team and sales-control capabilities by default", () => {
   assert.ok(html.includes("manage_sales:role==='manager'||document.getElementById('teamSalesManage').checked"));
   assert.ok(html.includes("manage_team:role==='manager'||document.getElementById('teamManage').checked"));
