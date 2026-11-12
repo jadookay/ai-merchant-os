@@ -480,3 +480,9 @@ test("team account creation validates email, phone, username and PIN formats", (
   assert.ok(teamAccess.includes('if (username && !/^[a-z0-9._-]{3,40}$/.test(username))'));
   assert.ok(teamAccess.includes('!/^\\d{6,8}$/.test(pin)'));
 });
+
+
+test("ordered purchase deletion uses the same guarded RPC after token refresh", () => {
+  assert.ok((html.match(/sb\.rpc\('shericeri_delete_ordered_purchase'/g)||[]).length>=2);
+  assert.ok(teamMigration.includes("if v_purchase.status<>'ordered' then"));
+});
