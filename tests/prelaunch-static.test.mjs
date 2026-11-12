@@ -427,3 +427,19 @@ test("stock conflicts do not create partial sale or purchase records", () => {
 test("voided server sales are excluded from the active sales workspace", () => {
   assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales).filter(x=>!x.voided)"));
 });
+
+
+test("destructive controls require both a manager-level role and the relevant responsibility", () => {
+  for (const [fn,permission] of [
+    ["deleteProduct","manage_inventory"],["deleteExpense","manage_expenses"],
+    ["deleteCustomer","manage_customers"],["deleteOSSupplier","manage_suppliers"],
+    ["deleteOSPurchase","manage_inventory"],["deleteOSCash","manage_finance"],
+    ["deleteOSBudget","manage_finance"]
+  ]) {
+    const start=html.indexOf("async function "+fn+"(");
+    assert.ok(start>=0,"missing "+fn);
+    const block=html.slice(start,start+500);
+    assert.ok(block.includes("sheriCan('manage_team')") && block.includes("sheriCan('"+permission+"')"),
+      fn+" must require both manager role and the relevant permission");
+  }
+});
