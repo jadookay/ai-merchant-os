@@ -41,3 +41,37 @@ These tests check source invariants. They do not replace browser, multi-user, of
 6. Promote through a reviewed pull request only after all tests pass.
 
 No database migration or Edge Function deployment is performed by this branch.
+
+
+## November 12 team access, sales and Shericeri extension
+
+- Adds merchant-scoped staff subaccounts with name, phone, or email plus a hashed 6–8 digit PIN; login attempts are rate-limited.
+- Adds role and permission assignment for managers, cashiers, inventory staff, and accountants. Only Owner/Admin can grant Admin; managers can delegate only permissions they hold.
+- Restricts edit/delete/void actions to Owner/Admin/Manager. Staff records are suspended rather than hard-deleted so transaction history remains intact.
+- Requires a reason for sensitive edits and deletions. The audit trail records the actor, action, affected record, reason, and transaction/invoice references.
+- Adds manager-visible audit history in team settings.
+- Adds multi-product sale cart operations, invoice/transaction IDs, immediate local confirmation, and printable receipts. Favorites are sorted before other products.
+- Routes sale stock updates and invoice voids through atomic permission-checked database functions. Voiding an invoice restores stock only for lines whose stock decrement was applied and marks original journal entries voided; delayed journal batches cannot recreate voided revenue.
+- Routes received-purchase stock and weighted-average cost updates through an atomic inventory RPC. Inventory staff can create products and receive purchases but cannot overwrite existing product master records.
+- Adds expiration alerts to dashboard priorities and Shericeri's date-aware business calendar.
+- Adds explicit voice-entry review with Done recording, transcript verification, Use/Save, and Discard actions.
+- Expands Shericeri context with current date/time and timezone, business settings, products and barcodes, sales and invoices, inventory expiry, accounting summaries and formulas, staff details visible to the current user's permissions, audit history, calendar events, and product-image references. Product-image URLs are supplied as metadata; this does not yet provide visual interpretation of the underlying image bytes.
+
+## Additional regression coverage
+
+The static regression suite now contains 43 tests. Run with:
+
+```bash
+node --test tests/prelaunch-static.test.mjs
+```
+
+The latest verified run at commit `336e532d7afd3e7851752f76ead3648eeac2db85` passed 43/43 tests. This is source-level CI only; it is not a live multi-user or device integration test.
+
+## Deployment status and required order
+
+The feature branch includes two unapplied migrations, in order:
+
+1. `20261112180000_aibos_sales_favorites_audit.sql`
+2. `20261112183000_aibos_merchant_team_access.sql`
+
+The `team-access` Edge Function is also not deployed. Production Supabase remains unchanged. Before rollout, validate both migrations and the Edge Function in a disposable staging project, then test Owner, Admin, Manager, Cashier, Inventory, and Accountant sessions, including offline/retry behavior and invoice-level voids. Do not merge this draft or deploy it until those checks pass.
