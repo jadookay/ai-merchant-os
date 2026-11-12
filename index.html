@@ -1787,7 +1787,7 @@ function sheriRecentActivitiesHtml(){
   for(const p of state.payments||[])rows.push({when:p.payment_date||p.created_at,type:p.direction==='receipt'?'Customer receipt':'Payment',title:p.reference||p.source_type||'Payment',amount:p.direction==='receipt'?Number(p.amount||0):-Number(p.amount||0)});
   return rows.filter(x=>sheriDateInReportRange(x.when)).sort((a,b)=>String(b.when||'').localeCompare(String(a.when||''))).slice(0,7).map(x=>'<div class="row"><div><b>'+esc(x.title)+'</b><div class="sub">'+esc(x.type)+' · '+esc(x.when?new Date(x.when).toLocaleString():'Time unavailable')+'</div></div><b>'+money(x.amount)+'</b></div>').join('')||'<div class="empty">No recent activity in this date range.</div>';
 }
-function sheriCan(permission){if(!session?.user||!state.merchant)return false;if(state.merchant.user_id===session.user.id)return true;if(state.currentMembership?.role==='admin')return true;return state.currentMembership?.permissions?.[permission]===true}
+function sheriCan(permission){if(!session?.user||!state.merchant)return false;if(state.merchant.user_id===session.user.id)return true;if(state.currentMembership?.role==='admin')return true;if(['manage_team','manage_sales'].includes(permission)&&state.currentMembership?.role!=='manager')return false;return state.currentMembership?.permissions?.[permission]===true}
 function sheriPermissionButton(permission,html){return sheriCan(permission)?html:''}
 function render(){
   if(!state.merchant)return;
@@ -2393,7 +2393,7 @@ function renderForecast(){
 let teamLoadedForMerchant=null;
 async function loadTeamMembers(force=false){
  if(!state.merchant||!sb)return;if(!force&&teamLoadedForMerchant===state.merchant.id)return;teamLoadedForMerchant=state.merchant.id;
- try{const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,last_login_at').eq('merchant_id',state.merchant.id).order('created_at',{ascending:false});if(error)throw error;state.teamMembers=data||[];state.currentMembership=state.teamMembers.find(x=>x.user_id===session?.user?.id)||null;const can=state.merchant.user_id===session?.user?.id||state.currentMembership?.role==='admin'||state.currentMembership?.permissions?.manage_team===true;const card=document.getElementById('teamAccessCard');if(card)card.style.display=can?'block':'none';renderTeamMembers()}catch(e){teamLoadedForMerchant=null;console.warn('[AIBOS team]',e)}
+ try{const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,last_login_at').eq('merchant_id',state.merchant.id).order('created_at',{ascending:false});if(error)throw error;state.teamMembers=data||[];state.currentMembership=state.teamMembers.find(x=>x.user_id===session?.user?.id)||null;const can=state.merchant.user_id===session?.user?.id||state.currentMembership?.role==='admin'||(state.currentMembership?.role==='manager'&&state.currentMembership?.permissions?.manage_team===true);const card=document.getElementById('teamAccessCard');if(card)card.style.display=can?'block':'none';renderTeamMembers()}catch(e){teamLoadedForMerchant=null;console.warn('[AIBOS team]',e)}
 }
 function renderTeamMembers(){
  const host=document.getElementById('teamMembersTable');if(!host)return;
