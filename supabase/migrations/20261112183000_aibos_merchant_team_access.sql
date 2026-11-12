@@ -394,7 +394,7 @@ begin
   insert into public.audit_log(id,merchant_id,actor_user_id,action,entity_type,entity_id,reason,details,created_at)
   values(p_audit_id,v_merchant_id,auth.uid(),'void','sale',p_sale_id,trim(p_reason),
     jsonb_build_object('reason',trim(p_reason),'invoice_number',v_invoice_number,'transaction_id',v_transaction_id,
-      'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids),now())
+      'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids,'actor_name',case when exists(select 1 from public.merchants where id=v_merchant_id and user_id=auth.uid()) then 'Owner' else coalesce((select full_name from public.merchant_members where merchant_id=v_merchant_id and user_id=auth.uid() and status='active' limit 1),'Staff') end),now())
   on conflict(id) do nothing;
   delete from public.sales
   where merchant_id=v_merchant_id
