@@ -1968,16 +1968,7 @@ async function generateProductImage(){
   }
 }
 
-function startProductVoice(){
-  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
-  const status=document.getElementById('productVoiceStatus');
-  if(!S){status.textContent='Voice input is not supported in this browser. Try Chrome.';return}
-  const r=new S();r.lang='en-US';
-  r.onstart=()=>status.textContent='Listening… try "Vaseline 250ml cost 1800 sell 2500 stock 18 reorder 8".';
-  r.onresult=e=>{const t=e.results[0][0].transcript;status.textContent='Heard: "'+t+'". ';parseVoiceProduct(t)};
-  r.onerror=()=>status.textContent='Voice capture failed. You can type the details instead.';
-  r.start();
-}
+function startProductVoice(){sheriStartFormVoice('productVoiceStatus',parseVoiceProduct,'Say product name, cost, selling price, stock and reorder level.');}
 function parseVoiceProduct(t){
   const status=document.getElementById('productVoiceStatus');
   let text=t.toLowerCase();
@@ -2442,15 +2433,47 @@ function offlineAnswer(q){
 }
 
 // ── Voice entry ──────────────────────────────────────────────────────────
-function startVoice(){
-  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!S){document.getElementById('voiceStatus').textContent='Voice input is not supported in this browser. Try Chrome.';return}
-  const r=new S();r.lang='en-US';
-  r.onstart=()=>voiceStatus.textContent='Listening… try "3 vaseline at 2500".';
-  r.onresult=e=>{const t=e.results[0][0].transcript;voiceStatus.textContent='Heard: "'+t+'". ';parseVoiceSale(t)};
-  r.onerror=()=>voiceStatus.textContent='Voice capture failed. You can type the sale instead.';
-  r.start();
+let sheriFormVoiceRecorder=null,sheriFormVoiceStream=null,sheriFormVoiceTimer=null,sheriFormVoiceChunks=[];
+async function sheriTranscribeFormAudio(blob){
+  if(!navigator.onLine){const local=await sheriLocalStt(blob,(document.getElementById('shericeriLang')?.value||'en-US'));if(local)return local;throw new Error('Voice transcription is unavailable offline on this device. Reconnect or enter the details manually.');}
+  const dataUrl=await blobToDataUrl(blob);let {data:{session:currentSession}}=await sb.auth.getSession();
+  if(!currentSession?.access_token){const refreshed=await sb.auth.refreshSession();currentSession=refreshed?.data?.session;if(!currentSession?.access_token)throw new Error('Please sign in again before using voice entry.');}
+  const lang=(document.getElementById('shericeriLang')?.value||'en-US').slice(0,2);
+  const body=JSON.stringify({mode:lang==='rw'?'kinya_transcribe':'transcribe',audio:dataUrl,language:lang,diagnostic:false});
+  const call=()=>fetch(SUPABASE_URL+'/functions/v1/advisor',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},body});
+  let res=await call();if(res.status===401){const refreshed=await sb.auth.refreshSession();currentSession=refreshed?.data?.session;if(!currentSession?.access_token)throw new Error('Your session expired. Please sign in again.');res=await call();}
+  const raw=await res.text();let out=null;try{out=raw?JSON.parse(raw):null}catch(_){}
+  if(!res.ok)throw new Error(out?.provider_error||out?.error||('Speech recognition failed (HTTP '+res.status+').'));
+  const transcript=String(out?.transcript||'').trim();if(!transcript)throw new Error('No clear speech was recognized. Please try again.');return transcript;
 }
+function sheriStopFormVoice(){if(sheriFormVoiceTimer){clearTimeout(sheriFormVoiceTimer);sheriFormVoiceTimer=null;}if(sheriFormVoiceRecorder&&sheriFormVoiceRecorder.state!=='inactive')sheriFormVoiceRecorder.stop();}
+async function sheriStartFormVoice(statusId,onTranscript,hint){
+  const status=document.getElementById(statusId);if(!status)return;
+  if(sheriFormVoiceRecorder&&sheriFormVoiceRecorder.state==='recording'){status.textContent='Processing your recording…';sheriStopFormVoice();return;}
+  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){status.textContent='Audio recording is not supported here. Open the app in Chrome over HTTPS, or type the details.';return;}
+  try{
+    if(!navigator.onLine&&!window.SHERICERI_VOICE_BRIDGE?.transcribeBlob)throw new Error('Reconnect to use speech recognition. Offline speech recognition is not installed on this device.');
+    status.textContent='Requesting microphone permission…';
+    sheriFormVoiceStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    const mime=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'].find(x=>!MediaRecorder.isTypeSupported||MediaRecorder.isTypeSupported(x))||'';
+    sheriFormVoiceChunks=[];try{sheriFormVoiceRecorder=new MediaRecorder(sheriFormVoiceStream,mime?{mimeType:mime}:undefined)}catch(_){sheriFormVoiceRecorder=new MediaRecorder(sheriFormVoiceStream)}
+    const recorder=sheriFormVoiceRecorder,stream=sheriFormVoiceStream;
+    recorder.ondataavailable=e=>{if(e.data&&e.data.size)sheriFormVoiceChunks.push(e.data)};
+    recorder.onerror=e=>{status.textContent='Microphone recording failed: '+(e.error?.message||'unknown recording error');stream.getTracks().forEach(t=>t.stop());};
+    recorder.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());sheriFormVoiceStream=null;sheriFormVoiceRecorder=null;
+      const blob=new Blob(sheriFormVoiceChunks,{type:recorder.mimeType||'audio/webm'});sheriFormVoiceChunks=[];
+      if(blob.size<800){status.textContent='The recording was too short or silent. Tap Voice and try again.';return;}
+      status.textContent='Recognizing your speech…';
+      try{const transcript=await sheriTranscribeFormAudio(blob);status.textContent='Heard: “'+transcript+'”. Review the filled fields before saving.';onTranscript(transcript);}
+      catch(err){status.textContent=(err?.message||String(err))+' You can type the details instead.';}
+    };
+    recorder.start(250);status.textContent='🔴 Recording… '+(hint||'Speak now')+' Tap the Voice button again to finish.';
+    sheriFormVoiceTimer=setTimeout(()=>{if(recorder.state==='recording'){status.textContent='Recording time limit reached. Processing…';sheriStopFormVoice();}},12000);
+  }catch(err){if(sheriFormVoiceStream){sheriFormVoiceStream.getTracks().forEach(t=>t.stop());sheriFormVoiceStream=null;}status.textContent=(err?.name==='NotAllowedError'?'Microphone permission was denied. Allow microphone access for this site in Chrome settings. ':err?.message||String(err))+' You can still type the details.';}
+}
+function startVoice(){sheriStartFormVoice('voiceStatus',parseVoiceSale,'Say quantity, product name and optional price, for example: 3 Vaseline at 2500.');}
+
 function parseVoiceSale(t){
   const m=t.toLowerCase().match(/(\d+)\s+(.+?)(?:\s+at\s+(\d+))?$/);
   if(!m){voiceStatus.textContent+='Could not parse a quantity and product — please fill the form manually.';return}
@@ -2464,22 +2487,7 @@ function parseVoiceSale(t){
   voiceStatus.textContent+=`Filled in: ${qty} × ${match.name}${price?` at ${money(price)}`:''}. Review and click Record sale.`;
 }
 
-function startAdvisorVoice(){
-  const S=window.SpeechRecognition||window.webkitSpeechRecognition;
-  const status=document.getElementById('advisorVoiceStatus');
-  if(!S){status.textContent='Voice input is not supported in this browser. Try Chrome.';return}
-  const r=new S();r.lang='en-US';
-  r.onstart=()=>status.textContent='Listening…';
-  r.onresult=e=>{
-    const t=e.results[0][0].transcript;
-    status.textContent='Heard: "'+t+'"';
-    document.getElementById('question').value=t;
-    askAI();
-  };
-  r.onerror=()=>status.textContent='Voice capture failed. You can type your question instead.';
-  r.onend=()=>{if(status.textContent==='Listening…')status.textContent=''};
-  r.start();
-}
+function startAdvisorVoice(){sheriStartFormVoice('advisorVoiceStatus',t=>{document.getElementById('question').value=t;},'Ask your question, then tap Voice again to finish.');}
 
 // ── Shericeri: tap-to-talk voice assistant ─────────────────────────────────
 // ── Temporary Shericeri voice diagnostics ─────────────────────────────────
