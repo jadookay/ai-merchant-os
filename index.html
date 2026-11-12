@@ -2341,6 +2341,7 @@ function parseVoiceExpense(transcript){
 }
 function clearExpenseForm(){eDesc.value=eAmt.value='';const status=document.getElementById('expenseVoiceStatus');if(status)status.textContent='';}
 async function addExpense(){
+  if(!sheriCan('manage_expenses'))return sheriToast('You do not have permission to record expenses.','error');
   const description=eDesc.value.trim(),amount=+eAmt.value,cat=eCat.value;
   if(!description||!Number.isFinite(amount)||amount<=0)return alert('Enter an expense description and a positive amount.');
   if(!confirm('Record this expense?\n'+description+' — '+money(amount)+'\nCategory: '+cat))return;
@@ -2376,6 +2377,7 @@ function parseVoiceCustomer(transcript){
 }
 function clearCustomerForm(){['cName','cPhone','cNotes'].forEach(id=>document.getElementById(id).value='');const s=document.getElementById('customerVoiceStatus');if(s)s.textContent='';}
 async function addCustomer(){
+  if(!sheriCan('manage_customers'))return sheriToast('You do not have permission to add customers.','error');
   const name=document.getElementById('cName').value.trim();
   const phone=document.getElementById('cPhone').value.trim();
   const notes=document.getElementById('cNotes').value.trim();
@@ -4595,6 +4597,7 @@ function osLocalInsights(){
   return lines;
 }
 async function addOSSupplier(){
+  if(!sheriCan('manage_suppliers'))return sheriToast('You do not have permission to add suppliers.','error');
   const name=document.getElementById('osSupplierName').value.trim();if(!name)return alert('Enter a supplier name.');
   const data={id:sheriUuid(),merchant_id:state.merchant.id,name,phone:document.getElementById('osSupplierPhone').value.trim()||null,email:document.getElementById('osSupplierEmail').value.trim()||null,payment_terms:document.getElementById('osSupplierTerms').value.trim()||null,created_at:sheriNow(),deleted:false};
   state.suppliers.push(data);await sheriPut('suppliers',data.id,{merchant_id:state.merchant.id,record:{...data}});await sheriQueue({type:'supplier_upsert',record:data});if(navigator.onLine)await sheriSyncOutbox();
@@ -4621,11 +4624,13 @@ async function addOSPurchase(){
 }
 async function deleteOSPurchase(id){if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can delete purchases.','error');const x=state.purchases.find(p=>p.id===id);if(!x)return;if(x.status!=='ordered')return alert('Received purchases cannot be deleted because they affect inventory and accounting. Record a purchase return/adjustment instead.');const reason=prompt('Reason for deleting this ordered purchase (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');if(!confirm('Delete this ordered purchase?\\nReason: '+reason.trim()))return;state.purchases=state.purchases.filter(p=>p.id!==id);await sheriSaveSnapshot();await sheriQueue({type:'purchase_delete',id});await accAudit('delete','purchase',id,{reason:reason.trim(),total:x.total||x.qty*x.unit_cost});if(navigator.onLine)await sheriSyncOutbox();render()}
 async function addOSCashEntry(){
+  if(!sheriCan('manage_finance'))return sheriToast('You do not have permission to record cash movements.','error');
   const kind=document.getElementById('osCashKind').value,amount=Number(document.getElementById('osCashAmount').value),category=document.getElementById('osCashCategory').value.trim()||'Other',description=document.getElementById('osCashDescription').value.trim();if(amount<=0||!description)return alert('Enter an amount and description.');
   const data={id:sheriUuid(),merchant_id:state.merchant.id,kind,amount,category,description,occurred_at:sheriNow(),created_at:sheriNow()};state.cashEntries.push(data);await sheriPut('cashEntries',data.id,{merchant_id:state.merchant.id,record:{...data}});await sheriQueue({type:'cash_upsert',record:data});if(navigator.onLine)await sheriSyncOutbox();document.getElementById('osCashAmount').value='';document.getElementById('osCashDescription').value='';render()
 }
 async function deleteOSCash(id){if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can delete cash movements.','error');const x=state.cashEntries.find(x=>x.id===id);if(!x)return;const reason=prompt('Reason for deleting this cash movement (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');if(!confirm('Delete this cash movement?\\nReason: '+reason.trim()))return;state.cashEntries=state.cashEntries.filter(x=>x.id!==id);await sheriSaveSnapshot();await sheriQueue({type:'cash_delete',id});await accAudit('delete','cash_entry',id,{reason:reason.trim(),amount:x.amount,kind:x.kind});if(navigator.onLine)await sheriSyncOutbox();render()}
 async function addOSBudget(){
+  if(!sheriCan('manage_finance'))return sheriToast('You do not have permission to manage budgets.','error');
   const month=document.getElementById('osBudgetMonth').value,category=document.getElementById('osBudgetCategory').value.trim(),amount=Number(document.getElementById('osBudgetAmount').value);if(!month||!category||amount<0)return alert('Complete the budget details.');
   const existing=state.budgets.find(x=>x.month===month+'-01'&&x.category.toLowerCase()===category.toLowerCase()&&!x.deleted);const data=existing||{id:sheriUuid(),merchant_id:state.merchant.id,created_at:sheriNow()};Object.assign(data,{month:month+'-01',category,amount,updated_at:sheriNow(),deleted:false});if(!existing)state.budgets.push(data);await sheriPut('budgets',data.id,{merchant_id:state.merchant.id,record:{...data}});await sheriQueue({type:'budget_upsert',record:data});if(navigator.onLine)await sheriSyncOutbox();document.getElementById('osBudgetAmount').value='';render()
 }
