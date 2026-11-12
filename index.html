@@ -4805,7 +4805,7 @@ function sheriHideInternalAccountingUi(){
     if(card.querySelector('#accOpeningAccount'))card.style.display='none';
   });
   document.querySelectorAll('#reports .card.section').forEach(card=>{
-    if(card.querySelector('#accTB,#accGL,#accAudit'))card.style.display='none';
+    if(card.querySelector('#accTB,#accGL'))card.style.display='none';
   });
 }
 function toggleExportMenu(btn){document.querySelectorAll('.export-wrap.open').forEach(x=>x.classList.remove('open'));btn.parentElement.classList.toggle('open')}
