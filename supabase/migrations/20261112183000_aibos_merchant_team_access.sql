@@ -263,7 +263,7 @@ begin
   select * into v_purchase from public.purchases
     where id=p_purchase_id and merchant_id=p_merchant_id for update;
   if not found then return jsonb_build_object('ok',true,'already_deleted',true); end if;
-  if v_purchase.status<>'ordered' or coalesce(v_purchase.stock_applied,false) then
+  if v_purchase.status<>'ordered' then
     raise exception 'Received purchases cannot be deleted; record a purchase return or stock adjustment instead';
   end if;
   insert into public.audit_log(id,merchant_id,actor_user_id,action,entity_type,entity_id,reason,details,created_at)
