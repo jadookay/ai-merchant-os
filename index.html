@@ -1754,6 +1754,15 @@ function sheriGoBack(){const previous=sheriViewHistory.pop()||'dashboard';show(p
 function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));sheriCurrentView=v;sheriEnsureViewBack(v);render()}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
 
+function sheriRecentActivitiesHtml(){
+  const rows=[];
+  for(const s of state.sales||[])rows.push({when:s.created_at,type:'Sale',title:s.product_name_snapshot||product(s.product_id)?.name||'Sale',amount:Number(s.qty||0)*Number(s.price||0)});
+  for(const e of state.expenses||[])rows.push({when:e.created_at,type:'Expense',title:e.description||'Expense',amount:-Number(e.amount||0)});
+  for(const p of state.purchases||[])if(p.status!=='ordered')rows.push({when:p.purchased_at||p.created_at,type:'Purchase',title:p.product_name_snapshot||product(p.product_id)?.name||'Purchase',amount:-Number(p.total||Number(p.qty||0)*Number(p.unit_cost||0))});
+  for(const c of state.cashEntries||[])rows.push({when:c.occurred_at||c.created_at,type:c.kind==='income'?'Cash income':c.kind==='expense'?'Cash expense':'Cash transfer',title:c.description||'Cash movement',amount:c.kind==='income'?Number(c.amount||0):c.kind==='expense'?-Number(c.amount||0):0});
+  for(const p of state.payments||[])rows.push({when:p.payment_date||p.created_at,type:p.direction==='receipt'?'Customer receipt':'Payment',title:p.reference||p.source_type||'Payment',amount:p.direction==='receipt'?Number(p.amount||0):-Number(p.amount||0)});
+  return rows.filter(x=>sheriDateInReportRange(x.when)).sort((a,b)=>String(b.when||'').localeCompare(String(a.when||''))).slice(0,7).map(x=>'<div class="row"><div><b>'+esc(x.title)+'</b><div class="sub">'+esc(x.type)+' · '+esc(x.when?new Date(x.when).toLocaleString():'Time unavailable')+'</div></div><b>'+money(x.amount)+'</b></div>').join('')||'<div class="empty">No recent activity in this date range.</div>';
+}
 function render(){
   if(!state.merchant)return;
   document.getElementById('merchantName').textContent=state.merchant.name;
@@ -1766,7 +1775,7 @@ function render(){
     ['Transactions',state.sales.length,'','sales','Open transactions'],
     ['Low-stock items',low,low?'warn':'good','inventory','Open inventory']
   ].map(x=>`<button type="button" class="card metric-card" onclick="show('${x[3]}')" aria-label="${x[4]}"><div class="label">${x[0]}</div><div class="metric ${x[2]}">${x[1]}</div><div class="sub" aria-hidden="true">View details →</div></button>`).join('');
-  document.getElementById('recent').innerHTML=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).slice(0,7).map(s=>{const p=product(s.product_id);return `<div class="row"><div><b>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</b><div class="sub">${s.qty} × ${money(s.price)}</div></div><b>${money(s.qty*s.price)}</b></div>`}).join('')||'<div class="empty">No sales yet.</div>';
+  document.getElementById('recent').innerHTML=sheriRecentActivitiesHtml();
   let lowNames=activeProducts().filter(p=>p.stock<=p.reorder).map(p=>esc(p.name));
   let best=bestProducts()[0];
   document.getElementById('priorities').innerHTML=[
@@ -1799,7 +1808,7 @@ async function recordSale(){
   const id=document.getElementById('saleProduct').value,q=+document.getElementById('saleQty').value,price=+document.getElementById('salePrice').value;
   const custId=document.getElementById('saleCustomer').value||null;
   const p=product(id);
-  if(!p||q<1||price<0)return alert('Enter valid sale details.');
+  if(!p||!Number.isFinite(q)||!Number.isFinite(price)||q<1||price<0)return alert('Enter a valid product, quantity and selling price.');
   if(q>p.stock)return alert('Not enough stock.');
   const newStock=p.stock-q;
   const saleRow={id:sheriUuid(),merchant_id:state.merchant.id,product_id:p.id,product_name_snapshot:p.name,customer_id:custId,qty:q,price,cost:p.cost,created_at:sheriNow()};
@@ -2011,6 +2020,7 @@ async function saveProduct(){
   const isEditing=!!editingProductId;
   if(!confirm((isEditing?'Update':'Save')+' product?\\n'+name+'\\nCost: '+money(cost)+' · Selling price: '+money(sell)+'\\nStock: '+stock+' · Reorder level: '+reorder))return;
   const now=sheriNow();
+  let openingStockProduct=null;
   if(editingProductId){
     const p=product(editingProductId); if(!p)return;
     Object.assign(p,{name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,updated_at:now});
@@ -2018,12 +2028,13 @@ async function saveProduct(){
     await sheriQueue({type:'product_upsert',record:{...p}});
   }else{
     const p={id:sheriUuid(),merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,created_at:now,updated_at:now};
-    state.products.push(p);
+    state.products.push(p);openingStockProduct=p;
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
   }
+  let openingWarning='';if(openingStockProduct&&openingStockProduct.stock>0&&openingStockProduct.cost>0){try{await accEnsureBase();const inv=accAccountCode('1200'),equity=accAccountCode('3000'),value=openingStockProduct.stock*openingStockProduct.cost;await accPostEntry({date:now.slice(0,10),description:'Opening inventory '+name,sourceType:'product_opening_stock',sourceId:openingStockProduct.id,lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]});}catch(err){openingWarning=' Opening stock was saved but its accounting entry needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] opening inventory posting failed',err);}}
   if(navigator.onLine)await sheriSyncOutbox();
-  document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast(isEditing?'Product updated.':'Product saved.');
+  document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast((isEditing?'Product updated.':'Product saved.')+openingWarning,openingWarning?'warning':'success');
 }
 async function deleteProduct(id){
   const p=product(id);if(!p)return;
