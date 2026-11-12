@@ -62,6 +62,16 @@ test("browser TTS fallback is used when the compatibility bridge is only a place
 });
 
 
+test("stale TTS onstart callbacks never cancel a newer turn's global speech queue", () => {
+  const start = html.indexOf("  utt.onstart=()=>{");
+  const end = html.indexOf("\n  utt.onend=", start);
+  assert.ok(start >= 0 && end > start, "expected utterance onstart handler");
+  const onstart = html.slice(start, end);
+  assert.match(onstart, /if\(turnId!==sheriTurnId\)\{[\s\S]*?return;/);
+  assert.doesNotMatch(onstart, /speechSynthesis\.cancel\(\)/,
+    "stale callbacks must not cancel newer utterances");
+});
+
 test("normal Android TTS waits for voices and does not cancel its fresh utterance", () => {
   const start = html.indexOf("  const speakNow=async()=>{");
   const end = html.indexOf("\n  // Explicit lifecycle:", start);
