@@ -1614,7 +1614,7 @@ async function loadAll(silent=false){
       }
       return [...sm.values()];
     };
-    state.products=mergeKeepLocal(products,state.products);state.sales=mergeKeepLocal(sales,state.sales);state.expenses=mergeKeepLocal(expenses,state.expenses);
+    state.products=mergeKeepLocal(products,state.products);state.sales=mergeKeepLocal(sales,state.sales).filter(x=>!x.voided);state.expenses=mergeKeepLocal(expenses,state.expenses);
     // Memory/customers failing to load should never block the rest of the
     // app — fall back to whatever's cached locally rather than throwing
     // the whole sync.
@@ -1894,7 +1894,7 @@ async function recordSale(){
   if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] background sync',e));
 }
 async function voidSale(id){
-  if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can void sales.','error');
+  if(!sheriCan('manage_sales'))return sheriToast('Only an Owner, Admin or authorized Manager can void sales.','error');
   const selected=state.sales.find(x=>x.id===id);if(!selected)return;
   const transactionId=selected.transaction_id||null;
   const rows=transactionId?state.sales.filter(x=>x.transaction_id===transactionId):[selected];
@@ -1939,7 +1939,7 @@ function sheriSearchTable(input){
 function renderSales(){
   const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);
   const rows=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${sheriCan('manage_team')?'<button class="btn small danger" onclick="voidSale(\''+s.id+'\')">Void</button>':''}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
+  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\''+s.id+'\')">Void</button>':''}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
 }
 
 // ── Products ─────────────────────────────────────────────────────────────
