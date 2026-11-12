@@ -170,18 +170,111 @@ begin
     execute format('drop policy if exists %I on public.%I',t.table_name||'_team_select',t.table_name);
     execute format('create policy %I on public.%I for select to authenticated using (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_select',t.table_name,read_perm);
     -- Audit records are written only by trusted server-side RPCs. Staff cannot forge them.
-    if insert_perm is not null and t.table_name<>'audit_log' then
+    if insert_perm is not null and t.table_name not in ('audit_log','sales','purchases','journal_entries','journal_lines') then
       execute format('drop policy if exists %I on public.%I',t.table_name||'_team_insert',t.table_name);
       execute format('create policy %I on public.%I for insert to authenticated with check (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_insert',t.table_name,insert_perm);
     end if;
-    if t.table_name<>'audit_log' then
+    if t.table_name not in ('audit_log','sales','journal_entries','journal_lines') then
       execute format('drop policy if exists %I on public.%I',t.table_name||'_team_update',t.table_name);
       execute format('drop policy if exists %I on public.%I',t.table_name||'_team_delete',t.table_name);
-      execute format('create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_update',t.table_name,write_perm,write_perm);
-      execute format('create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_delete',t.table_name,write_perm);
+      execute format('create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,'manage_team') and private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,'manage_team') and private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_update',t.table_name,write_perm,write_perm);
+      if t.table_name<>'purchases' then
+        execute format('create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,'manage_team') and private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_delete',t.table_name,write_perm);
+      end if;
     end if;
   end loop;
 end $;
+
+-- Trusted audit writer: never trust client-supplied actor identity or role.
+create or replace function public.shericeri_write_audit(
+  p_merchant_id uuid,
+  p_audit_id uuid,
+  p_action text,
+  p_entity_type text,
+  p_entity_id uuid,
+  p_reason text,
+  p_details jsonb default '{}'::jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path=''
+as $
+declare
+  v_permission text;
+  v_destructive boolean:=p_action in ('delete','update','void');
+  v_actor_name text;
+begin
+  if p_merchant_id is null or p_audit_id is null or coalesce(trim(p_action),'')='' or coalesce(trim(p_entity_type),'')='' then
+    raise exception 'Audit event identity is incomplete';
+  end if;
+  v_permission:=case p_entity_type
+    when 'sale' then case when p_action='create' then 'create_sale' else 'manage_sales' end
+    when 'expense' then 'manage_expenses'
+    when 'product' then 'manage_inventory'
+    when 'purchase' then 'manage_inventory'
+    when 'customer' then 'manage_customers'
+    when 'supplier' then 'manage_suppliers'
+    when 'cash_entry' then 'manage_finance'
+    when 'budget' then 'manage_finance'
+    else 'manage_finance'
+  end;
+  if not private.user_can_access_merchant(p_merchant_id,v_permission)
+     or (v_destructive and not private.user_can_access_merchant(p_merchant_id,'manage_team')) then
+    raise exception 'Not authorized to write this audit event';
+  end if;
+  select case when m.user_id=(select auth.uid()) then 'Owner'
+    else coalesce((select mm.full_name from public.merchant_members mm
+      where mm.merchant_id=p_merchant_id and mm.user_id=(select auth.uid()) and mm.status='active' limit 1),'Staff') end
+    into v_actor_name
+  from public.merchants m where m.id=p_merchant_id;
+  insert into public.audit_log(id,merchant_id,actor_user_id,action,entity_type,entity_id,reason,details,created_at)
+  values(p_audit_id,p_merchant_id,auth.uid(),p_action,p_entity_type,p_entity_id,nullif(trim(p_reason),''),
+    coalesce(p_details,'{}'::jsonb)-'actor_name'||jsonb_build_object('actor_name',coalesce(v_actor_name,'Staff')),now())
+  on conflict(id) do nothing;
+  return p_audit_id;
+end;
+$;
+revoke all on function public.shericeri_write_audit(uuid,uuid,text,text,uuid,text,jsonb) from public,anon;
+grant execute on function public.shericeri_write_audit(uuid,uuid,text,text,uuid,text,jsonb) to authenticated;
+
+-- Ordered purchases may be removed with a reason; received purchases remain immutable
+-- because they have already changed inventory and the ledger.
+create or replace function public.shericeri_delete_ordered_purchase(
+  p_merchant_id uuid,
+  p_purchase_id uuid,
+  p_reason text,
+  p_audit_id uuid default gen_random_uuid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $
+declare
+  v_purchase public.purchases%rowtype;
+begin
+  if coalesce(length(trim(p_reason)),0)<3 then raise exception 'A clear deletion reason is required'; end if;
+  if not (private.user_can_access_merchant(p_merchant_id,'manage_team')
+      and private.user_can_access_merchant(p_merchant_id,'manage_inventory')) then
+    raise exception 'Not authorized to delete purchases';
+  end if;
+  select * into v_purchase from public.purchases
+    where id=p_purchase_id and merchant_id=p_merchant_id for update;
+  if not found then return jsonb_build_object('ok',true,'already_deleted',true); end if;
+  if v_purchase.status<>'ordered' or coalesce(v_purchase.stock_applied,false) then
+    raise exception 'Received purchases cannot be deleted; record a purchase return or stock adjustment instead';
+  end if;
+  insert into public.audit_log(id,merchant_id,actor_user_id,action,entity_type,entity_id,reason,details,created_at)
+  values(p_audit_id,p_merchant_id,auth.uid(),'delete','purchase',p_purchase_id,trim(p_reason),
+    jsonb_build_object('reason',trim(p_reason),'total',v_purchase.total,'status',v_purchase.status),now())
+  on conflict(id) do nothing;
+  delete from public.purchases where id=p_purchase_id and merchant_id=p_merchant_id;
+  return jsonb_build_object('ok',true,'purchase_id',p_purchase_id);
+end;
+$;
+revoke all on function public.shericeri_delete_ordered_purchase(uuid,uuid,text,uuid) from public,anon;
+grant execute on function public.shericeri_delete_ordered_purchase(uuid,uuid,text,uuid) to authenticated;
 
 drop policy if exists merchants_team_select on public.merchants;
 drop policy if exists merchants_team_update on public.merchants;
