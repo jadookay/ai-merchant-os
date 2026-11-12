@@ -186,6 +186,78 @@ Deno.serve(async (req: Request) => {
       return json({ ok: true, member });
     }
 
+    if (action === "update_member") {
+      const authHeader = req.headers.get("Authorization") || "";
+      const bearer = authHeader.match(/^Bearer\\s+(.+)$/i)?.[1];
+      if (!bearer) return json({ error: "Manager sign-in required." }, 401);
+      const caller = createClient(url, anonKey, {
+        global: { headers: { Authorization: "Bearer " + bearer } },
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+      const { data: callerData, error: callerError } = await caller.auth.getUser(bearer);
+      if (callerError || !callerData?.user) return json({ error: "Manager session is invalid." }, 401);
+
+      const merchantId = String(body?.merchant_id || "");
+      const memberId = String(body?.member_id || "");
+      const fullName = String(body?.full_name || "").trim();
+      const responsibility = String(body?.responsibility || "").trim() || null;
+      const role = String(body?.role || "cashier");
+      const status = String(body?.status || "active");
+      const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
+      const pin = String(body?.pin || "");
+      if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
+      if (!["admin", "manager", "cashier", "inventory", "accountant", "custom"].includes(role)) return json({ error: "Invalid team role." }, 400);
+      if (!["active", "suspended"].includes(status)) return json({ error: "Invalid team status." }, 400);
+      if (pin && !/^\\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
+
+      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id").eq("id", merchantId).maybeSingle();
+      if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
+      let callerRole = merchant.user_id === callerData.user.id ? "owner" : null;
+      let callerPermissions: Record<string, boolean> = {};
+      if (!callerRole) {
+        const { data: membership, error: memberError } = await admin.from("merchant_members")
+          .select("role,permissions,status").eq("merchant_id", merchantId).eq("user_id", callerData.user.id).maybeSingle();
+        if (memberError) throw memberError;
+        callerRole = membership?.role || null;
+        callerPermissions = membership?.permissions && typeof membership.permissions === "object" ? membership.permissions : {};
+        if (membership?.status !== "active" || (callerRole !== "admin" && callerPermissions.manage_team !== true)) {
+          return json({ error: "You do not have permission to manage this team." }, 403);
+        }
+      }
+      const privileged = callerRole === "owner" || callerRole === "admin";
+      const { data: target, error: targetError } = await admin.from("merchant_members")
+        .select("id,user_id,role,status").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
+      if (targetError) throw targetError;
+      if (!target) return json({ error: "Team member not found." }, 404);
+      if (target.user_id === callerData.user.id) return json({ error: "Use the owner account to change another administrator's access; self-edits are disabled here." }, 403);
+      if (target.role === "admin" && !privileged) return json({ error: "Only the owner or an administrator can change an administrator account." }, 403);
+      if (role === "admin" && !privileged) return json({ error: "Only the owner or an administrator can assign administrator access." }, 403);
+
+      const grantable = new Set(["view_sales","create_sale","manage_sales","view_inventory","manage_inventory","view_expenses","manage_expenses","view_financial_reports","manage_finance","view_customers","manage_customers","view_suppliers","manage_suppliers","view_audit_log","manage_team"]);
+      for (const [permission, enabled] of Object.entries(permissions)) {
+        if (!grantable.has(permission) && enabled === true) return json({ error: "The requested permission is not recognized." }, 400);
+        if (enabled === true && !privileged && callerPermissions[permission] !== true &&
+            !(permission === "view_inventory" && callerPermissions.create_sale === true)) {
+          return json({ error: "You cannot grant a permission you do not have." }, 403);
+        }
+      }
+
+      const { data: updated, error: updateError } = await admin.from("merchant_members")
+        .update({ full_name: fullName, responsibility, role, permissions, status, updated_at: new Date().toISOString() })
+        .eq("id", memberId).eq("merchant_id", merchantId)
+        .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
+      if (updateError) throw updateError;
+      if (pin) {
+        const { error: pinError } = await admin.rpc("set_merchant_member_pin", { p_member_id: memberId, p_pin: pin });
+        if (pinError) throw pinError;
+      }
+      return json({ ok: true, member: updated });
+    }
+
+    if (action === "delete_member") {
+      return json({ error: "Team accounts are suspended, not deleted, to preserve transaction and audit history. Use update_member with status=suspended." }, 409);
+    }
+
     return json({ error: "Unsupported action." }, 400);
   } catch (error) {
     console.error("[team-access]", error);
