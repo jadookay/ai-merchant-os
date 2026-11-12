@@ -1866,7 +1866,7 @@ async function recordSale(){
   if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] background sync',e));
 }
 async function voidSale(id){
-  if(!sheriCan('manage_sales'))return sheriToast('You do not have permission to void sales.','error');
+  if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can void sales.','error');
   const selected=state.sales.find(x=>x.id===id);if(!selected)return;
   const transactionId=selected.transaction_id||null;
   const rows=transactionId?state.sales.filter(x=>x.transaction_id===transactionId):[selected];
@@ -2083,7 +2083,7 @@ async function saveProduct(){
   if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to add or edit products.','error');
   const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value,barcode=pBarcode.value.trim()||null,expiry_date=pExpiry.value||null;
   if(!name||!Number.isFinite(cost)||cost<0||!Number.isFinite(sell)||sell<=0||!Number.isFinite(stock)||stock<0||!Number.isFinite(reorder)||reorder<0)return alert('Enter a product name, a positive selling price, and valid non-negative cost and stock values.');
-  const isEditing=!!editingProductId;let editReason=null;if(isEditing){editReason=prompt('Reason for editing this product (required):');if(!editReason||!editReason.trim())return sheriToast('A reason is required to edit a product.','error');}
+  const isEditing=!!editingProductId;if(isEditing&&!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can edit existing products.','error');let editReason=null;if(isEditing){editReason=prompt('Reason for editing this product (required):');if(!editReason||!editReason.trim())return sheriToast('A reason is required to edit a product.','error');}
   if(!confirm((isEditing?'Update':'Save')+' product?\\n'+name+'\\nCost: '+money(cost)+' · Selling price: '+money(sell)+'\\nStock: '+stock+' · Reorder level: '+reorder))return;
   const now=sheriNow();
   let openingStockProduct=null;
@@ -2104,7 +2104,7 @@ async function saveProduct(){
   document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast((isEditing?'Product updated.':'Product saved.')+openingWarning,openingWarning?'warning':'success');
 }
 async function deleteProduct(id){
-  if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to delete products.','error');
+  if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can delete products.','error');
   const p=product(id);if(!p)return;
   const reason=prompt('Reason for deleting this product (required):');if(!reason||!reason.trim())return sheriToast('A reason is required to delete a product.','error');
   if(!confirm(`Delete "${p.name}"? Past sales stay in your history, but you won't be able to sell it again.`))return;
@@ -2124,7 +2124,7 @@ function expiryPill(p){
 }
 function renderInventory(){
   const list=activeProducts();const search=document.getElementById('inventorySearchHost');if(search)search.innerHTML=sheriSearchControl('inventory','inventoryTable','Search products by name, category or barcode',list.flatMap(p=>[p.name,p.cat,p.barcode]));
-  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions">${sheriCan('manage_inventory')?'<button class="btn small secondary" onclick="toggleProductFavorite(\''+p.id+'\')">'+(p.favorite?'★ Favorite':'☆ Favorite')+'</button><button class="btn small secondary" onclick="editProduct(\''+p.id+'\')">Edit</button><button class="btn small danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>':''}</div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
+  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions">${sheriCan('manage_team')?'<button class="btn small secondary" onclick="toggleProductFavorite(\''+p.id+'\')">'+(p.favorite?'★ Favorite':'☆ Favorite')+'</button><button class="btn small secondary" onclick="editProduct(\''+p.id+'\')">Edit</button><button class="btn small danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>':''}</div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
   renderCategory();
 }
 async function toggleProductFavorite(id){const p=product(id);if(!p)return;p.favorite=!p.favorite;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}});render();sheriToast(p.favorite?'Added to sales favorites.':'Removed from sales favorites.')}
@@ -2325,7 +2325,7 @@ async function addExpense(){
   if(navigator.onLine)await sheriSyncOutbox();clearExpenseForm();render();sheriToast('Expense recorded.'+warning,warning?'warning':'success');
 }
 async function deleteExpense(id){
-  if(!sheriCan('manage_expenses'))return sheriToast('You do not have permission to delete expenses.','error');
+  if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can delete expenses.','error');
   const expense=state.expenses.find(x=>x.id===id);if(!expense)return;const reason=prompt('Reason for deleting this expense (required):');if(!reason||!reason.trim())return sheriToast('A reason is required to delete an expense.','error');
   if(!confirm('Delete this expense?\\nReason: '+reason.trim()))return;
   state.expenses=state.expenses.filter(x=>x.id!==id);await sheriDelete('expenses',id);await sheriSaveSnapshot();
@@ -2337,7 +2337,7 @@ async function deleteExpense(id){
 function renderExpenses(){
   const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount or date',state.expenses.flatMap(e=>[e.description,e.cat]));
   const rows=state.expenses.filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('expenseTable').innerHTML=rows.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${rows.map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses in the selected date range.</div>';
+  document.getElementById('expenseTable').innerHTML=rows.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${rows.map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td>${sheriCan('manage_team')?`<button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button>`:''}</td></tr>`).join('')}</table>`:'<div class="empty">No expenses in the selected date range.</div>';
 }
 
 // ── Customers ────────────────────────────────────────────────────────────
