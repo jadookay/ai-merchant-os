@@ -263,6 +263,12 @@ test("operational staff receive only chart identifiers while financial reports a
   assert.match(teamMigration, /shericeri_ensure_operational_accounts/);
 });
 
+test("manager accounts receive team and sales-control capabilities by default", () => {
+  assert.ok(html.includes("manage_sales:role==='manager'||document.getElementById('teamSalesManage').checked"));
+  assert.ok(html.includes("manage_team:role==='manager'||document.getElementById('teamManage').checked"));
+  assert.ok(teamAccess.includes("permissions.manage_sales === true) && role !== \"manager\""));
+});
+
 test("manager-only destructive actions require reasons and are protected by backend policies", () => {
   for (const fn of ["deleteProduct","deleteExpense","deleteCustomer","deleteOSSupplier","deleteOSPurchase","deleteOSCash","deleteOSBudget"]) {
     const start = html.indexOf("async function "+fn+"(");
@@ -289,7 +295,7 @@ test("inventory staff can add products and receive purchases without editing exi
 test("team administration requires the manager role, not only a delegated flag", () => {
   assert.ok(teamAccess.includes("membership.role === \"manager\" && callerPermissions.manage_team === true"));
   assert.ok(teamAccess.includes("callerRole === \"manager\" && callerPermissions.manage_team === true"));
-  assert.ok(teamAccess.includes("Team administration can only be assigned to a manager or administrator role."));
+  assert.ok(teamAccess.includes("Manager-level controls can only be assigned to a manager or administrator role."));
 });
 
 test("cashier accounting setup and journal posting are permission-scoped", () => {
