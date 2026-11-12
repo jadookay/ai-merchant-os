@@ -4637,7 +4637,7 @@ async function accUpdate(table,record,collection){
 async function accEnsureBase(){
   if(!state.merchant)return;
   if(!Array.isArray(state.accounts))state.accounts=[];
-  if(!sheriCan('manage_finance')){
+  if(!sheriCan('manage_team')||!sheriCan('manage_finance')){
     const missing=ACC_DEFAULT_ACCOUNTS.some(([code])=>!state.accounts.some(a=>a.code===code));
     if(missing){
       if(!navigator.onLine)throw new Error('Operational accounting accounts are not cached. Reconnect once so the secure setup can finish.');
