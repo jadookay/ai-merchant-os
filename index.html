@@ -312,8 +312,9 @@ window.ensurePdfJs=async function(){
       <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="salePrice" type="number" min="0"></div>
       <div><label>Customer (optional)</label><select id="saleCustomer"><option value="">— Anonymous —</option></select></div>
     </div>
-    <div class="actions" style="margin-top:14px"><button class="btn" onclick="recordSale()">Record sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
+    <div class="actions" style="margin-top:14px"><button class="btn secondary" onclick="addSaleToCart()">＋ Add to cart</button><button class="btn" onclick="recordSale()">Confirm sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
     <div id="voiceStatus" class="sub" style="margin-top:8px"></div>
+    <div class="section"><h2>Sale cart</h2><div id="saleCartHost"><div class="empty">Add products to begin.</div></div><div class="actions" style="margin-top:10px"><button class="btn secondary small" onclick="clearSaleCart()">Clear cart</button><button class="btn small" onclick="printLastReceipt()" id="printReceiptBtn" disabled>Print last receipt</button></div></div>
   </div>
   <div class="card section"><h2>Sales history</h2><div class="formgrid"><div><label>View sales by</label><select id="salesPeriod" onchange="sheriApplySalesRange()"><option value="all">All time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="custom">Selected dates</option></select></div><div><label>From</label><input id="salesStartDate" type="date"></div><div><label>To</label><input id="salesEndDate" type="date"></div><div style="align-self:end"><button class="btn small" onclick="sheriApplySalesRange()">Apply dates</button></div></div><div id="salesSearchHost"></div><div id="salesTable"></div></div>
 </section>
@@ -1769,6 +1770,7 @@ function render(){
   document.querySelectorAll('[data-currency-label]').forEach(el=>el.textContent=merchantCurrency());
   document.getElementById('today').textContent=new Date().toLocaleDateString('en-RW',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   let low=activeProducts().filter(p=>p.stock<=p.reorder).length;
+  const todayKey=new Date().toISOString().slice(0,10),expiryAlerts=activeProducts().filter(p=>p.expiry_date).map(p=>({p,days:Math.ceil((new Date(p.expiry_date+'T00:00:00')-new Date(todayKey+'T00:00:00'))/86400000)})).filter(x=>x.days<=30).sort((a,b)=>a.days-b.days);
   document.getElementById('metrics').innerHTML=[
     ['Total revenue',money(revenue()),'','sales','Open sales history'],
     ['Estimated profit',money(profit()),profit()>=0?'good':'bad','reports','Open financial reports'],
@@ -1780,6 +1782,7 @@ function render(){
   let best=bestProducts()[0];
   document.getElementById('priorities').innerHTML=[
     low?`<div>📦 <b>Restock:</b> ${lowNames.slice(0,3).join(', ')}${low>3?'…':''}</div>`:'<div>✅ Stock levels look healthy.</div>',
+    expiryAlerts.length?`<div>⏳ <b>Expiry attention:</b> ${expiryAlerts.slice(0,5).map(x=>esc(x.p.name)+' — '+(x.days<0?'expired '+Math.abs(x.days)+' day(s) ago':x.days===0?'expires today':'expires in '+x.days+' day(s)')).join('; ')}${expiryAlerts.length>5?'…':''}</div>`:'',
     (best&&best.rev>0)?`<div>🔥 <b>Best revenue product:</b> ${esc(best.name)}</div>`:'',
     profit()>=0?`<div>💰 <b>Estimated profit:</b> ${money(profit())}</div>`:`<div>⚠️ <b>Estimated loss:</b> ${money(Math.abs(profit()))}</div>`
   ].filter(Boolean).join('');
@@ -1794,7 +1797,8 @@ function render(){
   if(codeEl)codeEl.textContent=state.merchant.shericeri_id||'(assigned when your business profile is synced)';
 }
 function fillSelects(){
-  document.getElementById('saleProduct').innerHTML=activeProducts().map(p=>`<option value="${p.id}">${esc(p.name)} (stock ${p.stock})</option>`).join('');
+  const products=activeProducts().slice().sort((a,b)=>Number(!!b.favorite)-Number(!!a.favorite)||a.name.localeCompare(b.name));
+  document.getElementById('saleProduct').innerHTML=products.map(p=>`<option value="${p.id}">${p.favorite?'★ ':''}${esc(p.name)} (stock ${p.stock})</option>`).join('');
   const p=product(document.getElementById('saleProduct').value);
   if(p)document.getElementById('salePrice').value=p.sell;
   const custSel=document.getElementById('saleCustomer');
@@ -1804,30 +1808,40 @@ document.getElementById('saleProduct').onchange=()=>{const p=product(document.ge
 if(document.getElementById('osPurchaseProduct'))document.getElementById('osPurchaseProduct').onchange=()=>{const p=product(document.getElementById('osPurchaseProduct').value);document.getElementById('osPurchaseCost').value=p?p.cost:''}
 
 // ── Sales ────────────────────────────────────────────────────────────────
+let saleCart=[];
+function addSaleToCart(){
+  const id=document.getElementById('saleProduct').value,qty=Number(document.getElementById('saleQty').value),price=Number(document.getElementById('salePrice').value),p=product(id);
+  if(!p||!Number.isInteger(qty)||qty<1||!Number.isFinite(price)||price<0){sheriToast('Choose a product and enter a valid quantity and price.','error');return}
+  const already=saleCart.filter(x=>x.productId===id).reduce((n,x)=>n+x.qty,0);if(already+qty>p.stock){sheriToast('Cart quantity exceeds available stock for '+p.name+'.','error');return}
+  const existing=saleCart.find(x=>x.productId===id&&Number(x.price)===price);if(existing)existing.qty+=qty;else saleCart.push({productId:id,qty,price});renderSaleCart();sheriToast(p.name+' added to cart.');
+}
+function removeSaleCartItem(i){saleCart.splice(i,1);renderSaleCart()}
+function clearSaleCart(){saleCart=[];renderSaleCart()}
+function renderSaleCart(){
+  const host=document.getElementById('saleCartHost');if(!host)return;if(!saleCart.length){host.innerHTML='<div class="empty">Add products to begin.</div>';return}
+  const total=saleCart.reduce((n,x)=>n+x.qty*x.price,0);
+  host.innerHTML='<div style="overflow-x:auto"><table class="table" style="min-width:520px"><tr><th>Product</th><th>Qty</th><th>Unit price</th><th>Total</th><th></th></tr>'+saleCart.map((x,i)=>{const p=product(x.productId);return '<tr><td>'+esc(p?.name||'Unavailable product')+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td><td><button class="btn small danger" onclick="removeSaleCartItem('+i+')">Remove</button></td></tr>'}).join('')+'</table></div><div class="row"><b>Cart total</b><b>'+money(total)+'</b></div>';
+}
+function printLastReceipt(){
+  const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
+  const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script></body></html>');w.document.close();
+}
 async function recordSale(){
-  const id=document.getElementById('saleProduct').value,q=+document.getElementById('saleQty').value,price=+document.getElementById('salePrice').value;
-  const custId=document.getElementById('saleCustomer').value||null;
-  const p=product(id);
-  if(!p||!Number.isFinite(q)||!Number.isFinite(price)||q<1||price<0)return alert('Enter a valid product, quantity and selling price.');
-  if(q>p.stock)return alert('Not enough stock.');
-  const newStock=p.stock-q;
-  const saleRow={id:sheriUuid(),merchant_id:state.merchant.id,product_id:p.id,product_name_snapshot:p.name,customer_id:custId,qty:q,price,cost:p.cost,created_at:sheriNow()};
-  if(!confirm('Confirm sale?\n'+q+' × '+p.name+' at '+money(price)+' each\nTotal: '+money(q*price)+'\nRemaining stock: '+newStock))return;
-  p.stock=newStock;state.sales.push(saleRow);await sheriSaveSnapshot();
-  await sheriQueue({type:'sale_upsert',record:saleRow,productId:p.id,localStock:newStock,expectedServerStock:newStock+q});
-  let warning='';
-  try{
-    await accEnsureBase();
-    const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000'),total=q*price,cost=q*Number(p.cost||0),date=saleRow.created_at.slice(0,10);
-    await accPostEntry({date,description:'Sale '+p.name,sourceType:'sale',sourceId:saleRow.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});
-    if(cost>0)await accPostEntry({date,description:'COGS '+p.name,sourceType:'sale_cogs',sourceId:saleRow.id,lines:[{accountId:cogs.id,debit:cost},{accountId:inv.id,credit:cost}]});
-  }catch(err){warning=' Sale saved, but ledger posting needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] sale posting failed',err);}
-  if(navigator.onLine)await sheriSyncOutbox();render();
-  sheriToast((navigator.onLine?'Sale recorded.':'Sale saved offline; sync will resume when connected.')+warning,warning?'warning':'success');
+  const custId=document.getElementById('saleCustomer').value||null,items=saleCart.length?saleCart:[{productId:document.getElementById('saleProduct').value,qty:Number(document.getElementById('saleQty').value),price:Number(document.getElementById('salePrice').value)}],checked=[];
+  for(const item of items){const p=product(item.productId);if(!p||!Number.isInteger(item.qty)||item.qty<1||!Number.isFinite(item.price)||item.price<0)return sheriToast('Check each product, quantity and selling price.','error');const used=checked.filter(x=>x.productId===p.id).reduce((n,x)=>n+x.qty,0);if(used+item.qty>p.stock)return sheriToast('Not enough stock for '+p.name+'.','error');checked.push({...item,product:p})}
+  const total=checked.reduce((n,x)=>n+x.qty*x.price,0),transactionId=sheriUuid(),createdAt=sheriNow(),invoice='INV-'+String(state.merchant.shericeri_id||'AIBOS')+'-'+Date.now();
+  if(!confirm('Confirm sale?\\n'+checked.map(x=>x.qty+' × '+x.product.name+' — '+money(x.qty*x.price)).join('\\n')+'\\nTotal: '+money(total)))return;
+  const rows=checked.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,product_id:x.product.id,product_name_snapshot:x.product.name,customer_id:custId,qty:x.qty,price:x.price,cost:x.product.cost,created_at:createdAt}));
+  checked.forEach(x=>{x.product.stock-=x.qty});state.sales.push(...rows);await sheriSaveSnapshot();window.__lastReceipt={business:state.merchant.name,invoice,createdAt,total,items:checked.map(x=>({name:x.product.name,qty:x.qty,price:x.price}))};
+  const pb=document.getElementById('printReceiptBtn');if(pb)pb.disabled=false;saleCart=[];renderSaleCart();render();sheriToast('Sale confirmed. Receipt '+invoice+' is ready to print.');
+  for(let i=0;i<rows.length;i++){const s=rows[i],p=checked[i].product;await sheriQueue({type:'sale_upsert',record:s,productId:p.id,localStock:p.stock,expectedServerStock:p.stock+checked[i].qty})}
+  if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] background sync',e));
 }
 async function voidSale(id){
   const s=state.sales.find(x=>x.id===id); if(!s)return;
-  if(!confirm('Void this sale? Its stock will be added back to inventory.'))return;
+  const reason=prompt('Enter the reason for voiding this sale (required):');if(!reason||!reason.trim()){sheriToast('A reason is required to void a sale.','error');return}window.__sheriVoidReasons=window.__sheriVoidReasons||{};window.__sheriVoidReasons[id]=reason.trim();
+  if(!confirm('Void this sale? Its stock will be added back to inventory.\\nReason: '+reason.trim()))return;
   const p=product(s.product_id); if(p)p.stock+=s.qty;
   state.sales=state.sales.filter(x=>x.id!==id);
   await sheriDelete('sales',id);
@@ -4644,7 +4658,7 @@ function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('e
 function accReportTotals(startDate=null,endDate=null){const by={};for(const a of state.accounts)by[a.code]=0;const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));for(const line of state.journalLines||[]){const entry=entries.get(line.journal_entry_id);if(!entry||entry.voided)continue;const date=String(entry.entry_date||entry.created_at||'').slice(0,10);if(endDate&&date>endDate)continue;if(startDate&&date<startDate)continue;const account=state.accounts.find(a=>a.id===line.account_id);if(!account)continue;const raw=Number(line.debit||0)-Number(line.credit||0);by[account.code]+=['liability','equity','income'].includes(account.type)?-raw:raw;}return by}
 
 const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);if(state.expenses.some(x=>x.id===id))return;try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
-const _v14_1_voidSale=voidSale;voidSale=async function(id){const s=state.sales.find(x=>x.id===id);if(!s)return;const entryDate=String(s.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This sale cannot be voided while its accounting period is locked.');await _v14_1_voidSale(id);if(state.sales.some(x=>x.id===id))return;try{await accEnsureBase();const total=Number(s.qty||0)*Number(s.price||0),cost=Number(s.qty||0)*Number(s.cost||0),cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');if(total>0)await accPostEntry({date:entryDate,description:'Reverse sale '+(s.product_name_snapshot||''),sourceType:'sale_void',sourceId:s.id,lines:[{accountId:sales.id,debit:total},{accountId:cash.id,credit:total}]});if(cost>0)await accPostEntry({date:entryDate,description:'Reverse COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs_void',sourceId:s.id,lines:[{accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost}]});await accAudit('void','sale',s.id,{total,cogs:cost})}catch(err){console.warn('[Sheri accounting] sale reversal failed',err);alert('Sale voided, but the accounting reversal could not be posted: '+(err.message||err))}render()};
+const _v14_1_voidSale=voidSale;voidSale=async function(id){const s=state.sales.find(x=>x.id===id);if(!s)return;const entryDate=String(s.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This sale cannot be voided while its accounting period is locked.');await _v14_1_voidSale(id);if(state.sales.some(x=>x.id===id))return;try{await accEnsureBase();const total=Number(s.qty||0)*Number(s.price||0),cost=Number(s.qty||0)*Number(s.cost||0),cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');if(total>0)await accPostEntry({date:entryDate,description:'Reverse sale '+(s.product_name_snapshot||''),sourceType:'sale_void',sourceId:s.id,lines:[{accountId:sales.id,debit:total},{accountId:cash.id,credit:total}]});if(cost>0)await accPostEntry({date:entryDate,description:'Reverse COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs_void',sourceId:s.id,lines:[{accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost}]});await accAudit('void','sale',s.id,{total,cogs:cost,reason:window.__sheriVoidReasons?.[id]||'Not provided',invoice_number:s.invoice_number||null,transaction_id:s.transaction_id||null})}catch(err){console.warn('[Sheri accounting] sale reversal failed',err);alert('Sale voided, but the accounting reversal could not be posted: '+(err.message||err))}render()};
 const _v14_1_addOSCashEntry=addOSCashEntry;addOSCashEntry=async function(){const before=state.cashEntries.length;await _v14_1_addOSCashEntry();if(state.cashEntries.length>before){const x=state.cashEntries[state.cashEntries.length-1];try{await accEnsureBase();const cash=accAccountCode('1000'),amount=Number(x.amount||0);if(amount>0&&x.kind==='income')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash income',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:cash.id,debit:amount},{accountId:accAccountCode('4100').id,credit:amount}]});else if(amount>0&&x.kind==='expense')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash expense',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:accAccountCode('6000').id,debit:amount},{accountId:cash.id,credit:amount}]});if(x.kind!=='transfer')await accAudit('create','cash_entry',x.id,{amount,kind:x.kind})}catch(err){console.warn('[Sheri accounting] cash entry failed',err);alert('Cash movement saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
 function sheriHideInternalAccountingUi(){
   const hideSelectors=['#money .top .btn[onclick="accRebuildFromOperations()"]','#accAccountingStatus','#reports .top .btn[onclick="accValidateLedger()"]'];
