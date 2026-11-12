@@ -2521,7 +2521,16 @@ async function askAI(webSearch){
     sheriDiagSet('Web research intent',wantsWebResearch?'DETECTED':'not detected');
     sheriDiagSet('Web search mode',effectiveWebSearch?'ON — Groq Compound Mini':'OFF');
   }
+  const currentDateTime=new Date().toISOString();
+  const currentTimeZone=Intl.DateTimeFormat().resolvedOptions().timeZone||'local';
+  const businessCalendar=[
+    ...activeProducts().filter(p=>p.expiry_date).map(p=>({date:p.expiry_date,type:'product_expiry',title:'Product expiry: '+p.name,product_id:p.id,barcode:p.barcode||null})),
+    ...(state.invoices||[]).filter(x=>x.due_date).map(x=>({date:x.due_date,type:'invoice_due',title:'Invoice due: '+(x.invoice_number||x.number||x.id),amount:x.total,reference:x.invoice_number||x.number||x.id})),
+    ...(state.bills||[]).filter(x=>x.due_date).map(x=>({date:x.due_date,type:'bill_due',title:'Bill due: '+(x.bill_number||x.number||x.id),amount:x.total,reference:x.bill_number||x.number||x.id})),
+    ...(state.recurringTransactions||[]).filter(x=>x.next_run_at||x.next_run_date).map(x=>({date:x.next_run_at||x.next_run_date,type:'recurring_transaction',title:x.description||x.name||'Recurring transaction',amount:x.amount||null}))
+  ].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   const context={
+    currentDateTime,currentTimeZone,businessCalendar,
     revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
     salesCount:state.sales.length,
     merchantName:state.merchant.name,merchantCategory:state.merchant.category,merchantTin:state.merchant.tin||null,fiscalYear:state.merchant.fiscal_year||null,country:state.merchant.country||'RW',currency:state.merchant.currency||'RWF',
@@ -2533,7 +2542,7 @@ async function askAI(webSearch){
     revenueTrend:revenueTrend(),
     profitTrend:dailyProfitTrend(),
     restockForecast:restockForecast().map(f=>({name:f.name,stock:f.stock,daysUntilStockout:Math.round(f.daysUntilStockout)})),
-    systemSnapshot:{merchant:state.merchant,products:state.products,sales:state.sales,expenses:state.expenses,customers:state.customers,suppliers:state.suppliers,purchases:state.purchases,cashEntries:state.cashEntries,budgets:state.budgets,chartOfAccounts:state.accounts,journalEntries:state.journalEntries,journalLines:state.journalLines,invoices:state.invoices,bills:state.bills,payments:state.payments,bankAccounts:state.bankAccounts,taxRates:state.taxRates,recurringTransactions:state.recurringTransactions,accountingSettings:state.accountingSettings,auditLog:state.auditLog,teamMembers:state.teamMembers||[],calendar:state.calendar||[],appNavigation:['Dashboard','Record Sale','Records','AIBOS Command Center','AI Advisor','Shericeri','Settings','Inventory','Expenses','Customers','Suppliers','Purchases','Financial Reports'],formulas:{revenue:'sum(quantity × selling price)',cogs:'sum(quantity × unit cost)',grossProfit:'revenue − cost of goods sold',netProfit:'gross profit − operating expenses'}}
+    systemSnapshot:{merchant:state.merchant,products:state.products,sales:state.sales,expenses:state.expenses,customers:state.customers,suppliers:state.suppliers,purchases:state.purchases,cashEntries:state.cashEntries,budgets:state.budgets,chartOfAccounts:state.accounts,journalEntries:state.journalEntries,journalLines:state.journalLines,invoices:state.invoices,bills:state.bills,payments:state.payments,bankAccounts:state.bankAccounts,taxRates:state.taxRates,recurringTransactions:state.recurringTransactions,accountingSettings:state.accountingSettings,auditLog:state.auditLog,teamMembers:state.teamMembers||[],calendar:businessCalendar,productImages:state.products.filter(p=>p.image_url).map(p=>({product_id:p.id,name:p.name,image_url:p.image_url})),settings:{merchant:state.merchant,accounting:state.accountingSettings},appNavigation:['Dashboard','Record Sale','Records','AIBOS Command Center','AI Advisor','Shericeri','Settings','Inventory','Expenses','Customers','Suppliers','Purchases','Financial Reports'],formulas:{revenue:'sum(quantity × selling price)',cogs:'sum(quantity × unit cost)',grossProfit:'revenue − cost of goods sold',netProfit:'gross profit − operating expenses'}}
   };
   let answered=false;
   if(advisorAvailable!==false){
