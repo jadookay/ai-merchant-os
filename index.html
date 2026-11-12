@@ -1848,7 +1848,11 @@ function sheriSearchTable(input){
   if(key)sheriSearchValues[key]=input.value;if(!target)return;
   target.querySelectorAll('tr').forEach((row,index)=>{row.style.display=index===0||!query||row.textContent.toLowerCase().includes(query)?'':'none';});
 }
-function renderSales(){const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);document.getElementById('salesTable').innerHTML=state.sales.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).map(s=>{const p=product(s.product_id);const c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales recorded.</div>'}
+function renderSales(){
+  const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);
+  const rows=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td><button class="btn small danger" onclick="voidSale('${s.id}')">Void</button></td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
+}
 
 // ── Products ─────────────────────────────────────────────────────────────
 let pendingProductImage=null; // {dataUrl, mimeType, file}
@@ -2261,7 +2265,11 @@ async function deleteExpense(id){
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
-function renderExpenses(){const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount or date',state.expenses.flatMap(e=>[e.description,e.cat]));document.getElementById('expenseTable').innerHTML=state.expenses.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${state.expenses.filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses recorded.</div>'}
+function renderExpenses(){
+  const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount or date',state.expenses.flatMap(e=>[e.description,e.cat]));
+  const rows=state.expenses.filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  document.getElementById('expenseTable').innerHTML=rows.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${rows.map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td><button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button></td></tr>`).join('')}</table>`:'<div class="empty">No expenses in the selected date range.</div>';
+}
 
 // ── Customers ────────────────────────────────────────────────────────────
 function parseVoiceCustomer(transcript){
