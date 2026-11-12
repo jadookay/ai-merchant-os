@@ -13,6 +13,14 @@ test("team managers cannot create administrator accounts", () => {
   assert.match(teamAccess, /Only the business owner or an administrator can create another administrator/);
 });
 
+test("team permission delegation cannot exceed the manager's own permissions", () => {
+  assert.ok(teamAccess.includes("callerPermissions[permission] !== true"));
+  assert.ok(teamAccess.includes("You cannot grant a permission you do not have."));
+  assert.ok(teamAccess.includes('action === "update_member"'));
+  assert.ok(teamAccess.includes('action === "delete_member"'));
+  assert.ok(teamAccess.includes('status: "suspended"') || teamAccess.includes('status=suspended'));
+});
+
 test("cancelled expense deletion does not post an accounting reversal", () => {
   assert.match(html, /await _v14_1_deleteExpense\(id\);if\(state\.expenses\.some\(x=>x\.id===id\)\)return;/);
 });
@@ -255,7 +263,10 @@ test("voice entry requires an explicit stop, review, use or discard action", () 
 
 test("Shericeri receives operational, accounting, team, calendar, image and formula context", () => {
   assert.ok(html.includes("teamMembers:state.teamMembers||[]"));
-  assert.ok(html.includes("calendar:state.calendar||[]"));
+  assert.ok(html.includes("calendar:businessCalendar"));
+  assert.ok(html.includes("currentDateTime,currentTimeZone,businessCalendar"));
+  assert.ok(html.includes("productImages:state.products.filter(p=>p.image_url)"));
+  assert.ok(html.includes("settings:{merchant:state.merchant,accounting:state.accountingSettings}"));
   assert.ok(html.includes("accountingSettings:state.accountingSettings"));
   assert.ok(html.includes("products:state.products"));
   assert.ok(html.includes("formulas:{revenue:"));
