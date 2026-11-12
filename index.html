@@ -2484,10 +2484,10 @@ function offlineAnswer(q){
 // ── Voice entry ──────────────────────────────────────────────────────────
 let sheriFormVoiceRecorder=null,sheriFormVoiceStream=null,sheriFormVoiceTimer=null,sheriFormVoiceChunks=[];
 async function sheriTranscribeFormAudio(blob){
-  if(!navigator.onLine){const local=await sheriLocalStt(blob,(document.getElementById('shericeriLang')?.value||'en-US'));if(local)return local;throw new Error('Voice transcription is unavailable offline on this device. Reconnect or enter the details manually.');}
+  if(!navigator.onLine){const local=await sheriLocalStt(blob,(typeof currentShericeriLang==='function'?currentShericeriLang():'en-US'));if(local)return local;throw new Error('Voice transcription is unavailable offline on this device. Reconnect or enter the details manually.');}
   const dataUrl=await blobToDataUrl(blob);let {data:{session:currentSession}}=await sb.auth.getSession();
   if(!currentSession?.access_token){const refreshed=await sb.auth.refreshSession();currentSession=refreshed?.data?.session;if(!currentSession?.access_token)throw new Error('Please sign in again before using voice entry.');}
-  const lang=(document.getElementById('shericeriLang')?.value||'en-US').slice(0,2);
+  const lang=(typeof currentShericeriLang==='function'?currentShericeriLang():'en-US').slice(0,2);
   const body=JSON.stringify({mode:lang==='rw'?'kinya_transcribe':'transcribe',audio:dataUrl,language:lang,diagnostic:false});
   const call=()=>fetch(SUPABASE_URL+'/functions/v1/advisor',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_ANON_KEY,'Authorization':'Bearer '+currentSession.access_token},body});
   let res=await call();if(res.status===401){const refreshed=await sb.auth.refreshSession();currentSession=refreshed?.data?.session;if(!currentSession?.access_token)throw new Error('Your session expired. Please sign in again.');res=await call();}
