@@ -2265,9 +2265,9 @@ function renderExpenses(){const search=document.getElementById('expenseSearchHos
 
 // ── Customers ────────────────────────────────────────────────────────────
 function parseVoiceCustomer(transcript){
-  const t=String(transcript||'').trim(),phone=t.match(/(?:\\+?250\\s*7\\d{8}|0?7\\d{8})/);
-  if(phone)document.getElementById('cPhone').value=phone[0].replace(/\\s+/g,'');
-  const name=t.replace(phone?phone[0]:'','').replace(/^(customer|name|add customer)\\s*[:,-]?\\s*/i,'').trim();
+  const t=String(transcript||'').trim(),phone=t.match(/(?:\+?250\s*7\d{8}|0?7\d{8})/);
+  if(phone)document.getElementById('cPhone').value=phone[0].replace(/\s+/g,'');
+  const name=t.replace(phone?phone[0]:'','').replace(/^(customer|name|add customer)\s*[:,-]?\s*/i,'').trim();
   if(name)document.getElementById('cName').value=name;
 }
 function clearCustomerForm(){['cName','cPhone','cNotes'].forEach(id=>document.getElementById(id).value='');const s=document.getElementById('customerVoiceStatus');if(s)s.textContent='';}
