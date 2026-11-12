@@ -2046,7 +2046,7 @@ async function saveProduct(){
   if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to add or edit products.','error');
   const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value,barcode=pBarcode.value.trim()||null,expiry_date=pExpiry.value||null;
   if(!name||!Number.isFinite(cost)||cost<0||!Number.isFinite(sell)||sell<=0||!Number.isFinite(stock)||stock<0||!Number.isFinite(reorder)||reorder<0)return alert('Enter a product name, a positive selling price, and valid non-negative cost and stock values.');
-  const isEditing=!!editingProductId;
+  const isEditing=!!editingProductId;let editReason=null;if(isEditing){editReason=prompt('Reason for editing this product (required):');if(!editReason||!editReason.trim())return sheriToast('A reason is required to edit a product.','error');}
   if(!confirm((isEditing?'Update':'Save')+' product?\\n'+name+'\\nCost: '+money(cost)+' · Selling price: '+money(sell)+'\\nStock: '+stock+' · Reorder level: '+reorder))return;
   const now=sheriNow();
   let openingStockProduct=null;
@@ -2062,16 +2062,19 @@ async function saveProduct(){
     await sheriQueue({type:'product_upsert',record:{...p}});
   }
   let openingWarning='';if(openingStockProduct&&openingStockProduct.stock>0&&openingStockProduct.cost>0){try{await accEnsureBase();const inv=accAccountCode('1200'),equity=accAccountCode('3000'),value=openingStockProduct.stock*openingStockProduct.cost;await accPostEntry({date:now.slice(0,10),description:'Opening inventory '+name,sourceType:'product_opening_stock',sourceId:openingStockProduct.id,lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]});}catch(err){openingWarning=' Opening stock was saved but its accounting entry needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] opening inventory posting failed',err);}}
+  if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name});
   if(navigator.onLine)await sheriSyncOutbox();
   document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast((isEditing?'Product updated.':'Product saved.')+openingWarning,openingWarning?'warning':'success');
 }
 async function deleteProduct(id){
   if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to delete products.','error');
   const p=product(id);if(!p)return;
+  const reason=prompt('Reason for deleting this product (required):');if(!reason||!reason.trim())return sheriToast('A reason is required to delete a product.','error');
   if(!confirm(`Delete "${p.name}"? Past sales stay in your history, but you won't be able to sell it again.`))return;
   p.deleted=true;p.updated_at=sheriNow();
   await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
   await sheriQueue({type:'product_delete',id});
+  await accAudit('delete','product',id,{reason:reason.trim(),name:p.name});
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
@@ -2286,9 +2289,11 @@ async function addExpense(){
 }
 async function deleteExpense(id){
   if(!sheriCan('manage_expenses'))return sheriToast('You do not have permission to delete expenses.','error');
-  if(!confirm('Delete this expense?'))return;
+  const expense=state.expenses.find(x=>x.id===id);if(!expense)return;const reason=prompt('Reason for deleting this expense (required):');if(!reason||!reason.trim())return sheriToast('A reason is required to delete an expense.','error');
+  if(!confirm('Delete this expense?\\nReason: '+reason.trim()))return;
   state.expenses=state.expenses.filter(x=>x.id!==id);await sheriDelete('expenses',id);await sheriSaveSnapshot();
   await sheriQueue({type:'expense_delete',id});
+  await accAudit('delete','expense',id,{reason:reason.trim(),description:expense.description,amount:expense.amount});
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
@@ -4581,7 +4586,7 @@ async function accPostEntry({date,description,sourceType,sourceId,lines}){
   return entry;
 }
 async function accAudit(action,entityType,entityId,details){
-  const row={id:sheriUuid(),merchant_id:state.merchant.id,action,entity_type:entityType,entity_id:entityId||null,details:details||{},created_at:sheriNow()};state.auditLog.unshift(row);
+  const row={id:sheriUuid(),merchant_id:state.merchant.id,actor_user_id:session?.user?.id||null,action,entity_type:entityType,entity_id:entityId||null,reason:details?.reason||null,details:details||{},created_at:sheriNow()};state.auditLog.unshift(row);
   await sheriPut('auditLog',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'audit_log',record:row});
 }
 function accInvoiceTotal(i){return Number(i.total||0)}
