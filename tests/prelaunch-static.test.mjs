@@ -397,10 +397,11 @@ test("customer records support shared voice entry and confirmation before saving
 test("team migration preserves owner RLS, prevents forged staff audit inserts and scopes edits by function", () => {
   assert.ok(teamMigration.includes("without removing or replacing the existing owner policies"));
   assert.ok(!teamMigration.includes("for pol in select policyname"));
-  assert.ok(teamMigration.includes("t.table_name<>'audit_log'"));
+  assert.ok(teamMigration.includes("t.table_name not in ('audit_log','sales','purchases','journal_entries','journal_lines')"));
   assert.ok(teamMigration.includes("when t.table_name='sales' then 'manage_sales'"));
   assert.ok(teamMigration.includes("when t.table_name='products' then 'manage_inventory'"));
   assert.ok(teamMigration.includes("when t.table_name='expenses' then 'manage_expenses'"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(merchant_id,'manage_team') and private.user_can_access_merchant(merchant_id,%L)"));
 });
 
 test("sale voiding retains source rows, reverses posted journals and is idempotent", () => {
