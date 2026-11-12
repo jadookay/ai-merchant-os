@@ -131,9 +131,10 @@ create policy merchant_members_manage on public.merchant_members for all to auth
   using (private.user_can_access_merchant(merchant_id,'manage_team'))
   with check (private.user_can_access_merchant(merchant_id,'manage_team'));
 
--- Replace merchant-scoped owner-only policies with permission-aware tenant policies.
-do $$
-declare t record; pol record; read_perm text; write_perm text; insert_perm text;
+-- Add narrow staff policies without removing or replacing the existing owner policies.
+-- PostgreSQL combines permissive policies with OR, so the original owner access remains intact.
+do $
+declare t record; read_perm text; write_perm text; insert_perm text;
 begin
   for t in select table_name from information_schema.columns
     where table_schema='public' and column_name='merchant_id'
@@ -144,23 +145,43 @@ begin
         'audit_log','shericeri_memory'
       )
   loop
-    for pol in select policyname from pg_policies where schemaname='public' and tablename=t.table_name
-    loop execute format('drop policy %I on public.%I',pol.policyname,t.table_name); end loop;
     read_perm:=case t.table_name
       when 'products' then 'view_inventory' when 'sales' then 'view_sales'
       when 'expenses' then 'view_expenses' when 'customers' then 'view_customers'
       when 'suppliers' then 'view_suppliers' when 'purchases' then 'view_inventory'
       when 'audit_log' then 'view_audit_log' else 'view_financial_reports' end;
-    write_perm:='manage_team';
-    insert_perm:=case when t.table_name='sales' then 'create_sale' when t.table_name='products' then 'manage_inventory' when t.table_name='expenses' then 'manage_expenses' when t.table_name='customers' then 'manage_customers' when t.table_name='suppliers' then 'manage_suppliers' when t.table_name='purchases' then 'manage_inventory' when t.table_name='audit_log' then 'view_dashboard' when t.table_name in ('chart_of_accounts','journal_entries','journal_lines','invoices','bills','payments','bank_accounts','tax_rates','recurring_transactions','accounting_settings','cash_entries','budgets') then 'manage_finance' else write_perm end;
+    write_perm:=case
+      when t.table_name='products' then 'manage_inventory'
+      when t.table_name='sales' then 'manage_sales'
+      when t.table_name='expenses' then 'manage_expenses'
+      when t.table_name='customers' then 'manage_customers'
+      when t.table_name='suppliers' then 'manage_suppliers'
+      when t.table_name='purchases' then 'manage_inventory'
+      else 'manage_finance' end;
+    insert_perm:=case
+      when t.table_name='sales' then 'create_sale'
+      when t.table_name='products' then 'manage_inventory'
+      when t.table_name='expenses' then 'manage_expenses'
+      when t.table_name='customers' then 'manage_customers'
+      when t.table_name='suppliers' then 'manage_suppliers'
+      when t.table_name='purchases' then 'manage_inventory'
+      when t.table_name in ('chart_of_accounts','journal_entries','journal_lines','invoices','bills','payments','bank_accounts','tax_rates','recurring_transactions','accounting_settings','cash_entries','budgets') then 'manage_finance'
+      else null end;
+    execute format('drop policy if exists %I on public.%I',t.table_name||'_team_select',t.table_name);
     execute format('create policy %I on public.%I for select to authenticated using (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_select',t.table_name,read_perm);
-    execute format('create policy %I on public.%I for insert to authenticated with check (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_insert',t.table_name,insert_perm);
+    -- Audit records are written only by trusted server-side RPCs. Staff cannot forge them.
+    if insert_perm is not null and t.table_name<>'audit_log' then
+      execute format('drop policy if exists %I on public.%I',t.table_name||'_team_insert',t.table_name);
+      execute format('create policy %I on public.%I for insert to authenticated with check (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_insert',t.table_name,insert_perm);
+    end if;
     if t.table_name<>'audit_log' then
+      execute format('drop policy if exists %I on public.%I',t.table_name||'_team_update',t.table_name);
+      execute format('drop policy if exists %I on public.%I',t.table_name||'_team_delete',t.table_name);
       execute format('create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_update',t.table_name,write_perm,write_perm);
       execute format('create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_delete',t.table_name,write_perm);
     end if;
   end loop;
-end $$;
+end $;
 
 drop policy if exists merchants_team_select on public.merchants;
 drop policy if exists merchants_team_update on public.merchants;
@@ -168,6 +189,10 @@ create policy merchants_team_select on public.merchants for select to authentica
 create policy merchants_team_update on public.merchants for update to authenticated
   using (user_id=(select auth.uid())) with check (user_id=(select auth.uid()));
 
+
+-- Preserve voided sales as immutable accounting source records.
+alter table public.sales
+  add column if not exists voided boolean not null default false;
 
 -- Accounting journal void metadata. Keep original journal lines for auditability.
 alter table public.journal_entries
@@ -254,7 +279,7 @@ begin
     v_authorized:=private.user_can_access_merchant(p_merchant_id,'manage_finance');
   end if;
   if not v_authorized then raise exception 'Not authorized to post this accounting entry'; end if;
-  if p_source_type in ('sale','sale_cogs') and not exists(select 1 from public.sales where id=p_source_id and merchant_id=p_merchant_id) then
+  if p_source_type in ('sale','sale_cogs') and not exists(select 1 from public.sales where id=p_source_id and merchant_id=p_merchant_id and coalesce(voided,false)=false) then
     return p_entry_id; -- A sale voided before its queued journal batch must never recreate revenue.
   end if;
   if p_entry_id is null or p_entry_date is null or coalesce(trim(p_description),'')='' then raise exception 'Journal entry identity is incomplete'; end if;
@@ -316,7 +341,6 @@ declare
   v_cost numeric;
   v_customer_id uuid;
   v_current_stock integer;
-  v_inserted integer;
   v_stock_applied boolean;
 begin
   v_merchant_id:=nullif(p_sale->>'merchant_id','')::uuid;
@@ -334,19 +358,18 @@ begin
   end if;
   select coalesce(stock,0) into v_current_stock from public.products where id=p_product_id and merchant_id=v_merchant_id for update;
   if not found then raise exception 'Product was not found for this business'; end if;
-  insert into public.sales
-  select (jsonb_populate_record(null::public.sales,p_sale || jsonb_build_object('stock_applied',false))).*
-  on conflict (id) do nothing;
-  get diagnostics v_inserted = row_count;
-  if v_inserted=0 then
-    select stock_applied into v_stock_applied from public.sales where id=v_sale_id and merchant_id=v_merchant_id;
+  select stock_applied into v_stock_applied from public.sales where id=v_sale_id and merchant_id=v_merchant_id;
+  if found then
     return jsonb_build_object('ok',true,'already_recorded',true,'stock_conflict',not coalesce(v_stock_applied,false),'server_stock',v_current_stock);
   end if;
+  -- Do not insert a sale unless the stock precondition is true. A conflict therefore
+  -- leaves no half-recorded transaction; the client can refresh stock and retry safely.
   if v_current_stock<>p_expected_server_stock then
-    return jsonb_build_object('ok',true,'stock_conflict',true,'server_stock',v_current_stock,'local_stock',p_local_stock);
+    return jsonb_build_object('ok',false,'stock_conflict',true,'server_stock',v_current_stock,'local_stock',p_local_stock);
   end if;
+  insert into public.sales
+  select (jsonb_populate_record(null::public.sales,p_sale || jsonb_build_object('stock_applied',true,'voided',false))).*;
   update public.products set stock=p_local_stock where id=p_product_id and merchant_id=v_merchant_id;
-  update public.sales set stock_applied=true where id=v_sale_id and merchant_id=v_merchant_id;
   return jsonb_build_object('ok',true,'stock_conflict',false,'server_stock',p_local_stock);
 end;
 $$;
@@ -376,10 +399,20 @@ declare
   v_sale_ids jsonb;
   v_sale_date date;
   v_lock date;
+  v_original record;
+  v_reversal_id uuid;
 begin
   if p_sale_id is null or coalesce(length(trim(p_reason)),0)<3 then raise exception 'A clear void reason is required'; end if;
   v_merchant_id:=coalesce(p_merchant_id,(select merchant_id from public.sales where id=p_sale_id));
   if v_merchant_id is null then return jsonb_build_object('ok',true,'already_voided',true); end if;
+  if not (private.user_can_access_merchant(v_merchant_id,'manage_sales')
+      or private.user_can_access_merchant(v_merchant_id,'manage_finance')) then
+    raise exception 'Not authorized to void sales';
+  end if;
+  perform 1 from public.sales
+   where merchant_id=v_merchant_id
+     and (id=p_sale_id or (p_transaction_id is not null and transaction_id=p_transaction_id))
+   for update;
   select coalesce(transaction_id,p_transaction_id),invoice_number,created_at::date
     into v_transaction_id,v_invoice_number,v_sale_date
   from public.sales
@@ -388,41 +421,76 @@ begin
   order by case when id=p_sale_id then 0 else 1 end
   limit 1;
   if not found then return jsonb_build_object('ok',true,'already_voided',true); end if;
-  if not private.user_can_access_merchant(v_merchant_id,'manage_team') then
-    raise exception 'Not authorized to void sales';
+  if not exists(select 1 from public.sales where merchant_id=v_merchant_id
+      and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
+      and coalesce(voided,false)=false) then
+    return jsonb_build_object('ok',true,'already_voided',true);
   end if;
   select locked_through into v_lock from public.accounting_settings where merchant_id=v_merchant_id;
-  if v_lock is not null and v_sale_date<=v_lock then raise exception 'The sale is in a locked accounting period'; end if;
+  if v_lock is not null and (v_sale_date<=v_lock or current_date<=v_lock) then
+    raise exception 'The sale or current accounting period is locked';
+  end if;
   select coalesce(sum(qty*price),0),count(*),coalesce(jsonb_agg(id),'[]'::jsonb)
     into v_amount,v_line_count,v_sale_ids
   from public.sales
   where merchant_id=v_merchant_id
-    and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id));
+    and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
+    and coalesce(voided,false)=false;
+
+  -- Restore only stock movements that were actually applied, then mark them unapplied.
   update public.products p set stock=p.stock+x.qty
   from (
     select product_id,sum(qty)::integer as qty
     from public.sales
     where merchant_id=v_merchant_id
       and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
-      and product_id is not null and stock_applied=true
+      and product_id is not null and stock_applied=true and coalesce(voided,false)=false
     group by product_id
   ) x
   where p.id=x.product_id and p.merchant_id=v_merchant_id;
-  update public.journal_entries
-  set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid()
-  where merchant_id=v_merchant_id and source_type in ('sale','sale_cogs')
-    and source_id in (
-      select id from public.sales where merchant_id=v_merchant_id
-        and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
-    );
+
+  -- Reverse each posted sale journal entry in the current open period. The original
+  -- entry and lines remain intact and are marked voided for a complete audit trail.
+  for v_original in
+    select je.id,je.entry_date,je.description
+    from public.journal_entries je
+    where je.merchant_id=v_merchant_id and je.source_type in ('sale','sale_cogs')
+      and je.source_id in (
+        select s.id from public.sales s where s.merchant_id=v_merchant_id
+          and (s.id=p_sale_id or (v_transaction_id is not null and s.transaction_id=v_transaction_id))
+      )
+      and coalesce(je.voided,false)=false
+    for update
+  loop
+    if not exists(select 1 from public.journal_entries
+       where merchant_id=v_merchant_id and source_type='sale_void' and source_id=v_original.id) then
+      v_reversal_id:=gen_random_uuid();
+      insert into public.journal_entries(id,merchant_id,entry_date,description,source_type,source_id)
+      values(v_reversal_id,v_merchant_id,current_date,'Reversal: '||v_original.description,'sale_void',v_original.id);
+      insert into public.journal_lines(id,merchant_id,journal_entry_id,account_id,debit,credit,memo)
+      select gen_random_uuid(),jl.merchant_id,v_reversal_id,jl.account_id,jl.credit,jl.debit,
+             coalesce(jl.memo,'')||' (void reversal)'
+      from public.journal_lines jl
+      where jl.merchant_id=v_merchant_id and jl.journal_entry_id=v_original.id;
+    end if;
+    update public.journal_entries
+      set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid()
+      where id=v_original.id and merchant_id=v_merchant_id;
+  end loop;
+
+  update public.sales
+    set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid(),stock_applied=false
+    where merchant_id=v_merchant_id
+      and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
+      and coalesce(voided,false)=false;
+
   insert into public.audit_log(id,merchant_id,actor_user_id,action,entity_type,entity_id,reason,details,created_at)
   values(p_audit_id,v_merchant_id,auth.uid(),'void','sale',p_sale_id,trim(p_reason),
     jsonb_build_object('reason',trim(p_reason),'invoice_number',v_invoice_number,'transaction_id',v_transaction_id,
-      'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids,'actor_name',case when exists(select 1 from public.merchants where id=v_merchant_id and user_id=auth.uid()) then 'Owner' else coalesce((select full_name from public.merchant_members where merchant_id=v_merchant_id and user_id=auth.uid() and status='active' limit 1),'Staff') end),now())
+      'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids,
+      'actor_name',case when exists(select 1 from public.merchants where id=v_merchant_id and user_id=auth.uid())
+        then 'Owner' else coalesce((select full_name from public.merchant_members where merchant_id=v_merchant_id and user_id=auth.uid() and status='active' limit 1),'Staff') end),now())
   on conflict(id) do nothing;
-  delete from public.sales
-  where merchant_id=v_merchant_id
-    and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id));
   return jsonb_build_object('ok',true,'invoice_number',v_invoice_number,'transaction_id',v_transaction_id,
     'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids);
 end;
@@ -502,7 +570,6 @@ declare
   v_current_stock integer;
   v_current_cost integer;
   v_stock_applied boolean;
-  v_inserted integer;
   v_expected_cost integer;
   v_status text;
   v_supplier_id uuid;
@@ -521,35 +588,35 @@ begin
   if v_supplier_id is not null and not exists(select 1 from public.suppliers where id=v_supplier_id and merchant_id=v_merchant_id) then
     raise exception 'Supplier does not belong to this business';
   end if;
+  if v_status not in ('ordered','received') then raise exception 'Purchase status is invalid'; end if;
   select coalesce(stock,0),coalesce(cost,0) into v_current_stock,v_current_cost from public.products
   where id=p_product_id and merchant_id=v_merchant_id for update;
   if not found then raise exception 'Product was not found for this business'; end if;
-  insert into public.purchases
-  select (jsonb_populate_record(null::public.purchases,p_purchase || jsonb_build_object('stock_applied',v_status='ordered'))).*
-  on conflict (id) do nothing;
-  get diagnostics v_inserted = row_count;
-  if v_inserted=0 then
-    select stock_applied into v_stock_applied from public.purchases where id=v_purchase_id and merchant_id=v_merchant_id;
-    return jsonb_build_object('ok',true,'already_recorded',true,'stock_conflict',not coalesce(v_stock_applied,false),'server_stock',v_current_stock);
+  select stock_applied into v_stock_applied from public.purchases where id=v_purchase_id and merchant_id=v_merchant_id;
+  if found then
+    return jsonb_build_object('ok',true,'already_recorded',true,'stock_conflict',v_status<>'ordered' and not coalesce(v_stock_applied,false),'server_stock',v_current_stock,'server_cost',v_current_cost);
   end if;
+  if v_status='received' then
+    if p_expected_server_stock is null or p_expected_server_cost is null or p_local_stock is null or p_local_cost is null
+       or p_local_stock<>p_expected_server_stock+v_qty then
+      raise exception 'Purchase stock values are invalid';
+    end if;
+    if v_current_stock+v_qty>0 then
+      v_expected_cost:=round(((v_current_stock*v_current_cost)+(v_qty*v_unit_cost))::numeric/(v_current_stock+v_qty))::integer;
+    else
+      v_expected_cost:=v_unit_cost;
+    end if;
+    if v_current_stock<>p_expected_server_stock or v_current_cost<>p_expected_server_cost then
+      return jsonb_build_object('ok',false,'stock_conflict',true,'server_stock',v_current_stock,'server_cost',v_current_cost);
+    end if;
+    if p_local_cost<>v_expected_cost then raise exception 'Weighted average purchase cost does not match the server calculation'; end if;
+  end if;
+  insert into public.purchases
+  select (jsonb_populate_record(null::public.purchases,p_purchase || jsonb_build_object('stock_applied',v_status='received'))).*;
   if v_status='ordered' then
     return jsonb_build_object('ok',true,'stock_conflict',false,'ordered',true);
   end if;
-  if p_expected_server_stock is null or p_expected_server_cost is null or p_local_stock is null or p_local_cost is null
-     or p_local_stock<>p_expected_server_stock+v_qty then
-    raise exception 'Purchase stock values are invalid';
-  end if;
-  if v_current_stock+v_qty>0 then
-    v_expected_cost:=round(((v_current_stock*v_current_cost)+(v_qty*v_unit_cost))::numeric/(v_current_stock+v_qty))::integer;
-  else
-    v_expected_cost:=v_unit_cost;
-  end if;
-  if v_current_stock<>p_expected_server_stock or v_current_cost<>p_expected_server_cost then
-    return jsonb_build_object('ok',true,'stock_conflict',true,'server_stock',v_current_stock,'server_cost',v_current_cost);
-  end if;
-  if p_local_cost<>v_expected_cost then raise exception 'Weighted average purchase cost does not match the server calculation'; end if;
   update public.products set stock=p_local_stock,cost=p_local_cost where id=p_product_id and merchant_id=v_merchant_id;
-  update public.purchases set stock_applied=true where id=v_purchase_id and merchant_id=v_merchant_id;
   return jsonb_build_object('ok',true,'stock_conflict',false,'server_stock',p_local_stock,'server_cost',p_local_cost);
 end;
 $$;
