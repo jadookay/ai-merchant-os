@@ -53,7 +53,7 @@ as $$
         and (p_permission not in ('manage_team','manage_sales') or mm.role='manager')
       )
       or p_permission in ('view_dashboard','member_active')
-      or (p_permission='view_inventory' and coalesce((mm.permissions->>'create_sale')::boolean,false))
+      or (p_permission='view_inventory' and (coalesce((mm.permissions->>'create_sale')::boolean,false) or coalesce((mm.permissions->>'manage_inventory')::boolean,false)))
     )
   );
 $$;
