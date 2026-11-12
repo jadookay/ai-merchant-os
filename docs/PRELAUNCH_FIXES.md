@@ -46,7 +46,7 @@ No database migration or Edge Function deployment is performed by this branch.
 ## November 12 team access, sales and Shericeri extension
 
 - Adds merchant-scoped staff subaccounts with name, phone, or email plus a hashed 6–8 digit PIN; login attempts are rate-limited.
-- Adds role and permission assignment for managers, cashiers, inventory staff, and accountants. Only Owner/Admin can grant Admin; managers can delegate only permissions they hold.
+- Adds role and permission assignment for managers, cashiers, inventory staff, and accountants. Only Owner/Admin can grant Admin; managers can delegate only permissions they hold. Managers can update staff names, email, phone, username, responsibilities, roles and permissions while preserving at least one login identifier.
 - Restricts edit/delete/void actions to Owner/Admin/Manager. Staff records are suspended rather than hard-deleted so transaction history remains intact.
 - Requires a reason for sensitive edits and deletions. The audit trail records the actor, action, affected record, reason, and transaction/invoice references.
 - Adds manager-visible audit history in team settings.
@@ -59,13 +59,13 @@ No database migration or Edge Function deployment is performed by this branch.
 
 ## Additional regression coverage
 
-The static regression suite now contains 43 tests. Run with:
+The static regression suite now contains 44 tests. Run with:
 
 ```bash
 node --test tests/prelaunch-static.test.mjs
 ```
 
-The latest verified run at commit `336e532d7afd3e7851752f76ead3648eeac2db85` passed 43/43 tests. This is source-level CI only; it is not a live multi-user or device integration test.
+The latest verified run at commit `51c15cbba74717f6ecadb216f04bcebab4f53011` passed 44/44 tests. This is source-level CI only; it is not a live multi-user or device integration test.
 
 ## Deployment status and required order
 
