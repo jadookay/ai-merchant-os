@@ -23,3 +23,8 @@ alter table public.audit_log
 
 create index if not exists audit_log_merchant_created_idx
   on public.audit_log (merchant_id, created_at desc);
+
+
+-- Track whether received purchases were applied to product stock; ordered purchases are marked applied without changing stock.
+alter table public.purchases
+  add column if not exists stock_applied boolean not null default true;
