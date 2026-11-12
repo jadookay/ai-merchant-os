@@ -3399,6 +3399,7 @@ function sheriIsGoodbyePhrase(q){
   if(/^(bye|goodbye|good night|see you|see you later|all right,? bye|alright,? bye|okay,? bye|ok,? bye|bye bye|see ya|murabeho|murabeho cyane)[!.?]*$/i.test(text)) return true;
   // Natural end-of-task phrases sleep the session without requiring a literal goodbye.
   if(/^(that's it|thats it|that is it|that's all|thats all|that is all|i am done|i'm done|im done|we are done|we're done|were done|nothing else|no more|that's everything|thats everything|all done|finished for now|c'est tout|j'ai fini|on a terminé|on a termine|c'est bon|je n'ai plus besoin|birarangiye|ndangije|ntakindi|nta kindi|bihagije|turangije|ni ibyo)[!.?]*$/i.test(text)) return true;
+  if(/^(?:thanks?|thank you(?: so much)?|merci(?: beaucoup)?|murakoze(?: cyane)?)[ ,;]+(?:that's it|thats it|that is it|that's all|thats all|that is all|i am done|i'm done|we're done|nothing else|c'est tout|j'ai fini|birarangiye|ndangije|ntakindi)[!.?]*$/i.test(text)) return true;
   // Also recognize natural closing phrases that end with a goodbye, e.g.
   // “that's it, thank you, bye” / “thank you, bye” without triggering on
   // questions that merely mention the word “goodbye”.
