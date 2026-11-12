@@ -2454,6 +2454,9 @@ function renderTeamAuditTrail(){
 async function editTeamMember(id){
  const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
  const full_name=prompt('Staff member name:',m.full_name);if(full_name===null)return;
+ const email=prompt('Email address (leave blank to remove email login):',m.email||'');if(email===null)return;
+ const phone=prompt('Phone number in international format (leave blank to remove phone login):',m.phone||'');if(phone===null)return;
+ const username=prompt('Username (optional; leave blank to remove):',m.username||'');if(username===null)return;
  const role=prompt('Role: cashier, inventory, accountant, manager, admin or custom',m.role);if(role===null)return;
  const responsibility=prompt('Responsibilities:',m.responsibility||'');if(responsibility===null)return;
  const keys=Object.keys(m.permissions||{}).filter(k=>m.permissions[k]===true);
@@ -2462,7 +2465,7 @@ async function editTeamMember(id){
  const permissions={};permissionText.split(',').map(x=>x.trim()).filter(Boolean).forEach(k=>permissions[k]=true);if(role.trim().toLowerCase()==='manager'){permissions.manage_team=true;permissions.manage_sales=true;permissions.view_audit_log=true;}
  const status=document.getElementById('teamStatus');if(status)status.textContent='Updating staff access…';
  try{
-  const {data,error}=await sb.functions.invoke('team-access',{body:{action:'update_member',merchant_id:state.merchant.id,member_id:id,full_name:full_name.trim(),role:role.trim().toLowerCase(),responsibility,permissions,status:m.status}});
+  const {data,error}=await sb.functions.invoke('team-access',{body:{action:'update_member',merchant_id:state.merchant.id,member_id:id,full_name:full_name.trim(),email:email.trim(),phone:phone.trim(),username:username.trim(),role:role.trim().toLowerCase(),responsibility,permissions,status:m.status}});
   if(error||!data?.ok)throw error||new Error(data?.error||'Could not update team access.');
   if(status)status.textContent='Staff access updated. Permission changes take effect on the next data request.';
   await loadTeamMembers(true);
