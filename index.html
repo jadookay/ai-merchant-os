@@ -3846,7 +3846,8 @@ function sheriDrainSpeakQueue(){
 
   utt.onstart=()=>{
     if(turnId!==sheriTurnId){
-      try{speechSynthesis.cancel()}catch(_){}
+      // A stale utterance callback must never cancel the global speech queue:
+      // it may now contain a newer turn's valid utterance.
       return;
     }
     started=true;
