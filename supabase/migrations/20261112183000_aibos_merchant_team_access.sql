@@ -312,6 +312,9 @@ declare
   v_merchant_id uuid;
   v_sale_id uuid;
   v_qty integer;
+  v_price numeric;
+  v_cost numeric;
+  v_customer_id uuid;
   v_current_stock integer;
   v_inserted integer;
   v_stock_applied boolean;
@@ -319,9 +322,13 @@ begin
   v_merchant_id:=nullif(p_sale->>'merchant_id','')::uuid;
   v_sale_id:=nullif(p_sale->>'id','')::uuid;
   v_qty:=nullif(p_sale->>'qty','')::integer;
-  if v_merchant_id is null or v_sale_id is null or v_qty is null or v_qty<1 then raise exception 'Sale identity or quantity is invalid'; end if;
+  v_price:=nullif(p_sale->>'price','')::numeric;
+  v_cost:=nullif(p_sale->>'cost','')::numeric;
+  v_customer_id:=nullif(p_sale->>'customer_id','')::uuid;
+  if v_merchant_id is null or v_sale_id is null or v_qty is null or v_qty<1 or v_price is null or v_price<0 or v_cost is null or v_cost<0 then raise exception 'Sale identity, quantity, price or cost is invalid'; end if;
   if not private.user_can_access_merchant(v_merchant_id,'create_sale') then raise exception 'Not authorized to record sales'; end if;
   if nullif(p_sale->>'product_id','')::uuid is distinct from p_product_id then raise exception 'Sale product does not match the stock operation'; end if;
+  if v_customer_id is not null and not exists(select 1 from public.customers where id=v_customer_id and merchant_id=v_merchant_id) then raise exception 'Customer does not belong to this business'; end if;
   if p_product_id is null or p_local_stock is null or p_expected_server_stock is null or p_local_stock<0 or p_local_stock<>p_expected_server_stock-v_qty then
     raise exception 'Sale stock values are invalid';
   end if;
