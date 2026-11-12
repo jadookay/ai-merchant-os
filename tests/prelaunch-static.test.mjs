@@ -287,9 +287,9 @@ test("manager-only destructive actions require reasons and are protected by back
     assert.match(block, /sheriCan\('manage_team'\)/, fn+" must be manager-gated");
     assert.match(block, /reason=prompt\(/, fn+" must require a reason");
   }
-  assert.match(html, /if\(!sheriCan\('manage_team'\)\)return sheriToast\('Only a Manager, Admin or Owner can void sales/);
-  assert.match(teamMigration, /write_perm:='manage_team'/);
-  assert.match(teamMigration, /if not private\.user_can_access_merchant\(v_merchant_id,'manage_team'\) then/);
+  assert.match(html, /if\(!sheriCan\('manage_sales'\)\)return sheriToast\('Only an Owner, Admin or authorized Manager can void sales/);
+  assert.match(teamMigration, /when t\.table_name='sales' then 'manage_sales'/);
+  assert.match(teamMigration, /private\.user_can_access_merchant\(v_merchant_id,'manage_sales'\)/);
 });
 
 test("inventory staff can add products and receive purchases without editing existing product masters", () => {
@@ -391,4 +391,39 @@ test("customer records support shared voice entry and confirmation before saving
   assert.match(html, /sheriStartFormVoice\('customerVoiceStatus',parseVoiceCustomer/);
   assert.match(html, /function parseVoiceCustomer\(transcript\)/);
   assert.match(html, /Add this customer\?/);
+});
+
+
+test("team migration preserves owner RLS, prevents forged staff audit inserts and scopes edits by function", () => {
+  assert.ok(teamMigration.includes("without removing or replacing the existing owner policies"));
+  assert.ok(!teamMigration.includes("for pol in select policyname"));
+  assert.ok(teamMigration.includes("t.table_name<>'audit_log'"));
+  assert.ok(teamMigration.includes("when t.table_name='sales' then 'manage_sales'"));
+  assert.ok(teamMigration.includes("when t.table_name='products' then 'manage_inventory'"));
+  assert.ok(teamMigration.includes("when t.table_name='expenses' then 'manage_expenses'"));
+});
+
+test("sale voiding retains source rows, reverses posted journals and is idempotent", () => {
+  assert.ok(teamMigration.includes("add column if not exists voided boolean not null default false"));
+  assert.ok(teamMigration.includes("set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid(),stock_applied=false"));
+  assert.ok(teamMigration.includes("source_type='sale_void' and source_id=v_original.id"));
+  assert.ok(teamMigration.includes("jl.credit,jl.debit"));
+  assert.ok(!teamMigration.includes("delete from public.sales"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
+});
+
+test("stock conflicts do not create partial sale or purchase records", () => {
+  const saleStart=teamMigration.indexOf("create or replace function public.shericeri_sync_sale_stock");
+  const saleEnd=teamMigration.indexOf("revoke all on function public.shericeri_sync_sale_stock",saleStart);
+  const sale=teamMigration.slice(saleStart,saleEnd);
+  assert.ok(sale.indexOf("if v_current_stock<>p_expected_server_stock") < sale.indexOf("insert into public.sales"));
+  assert.ok(sale.includes("return jsonb_build_object('ok',false,'stock_conflict',true"));
+  const purchaseStart=teamMigration.indexOf("create or replace function public.shericeri_sync_purchase_stock");
+  const purchase=teamMigration.slice(purchaseStart);
+  assert.ok(purchase.indexOf("if v_current_stock<>p_expected_server_stock") < purchase.indexOf("insert into public.purchases"));
+  assert.ok(purchase.includes("return jsonb_build_object('ok',false,'stock_conflict',true"));
+});
+
+test("voided server sales are excluded from the active sales workspace", () => {
+  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales).filter(x=>!x.voided)"));
 });
