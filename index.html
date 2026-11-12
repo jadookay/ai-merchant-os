@@ -1997,7 +1997,9 @@ function editProduct(id){const p=product(id);if(!p)return;document.getElementByI
 function cancelProductEdit(){document.getElementById('addProduct').style.display='none';clearProductForm()}
 async function saveProduct(){
   const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value,barcode=pBarcode.value.trim()||null,expiry_date=pExpiry.value||null;
-  if(!name||!cost||!sell)return alert('Complete product details.');
+  if(!name||!Number.isFinite(cost)||cost<0||!Number.isFinite(sell)||sell<=0||!Number.isFinite(stock)||stock<0||!Number.isFinite(reorder)||reorder<0)return alert('Enter a product name, a positive selling price, and valid non-negative cost and stock values.');
+  const isEditing=!!editingProductId;
+  if(!confirm((isEditing?'Update':'Save')+' product?\\n'+name+'\\nCost: '+money(cost)+' · Selling price: '+money(sell)+'\\nStock: '+stock+' · Reorder level: '+reorder))return;
   const now=sheriNow();
   if(editingProductId){
     const p=product(editingProductId); if(!p)return;
@@ -2011,7 +2013,7 @@ async function saveProduct(){
     await sheriQueue({type:'product_upsert',record:{...p}});
   }
   if(navigator.onLine)await sheriSyncOutbox();
-  document.getElementById('addProduct').style.display='none';clearProductForm();render();
+  document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast(isEditing?'Product updated.':'Product saved.');
 }
 async function deleteProduct(id){
   const p=product(id);if(!p)return;
