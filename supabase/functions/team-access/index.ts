@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
         callerRole = membership?.role || null;
         callerPermissions = membership?.permissions && typeof membership.permissions === "object" ? membership.permissions : {};
         canManage = membership?.status === "active" &&
-          (membership.role === "admin" || callerPermissions.manage_team === true);
+          (membership.role === "admin" || (membership.role === "manager" && callerPermissions.manage_team === true));
       }
       if (!canManage) return json({ error: "You do not have permission to manage this team." }, 403);
       const isPrivilegedGrantor = callerRole === "owner" || callerRole === "admin";
@@ -220,7 +220,7 @@ Deno.serve(async (req: Request) => {
         if (memberError) throw memberError;
         callerRole = membership?.role || null;
         callerPermissions = membership?.permissions && typeof membership.permissions === "object" ? membership.permissions : {};
-        if (membership?.status !== "active" || (callerRole !== "admin" && callerPermissions.manage_team !== true)) {
+        if (membership?.status !== "active" || (callerRole !== "admin" && !(callerRole === "manager" && callerPermissions.manage_team === true))) {
           return json({ error: "You do not have permission to manage this team." }, 403);
         }
       }
