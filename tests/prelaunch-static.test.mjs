@@ -624,7 +624,7 @@ test("device session registration and manager revocation are server-enforced", (
 });
 
 test("accounting snapshot is gated by financial report permission and audit permission separately", () => {
-  assert.ok(teamMigration.includes("Not authorized for financial reports"));
+  assert.ok(teamMigration.includes("v_can_view_reports boolean := private.user_can_access_merchant(p_merchant_id,'view_financial_reports')"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'view_audit_log')"));
 });
 
@@ -660,4 +660,21 @@ test("staff without financial report access cannot load cached ledger or audit d
   assert.ok(html.includes("const canAudit=sheriCan('view_audit_log')"));
   assert.ok(html.includes("await sheriPurgeLocalAccountingStores(merchantId,['journalEntries','journalLines','invoices','bills','payments','bankAccounts','recurringTransactions'])"));
   assert.ok(html.includes("if(sheriCan('view_financial_reports'))await accEnsureOperationalLedger()"));
+});
+
+test("journal batches are idempotent by source and cannot duplicate a sale or expense posting", () => {
+  assert.ok(teamMigration.includes("v_existing_source_entry uuid"));
+  assert.ok(teamMigration.includes("pg_advisory_xact_lock(hashtextextended(p_merchant_id::text||':'||p_source_type||':'||p_source_id::text,0))"));
+  assert.ok(teamMigration.includes("where merchant_id=p_merchant_id and source_type=p_source_type and source_id=p_source_id"));
+  assert.ok(html.includes("if(data!==entry.id){"));
+  assert.ok(html.includes("await sheriDelete('journalEntries',entry.id)"));
+});
+
+test("journal line batches reject malformed objects and duplicate line IDs", () => {
+  assert.ok(teamMigration.includes("Journal lines must be a JSON array"));
+  assert.ok(teamMigration.includes("Journal batch contains duplicate or missing line IDs"));
+});
+
+test("recurring journal source identifiers remain valid UUIDs", () => {
+  assert.ok(html.includes("sourceType:'recurring',sourceId:sheriUuid()"));
 });
