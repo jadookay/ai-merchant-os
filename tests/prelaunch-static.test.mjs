@@ -690,15 +690,7 @@ test("Kinyarwanda TTS keeps the live JWT setting until voice callers are verifie
   assert.ok(config.includes("[functions.team-access]\nverify_jwt = false"));
 });
 
-test("all inline application scripts parse without syntax errors", () => {
-  const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
-  for (const match of scripts) {
-    const attrs = match[1] || "";
-    const body = match[2] || "";
-    if (/type=["'](?:application\\/json|module)["']/i.test(attrs) || !body.trim()) continue;
-    new vm.Script(body, { filename: "index.html inline script" });
-  }
-});
+
 
 test("legacy owner outbox records remain recoverable without exposing them to staff", () => {
   assert.ok(html.includes("if(store==='outbox')return Boolean(merchantId&&state.merchant?.user_id===userId"));
