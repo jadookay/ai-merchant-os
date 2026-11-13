@@ -11,6 +11,7 @@ const teamMigration = await readFile(new URL("../supabase/migrations/20261112183
 const authorizationFixMigration = await readFile(new URL("../supabase/migrations/20261113150000_aibos_release_authorization_fixes.sql", import.meta.url), "utf8");
 const atomicCartMigration = await readFile(new URL("../supabase/migrations/20261113153000_aibos_atomic_cart_sync.sql", import.meta.url), "utf8");
 const pinRateLimitMigration = await readFile(new URL("../supabase/migrations/20261113160000_aibos_pin_rate_limit.sql", import.meta.url), "utf8");
+const storageMemoryMigration = await readFile(new URL("../supabase/migrations/20261112170000_aibos_priority_storage_memory.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -647,4 +648,12 @@ test("team identity updates roll back database and Auth state if a later step fa
   assert.match(teamAccess, /if \(authStatusUpdated\)[\s\S]*?ban_duration: target\.status/);
   assert.match(teamAccess, /if \(authEmailUpdated && originalAuthEmail\)[\s\S]*?email: originalAuthEmail/);
   assert.match(teamAccess, /if \(pinError\) \{\s*await rollbackMemberAndAuth\(\)/);
+});
+
+
+test("clean staging receives Shericeri memory and the product-images bucket before team policies", () => {
+  assert.match(storageMemoryMigration, /create table if not exists public\.shericeri_memory/);
+  assert.match(storageMemoryMigration, /insert into storage\.buckets/);
+  assert.match(storageMemoryMigration, /file_size_limit=4194304/);
+  assert.match(authorizationFixMigration, /create policy shericeri_memory_team_insert[\s\S]*?manage_finance/);
 });
