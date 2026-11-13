@@ -741,3 +741,8 @@ test("staff operational insert permissions are independent of team administratio
   assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_expenses')"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_inventory')"));
 });
+
+test("sale void sync has no obsolete handler that bypasses the audited RPC", () => {
+  assert.ok(!html.includes("sheriSyncVoidSale(op)"));
+  assert.ok((html.match(/op\.type==='sale_void'\)\{await sheriSyncSaleVoidOperation\(op\)\}/g)||[]).length>=2);
+});
