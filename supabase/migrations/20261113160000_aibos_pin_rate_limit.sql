@@ -12,7 +12,7 @@ security definer
 set search_path=''
 as $$
 declare
-  v_identifier text:=lower(trim(coalesce(p_identifier,'')));
+  v_identifier text:=regexp_replace(lower(trim(coalesce(p_identifier,''))),'\s+',' ','g');
   v_identity text;
   v_key text;
   v_ip_key text;
