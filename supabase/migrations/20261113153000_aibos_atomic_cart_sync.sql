@@ -98,7 +98,7 @@ begin
       raise exception 'A cart stock precondition is invalid';
     end if;
     select coalesce(stock,0) into v_current from public.products
-      where id=v_product_id and merchant_id=p_merchant_id for update;
+      where id=v_product_id and merchant_id=p_merchant_id and coalesce(deleted,false)=false for update;
     if not found then raise exception 'A cart product was not found for this business'; end if;
     if v_current<>v_expected then
       v_conflicts:=v_conflicts||jsonb_build_array(jsonb_build_object(
