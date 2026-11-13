@@ -512,3 +512,11 @@ test("safe preview contains inventory movements, reports and device-session cont
   assert.match(previewHtml, /Security simulation only/);
   assert.doesNotMatch(previewHtml, /supabase\\.co|fetch\\s*\\(/i);
 });
+
+test("safe preview includes mandatory stock reasons, date reports and separated valuation permissions", () => {
+  assert.match(previewHtml, /Mandatory reason \/ source/);
+  assert.match(previewHtml, /value="year"/);
+  assert.match(previewHtml, /view_inventory_costs/);
+  assert.match(previewHtml, /function revokeDevice/);
+  assert.match(previewHtml, /function removeStaff/);
+});
