@@ -579,3 +579,24 @@ test("legacy accounting SECURITY DEFINER RPCs are no longer executable by anon",
   assert.ok(teamMigration.includes("revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon"));
   assert.ok(teamMigration.includes("revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon"));
 });
+
+test("team authorization validates a live Auth session on every privileged merchant check", () => {
+  assert.ok(teamMigration.includes("from auth.sessions s"));
+  assert.ok(teamMigration.includes("s.id=nullif((select auth.jwt()->>'session_id'),'')::uuid"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_validate_member_session"));
+});
+
+test("PIN brute-force limits follow both the identifier and source IP", () => {
+  assert.ok(teamMigration.includes("v_identifier_key:='identifier:'"));
+  assert.ok(teamMigration.includes("v_ip_key:='ip:'"));
+  assert.ok(teamMigration.includes("then 20 else 5 end"));
+  assert.ok(teamMigration.includes("blocked_until is not null and blocked_until>now()"));
+});
+
+test("suspending a team member clears the PIN and invalidates refresh sessions", () => {
+  assert.ok(teamAccess.includes('if (status === "suspended") memberPatch.pin_hash = null'));
+  assert.ok(teamAccess.includes("admin.auth.admin.updateUserById(target.user_id, {"));
+  assert.ok(teamAccess.includes("password: randomPassword()"));
+  assert.ok(teamAccess.includes("Set a new 6–8 digit PIN before re-enabling this member."));
+  assert.ok(teamAccess.includes('status: "suspended", pin_hash: null'));
+});
