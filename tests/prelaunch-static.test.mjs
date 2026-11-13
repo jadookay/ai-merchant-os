@@ -746,3 +746,8 @@ test("sale void sync has no obsolete handler that bypasses the audited RPC", () 
   assert.ok(!html.includes("sheriSyncVoidSale(op)"));
   assert.ok((html.match(/op\.type==='sale_void'\)\{await sheriSyncSaleVoidOperation\(op\)\}/g)||[]).length>=2);
 });
+
+test("sale void RPC checks authorization before acquiring the invoice lock", () => {
+  const fn=teamMigration.slice(teamMigration.indexOf("create or replace function public.shericeri_void_sale"),teamMigration.indexOf("revoke all on function public.shericeri_void_sale"));
+  assert.ok(fn.indexOf("private.user_can_access_merchant(v_merchant_id,'manage_team')") < fn.indexOf("pg_advisory_xact_lock"));
+});
