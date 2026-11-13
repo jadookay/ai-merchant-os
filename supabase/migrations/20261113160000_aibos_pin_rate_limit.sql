@@ -21,6 +21,7 @@ declare
   v_member public.merchant_members%rowtype;
   v_count integer;
 begin
+  if coalesce(auth.jwt()->>'role','')<>'service_role' then raise exception 'not authorized'; end if;
   if p_merchant_id is null or length(v_identifier)<2
      or coalesce(p_pin,'') !~ '^[0-9]{6,8}$' then
     return jsonb_build_object('ok',false);
