@@ -256,12 +256,11 @@ test("sales and expenses confirm before saving and post balanced journal entries
   assert.ok(expense.includes("sheriToast('Expense recorded."));
 });
 
-test("cashier sales use an atomic stock RPC on normal sync and auth-retry paths", () => {
-  assert.ok(html.includes("async function sheriSyncSaleOperation(op)"));
-  assert.ok(html.includes("sb.rpc('shericeri_sync_sale_stock'"));
-  assert.ok(html.includes("op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}"));
-  assert.ok(html.includes("op.type==='sale_void'){await sheriSyncVoidSale(op)}"));
-  assert.ok(teamMigration.includes("create or replace function public.shericeri_sync_sale_stock"));
+test("cashier sale carts use one atomic stock RPC on normal sync and auth-retry paths", () => {
+  assert.ok(html.includes("async function sheriSyncSaleCartOperation(op)"));
+  assert.ok(html.includes("sb.rpc('shericeri_sync_sale_cart'"));
+  assert.ok(html.includes("op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_sync_sale_cart"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'create_sale')"));
 });
 
@@ -731,7 +730,11 @@ test("sales void buttons render valid JavaScript and pending status", () => {
 });
 
 test("staff operational insert permissions are independent of team administration", () => {
-  assert.ok(teamMigration.includes("private.user_can_access_merchant(merchant_id,write_perm)"));
+  assert.ok(teamMigration.includes("insert_perm:=case"));
+  assert.ok(teamMigration.includes("when t.table_name='sales' then 'create_sale'"));
+  assert.ok(teamMigration.includes("when t.table_name='expenses' then 'manage_expenses'"));
+  assert.ok(teamMigration.includes("when t.table_name='products' then 'manage_inventory'"));
+  assert.ok(teamMigration.includes("with check (private.user_can_access_merchant(merchant_id,%L))"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'create_sale')"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_expenses')"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_inventory')"));
