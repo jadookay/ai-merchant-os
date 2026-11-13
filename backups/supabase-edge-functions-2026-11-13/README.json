@@ -1,0 +1,55 @@
+{
+  "captured_at": "2026-11-13",
+  "supabase_project_ref": "bhtodxjhgucgwarpaqzy",
+  "note": "Source snapshots retrieved from the active Supabase Edge Functions and committed to the GitHub production backup branch. Secrets/environment variables are not included.",
+  "functions": [
+    {
+      "slug": "advisor",
+      "path": "backups/supabase-edge-functions-2026-11-13/advisor/index.ts",
+      "commit": "f196de44186a30df687a53d910312e05458b032e",
+      "bytes": 6430
+    },
+    {
+      "slug": "advisor",
+      "version": 111,
+      "verify_jwt": true,
+      "source_sha256": "429c44e83af505cde22701f24d1f2154cc279ff30c66225f4e9ac78b1237a032"
+    },
+    {
+      "slug": "quick-service",
+      "path": "backups/supabase-edge-functions-2026-11-13/quick-service/index.ts",
+      "commit": "e5bbedccaa24fa2efff5ee966cfad19977cb1bdc",
+      "bytes": 45637
+    },
+    {
+      "slug": "quick-service",
+      "version": 4,
+      "verify_jwt": true,
+      "source_sha256": "ab665adcfe56266b1e066df1ef09582153185c93a9a0753ec4ae796849a0e157"
+    },
+    {
+      "slug": "kinya-tts",
+      "path": "backups/supabase-edge-functions-2026-11-13/kinya-tts/index.ts",
+      "commit": "4a94545a8c9028c7171f90f602557f98fb29bcc9",
+      "bytes": 5304
+    },
+    {
+      "slug": "kinya-tts",
+      "version": 6,
+      "verify_jwt": false,
+      "source_sha256": "3121e50eb1433423e589f638f0d5bff1f425ac526aa423419bc5406828a5eba5"
+    },
+    {
+      "slug": "amatavida",
+      "path": "backups/supabase-edge-functions-2026-11-13/amatavida/index.ts",
+      "commit": "8792ca7bf4a79dd55dd59350c3a4ebb068a445e6",
+      "bytes": 22008
+    },
+    {
+      "slug": "amatavida",
+      "version": 28,
+      "verify_jwt": false,
+      "source_sha256": "d769c2956992b38228e9631f11f80f606cd35403f03b2c6925e2e5cfff97f8b7"
+    }
+  ]
+}
