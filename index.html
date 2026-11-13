@@ -1132,6 +1132,15 @@ async function sheriSyncVoidSale(op){
   });
   if(error)throw error;
   if(data?.not_found)await sheriFinalizeUnpostedVoid(op);
+  else{
+    const saleIds=op.sale_ids||[op.id],queued=await sheriGetAll('outbox');
+    for(const item of queued){
+      const q=item.op||{};
+      if((q.type==='sale_cart'&&q.transaction_id===op.transaction_id)||(q.type==='sale_upsert'&&saleIds.includes(q.record?.id)))await sheriDelete('outbox',item.key);
+    }
+    const conflicts=await sheriGetAll('conflicts');
+    for(const row of conflicts){if(row.info?.operation?.transaction_id===op.transaction_id)await sheriDelete('conflicts',row.key);}
+  }
 }
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
