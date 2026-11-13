@@ -972,14 +972,18 @@ async function sheriReconcileMerchantId(){
       const ops=await sheriGetAll('outbox');
       for(const item of ops){
         const op=item.op||{};
-        if(op.type==='merchant_upsert'&&op.record?.id===oldId)op.record.id=newId;
+        // The server merchant profile was already created/updated above; remove
+        // its stale local upsert. Re-key every other queued operation to the
+        // canonical merchant scope so scoped IndexedDB cannot strand the queue.
+        if(op.type==='merchant_upsert'&&op.record?.id===oldId){await sheriDelete('outbox',item.key);continue;}
+        if(op.merchant_id===oldId)op.merchant_id=newId;
         if(op.record?.merchant_id===oldId)op.record.merchant_id=newId;
-        await sheriPut('outbox',item.key,{...item,op});
+        if(op.entry?.merchant_id===oldId)op.entry.merchant_id=newId;
+        if(op.auditRow?.merchant_id===oldId)op.auditRow.merchant_id=newId;
+        if(Array.isArray(op.records))for(const row of op.records)if(row.merchant_id===oldId)row.merchant_id=newId;
+        await sheriDelete('outbox',item.key);
+        await sheriPut('outbox',item.key,{...item,merchant_id:newId,op});
       }
-      // The profile was already applied to the real server merchant. Remove
-      // only this stale merchant-upsert operation; data operations still sync.
-      const refreshed=await sheriGetAll('outbox');
-      for(const item of refreshed){if(item.op?.type==='merchant_upsert'&&item.op?.record?.id===newId)await sheriDelete('outbox',item.key)}
       await sheriDelete('merchants',oldId);
     }
     state.merchant={...data};
