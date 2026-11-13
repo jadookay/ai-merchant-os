@@ -721,21 +721,53 @@ function sheriTx(store,mode='readonly'){
   if(!sheriOfflineDb)throw new Error('Offline database not initialized');
   return sheriOfflineDb.transaction(store,mode).objectStore(store);
 }
+function sheriLocalScope(store,key,value={}){
+  const userId=session?.user?.id||'anonymous';
+  const merchantId=store==='merchants'?String(key):(value.merchant_id||value.op?.merchant_id||state.merchant?.id||'none');
+  return {userId,merchantId,storageKey:userId+'::'+merchantId+'::'+String(key)};
+}
 async function sheriPut(store,key,value){
   await sheriOpenLocalDb();
-  return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').put({key,...value});req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)})
+  const scope=sheriLocalScope(store,key,value);
+  const row={...value,key:scope.storageKey,local_key:String(key),user_scope:scope.userId,merchant_scope:scope.merchantId};
+  return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').put(row);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)});
 }
 async function sheriGet(store,key){
   await sheriOpenLocalDb();
-  return new Promise((resolve,reject)=>{const req=sheriTx(store).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)})
+  const scope=sheriLocalScope(store,key);
+  const scoped=await new Promise((resolve,reject)=>{const req=sheriTx(store).get(scope.storageKey);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});
+  if(scoped)return {...scoped,key:scoped.local_key||String(key)};
+  // Legacy shared-cache fallback is owner-only. Staff never inherit a prior
+  // user's IndexedDB records, even when they work in the same browser.
+  const legacy=await new Promise((resolve,reject)=>{const req=sheriTx(store).get(String(key));req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});
+  const isOwner=store==='merchants'?legacy?.user_id===scope.userId:
+    Boolean(legacy&&state.merchant?.user_id===scope.userId&&legacy.merchant_id===scope.merchantId);
+  return isOwner?{...legacy,key:legacy.local_key||String(key),_legacy:true}:null;
 }
 async function sheriGetAll(store){
   await sheriOpenLocalDb();
-  return new Promise((resolve,reject)=>{const req=sheriTx(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)})
+  const rows=await new Promise((resolve,reject)=>{const req=sheriTx(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)});
+  const userId=session?.user?.id||'anonymous',merchantId=state.merchant?.id;
+  const visible=rows.filter(row=>{
+    if(row.user_scope)return row.user_scope===userId&&(store==='merchants'||!merchantId||row.merchant_scope===merchantId);
+    if(store==='merchants')return row.user_id===userId;
+    return Boolean(merchantId&&state.merchant?.user_id===userId&&row.merchant_id===merchantId);
+  });
+  const byKey=new Map();
+  for(const row of visible){
+    const localKey=row.local_key||row.key;
+    const previous=byKey.get(localKey);
+    if(!previous||(row.user_scope===userId&&previous.user_scope!==userId))byKey.set(localKey,{...row,key:localKey});
+  }
+  return [...byKey.values()];
 }
 async function sheriDelete(store,key){
   await sheriOpenLocalDb();
-  return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(key);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)})
+  const scope=sheriLocalScope(store,key);
+  await new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(scope.storageKey);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)});
+  const isOwner=store==='merchants'?state.merchant?.user_id===scope.userId:state.merchant?.user_id===scope.userId;
+  if(isOwner)await new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(String(key));req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)});
+  return true;
 }
 async function sheriSaveSnapshot(){
   if(!state.merchant)return;
@@ -757,14 +789,32 @@ async function sheriSaveAccountingSnapshot(){
   for(const [store,rows] of groups)for(const row of (rows||[]))await sheriPut(store,row.id||row.key,{merchant_id:mid,record:{...row}});
   if(state.accountingSettings)await sheriPut('accountingSettings','settings',{merchant_id:mid,record:{...state.accountingSettings}});
 }
+async function sheriPurgeLocalAccountingStores(merchantId,stores){
+  for(const store of stores){
+    const rows=await sheriGetAll(store);
+    for(const row of rows)if(row.merchant_id===merchantId)await sheriDelete(store,row.key);
+  }
+}
 async function sheriLoadAccountingSnapshot(merchantId){
   await sheriOpenLocalDb();
+  const canReports=sheriCan('view_financial_reports');
+  const canAudit=sheriCan('view_audit_log');
   const stores=['accounts','journalEntries','journalLines','invoices','bills','payments','bankAccounts','taxRates','recurringTransactions','accountingSettings','auditLog'];
   const vals=await Promise.all(stores.map(x=>sheriGetAll(x)));
   const [as,jes,jls,ins,bills,pays,banks,taxes,recs,sets]=vals;
   const pick=a=>a.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.accounts=pick(as); state.journalEntries=pick(jes); state.journalLines=pick(jls); state.invoices=pick(ins); state.bills=pick(bills); state.payments=pick(pays); state.bankAccounts=pick(banks); state.taxRates=pick(taxes); state.recurringTransactions=pick(recs); state.auditLog=pick(vals[10]||[]);
-  const setting=sets.find(x=>x.merchant_id===merchantId); state.accountingSettings=setting?.record||null;
+  state.accounts=pick(as); // Chart labels are needed for operational posting, not financial reporting.
+  state.taxRates=pick(taxes);state.accountingSettings=sets.find(x=>x.merchant_id===merchantId)?.record||null;
+  if(canReports){
+    state.journalEntries=pick(jes);state.journalLines=pick(jls);state.invoices=pick(ins);state.bills=pick(bills);
+    state.payments=pick(pays);state.bankAccounts=pick(banks);state.recurringTransactions=pick(recs);
+  }else{
+    state.journalEntries=[];state.journalLines=[];state.invoices=[];state.bills=[];state.payments=[];
+    state.bankAccounts=[];state.recurringTransactions=[];
+    await sheriPurgeLocalAccountingStores(merchantId,['journalEntries','journalLines','invoices','bills','payments','bankAccounts','recurringTransactions']);
+  }
+  state.auditLog=canAudit?pick(vals[10]||[]):[];
+  if(!canAudit)await sheriPurgeLocalAccountingStores(merchantId,['auditLog']);
   return true;
 }
 
@@ -1646,7 +1696,7 @@ async function loadAll(silent=false){
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
   if(hadLocal)render();
-  if(!navigator.onLine){await accEnsureBase();await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
+  if(!navigator.onLine){await accEnsureBase();if(sheriCan('view_financial_reports'))await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
   try{
     const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr},{data:memory,error:mErr},{data:customers,error:cErr},{data:suppliers,error:supErr},{data:purchases,error:purErr},{data:cashEntries,error:cashErr},{data:budgets,error:budErr}]=await Promise.all([
       sb.from('products').select('*').eq('merchant_id',mId).order('created_at'),
@@ -1735,7 +1785,7 @@ async function loadAll(silent=false){
       await sheriSaveAccountingSnapshot();
     }catch(e){console.warn('[Sheri accounting] server refresh failed; local accounting retained',e)}
     await accEnsureBase();
-    await accEnsureOperationalLedger();
+    if(sheriCan('view_financial_reports'))await accEnsureOperationalLedger();
     sheriSetConnectivity('online','Server data synced');
   }catch(err){
     sheriSetConnectivity('degraded','Using cached data — server refresh failed');
