@@ -266,39 +266,64 @@ Deno.serve(async (req: Request) => {
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
+      let authStatusUpdated = false;
+      let authEmailUpdated = false;
+      let originalAuthEmail: string | null = null;
+      const rollbackMemberAndAuth = async () => {
+        const { error: rollbackError } = await admin.from("merchant_members").update({
+          status: target.status, full_name: target.full_name, email: target.email,
+          phone: target.phone, username: target.username, role: target.role,
+          permissions: target.permissions, responsibility: target.responsibility,
+          updated_at: new Date().toISOString(),
+        }).eq("id", memberId).eq("merchant_id", merchantId);
+        if (rollbackError) console.error("[team-access] member rollback failed", rollbackError);
+        if (authStatusUpdated) {
+          const { error } = await admin.auth.admin.updateUserById(target.user_id, {
+            ban_duration: target.status === "suspended" ? "876000h" : "none",
+          });
+          if (error) console.error("[team-access] Auth status rollback failed", error);
+        }
+        if (authEmailUpdated && originalAuthEmail) {
+          const { error } = await admin.auth.admin.updateUserById(target.user_id, {
+            email: originalAuthEmail, email_confirm: true,
+          });
+          if (error) console.error("[team-access] Auth email rollback failed", error);
+        }
+      };
       if (status !== target.status) {
-        // A suspended member must be unable to refresh or start Auth sessions.
-        // RLS and SECURITY DEFINER authorization also check active membership,
-        // so already-issued JWTs lose business access immediately on the next API call.
+        // A suspended member cannot refresh or start Auth sessions. Database
+        // authorization also checks active membership, invalidating data access
+        // immediately even while an already-issued JWT is still unexpired.
         const { error: authStatusError } = await admin.auth.admin.updateUserById(
           target.user_id,
           { ban_duration: status === "suspended" ? "876000h" : "none" },
         );
         if (authStatusError) {
-          await admin.from("merchant_members").update({
-            status: target.status,
-            full_name: target.full_name,
-            email: target.email,
-            phone: target.phone,
-            username: target.username,
-            role: target.role,
-            permissions: target.permissions,
-            responsibility: target.responsibility,
-            updated_at: new Date().toISOString(),
-          }).eq("id", memberId).eq("merchant_id", merchantId);
+          await rollbackMemberAndAuth();
           throw authStatusError;
         }
+        authStatusUpdated = true;
       }
       if (email && email !== target.email) {
+        const { data: authTarget, error: authTargetError } = await admin.auth.admin.getUserById(target.user_id);
+        if (authTargetError || !authTarget?.user?.email) {
+          await rollbackMemberAndAuth();
+          throw authTargetError || new Error("The existing Auth email could not be read for a safe update.");
+        }
+        originalAuthEmail = authTarget.user.email;
         const { error: authEmailError } = await admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true });
         if (authEmailError) {
-          await admin.from("merchant_members").update({ email: target.email, phone: target.phone, username: target.username }).eq("id", memberId).eq("merchant_id", merchantId);
+          await rollbackMemberAndAuth();
           throw authEmailError;
         }
+        authEmailUpdated = true;
       }
       if (pin) {
         const { error: pinError } = await admin.rpc("set_merchant_member_pin", { p_member_id: memberId, p_pin: pin });
-        if (pinError) throw pinError;
+        if (pinError) {
+          await rollbackMemberAndAuth();
+          throw pinError;
+        }
       }
       return json({ ok: true, member: updated });
     }
