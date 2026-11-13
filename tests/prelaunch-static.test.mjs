@@ -684,7 +684,7 @@ test("staff offline access uses a time-limited cached membership and respects it
   assert.match(html, /sheriGet\('meta','membership:'\+session\.user\.id\)/);
   assert.ok(html.includes("member?.status==='active'&&Date.parse(member.cache_expires_at||'')>Date.now()"));
   assert.match(html, /cache_expires_at:new Date\(Date\.now\(\)\+8\*60\*60\*1000\)/);
-  assert.match(html, /if\(!navigator\.onLine&&Date\.parse\(member\.cache_expires_at\|\|''\)<=Date\.now\(\)\)return false/);
+  assert.match(html, /if\(!navigator\.onLine\)\{const expiry=Date\.parse\(member\.cache_expires_at\|\|''\);if\(!Number\.isFinite\(expiry\)\|\|expiry<=Date\.now\(\)\)return false;\}/);
   assert.match(html, /async function signOut\(\)\{if\(session\?\.user\?\.id\)await sheriDelete\('meta','membership:'\+session\.user\.id\)/);
 });
 
