@@ -713,3 +713,15 @@ test("unknown merchant-code attempts are rate-limited without account enumeratio
   assert.ok(teamAccess.includes("verified?.rate_limited ? 429 : 401"));
   assert.ok(teamAccess.includes("The sign-in details were not recognized."));
 });
+
+test("sale voiding is server-confirmed before local stock and sales are changed", () => {
+  assert.ok(html.includes("async function sheriSyncSaleVoidOperation(op)"));
+  assert.ok(html.includes("p_reason:op.reason,p_audit_id:op.audit_id"));
+  assert.ok(html.includes("if(!data?.ok)throw new Error('The server did not confirm this sale void.')"));
+  assert.ok(html.includes("row.void_pending=true"));
+  assert.ok(html.includes("The sale remains active until the server accepts it."));
+  assert.ok(html.includes("data.stock_updates||[]"));
+  assert.ok(html.includes("data.audit_recorded&&op.auditRow"));
+  assert.ok(html.includes("op.type==='sale_void'"));
+  assert.ok(html.includes("s.void_pending?'<span class=\"muted\">Void pending</span>'"));
+});
