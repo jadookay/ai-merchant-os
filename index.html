@@ -1099,10 +1099,44 @@ async function sheriSyncOutbox(){
     }catch(_){/* Supabase auto-refresh may still be completing; continue below. */}
     await sheriReconcileMerchantId();
     const now=Date.now();
-    const items=(await sheriGetAll('outbox'))
+    const queuedItems=(await sheriGetAll('outbox'))
       .filter(item=>!item.blocked)
       .filter(item=>!item.next_retry_at||new Date(item.next_retry_at).getTime()<=now)
       .sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+    const legacySaleGroups=new Map(),items=[];
+    for(const queued of queuedItems){
+      const op=queued.op||{};
+      if(op.type==='sale_upsert'&&op.record?.transaction_id){
+        const key=String(op.record.transaction_id);
+        if(!legacySaleGroups.has(key))legacySaleGroups.set(key,[]);
+        legacySaleGroups.get(key).push(queued);
+      }else items.push(queued);
+    }
+    // Upgrade old per-line offline queues to one transaction-level operation
+    // before sending anything. A partially synced legacy invoice is rejected
+    // by the server RPC and surfaced for manual reconciliation.
+    for(const [transactionId,group] of legacySaleGroups){
+      const records=group.map(x=>x.op.record),stockChanges=[];
+      for(const queued of group){
+        const op=queued.op,productId=op.productId||op.record.product_id;
+        let change=stockChanges.find(x=>x.product_id===productId);
+        if(!change){
+          change={product_id:productId,quantity:0,local_stock:Number(op.localStock),expected_server_stock:0};
+          stockChanges.push(change);
+        }
+        change.quantity+=Number(op.record.qty||0);
+        change.expected_server_stock=change.local_stock+change.quantity;
+      }
+      const batchOp={
+        type:'sale_cart_upsert',merchant_id:records[0].merchant_id,transaction_id:transactionId,
+        invoice_number:records[0].invoice_number||null,records,stockChanges
+      };
+      const first=group[0];
+      await sheriPut('outbox',first.key,{...first,op:batchOp});
+      for(const extra of group.slice(1))await sheriDelete('outbox',extra.key);
+      items.push({...first,op:batchOp});
+    }
+    items.sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
     sheriSyncQueued=await sheriQueueCount();
     if(!items.length){
       sheriSetConnectivity('online',sheriSyncQueued?`${sheriSyncQueued} pending local change(s) — waiting to retry`:'Server data synced');
