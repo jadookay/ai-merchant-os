@@ -285,3 +285,29 @@ alter function public.set_merchants_updated_at() set search_path = '';
 alter function public.set_accounting_settings_updated_at() set search_path = '';
 alter function public.prevent_locked_journal_entry() set search_path = '';
 alter function public.prevent_locked_journal_line() set search_path = '';
+
+
+-- Disable refresh-token sessions when a staff member is suspended.
+-- Their current access JWT is also denied by membership-aware RLS immediately.
+create or replace function public.revoke_merchant_member_sessions(p_user_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_deleted integer := 0;
+begin
+  if coalesce(auth.jwt()->>'role','') <> 'service_role' then
+    raise exception 'not authorized';
+  end if;
+  if p_user_id is null then
+    raise exception 'user ID is required';
+  end if;
+  delete from auth.sessions where user_id=p_user_id;
+  get diagnostics v_deleted = row_count;
+  return v_deleted;
+end;
+$$;
+revoke all on function public.revoke_merchant_member_sessions(uuid) from public,anon,authenticated;
+grant execute on function public.revoke_merchant_member_sessions(uuid) to service_role;
