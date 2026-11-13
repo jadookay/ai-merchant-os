@@ -48,10 +48,13 @@ test("cancelled sale void leaves records and accounting untouched", () => {
   assert.doesNotMatch(html, /const _v14_1_voidSale=voidSale/);
 });
 
-test("locally deleted expenses and voided invoice sale rows are removed from IndexedDB", () => {
+test("sale rows remain active until the server confirms a void, then leave IndexedDB", () => {
   assert.match(html, /state\.expenses=state\.expenses\.filter\(x=>x\.id!==id\);await sheriDelete\('expenses',id\)/);
-  assert.match(html, /for\(const row of rows\)[\s\S]*?await sheriDelete\('sales',row\.id\)/);
-  assert.match(html, /state\.sales=state\.sales\.filter\(x=>!saleIds\.includes\(x\.id\)\)/);
+  assert.match(html, /row\.void_pending=true/);
+  assert.match(html, /await sheriQueue\(\{type:'sale_void'/);
+  assert.match(html, /for\(const saleId of ids\)await sheriDelete\('sales',saleId\)/);
+  assert.match(html, /state\.sales=\(state\.sales\|\|\[\]\)\.filter\(s=>!ids\.includes\(String\(s\.id\)\)\)/);
+  assert.doesNotMatch(html, /for\(const row of rows\)[\s\S]*?await sheriDelete\('sales',row\.id\)/);
 });
 
 test("journal entries synchronize as one atomic RPC batch on normal and auth-retry paths", () => {
