@@ -71,7 +71,7 @@ test("journal entries synchronize as one atomic RPC batch on normal and auth-ret
   const sync = html.slice(syncStart, syncEnd);
   const normalEnd = sync.indexOf("      }catch(err){");
   const retryStart = sync.indexOf("// Re-run this operation exactly once");
-  const retryEnd = sync.indexOf("await sheriDelete('outbox',item.key);", retryStart);
+  const retryEnd = sync.indexOf("for(const key of (item._outboxKeys||[item.key]))await sheriDelete('outbox',key);", retryStart);
   assert.ok(normalEnd > 0 && retryStart > normalEnd && retryEnd > retryStart, "expected normal and 401 retry sections");
 
   const countBatch = source => (source.match(/op\.type==='accounting_journal_batch'/g) || []).length;
@@ -593,7 +593,8 @@ test("new carts are queued and synchronized as one transaction in both sync path
 
 test("legacy queued cart lines are grouped into one atomic retry and retained together on failure", () => {
   assert.match(html, /const legacySaleGroups=new Map\(\),items=\[\]/);
-  assert.match(html, /op\.type==='sale_upsert'&&op\.record\?\.transaction_id/);
+  assert.match(html, /op\.type==='sale_upsert'&&op\.record\?\.id/);
+  assert.match(html, /op\.record\.transaction_id\|\|op\.record\.invoice_number\|\|op\.record\.id/);
   assert.match(html, /type:'sale_cart',merchant_id:records\[0\]\.merchant_id,transaction_id:transactionId/);
   assert.match(html, /_outboxKeys:group\.map\(x=>x\.key\)/);
   assert.match(html, /for\(const key of \(item\._outboxKeys\|\|\[item\.key\]\)\)await sheriDelete\('outbox',key\)/);
