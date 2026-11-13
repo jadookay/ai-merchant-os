@@ -627,3 +627,15 @@ test("accounting snapshot is gated by financial report permission and audit perm
   assert.ok(teamMigration.includes("Not authorized for financial reports"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'view_audit_log')"));
 });
+
+test("atomic cart RPC rejects malformed arrays and reused invoice identifiers", () => {
+  assert.ok(teamMigration.includes("Sale cart payload must be a JSON array"));
+  assert.ok(teamMigration.includes("Every sale cart line must be a JSON object"));
+  assert.ok(teamMigration.includes("This sale transaction or invoice identifier is already in use"));
+  assert.ok(teamMigration.includes("and deleted=false for update"));
+});
+
+test("session validation runs before merchant reconciliation and outbox work", () => {
+  assert.ok(html.includes("if(!await sheriEnsureActiveSession())return;\n    await sheriReconcileMerchantId();"));
+  assert.ok(html.includes("sale_cart_upsert:'Sale cart recorded'"));
+});
