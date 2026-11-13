@@ -746,3 +746,13 @@ test("voiding an unposted invoice cleans its sale queue, conflicts and unposted 
   assert.match(html, /operation\?\.type==='sale_void'/);
   assert.match(html, /pending\)return; \/\/ The manager cancelled this invoice before it reached the server\./);
 });
+
+
+test("voided sale queues cannot race with cart sync or recreate revenue", () => {
+  assert.match(html, /pending=\(await sheriGetAll\('outbox'\)\)\.some\(item=>item\.op\?\.type==='sale_void'/);
+  assert.match(html, /if\(pending\)return; \/\/ The manager cancelled this invoice before it reached the server\./);
+  assert.match(html, /async function sheriSyncVoidSale\(op\)[\s\S]*?if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\)/);
+  assert.match(html, /async function sheriFinalizeUnpostedVoid\(op\)[\s\S]*?shericeri_write_audit/);
+  assert.match(html, /if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\);[\s\S]*?q\.type==='sale_cart'/);
+  assert.match(journalIntegrityMigration, /if\(v_sale_voided\) then return p_entry_id/);
+});
