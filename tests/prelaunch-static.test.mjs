@@ -484,6 +484,18 @@ test("PIN throttling locks independent identity and IP buckets and rejects concu
   assert.match(teamAccess, /: "";/);
 });
 
+test("suspending a staff member revokes refresh sessions and the client revalidates active membership", () => {
+  assert.match(releaseMigration, /create or replace function public\.revoke_merchant_member_sessions\(p_user_id uuid\)/);
+  assert.match(releaseMigration, /delete from auth\.sessions where user_id=p_user_id/);
+  assert.match(releaseMigration, /grant execute on function public\.revoke_merchant_member_sessions\(uuid\) to service_role/);
+  assert.match(teamAccess, /admin\.rpc\("revoke_merchant_member_sessions"/);
+  assert.match(teamAccess, /status === "suspended" && target\.status !== "suspended"/);
+  assert.match(html, /async function sheriValidateCurrentMembership\(\)/);
+  assert.match(html, /if\(!data\|\|data\.status!=='active'\)/);
+  assert.match(html, /Staff access verified/);
+  assert.match(html, /if\(navigator\.onLine&&\!\(await sheriValidateCurrentMembership\(\)\)\)return/);
+});
+
 test("privileged accounting RPCs are not executable by anon or PUBLIC", () => {
   assert.match(releaseMigration, /revoke all on function public\.shericeri_get_accounting_snapshot\(uuid\) from public,anon/);
   assert.match(releaseMigration, /revoke all on function public\.shericeri_sync_journal_batch\(uuid,uuid,date,text,text,uuid,jsonb\) from public,anon/);
