@@ -266,6 +266,26 @@ Deno.serve(async (req: Request) => {
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
+      if (status !== target.status) {
+        // A suspended member must be unable to refresh or start Auth sessions.
+        // RLS and SECURITY DEFINER authorization also check active membership,
+        // so already-issued JWTs lose business access immediately on the next API call.
+        const { error: authStatusError } = await admin.auth.admin.updateUserById(
+          target.user_id,
+          { ban_duration: status === "suspended" ? "876000h" : "none" },
+        );
+        if (authStatusError) {
+          await admin.from("merchant_members").update({
+            status: target.status,
+            full_name: target.full_name,
+            role: target.role,
+            permissions: target.permissions,
+            responsibility: target.responsibility,
+            updated_at: new Date().toISOString(),
+          }).eq("id", memberId).eq("merchant_id", merchantId);
+          throw authStatusError;
+        }
+      }
       if (email && email !== target.email) {
         const { error: authEmailError } = await admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true });
         if (authEmailError) {
