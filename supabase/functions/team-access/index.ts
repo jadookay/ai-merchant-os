@@ -282,7 +282,13 @@ Deno.serve(async (req: Request) => {
         const { error: pinError } = await admin.rpc("set_merchant_member_pin", { p_member_id: memberId, p_pin: pin });
         if (pinError) throw pinError;
       }
-      return json({ ok: true, member: updated });
+      if (status === "suspended" && target.status !== "suspended") {
+        // Revoke refresh sessions immediately. Existing access JWTs are still
+        // rejected by membership-aware RLS and the client revalidates status.
+        const { error: revokeError } = await admin.rpc("revoke_merchant_member_sessions", { p_user_id: target.user_id });
+        if (revokeError) throw revokeError;
+      }
+      return json({ ok: true, member: updated, sessions_revoked: status === "suspended" });
     }
 
     if (action === "delete_member") {
