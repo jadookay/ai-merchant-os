@@ -236,7 +236,7 @@ Deno.serve(async (req: Request) => {
       }
       const privileged = callerRole === "owner" || callerRole === "admin";
       const { data: target, error: targetError } = await admin.from("merchant_members")
-        .select("id,user_id,role,status,email,phone,username,pin_hash").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
+        .select("id,user_id,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
       if (status === "active" && target?.status === "suspended" && !pin) return json({ error: "Set a new 6–8 digit PIN before re-enabling this member." }, 400);
