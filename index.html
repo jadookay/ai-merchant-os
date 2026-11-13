@@ -1149,6 +1149,7 @@ async function sheriSyncOutbox(){
               // Re-run this operation exactly once with the fresh token.
               if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
+              else if(op.type==='sale_cart'){await sheriSyncSaleCartOperation(op)}
               else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
               else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
               else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
