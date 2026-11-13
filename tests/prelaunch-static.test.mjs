@@ -639,3 +639,12 @@ test("suspended PIN users are rejected before merchant workspace lookup or onboa
   assert.match(html, /if\(memberResult\.data\.status!=='active'\)\{await sb\.auth\.signOut\(\);session=null;return false;\}/);
   assert.match(html, /complete=await ensureMerchant\(\);\s*if\(!session\?\.user\)return;/);
 });
+
+
+test("team identity updates roll back database and Auth state if a later step fails", () => {
+  assert.match(teamAccess, /const rollbackMemberAndAuth = async \(\) =>/);
+  assert.match(teamAccess, /admin\.auth\.admin\.getUserById\(target\.user_id\)/);
+  assert.match(teamAccess, /if \(authStatusUpdated\)[\s\S]*?ban_duration: target\.status/);
+  assert.match(teamAccess, /if \(authEmailUpdated && originalAuthEmail\)[\s\S]*?email: originalAuthEmail/);
+  assert.match(teamAccess, /if \(pinError\) \{\s*await rollbackMemberAndAuth\(\)/);
+});
