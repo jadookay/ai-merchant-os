@@ -219,7 +219,6 @@ Deno.serve(async (req: Request) => {
       if (!["admin", "manager", "cashier", "inventory", "accountant", "custom"].includes(role)) return json({ error: "Invalid team role." }, 400);
       if (!["active", "suspended"].includes(status)) return json({ error: "Invalid team status." }, 400);
       if (pin && !/^\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
-      if (status === "active" && target?.status === "suspended" && !pin) return json({ error: "Set a new 6–8 digit PIN before re-enabling this member." }, 400);
 
       const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
@@ -240,6 +239,7 @@ Deno.serve(async (req: Request) => {
         .select("id,user_id,role,status,email,phone,username,pin_hash").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
+      if (status === "active" && target?.status === "suspended" && !pin) return json({ error: "Set a new 6–8 digit PIN before re-enabling this member." }, 400);
       const nextEmail = email === undefined ? target.email : email;
       const nextPhone = phone === undefined ? target.phone : phone;
       const nextUsername = username === undefined ? target.username : username;
