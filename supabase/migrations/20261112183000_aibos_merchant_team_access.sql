@@ -470,6 +470,166 @@ $$;
 revoke all on function public.shericeri_sync_sale_stock(jsonb,uuid,integer,integer) from public,anon;
 grant execute on function public.shericeri_sync_sale_stock(jsonb,uuid,integer,integer) to authenticated;
 
+
+-- Atomic multi-line cart synchronization. All lines and stock movements commit
+-- together or none do; retries are idempotent by sale-line UUID.
+create or replace function public.shericeri_sync_sale_cart(
+  p_merchant_id uuid,
+  p_sales jsonb,
+  p_stock_checks jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_sale jsonb;
+  v_check record;
+  v_sale_id uuid;
+  v_transaction_id uuid;
+  v_invoice_number text;
+  v_product_id uuid;
+  v_customer_id uuid;
+  v_qty integer;
+  v_price numeric;
+  v_cost numeric;
+  v_line_count integer;
+  v_existing_count integer;
+  v_current_stock integer;
+  v_cart_qty integer;
+  v_conflicts jsonb:='[]'::jsonb;
+begin
+  if p_merchant_id is null
+     or jsonb_typeof(p_sales)<>'array'
+     or jsonb_array_length(p_sales)<1
+     or jsonb_array_length(p_sales)>100
+     or jsonb_typeof(p_stock_checks)<>'array'
+     or jsonb_array_length(p_stock_checks)<1 then
+    raise exception 'Sale cart payload is invalid';
+  end if;
+  if not private.user_can_access_merchant(p_merchant_id,'create_sale') then
+    raise exception 'Not authorized to record sales';
+  end if;
+
+  select count(*),count(distinct nullif(value->>'id','')::uuid)
+    into v_line_count,v_existing_count
+  from jsonb_array_elements(p_sales);
+  if v_line_count<>v_existing_count then raise exception 'Sale cart contains duplicate or missing line IDs'; end if;
+
+  v_sale:=p_sales->0;
+  v_transaction_id:=nullif(v_sale->>'transaction_id','')::uuid;
+  v_invoice_number:=nullif(v_sale->>'invoice_number','');
+  if v_transaction_id is null or v_invoice_number is null then
+    raise exception 'Sale cart transaction and invoice identifiers are required';
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended(p_merchant_id::text||':'||v_transaction_id::text,0));
+
+  for v_sale in select value from jsonb_array_elements(p_sales) loop
+    v_sale_id:=nullif(v_sale->>'id','')::uuid;
+    v_product_id:=nullif(v_sale->>'product_id','')::uuid;
+    v_customer_id:=nullif(v_sale->>'customer_id','')::uuid;
+    v_qty:=nullif(v_sale->>'qty','')::integer;
+    v_price:=nullif(v_sale->>'price','')::numeric;
+    v_cost:=nullif(v_sale->>'cost','')::numeric;
+    if v_sale_id is null or v_product_id is null or v_qty is null or v_qty<1
+       or v_price is null or v_price<0 or v_cost is null or v_cost<0
+       or nullif(v_sale->>'merchant_id','')::uuid is distinct from p_merchant_id
+       or nullif(v_sale->>'transaction_id','')::uuid is distinct from v_transaction_id
+       or nullif(v_sale->>'invoice_number','') is distinct from v_invoice_number then
+      raise exception 'Sale cart contains an invalid or mismatched line';
+    end if;
+    if v_customer_id is not null and not exists(
+      select 1 from public.customers where id=v_customer_id and merchant_id=p_merchant_id
+    ) then raise exception 'Customer does not belong to this business'; end if;
+    if not exists(select 1 from public.products where id=v_product_id and merchant_id=p_merchant_id and deleted=false) then
+      raise exception 'A cart product does not belong to this business or is unavailable';
+    end if;
+  end loop;
+
+  select count(*) into v_existing_count
+  from public.sales s
+  where s.id in (select (value->>'id')::uuid from jsonb_array_elements(p_sales));
+  if v_existing_count>0 then
+    if v_existing_count=v_line_count and not exists(
+      select 1 from jsonb_array_elements(p_sales) x
+      where not exists(
+        select 1 from public.sales s
+        where s.id=(x.value->>'id')::uuid
+          and s.merchant_id=p_merchant_id
+          and s.transaction_id=v_transaction_id
+      )
+    ) then
+      return jsonb_build_object('ok',true,'already_recorded',true,'inserted_count',0);
+    end if;
+    raise exception 'Sale cart is partially present; refusing a partial retry';
+  end if;
+
+  if (select count(*) from jsonb_array_elements(p_stock_checks))
+     <> (select count(distinct (value->>'product_id')::uuid) from jsonb_array_elements(p_sales)) then
+    raise exception 'Stock checks must cover every distinct cart product exactly once';
+  end if;
+  if exists(
+    select 1 from jsonb_array_elements(p_stock_checks) c
+    where nullif(c.value->>'product_id','') is null
+       or not exists(select 1 from jsonb_array_elements(p_sales) s where (s.value->>'product_id')::uuid=(c.value->>'product_id')::uuid)
+       or (select count(*) from jsonb_array_elements(p_stock_checks) c2 where c2.value->>'product_id'=c.value->>'product_id')<>1
+  ) then raise exception 'Stock check product IDs are invalid or duplicated'; end if;
+
+  -- Lock product rows in stable UUID order to avoid deadlocks between carts.
+  for v_check in
+    select (value->>'product_id')::uuid product_id,
+           (value->>'expected_server_stock')::integer expected_server_stock,
+           (value->>'local_stock')::integer local_stock
+    from jsonb_array_elements(p_stock_checks)
+    order by (value->>'product_id')::uuid
+  loop
+    if v_check.expected_server_stock<0 or v_check.local_stock<0 then
+      raise exception 'Stock check quantities cannot be negative';
+    end if;
+    select coalesce(stock,0) into v_current_stock
+    from public.products where id=v_check.product_id and merchant_id=p_merchant_id for update;
+    if not found then raise exception 'A cart product was not found for this business'; end if;
+    select coalesce(sum((value->>'qty')::integer),0) into v_cart_qty
+    from jsonb_array_elements(p_sales)
+    where (value->>'product_id')::uuid=v_check.product_id;
+    if v_cart_qty<1 or v_check.local_stock<>v_check.expected_server_stock-v_cart_qty then
+      raise exception 'Sale cart stock values are invalid';
+    end if;
+    if v_current_stock<>v_check.expected_server_stock then
+      v_conflicts:=v_conflicts||jsonb_build_array(jsonb_build_object(
+        'product_id',v_check.product_id,'expected_server_stock',v_check.expected_server_stock,
+        'server_stock',v_current_stock,'local_stock',v_check.local_stock,'requested_qty',v_cart_qty
+      ));
+    end if;
+  end loop;
+  if jsonb_array_length(v_conflicts)>0 then
+    return jsonb_build_object('ok',false,'stock_conflict',true,'conflicts',v_conflicts);
+  end if;
+
+  insert into public.sales
+  select (jsonb_populate_record(
+    null::public.sales,
+    value||jsonb_build_object('stock_applied',true,'voided',false)
+  )).*
+  from jsonb_array_elements(p_sales);
+
+  for v_check in
+    select (value->>'product_id')::uuid product_id,
+           (value->>'local_stock')::integer local_stock
+    from jsonb_array_elements(p_stock_checks)
+    order by (value->>'product_id')::uuid
+  loop
+    update public.products set stock=v_check.local_stock
+    where id=v_check.product_id and merchant_id=p_merchant_id;
+  end loop;
+
+  return jsonb_build_object('ok',true,'stock_conflict',false,'inserted_count',v_line_count);
+end;
+$$;
+revoke all on function public.shericeri_sync_sale_cart(uuid,jsonb,jsonb) from public,anon;
+grant execute on function public.shericeri_sync_sale_cart(uuid,jsonb,jsonb) to authenticated;
+
 -- Voiding a cart invoice restores stock, reverses its journal entries, preserves
 -- the reason and actor in the audit log, and removes the sale rows atomically.
 create or replace function public.shericeri_void_sale(
@@ -499,9 +659,11 @@ begin
   if p_sale_id is null or coalesce(length(trim(p_reason)),0)<3 then raise exception 'A clear void reason is required'; end if;
   v_merchant_id:=coalesce(p_merchant_id,(select merchant_id from public.sales where id=p_sale_id));
   if v_merchant_id is null then return jsonb_build_object('ok',true,'already_voided',true); end if;
-  if not (private.user_can_access_merchant(v_merchant_id,'manage_sales')
-      or private.user_can_access_merchant(v_merchant_id,'manage_finance')) then
-    raise exception 'Not authorized to void sales';
+  -- Voiding is a manager-level destructive action. A finance permission alone
+  -- must never let a Cashier or Accountant void a sale through a direct RPC call.
+  if not (private.user_can_access_merchant(v_merchant_id,'manage_team')
+      and private.user_can_access_merchant(v_merchant_id,'manage_sales')) then
+    raise exception 'Only the owner, an administrator, or an authorized manager can void sales';
   end if;
   perform 1 from public.sales
    where merchant_id=v_merchant_id
@@ -716,3 +878,12 @@ end;
 $$;
 revoke all on function public.shericeri_sync_purchase_stock(jsonb,uuid,integer,integer,integer,integer) from public,anon;
 grant execute on function public.shericeri_sync_purchase_stock(jsonb,uuid,integer,integer,integer,integer) to authenticated;
+
+
+-- The legacy accounting snapshot and journal RPCs must not be callable by anon.
+-- Authenticated calls are still checked against merchant ownership/permissions in
+-- the function body and RLS policies.
+revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon;
+grant execute on function public.shericeri_get_accounting_snapshot(uuid) to authenticated;
+revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon;
+grant execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) to authenticated;
