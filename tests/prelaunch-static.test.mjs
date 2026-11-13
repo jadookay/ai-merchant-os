@@ -731,7 +731,6 @@ test("pending voids do not collide across unrelated legacy single-sale records",
 });
 
 test("sales void buttons render valid JavaScript and pending status", () => {
-  assert.ok(html.includes(String.raw`onclick="voidSale(\''+s.id+'\')"`)===false);
-  assert.ok(html.includes(String.raw`onclick="voidSale(\''+s.id+'\')"`)===false);
-  assert.ok(html.includes("s.void_pending?'<span class=\"muted\">Void pending</span>'"));
+  assert.ok(html.includes(String.raw`onclick="voidSale(\\''+s.id+'\\')"`));
+  assert.ok(html.includes("s.void_pending?'<span class=\\"muted\\">Void pending</span>'"));
 });
