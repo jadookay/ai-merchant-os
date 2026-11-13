@@ -1183,7 +1183,7 @@ async function sheriSyncOutbox(){
         else if(op.type==='sale_void'){await sheriSyncSaleVoidOperation(op)}
         else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
-        else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
+        
         else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='expense_delete'){const {error}=await sb.from('expenses').delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='sale_delete'){const {error}=await sb.from('sales').delete().eq('id',op.id);if(error)throw error}
@@ -1223,7 +1223,7 @@ async function sheriSyncOutbox(){
               else if(op.type==='sale_void'){await sheriSyncSaleVoidOperation(op)}
         else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
-              else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
+              
               else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
               else if(op.type==='purchase_delete'){const {error}=await sb.rpc('shericeri_delete_ordered_purchase',{p_merchant_id:op.merchant_id,p_purchase_id:op.id,p_reason:op.reason,p_audit_id:op.audit_id});if(error)throw error}
               else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
