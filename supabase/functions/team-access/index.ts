@@ -278,6 +278,9 @@ Deno.serve(async (req: Request) => {
           await admin.from("merchant_members").update({
             status: target.status,
             full_name: target.full_name,
+            email: target.email,
+            phone: target.phone,
+            username: target.username,
             role: target.role,
             permissions: target.permissions,
             responsibility: target.responsibility,
