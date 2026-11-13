@@ -6,6 +6,7 @@ alter table public.sales
   add column if not exists void_reason text,
   add column if not exists voided_at timestamptz,
   add column if not exists voided_by uuid references auth.users(id) on delete set null,
+  add column if not exists voided boolean not null default false,
   add column if not exists stock_applied boolean not null default true;
 
 create index if not exists sales_merchant_transaction_idx
