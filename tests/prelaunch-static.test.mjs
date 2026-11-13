@@ -735,3 +735,14 @@ test("sale journal batches wait for the corresponding cart sync or stock-conflic
   assert.match(journalIntegrityMigration, /Sale must synchronize before its journal entry can post/);
   assert.match(journalIntegrityMigration, /if\(v_sale_voided\) then return p_entry_id/);
 });
+
+
+test("voiding an unposted invoice cleans its sale queue, conflicts and unposted journals", () => {
+  assert.match(html, /async function sheriFinalizeUnpostedVoid\(op\)/);
+  assert.match(html, /if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\)/);
+  assert.match(html, /sale_records:rows/);
+  assert.match(html, /q\.type==='accounting_journal_batch'&&saleIds\.includes\(q\.entry\?\.source_id\)/);
+  assert.match(html, /sheriWriteAudit|shericeri_write_audit/);
+  assert.match(html, /operation\?\.type==='sale_void'/);
+  assert.match(html, /pending\)return; \/\/ The manager cancelled this invoice before it reached the server\./);
+});
