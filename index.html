@@ -1353,7 +1353,7 @@ async function sheriSyncOutbox(){
 function sheriOnlineEvents(){
   window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sherriSyncKick()});
   window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)sherriSyncKick()});
-  window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
+  window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.');sheriScheduleOfflineMembershipExpiry(state.currentMembership)});
   // Re-check membership periodically so disabled accounts are signed out on
   // active devices without waiting for a manual refresh.
   setInterval(()=>{if(navigator.onLine&&session?.user&&state.merchant)loadTeamMembers(true)},60000);
@@ -1714,7 +1714,7 @@ async function ensureMerchant(){
     const member=cached?.record;
     if(member?.status==='active'&&Date.parse(member.cache_expires_at||'')>Date.now()){
       const merchantCache=await sheriGet('merchants',member.merchant_id);
-      if(merchantCache){state.currentMembership=member;state.merchant=merchantCache.record||merchantCache;return true;}
+      if(merchantCache){state.currentMembership=member;state.merchant=merchantCache.record||merchantCache;sheriScheduleOfflineMembershipExpiry(member);return true;}
     }
     return false;
   }
@@ -2048,6 +2048,18 @@ function sheriRecentActivitiesHtml(){
   for(const c of state.cashEntries||[])rows.push({when:c.occurred_at||c.created_at,type:c.kind==='income'?'Cash income':c.kind==='expense'?'Cash expense':'Cash transfer',title:c.description||'Cash movement',amount:c.kind==='income'?Number(c.amount||0):c.kind==='expense'?-Number(c.amount||0):0});
   for(const p of state.payments||[])rows.push({when:p.payment_date||p.created_at,type:p.direction==='receipt'?'Customer receipt':'Payment',title:p.reference||p.source_type||'Payment',amount:p.direction==='receipt'?Number(p.amount||0):-Number(p.amount||0)});
   return rows.filter(x=>sheriDateInReportRange(x.when)).sort((a,b)=>String(b.when||'').localeCompare(String(a.when||''))).slice(0,7).map(x=>'<div class="row"><div><b>'+esc(x.title)+'</b><div class="sub">'+esc(x.type)+' · '+esc(x.when?new Date(x.when).toLocaleString():'Time unavailable')+'</div></div><b>'+money(x.amount)+'</b></div>').join('')||'<div class="empty">No recent activity in this date range.</div>';
+}
+function sheriScheduleOfflineMembershipExpiry(member){
+  const expiry=Date.parse(member?.cache_expires_at||'');
+  if(!Number.isFinite(expiry))return;
+  const cacheExpiry=member.cache_expires_at,delay=Math.max(0,expiry-Date.now());
+  setTimeout(async()=>{
+    if(navigator.onLine||state.currentMembership?.cache_expires_at!==cacheExpiry)return;
+    try{await sb.auth.signOut({scope:'local'});}catch(e){console.warn('[AIBOS access] offline session expiry sign-out failed',e);}
+    session=null;state.currentMembership=null;state.merchant=null;state.teamMembers=[];
+    for(const key of ['sales','products','expenses','customers','suppliers','purchases','journalEntries','journalLines','auditLog','accounts','taxRates','bankAccounts','bills','payments','cashEntries','budgets','recurringTransactions','shericeriMemory'])if(Array.isArray(state[key]))state[key]=[];
+    location.reload();
+  },delay);
 }
 function sheriCan(permission){if(!session?.user||!state.merchant)return false;if(state.merchant.user_id===session.user.id)return true;const member=state.currentMembership;if(!member||member.status!=='active')return false;if(!navigator.onLine){const expiry=Date.parse(member.cache_expires_at||'');if(!Number.isFinite(expiry)||expiry<=Date.now())return false;}if(member.role==='admin')return true;if(['manage_team','manage_sales'].includes(permission)&&member.role!=='manager')return false;return member.permissions?.[permission]===true}
 function sheriPermissionButton(permission,html){return sheriCan(permission)?html:''}
