@@ -991,6 +991,25 @@ async function sheriSyncJournalBatch(op){
   if(error)throw error;
   if(data!==entry.id)throw new Error('Atomic journal synchronization returned an unexpected entry ID.');
 }
+async function sheriSyncSaleCartOperation(op){
+  const {data,error}=await sb.rpc('shericeri_sync_sale_cart',{
+    p_merchant_id:op.merchant_id,
+    p_transaction_id:op.transaction_id,
+    p_invoice_number:op.invoice_number,
+    p_sales:(op.records||[]).map(sheriServerRecord),
+    p_stock_changes:op.stockChanges||[]
+  });
+  if(error)throw error;
+  if(data?.stock_conflict){
+    for(const conflict of (data.conflicts||[])){
+      await sheriRecordConflict({
+        type:'stock_conflict',product_id:conflict.product_id,
+        local_stock:conflict.local_stock,server_stock:conflict.server_stock,
+        transaction_id:op.transaction_id,invoice_number:op.invoice_number,operation:op
+      });
+    }
+  }
+}
 async function sheriSyncSaleOperation(op){
   const {data,error}=await sb.rpc('shericeri_sync_sale_stock',{
     p_sale:sheriServerRecord(op.record),
@@ -1065,6 +1084,7 @@ async function sheriSyncOutbox(){
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
         else if(op.type==='product_delete'){const {error}=await sb.from('products').update({deleted:true}).eq('id',op.id);if(error)throw error}
+        else if(op.type==='sale_cart'){await sheriSyncSaleCartOperation(op)}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
         else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
         else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
@@ -1892,7 +1912,11 @@ async function recordSale(){
   const rows=checked.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,product_id:x.product.id,product_name_snapshot:x.product.name,customer_id:custId,qty:x.qty,price:x.price,cost:x.product.cost,created_at:createdAt}));
   checked.forEach(x=>{x.product.stock-=x.qty});state.sales.push(...rows);await sheriSaveSnapshot();window.__lastReceipt={business:state.merchant.name,invoice,createdAt,total,items:checked.map(x=>({name:x.product.name,qty:x.qty,price:x.price}))};
   const pb=document.getElementById('printReceiptBtn');if(pb)pb.disabled=false;saleCart=[];renderSaleCart();render();sheriToast('Sale confirmed. Receipt '+invoice+' is ready to print.');
-  for(let i=0;i<rows.length;i++){const s=rows[i],p=checked[i].product;await sheriQueue({type:'sale_upsert',record:s,productId:p.id,localStock:p.stock,expectedServerStock:p.stock+checked[i].qty})}
+  const stockChanges=[...new Map(checked.map(x=>[x.product.id,x.product])).values()].map(p=>{
+    const qty=checked.filter(x=>x.product.id===p.id).reduce((sum,x)=>sum+x.qty,0);
+    return {product_id:p.id,qty,local_stock:p.stock,expected_server_stock:p.stock+qty};
+  });
+  await sheriQueue({type:'sale_cart',merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,records:rows,stockChanges});
   if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] background sync',e));
 }
 async function voidSale(id){
