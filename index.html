@@ -1049,6 +1049,8 @@ async function sheriSyncJournalBatch(op){
   if(data!==entry.id)throw new Error('Atomic journal synchronization returned an unexpected entry ID.');
 }
 async function sheriSyncSaleCartOperation(op){
+  const pending=(await sheriGetAll('outbox')).some(item=>item.op?.type==='sale_void'&&item.op.transaction_id===op.transaction_id);
+  if(pending)return; // The manager cancelled this invoice before it reached the server.
   const {data,error}=await sb.rpc('shericeri_sync_sale_cart',{
     p_merchant_id:op.merchant_id,
     p_transaction_id:op.transaction_id,
@@ -1058,6 +1060,7 @@ async function sheriSyncSaleCartOperation(op){
   });
   if(error)throw error;
   if(data?.stock_conflict){
+    for(const row of (op.records||[])){const local=state.sales.find(x=>x.id===row.id);if(local){local._sync_conflict=true;await sheriPut('sales',local.id,{merchant_id:state.merchant.id,record:{...local}});}}
     for(const conflict of (data.conflicts||[])){
       await sheriRecordConflict({
         type:'stock_conflict',product_id:conflict.product_id,
@@ -1065,6 +1068,10 @@ async function sheriSyncSaleCartOperation(op){
         transaction_id:op.transaction_id,invoice_number:op.invoice_number,operation:op
       });
     }
+    await sheriSaveSnapshot();
+  }else{
+    for(const row of (op.records||[])){const local=state.sales.find(x=>x.id===row.id);if(local){delete local._sync_conflict;local._serverConfirmed=true;await sheriPut('sales',local.id,{merchant_id:state.merchant.id,record:{...local}});}}
+    await sheriSaveSnapshot();
   }
 }
 async function sheriSyncSaleOperation(op){
@@ -1080,11 +1087,47 @@ async function sheriSyncSaleOperation(op){
     server_stock:data.server_stock,sale_id:op.record.id,operation:op
   });
 }
+async function sheriFinalizeUnpostedVoid(op){
+  const saleIds=op.sale_ids||[op.id],transactionId=op.transaction_id||null;
+  const queued=await sheriGetAll('outbox');
+  for(const item of queued){
+    const q=item.op||{};
+    const isSale=q.type==='sale_cart'&&q.transaction_id===transactionId;
+    const isLegacySale=q.type==='sale_upsert'&&saleIds.includes(q.record?.id);
+    const isJournal=q.type==='accounting_journal_batch'&&saleIds.includes(q.entry?.source_id);
+    if(isSale||isLegacySale||isJournal)await sheriDelete('outbox',item.key);
+  }
+  const conflicts=await sheriGetAll('conflicts');
+  for(const row of conflicts){if(row.info?.operation?.transaction_id===transactionId)await sheriDelete('conflicts',row.key);}
+  const entries=(state.journalEntries||[]).filter(e=>saleIds.includes(e.source_id)&&['sale','sale_cogs'].includes(e.source_type));
+  const entryIds=entries.map(e=>e.id);
+  const lines=(state.journalLines||[]).filter(l=>entryIds.includes(l.journal_entry_id));
+  state.journalEntries=(state.journalEntries||[]).filter(e=>!entryIds.includes(e.id));
+  state.journalLines=(state.journalLines||[]).filter(l=>!entryIds.includes(l.journal_entry_id));
+  state.sales=(state.sales||[]).filter(s=>!saleIds.includes(s.id));
+  for(const id of saleIds)await sheriDelete('sales',id);
+  for(const entry of entries)await sheriDelete('journalEntries',entry.id);
+  for(const line of lines)await sheriDelete('journalLines',line.id);
+  const productIds=[...new Set((op.sale_records||[]).map(x=>x.product_id).filter(Boolean))];
+  if(productIds.length&&navigator.onLine){
+    const {data,error}=await sb.from('products').select('id,stock').eq('merchant_id',op.merchant_id).in('id',productIds);
+    if(error)throw error;
+    for(const row of data||[]){const p=product(row.id);if(p)p.stock=Number(row.stock||0);}
+  }
+  await sheriSaveSnapshot();await sheriSaveAccountingSnapshot();
+  const {error:auditError}=await sb.rpc('shericeri_write_audit',{
+    p_merchant_id:op.merchant_id,p_audit_id:op.audit_id||sheriUuid(),p_action:'void',
+    p_entity_type:'sale',p_entity_id:op.id,p_reason:op.reason,
+    p_details:op.details||{invoice_number:op.invoice_number||null,transaction_id:transactionId,sale_ids:saleIds}
+  });
+  if(auditError)throw auditError;
+}
 async function sheriSyncVoidSale(op){
-  const {error}=await sb.rpc('shericeri_void_sale',{
+  const {data,error}=await sb.rpc('shericeri_void_sale',{
     p_merchant_id:op.merchant_id,p_sale_id:op.id,p_transaction_id:op.transaction_id||null,p_reason:op.reason,p_audit_id:op.audit_id
   });
   if(error)throw error;
+  if(data?.not_found)await sheriFinalizeUnpostedVoid(op);
 }
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
@@ -1119,6 +1162,7 @@ async function sheriJournalDependsOnPendingSale(op){
   const containsSale=operation=>{
     if(operation?.type==='sale_cart')return (operation.records||[]).some(row=>row.id===entry.source_id);
     if(operation?.type==='sale_upsert')return operation.record?.id===entry.source_id;
+    if(operation?.type==='sale_void')return (operation.sale_ids||[operation.id]).includes(entry.source_id);
     return false;
   };
   return queue.some(item=>containsSale(item.op))||conflicts.some(row=>containsSale(row.info?.operation));
@@ -2102,7 +2146,7 @@ async function voidSale(id){
     }
   }
   await sheriSaveSnapshot();await sheriSaveAccountingSnapshot();
-  await sheriQueue({type:'sale_void',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId});
+  await sheriQueue({type:'sale_void',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId,sale_ids:saleIds,sale_records:rows,invoice_number:invoice,details:auditRow.details});
   if(navigator.onLine)await sheriSyncOutbox();
   render();sheriToast((invoice?'Invoice '+invoice:'Sale')+' voided with stock and accounting reversal recorded.');
 }
