@@ -672,13 +672,26 @@ async function sheriTogglePendingSync(){
   panel.innerHTML='<b>Loading pending activities…</b>';
   try{
     const pending=(await sheriGetAll('outbox')).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+    const conflicts=(await sheriGetAll('conflicts')).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
     const blocked=pending.filter(x=>x.blocked).length;
-    const labels={sale_upsert:'Sale recorded',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
-    let out='<b>'+pending.length+' pending activities</b> · '+blocked+' need attention';if(!pending.length)out='<b>Everything is synchronized.</b>';
+    const labels={sale_upsert:'Sale recorded',sale_cart:'Sale invoice',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
+    let out='<b>'+pending.length+' pending activities</b> · '+blocked+' blocked · '+conflicts.length+' conflicts need attention';
+    if(!pending.length&&!conflicts.length)out='<b>Everything is synchronized.</b>';
     for(const item of pending){
       const op=item.op||{},status=item.blocked?'Needs attention':item.next_retry_at&&new Date(item.next_retry_at)>new Date()?'Waiting for retry':'Waiting to sync';
       const reason=item.last_error||(item.blocked?'The server rejected this activity. Review permissions or the reported data error.':item.next_retry_at?'A previous sync attempt failed; automatic retry is scheduled.':'Saved on this device and waiting for the next sync attempt.');
       out+='<div class="sheri-pending-item"><b>'+esc(labels[op.type]||String(op.type||'Business update').replace(/_/g,' '))+'</b> <span class="pill">'+status+'</span><div class="sub">'+esc(item.created_at?new Date(item.created_at).toLocaleString():'Time unavailable')+' · attempts: '+(Number(item.attempts)||0)+'</div><div>'+esc(reason)+'</div>'+(item.next_retry_at?'<div class="sub">Next retry: '+esc(new Date(item.next_retry_at).toLocaleString())+'</div>':'')+'</div>';
+    }
+    for(const conflict of conflicts){
+      const info=conflict.info||{},op=info.operation||{};
+      const title=info.type==='stock_conflict'?'Stock changed on the server':String(info.type||'Sync conflict').replace(/_/g,' ');
+      const detail=info.type==='stock_conflict'
+        ?'Invoice '+esc(info.invoice_number||op.invoice_number||'—')+' · local stock '+esc(info.local_stock??'—')+' · server stock '+esc(info.server_stock??'—')+' · quantity '+esc(info.quantity??'—')
+        :'This activity needs review before it can be synchronized.';
+      out+='<div class="sheri-pending-item"><b>'+title+'</b><div>'+detail+'</div><div class="sub">'+esc(conflict.created_at?new Date(conflict.created_at).toLocaleString():'Time unavailable')+'</div>';
+      if(info.type==='stock_conflict'&&op.type==='sale_cart'&&sheriCan('create_sale'))out+='<button class="btn small" onclick="sheriRetryStockConflict(\''+esc(conflict.key)+'\')">Refresh stock and retry invoice</button>';
+      else out+='<div class="sub">Resolve the stock or record mismatch, then contact the manager if a retry is still needed.</div>';
+      out+='</div>';
     }
     out+='<div class="actions" style="margin-top:10px"><button class="btn small secondary" onclick="sheriTogglePendingSync()">Close</button>'+(blocked?'<button class="btn small" onclick="sheriRetryBlockedWithConfirm()">Review and retry blocked items</button>':'')+'</div>';panel.innerHTML=out;
   }catch(e){panel.innerHTML='<b>Could not read pending activities.</b><div class="sub">'+esc(e?.message||String(e))+'</div>';}
@@ -883,7 +896,32 @@ async function sheriQueueCount(){
 }
 
 async function sheriRecordConflict(info){
-  const key=sheriUuid(); await sheriPut('conflicts',key,{created_at:sheriNow(),info});
+  const key=sheriUuid();await sheriPut('conflicts',key,{created_at:sheriNow(),info});return key;
+}
+async function sheriRetryStockConflict(key){
+  if(!sheriCan('create_sale'))return sheriToast('You do not have permission to retry this sale.','error');
+  try{
+    const saved=await sheriGet('conflicts',key),info=saved?.info,op=info?.operation;
+    if(!op||op.type!=='sale_cart')throw new Error('This conflict is not a retryable multi-product sale.');
+    const ids=[...new Set((op.stockChanges||[]).map(x=>x.product_id))];
+    if(!ids.length)throw new Error('The sale has no valid stock checks.');
+    const {data,error}=await sb.from('products').select('id,stock').eq('merchant_id',state.merchant.id).in('id',ids);
+    if(error)throw error;
+    const server=new Map((data||[]).map(x=>[x.id,Number(x.stock||0)]));
+    const stockChanges=(op.stockChanges||[]).map(x=>{
+      if(!server.has(x.product_id))throw new Error('A product is no longer available in this business.');
+      const current=server.get(x.product_id),qty=Number(x.qty||0);
+      if(current<qty)throw new Error('Not enough server stock for this invoice. Restock the product or revise the sale before retrying.');
+      return {...x,expected_server_stock:current,local_stock:current-qty};
+    });
+    for(const change of stockChanges){const p=product(change.product_id);if(p)p.stock=change.local_stock;}
+    await sheriSaveSnapshot();
+    await sheriQueue({...op,stockChanges});
+    await sheriDelete('conflicts',key);
+    if(navigator.onLine)await sheriSyncOutbox();
+    render();
+    sheriToast('Invoice returned to the sync queue using the latest server stock.');
+  }catch(e){sheriToast(e?.message||'Could not retry this invoice.','error');}
 }
 function sheriServerRecord(record){
   const out={};
