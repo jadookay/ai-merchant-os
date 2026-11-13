@@ -183,6 +183,21 @@ begin
   ) x
   where p.id=x.product_id and p.merchant_id=v_merchant_id;
 
+  if exists(
+    select 1 from public.journal_entries je
+    left join public.journal_lines jl on jl.journal_entry_id=je.id and jl.merchant_id=je.merchant_id
+    where je.merchant_id=v_merchant_id and je.source_type in ('sale','sale_cogs')
+      and je.source_id in (
+        select s.id from public.sales s where s.merchant_id=v_merchant_id
+          and (s.id=p_sale_id or (v_transaction_id is not null and s.transaction_id=v_transaction_id))
+      )
+      and coalesce(je.voided,false)=false
+    group by je.id
+    having count(jl.id)<2 or abs(coalesce(sum(jl.debit),0)-coalesce(sum(jl.credit),0))>0.005
+  ) then
+    raise exception 'Sale journal is incomplete or unbalanced; reconcile it before voiding the sale';
+  end if;
+
   for v_original in
     select je.id,je.entry_date,je.description
     from public.journal_entries je
