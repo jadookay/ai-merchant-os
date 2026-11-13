@@ -711,3 +711,14 @@ test("journal sync enforces one active source posting and validates persisted ba
   assert.match(journalIntegrityMigration, /p_entry_date<=v_lock/);
   assert.match(journalIntegrityMigration, /revoke all on function public\.shericeri_sync_journal_batch/);
 });
+
+
+test("all legacy sale queue records, including single-line invoices, use atomic cart sync", () => {
+  assert.match(html, /op\.type==='sale_upsert'&&op\.record\?\.id/);
+  assert.match(html, /const transactionId=group\[0\]\.op\.record\.transaction_id\|\|group\[0\]\.op\.record\.id/);
+  assert.match(html, /const invoiceNumber=group\[0\]\.op\.record\.invoice_number\|\|\('INV-LEGACY-'\+transactionId\)/);
+  assert.match(html, /type:'sale_cart',merchant_id:records\[0\]\.merchant_id,transaction_id:transactionId/);
+  assert.match(html, /select\('id,stock,deleted'\)/);
+  assert.match(html, /if\(serverProduct\.deleted\)throw new Error/);
+  assert.match(atomicCartMigration, /coalesce\(deleted,false\)=false for update/);
+});
