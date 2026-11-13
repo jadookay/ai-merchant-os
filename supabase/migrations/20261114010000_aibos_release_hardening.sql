@@ -37,6 +37,17 @@ begin
     v_ip_key := 'ip:' || encode(extensions.digest(p_merchant_id::text||':'||p_ip_hash,'sha256'),'hex');
   end if;
 
+  -- Materialize and lock both throttle buckets before checking them. Concurrent
+  -- attempts for the same identity or IP therefore serialize on the same rows.
+  insert into public.team_login_attempts(attempt_key,attempt_count,window_started_at)
+  select k,0,now()
+  from unnest(array_remove(array[v_identity_key,v_ip_key],null)) as k
+  on conflict(attempt_key) do nothing;
+  perform 1
+  from public.team_login_attempts
+  where attempt_key = any(array_remove(array[v_identity_key,v_ip_key],null))
+  order by attempt_key
+  for update;
   select max(blocked_until) into v_blocked_until
   from public.team_login_attempts
   where attempt_key = any(array_remove(array[v_identity_key,v_ip_key],null))
