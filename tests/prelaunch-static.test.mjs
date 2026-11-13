@@ -12,6 +12,7 @@ const authorizationFixMigration = await readFile(new URL("../supabase/migrations
 const atomicCartMigration = await readFile(new URL("../supabase/migrations/20261113153000_aibos_atomic_cart_sync.sql", import.meta.url), "utf8");
 const pinRateLimitMigration = await readFile(new URL("../supabase/migrations/20261113160000_aibos_pin_rate_limit.sql", import.meta.url), "utf8");
 const storageMemoryMigration = await readFile(new URL("../supabase/migrations/20261112170000_aibos_priority_storage_memory.sql", import.meta.url), "utf8");
+const journalIntegrityMigration = await readFile(new URL("../supabase/migrations/20261113170000_aibos_journal_integrity.sql", import.meta.url), "utf8");
 const supabaseConfig = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
 const kinyaTts = await readFile(new URL("../supabase/functions/kinya-tts/index.ts", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
@@ -699,4 +700,14 @@ test("legacy multi-line invoices are never partially retried when one line is bl
   assert.match(html, /if\(item\.blocked\)group\.blocked=true/);
   assert.match(html, /if\(item\.next_retry_at&&new Date\(item\.next_retry_at\)\.getTime\(\)>now\)group\.waiting=true/);
   assert.match(html, /return !group\?\.blocked&&!group\?\.waiting/);
+});
+
+
+test("journal sync enforces one active source posting and validates persisted balance", () => {
+  assert.match(journalIntegrityMigration, /create unique index if not exists journal_entries_merchant_source_active_unique/);
+  assert.match(journalIntegrityMigration, /This business event already has an active journal posting/);
+  assert.match(journalIntegrityMigration, /Journal entry ID is already used by a different posting/);
+  assert.match(journalIntegrityMigration, /Persisted journal entry is not balanced/);
+  assert.match(journalIntegrityMigration, /p_entry_date<=v_lock/);
+  assert.match(journalIntegrityMigration, /revoke all on function public\.shericeri_sync_journal_batch/);
 });
