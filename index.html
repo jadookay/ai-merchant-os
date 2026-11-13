@@ -5369,6 +5369,41 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     '📈 forecast':'📈 Prévisions','▤ report':'▤ Rapports','↩ returns':'↩ Retours',
     '＋ add team member':'＋ Ajouter un membre','＋ add sample products':'＋ Ajouter des produits de démonstration'
   });
+  const phraseFragments={
+    rw:[
+      ["Confirm sale?","Emeza igurisha?"],["Sale confirmed.","Igurisha ryemejwe."],
+      ["Receipt ","Inyemezabwishyu "],[" is ready to print.","iteguye gucapwa."],
+      ["Enter the reason for voiding this sale (required):","Andika impamvu yo guhagarika iri gurisha (birakenewe):"],
+      ["A clear void reason is required.","Ugomba kwandika neza impamvu yo guhagarika igurisha."],
+      ["You do not have permission to record sales.","Ntabwo wemerewe kwandika ibyagurishijwe."],
+      ["Only an Owner, Admin or authorized Manager can void sales.","Guhagarika igurisha byemewe kuri nyir’ubucuruzi, ushinzwe ubuyobozi cyangwa umuyobozi wabiherewe uburenganzira gusa."],
+      ["Not enough stock for ","Nta bicuruzwa bihagije mu bubiko kuri "],
+      ["Check each product, quantity and selling price.","Reba neza igicuruzwa, umubare n’igiciro cyo kugurisha."],
+      ["You have sold ","Umaze kugurisha ibifite agaciro ka "],
+      [" so far, across "," kugeza ubu, mu bikorwa byo kugurisha "],
+      [" transactions.","."],["Your total expenses are ","Amafaranga yose wakoresheje ni "],
+      ["Top restock priority: ","Ibyo ugomba kongera mu bubiko mbere ni: "],
+      ["There are no products to add.","Nta bicuruzwa byo kongeraho bihari."],
+      ["Are you sure you want to delete ","Urashaka koko gusiba "],
+      ["? This cannot be undone.","? Ibi ntibishobora gusubizwa inyuma."]
+    ],
+    fr:[
+      ["Confirm sale?","Confirmer la vente ?"],["Sale confirmed.","Vente confirmée."],
+      ["Receipt ","Reçu "],[" is ready to print."," prêt à être imprimé."],
+      ["Enter the reason for voiding this sale (required):","Indiquez le motif d’annulation de cette vente (obligatoire) :"],
+      ["A clear void reason is required.","Un motif d’annulation précis est obligatoire."],
+      ["You do not have permission to record sales.","Vous n’avez pas l’autorisation d’enregistrer des ventes."],
+      ["Only an Owner, Admin or authorized Manager can void sales.","Seul le propriétaire, un administrateur ou un gestionnaire autorisé peut annuler des ventes."],
+      ["Not enough stock for ","Stock insuffisant pour "],
+      ["Check each product, quantity and selling price.","Vérifiez chaque produit, la quantité et le prix de vente."],
+      ["You've sold ","Vous avez réalisé "],[" so far, across "," à ce jour, sur "],
+      [" transactions."," transactions."],["Your total expenses are ","Le total de vos dépenses est de "],
+      ["Top restock priority: ","Priorité de réapprovisionnement : "],
+      ["There are no products to add.","Aucun produit à ajouter."],
+      ["Are you sure you want to delete ","Voulez-vous vraiment supprimer "],
+      ["? This cannot be undone."," ? Cette action est irréversible."]
+    ]
+  };
   const originals=new WeakMap();
   const supported=['en','rw','fr'];
   let current='en';
@@ -5378,6 +5413,8 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     const dict=dictionaries[lang]||{};
     const key=normalize(original);
     if(dict[key])return dict[key];
+    let phrase=String(original);for(const pair of (phraseFragments[lang]||[]))phrase=phrase.split(pair[0]).join(pair[1]);
+    if(phrase!==String(original))return phrase;
     const leading=(String(original).match(/^\s*/)||[''])[0],trailing=(String(original).match(/\s*$/)||[''])[0];
     return leading+String(original).trim()+trailing;
   }
