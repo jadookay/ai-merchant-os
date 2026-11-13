@@ -41,15 +41,16 @@ Deno.serve(async (req: Request) => {
       const ip = req.headers.get("cf-connecting-ip") || "unknown";
       const ipHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))), b => b.toString(16).padStart(2, "0")).join("");
       const { data: merchant, error: merchantError } = await admin.from("merchants").select("id").eq("shericeri_id", Number(merchantCode)).maybeSingle();
-      if (merchantError || !merchant) return json({ error: "Business account ID was not recognized." }, 404);
+      if (merchantError) throw merchantError;
       const { data: verified, error: verifyError } = await admin.rpc("verify_merchant_member_pin", {
-        p_merchant_id: merchant.id,
-        p_identifier: identifier,
+        p_merchant_id: merchant?.id || null,
+        p_identifier: merchant ? identifier : merchantCode,
         p_pin: pin,
         p_ip_hash: ipHash,
       });
       if (verifyError) throw verifyError;
-      if (!verified?.ok) return json({ error: verified?.rate_limited ? "Too many attempts. Try again in 15 minutes." : "The sign-in details were not recognized." }, 401);
+      if (!merchant) return json({ error: verified?.rate_limited ? "Too many attempts. Try again in 15 minutes." : "The sign-in details were not recognized." }, verified?.rate_limited ? 429 : 401);
+      if (!verified?.ok) return json({ error: verified?.rate_limited ? "Too many attempts. Try again in 15 minutes." : "The sign-in details were not recognized." }, verified?.rate_limited ? 429 : 401);
 
       const { data: authUser, error: userError } = await admin.auth.admin.getUserById(verified.user_id);
       if (userError || !authUser?.user) throw userError || new Error("User account not found");
