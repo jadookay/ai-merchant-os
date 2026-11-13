@@ -683,3 +683,8 @@ test("recurring journal sources use deterministic UUIDs per scheduled occurrence
   assert.ok(html.includes("async function sheriStableUuid(seed)"));
   assert.ok(html.includes("sourceId:await sheriStableUuid(r.id+':'+r.next_run)"));
 });
+
+test("Kinyarwanda TTS keeps the live JWT setting until voice callers are verified", () => {
+  assert.ok(config.includes("[functions.kinya-tts]\nverify_jwt = false"));
+  assert.ok(config.includes("[functions.team-access]\nverify_jwt = false"));
+});
