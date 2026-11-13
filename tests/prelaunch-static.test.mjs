@@ -640,7 +640,9 @@ test("PIN login validates identifier length, numeric merchant code and exact PIN
 
 test("suspended PIN users are rejected before merchant workspace lookup or onboarding", () => {
   assert.match(html, /from\('merchant_members'\)\.select\('id,merchant_id,user_id,full_name,role,permissions,status'\)\.eq\('user_id',session\.user\.id\)/);
-  assert.match(html, /if\(memberResult\.data\.status!=='active'\)\{await sheriDelete\('meta','membership:'\+session\.user\.id\);await sb\.auth\.signOut\(\);session=null;return false;\}/);
+  assert.ok(html.includes("if(memberResult.data.status!=='active'){"));
+  assert.ok(html.includes("await sheriDelete('meta','membership:'+session.user.id);"));
+  assert.ok(html.includes("await sb.auth.signOut();session=null;return false;"));
   assert.match(html, /complete=await ensureMerchant\(\);\s*if\(!session\?\.user\)return;/);
 });
 
@@ -674,7 +676,7 @@ test("stock-conflicted cart invoices remain visible and can be retried against c
 
 test("staff offline access uses a time-limited cached membership and respects its expiry", () => {
   assert.match(html, /sheriGet\('meta','membership:'\+session\.user\.id\)/);
-  assert.match(html, /member\?\.status==='active'&&Date\.parse\(member\.cache_expires_at\|\|' '\)>Date\.now\(\)/);
+  assert.ok(html.includes("member?.status==='active'&&Date.parse(member.cache_expires_at||'')>Date.now()"));
   assert.match(html, /cache_expires_at:new Date\(Date\.now\(\)\+8\*60\*60\*1000\)/);
   assert.match(html, /if\(!navigator\.onLine&&Date\.parse\(member\.cache_expires_at\|\|''\)<=Date\.now\(\)\)return false/);
   assert.match(html, /async function signOut\(\)\{if\(session\?\.user\?\.id\)await sheriDelete\('meta','membership:'\+session\.user\.id\)/);
