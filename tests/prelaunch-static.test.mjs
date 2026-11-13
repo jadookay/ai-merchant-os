@@ -7,7 +7,9 @@ const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const quickService = await readFile(new URL("../supabase/functions/quick-service/index.ts", import.meta.url), "utf8");
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
+const config = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const salesMigration = await readFile(new URL("../supabase/migrations/20261112180000_aibos_sales_favorites_audit.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -34,7 +36,7 @@ test("cancelled expense deletion does not post an accounting reversal", () => {
 
 test("sale void reason and transaction references are persisted to the audit trail", () => {
   assert.match(html, /type:'sale_void',id,merchant_id:state\.merchant\.id,reason:reason\.trim\(\),audit_id:auditId/);
-  assert.match(html, /p_merchant_id:op\.merchant_id,p_sale_id:op\.id,p_transaction_id:op\.transaction_id\|\|null,p_reason:op\.reason,p_audit_id:op\.audit_id/);
+  assert.match(html, /p_merchant_id:op\.merchant_id,p_sale_id:op\.id,p_transaction_id:op\.transaction_id\|\|null,[\s\S]*?p_reason:op\.reason,p_audit_id:op\.audit_id/);
   assert.ok(html.includes("invoice_number:invoice||null,transaction_id:transactionId"));
   assert.match(teamMigration, /create or replace function public\.shericeri_void_sale/);
   assert.match(teamMigration, /void_reason=trim\(p_reason\),voided_at=now\(\),voided_by=auth\.uid\(\)/);
@@ -46,10 +48,13 @@ test("cancelled sale void leaves records and accounting untouched", () => {
   assert.doesNotMatch(html, /const _v14_1_voidSale=voidSale/);
 });
 
-test("locally deleted expenses and voided invoice sale rows are removed from IndexedDB", () => {
+test("sale rows remain active until the server confirms a void, then leave IndexedDB", () => {
   assert.match(html, /state\.expenses=state\.expenses\.filter\(x=>x\.id!==id\);await sheriDelete\('expenses',id\)/);
-  assert.match(html, /for\(const row of rows\)[\s\S]*?await sheriDelete\('sales',row\.id\)/);
-  assert.match(html, /state\.sales=state\.sales\.filter\(x=>!saleIds\.includes\(x\.id\)\)/);
+  assert.match(html, /row\.void_pending=true/);
+  assert.match(html, /await sheriQueue\(\{type:'sale_void'/);
+  assert.match(html, /for\(const saleId of ids\)await sheriDelete\('sales',saleId\)/);
+  assert.match(html, /state\.sales=\(state\.sales\|\|\[\]\)\.filter\(s=>!ids\.includes\(String\(s\.id\)\)\)/);
+  assert.doesNotMatch(html, /for\(const row of rows\)[\s\S]*?await sheriDelete\('sales',row\.id\)/);
 });
 
 test("journal entries synchronize as one atomic RPC batch on normal and auth-retry paths", () => {
@@ -251,12 +256,11 @@ test("sales and expenses confirm before saving and post balanced journal entries
   assert.ok(expense.includes("sheriToast('Expense recorded."));
 });
 
-test("cashier sales use an atomic stock RPC on normal sync and auth-retry paths", () => {
-  assert.ok(html.includes("async function sheriSyncSaleOperation(op)"));
-  assert.ok(html.includes("sb.rpc('shericeri_sync_sale_stock'"));
-  assert.ok(html.includes("op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}"));
-  assert.ok(html.includes("op.type==='sale_void'){await sheriSyncVoidSale(op)}"));
-  assert.ok(teamMigration.includes("create or replace function public.shericeri_sync_sale_stock"));
+test("cashier sale carts use one atomic stock RPC on normal sync and auth-retry paths", () => {
+  assert.ok(html.includes("async function sheriSyncSaleCartOperation(op)"));
+  assert.ok(html.includes("sb.rpc('shericeri_sync_sale_cart'"));
+  assert.ok(html.includes("op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_sync_sale_cart"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'create_sale')"));
 });
 
@@ -548,4 +552,214 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
   assert.ok(localeScript.includes("'cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe'"));
   assert.doesNotMatch(localeScript, /fetch\s*\(|https?:\/\//i);
   assert.ok(localeScript.includes("does not change business records"));
+});
+
+
+
+test("multi-line cart sale sync is one atomic, idempotent server operation", () => {
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_sync_sale_cart"));
+  assert.ok(teamMigration.includes("pg_advisory_xact_lock"));
+  assert.ok(teamMigration.includes("stock_conflict"));
+  assert.ok(teamMigration.includes("Sale cart is partially present; refusing a partial retry"));
+  assert.ok(teamMigration.includes("grant execute on function public.shericeri_sync_sale_cart(uuid,jsonb,jsonb) to authenticated"));
+  assert.ok(html.includes("type:'sale_cart_upsert',merchant_id:state.merchant.id,transaction_id:transactionId,records:rows,stock_checks:stockChecks"));
+  assert.ok(html.includes("op.type==='sale_cart_upsert'"));
+  assert.ok(html.includes("async function sheriSyncSaleCartOperation(op)"));
+});
+
+test("sale void RPC requires manager-level access plus the sales permission", () => {
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'manage_team')"));
+  assert.ok(teamMigration.includes("and private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
+  assert.ok(teamMigration.includes("Only the owner, an administrator, or an authorized manager can void sales"));
+});
+
+test("sale void metadata migration adds the voided state used by the server RPC", () => {
+  assert.ok(salesMigration.includes("add column if not exists voided boolean not null default false"));
+  assert.ok(teamMigration.includes("set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid()"));
+});
+
+test("legacy accounting SECURITY DEFINER RPCs are no longer executable by anon", () => {
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon"));
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon"));
+});
+
+test("team authorization validates a live Auth session on every privileged merchant check", () => {
+  assert.ok(teamMigration.includes("from auth.sessions s"));
+  assert.ok(teamMigration.includes("s.id=nullif((select auth.jwt()->>'session_id'),'')::uuid"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_validate_member_session"));
+});
+
+test("PIN brute-force limits follow both the identifier and source IP", () => {
+  assert.ok(teamMigration.includes("v_identifier_key:='identifier:'"));
+  assert.ok(teamMigration.includes("v_ip_key:='ip:'"));
+  assert.ok(teamMigration.includes("then 20 else 5 end"));
+  assert.ok(teamMigration.includes("blocked_until is not null and blocked_until>now()"));
+});
+
+test("suspending a team member clears the PIN and invalidates refresh sessions", () => {
+  assert.ok(teamAccess.includes('if (status === "suspended") memberPatch.pin_hash = null'));
+  assert.ok(teamAccess.includes("admin.auth.admin.updateUserById(target.user_id, {"));
+  assert.ok(teamAccess.includes("password: randomPassword()"));
+  assert.ok(teamAccess.includes("Set a new 6–8 digit PIN before re-enabling this member."));
+  assert.ok(teamAccess.includes('status: "suspended", pin_hash: null'));
+});
+
+test("online and foreground app access is revalidated before cached data or outbox sync", () => {
+  assert.ok(html.includes("async function sheriEnsureActiveSession()"));
+  assert.ok(html.includes("sb.rpc('shericeri_validate_member_session'"));
+  assert.ok(html.includes("if(navigator.onLine&&session?.access_token&&!await sheriEnsureActiveSession())return;"));
+  assert.ok(html.includes("if(!await sheriEnsureActiveSession())return;"));
+  assert.ok(html.includes("window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)sheriEnsureActiveSession()"));
+});
+
+test("device session registration and manager revocation are server-enforced", () => {
+  assert.ok(teamMigration.includes("create table if not exists public.merchant_member_sessions"));
+  assert.ok(teamMigration.includes("shericeri_register_member_session"));
+  assert.ok(teamMigration.includes("shericeri_list_member_sessions"));
+  assert.ok(teamMigration.includes("shericeri_revoke_member_session"));
+  assert.ok(teamMigration.includes("shericeri_revoke_member_sessions"));
+  assert.ok(teamMigration.includes("d.revoked_at is not null"));
+  assert.ok(teamAccess.includes("shericeri_revoke_member_sessions"));
+  assert.ok(html.includes("sheriJwtSessionId()"));
+  assert.ok(html.includes("sheriRegisterCurrentDevice") || html.includes("shericeri_register_member_session"));
+  assert.ok(html.includes("revokeTeamDevice"));
+  assert.ok(html.includes("id=\"teamSessionsTable\""));
+});
+
+test("accounting snapshot is gated by financial report permission and audit permission separately", () => {
+  assert.ok(teamMigration.includes("v_can_view_reports boolean := private.user_can_access_merchant(p_merchant_id,'view_financial_reports')"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'view_audit_log')"));
+});
+
+test("atomic cart RPC rejects malformed arrays and reused invoice identifiers", () => {
+  assert.ok(teamMigration.includes("Sale cart payload must be a JSON array"));
+  assert.ok(teamMigration.includes("Every sale cart line must be a JSON object"));
+  assert.ok(teamMigration.includes("This sale transaction or invoice identifier is already in use"));
+  assert.ok(teamMigration.includes("and deleted=false for update"));
+});
+
+test("session validation runs before merchant reconciliation and outbox work", () => {
+  assert.ok(html.includes("if(!await sheriEnsureActiveSession())return;\n    await sheriReconcileMerchantId();"));
+  assert.ok(html.includes("sale_cart_upsert:'Sale cart recorded'"));
+});
+
+test("sale void RPC derives invoice membership from the selected sale and rejects mismatched transaction IDs", () => {
+  assert.ok(teamMigration.includes("Derive the transaction from the selected sale row"));
+  assert.ok(teamMigration.includes("where merchant_id=v_merchant_id and id=p_sale_id"));
+  assert.ok(teamMigration.includes("p_transaction_id is distinct from v_transaction_id"));
+  assert.ok(teamMigration.includes("Transaction ID does not match the selected sale"));
+});
+
+test("offline IndexedDB cache is scoped to the authenticated user and merchant", () => {
+  assert.ok(html.includes("function sheriLocalScope(store,key,value={})"));
+  assert.ok(html.includes("user_scope:scope.userId"));
+  assert.ok(html.includes("row.user_scope===userId"));
+  assert.ok(html.includes("Legacy shared-cache fallback is owner-only"));
+  assert.ok(html.includes("state.merchant?.user_id===userId&&row.merchant_id===merchantId"));
+});
+
+test("staff without financial report access cannot load cached ledger or audit data", () => {
+  assert.ok(html.includes("const canReports=sheriCan('view_financial_reports')"));
+  assert.ok(html.includes("const canAudit=sheriCan('view_audit_log')"));
+  assert.ok(html.includes("await sheriPurgeLocalAccountingStores(merchantId,['journalEntries','journalLines','invoices','bills','payments','bankAccounts','recurringTransactions'])"));
+  assert.ok(html.includes("if(sheriCan('view_financial_reports'))await accEnsureOperationalLedger()"));
+});
+
+test("journal batches are idempotent by source and cannot duplicate a sale or expense posting", () => {
+  assert.ok(teamMigration.includes("v_existing_source_entry uuid"));
+  assert.ok(teamMigration.includes("pg_advisory_xact_lock(hashtextextended(p_merchant_id::text||':'||p_source_type||':'||p_source_id::text,0))"));
+  assert.ok(teamMigration.includes("where merchant_id=p_merchant_id and source_type=p_source_type and source_id=p_source_id"));
+  assert.ok(html.includes("if(data!==entry.id){"));
+  assert.ok(html.includes("await sheriDelete('journalEntries',entry.id)"));
+});
+
+test("journal line batches reject malformed objects and duplicate line IDs", () => {
+  assert.ok(teamMigration.includes("Journal lines must be a JSON array"));
+  assert.ok(teamMigration.includes("Journal batch contains duplicate or missing line IDs"));
+});
+
+test("recurring journal source identifiers remain valid UUIDs", () => {
+  assert.ok(html.includes("sourceType:'recurring',sourceId:await sheriStableUuid(r.id+':'+r.next_run)"));
+});
+
+test("recurring journal sources use deterministic UUIDs per scheduled occurrence", () => {
+  assert.ok(html.includes("async function sheriStableUuid(seed)"));
+  assert.ok(html.includes("sourceId:await sheriStableUuid(r.id+':'+r.next_run)"));
+});
+
+test("Kinyarwanda TTS keeps the live JWT setting until voice callers are verified", () => {
+  assert.ok(config.includes("[functions.kinya-tts]\nverify_jwt = false"));
+  assert.ok(config.includes("[functions.team-access]\nverify_jwt = false"));
+});
+
+
+
+test("legacy owner outbox records remain recoverable without exposing them to staff", () => {
+  assert.ok(html.includes("if(store==='outbox')return Boolean(merchantId&&state.merchant?.user_id===userId"));
+  assert.ok(html.includes("row.op?.entry?.merchant_id===merchantId"));
+});
+
+test("unknown merchant-code attempts are rate-limited without account enumeration", () => {
+  assert.ok(teamMigration.includes("unknown-merchant:"));
+  assert.ok(teamMigration.includes("global-ip:"));
+  assert.ok(teamMigration.includes("if p_merchant_id is null then"));
+  assert.ok(teamAccess.includes("p_merchant_id: merchant?.id || null"));
+  assert.ok(teamAccess.includes("verified?.rate_limited ? 429 : 401"));
+  assert.ok(teamAccess.includes("The sign-in details were not recognized."));
+});
+
+test("sale voiding is server-confirmed before local stock and sales are changed", () => {
+  assert.ok(html.includes("async function sheriSyncSaleVoidOperation(op)"));
+  assert.ok(html.includes("p_reason:op.reason,p_audit_id:op.audit_id"));
+  assert.ok(html.includes("if(!data?.ok)throw new Error('The server did not confirm this sale void.')"));
+  assert.ok(html.includes("row.void_pending=true"));
+  assert.ok(html.includes("The sale remains active until the server accepts it."));
+  assert.ok(html.includes("data.stock_updates||[]"));
+  assert.ok(html.includes("data.audit_recorded&&op.auditRow"));
+  assert.ok(html.includes("op.type==='sale_void'"));
+  assert.ok(html.includes(`s.void_pending?'<span class="muted">Void pending</span>'`));
+});
+
+test("pending voids do not collide across unrelated legacy single-sale records", () => {
+  assert.ok(html.includes("x.op.sale_ids?.some(v=>saleIds.includes(v))||(transactionId&&x.op.transaction_id===transactionId)"));
+});
+
+test("sales void buttons render valid JavaScript and pending status", () => {
+  assert.ok(html.includes(`onclick="voidSale(\\''+s.id+'\\')"`));
+  assert.ok(html.includes(`s.void_pending?'<span class="muted">Void pending</span>'`));
+});
+
+test("staff operational insert permissions are independent of team administration", () => {
+  assert.ok(teamMigration.includes("insert_perm:=case"));
+  assert.ok(teamMigration.includes("when t.table_name='sales' then 'create_sale'"));
+  assert.ok(teamMigration.includes("when t.table_name='expenses' then 'manage_expenses'"));
+  assert.ok(teamMigration.includes("when t.table_name='products' then 'manage_inventory'"));
+  assert.ok(teamMigration.includes("with check (private.user_can_access_merchant(merchant_id,%L))"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'create_sale')"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_expenses')"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_inventory')"));
+});
+
+test("sale void sync has no obsolete handler that bypasses the audited RPC", () => {
+  assert.ok(!html.includes("sheriSyncVoidSale(op)"));
+  assert.ok((html.match(/op\.type==='sale_void'\)\{await sheriSyncSaleVoidOperation\(op\)\}/g)||[]).length>=2);
+});
+
+test("sale void RPC checks authorization before acquiring the invoice lock", () => {
+  const fn=teamMigration.slice(teamMigration.indexOf("create or replace function public.shericeri_void_sale"),teamMigration.indexOf("revoke all on function public.shericeri_void_sale"));
+  assert.ok(fn.indexOf("private.user_can_access_merchant(v_merchant_id,'manage_team')") < fn.indexOf("pg_advisory_xact_lock"));
+});
+
+test("sale void cannot report success for a missing or cross-merchant sale", () => {
+  const fn=teamMigration.slice(teamMigration.indexOf("create or replace function public.shericeri_void_sale"),teamMigration.indexOf("revoke all on function public.shericeri_void_sale"));
+  assert.ok(fn.includes("raise exception 'Sale not found or no longer available'"));
+  assert.ok(html.includes("if(!ids.length)throw new Error('The server did not return the sale lines for this void request.')"));
+});
+
+test("offline merchant reconciliation re-scopes all pending operations to the canonical merchant ID", () => {
+  assert.ok(html.includes("Re-key every other queued operation to the"));
+  assert.ok(html.includes("if(op.merchant_id===oldId)op.merchant_id=newId"));
+  assert.ok(html.includes("if(op.entry?.merchant_id===oldId)op.entry.merchant_id=newId"));
+  assert.ok(html.includes("if(Array.isArray(op.records))for(const row of op.records)"));
+  assert.ok(html.includes("await sheriPut('outbox',item.key,{...item,merchant_id:newId,op})"));
 });

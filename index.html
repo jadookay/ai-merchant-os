@@ -584,7 +584,7 @@ window.ensurePdfJs=async function(){
     </div>
     <div class="sub" style="margin-top:10px">Deleted products stay in your sales history but disappear from the inventory list and sale form.</div>
   </div>
-  <div class="card section" id="teamAccessCard" style="display:none"><h2>Team access & responsibilities</h2><p class="sub">Create individual logins and assign each employee only the responsibilities and access they need.</p><div class="formgrid"><div><label>Full name</label><input id="teamFullName" placeholder="Employee full name"></div><div><label>Username (optional)</label><input id="teamUsername" placeholder="Unique username"></div><div><label>Email</label><input id="teamEmail" type="email" placeholder="name@example.com"></div><div><label>Phone</label><input id="teamPhone" type="tel" placeholder="+250..."></div><div><label>PIN (6–8 digits)</label><input id="teamPin" type="password" inputmode="numeric" maxlength="8"></div><div><label>Role</label><select id="teamRole"><option value="cashier">Cashier</option><option value="inventory">Inventory officer</option><option value="accountant">Accountant</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="custom">Custom</option></select></div><div style="grid-column:1/-1"><label>Responsibilities</label><input id="teamResponsibility" placeholder="e.g. Morning shift, stock receiving, daily cash close"></div></div><div class="formgrid" style="margin-top:12px"><label><input type="checkbox" id="teamSales" checked style="width:auto"> View and record sales</label><label><input type="checkbox" id="teamSalesManage" style="width:auto"> Edit / void / delete sales</label><label><input type="checkbox" id="teamInventory" style="width:auto"> View and manage inventory</label><label><input type="checkbox" id="teamExpenses" style="width:auto"> View and manage expenses</label><label><input type="checkbox" id="teamReports" style="width:auto"> View financial reports</label><label><input type="checkbox" id="teamFinance" style="width:auto"> Manage accounting and finance</label><label><input type="checkbox" id="teamCustomers" style="width:auto"> Manage customers</label><label><input type="checkbox" id="teamSuppliers" style="width:auto"> Manage suppliers and purchases</label><label><input type="checkbox" id="teamAudit" style="width:auto"> View audit trail</label><label><input type="checkbox" id="teamManage" style="width:auto"> Manage team access</label></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="createTeamMember()">＋ Add team member</button><button class="btn secondary" onclick="loadTeamMembers(true)">Refresh team</button></div><div id="teamStatus" class="sub" style="margin-top:8px"></div><div id="teamMembersTable" style="overflow-x:auto;margin-top:12px"></div><div id="teamAuditTrail" style="overflow-x:auto;margin-top:16px"></div></div>
+  <div class="card section" id="teamAccessCard" style="display:none"><h2>Team access & responsibilities</h2><p class="sub">Create individual logins and assign each employee only the responsibilities and access they need.</p><div class="formgrid"><div><label>Full name</label><input id="teamFullName" placeholder="Employee full name"></div><div><label>Username (optional)</label><input id="teamUsername" placeholder="Unique username"></div><div><label>Email</label><input id="teamEmail" type="email" placeholder="name@example.com"></div><div><label>Phone</label><input id="teamPhone" type="tel" placeholder="+250..."></div><div><label>PIN (6–8 digits)</label><input id="teamPin" type="password" inputmode="numeric" maxlength="8"></div><div><label>Role</label><select id="teamRole"><option value="cashier">Cashier</option><option value="inventory">Inventory officer</option><option value="accountant">Accountant</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="custom">Custom</option></select></div><div style="grid-column:1/-1"><label>Responsibilities</label><input id="teamResponsibility" placeholder="e.g. Morning shift, stock receiving, daily cash close"></div></div><div class="formgrid" style="margin-top:12px"><label><input type="checkbox" id="teamSales" checked style="width:auto"> View and record sales</label><label><input type="checkbox" id="teamSalesManage" style="width:auto"> Edit / void / delete sales</label><label><input type="checkbox" id="teamInventory" style="width:auto"> View and manage inventory</label><label><input type="checkbox" id="teamExpenses" style="width:auto"> View and manage expenses</label><label><input type="checkbox" id="teamReports" style="width:auto"> View financial reports</label><label><input type="checkbox" id="teamFinance" style="width:auto"> Manage accounting and finance</label><label><input type="checkbox" id="teamCustomers" style="width:auto"> Manage customers</label><label><input type="checkbox" id="teamSuppliers" style="width:auto"> Manage suppliers and purchases</label><label><input type="checkbox" id="teamAudit" style="width:auto"> View audit trail</label><label><input type="checkbox" id="teamManage" style="width:auto"> Manage team access</label></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="createTeamMember()">＋ Add team member</button><button class="btn secondary" onclick="loadTeamMembers(true)">Refresh team</button></div><div id="teamStatus" class="sub" style="margin-top:8px"></div><div id="teamMembersTable" style="overflow-x:auto;margin-top:12px"></div><div id="teamSessionsTable" style="overflow-x:auto;margin-top:16px"></div><div id="teamAuditTrail" style="overflow-x:auto;margin-top:16px"></div></div>
   <div class="footer">AI Business OS • Supabase + Groq backend • Not a financial or lending decision engine.</div>
 </section>
 </main>
@@ -640,7 +640,7 @@ function merchantLocale(){try{return new Intl.Locale('en-'+merchantCountry().toU
 function money(n){try{return new Intl.NumberFormat(merchantLocale(),{style:'currency',currency:merchantCurrency(),maximumFractionDigits:0}).format(Number(n)||0)}catch(_){return merchantCurrency()+' '+Math.round(n||0).toLocaleString()}}
 
 let session=null;
-let state={merchant:null,products:[],sales:[],expenses:[],memory:[],customers:[],suppliers:[],purchases:[],cashEntries:[],budgets:[],accounts:[],journalEntries:[],journalLines:[],invoices:[],bills:[],payments:[],bankAccounts:[],taxRates:[],recurringTransactions:[],accountingSettings:null,auditLog:[],teamMembers:[],currentMembership:null};
+let state={merchant:null,products:[],sales:[],expenses:[],memory:[],customers:[],suppliers:[],purchases:[],cashEntries:[],budgets:[],accounts:[],journalEntries:[],journalLines:[],invoices:[],bills:[],payments:[],bankAccounts:[],taxRates:[],recurringTransactions:[],accountingSettings:null,auditLog:[],teamMembers:[],teamSessions:[],currentMembership:null};
 let editingProductId=null;
 
 let advisorAvailable=null; // null=unknown, true/false once tested
@@ -673,7 +673,7 @@ async function sheriTogglePendingSync(){
   try{
     const pending=(await sheriGetAll('outbox')).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
     const blocked=pending.filter(x=>x.blocked).length;
-    const labels={sale_upsert:'Sale recorded',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
+    const labels={sale_void:'Sale void request',sale_cart_upsert:'Sale cart recorded',sale_cart_stock_conflict:'Sale cart stock conflict',sale_upsert:'Sale recorded',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
     let out='<b>'+pending.length+' pending activities</b> · '+blocked+' need attention';if(!pending.length)out='<b>Everything is synchronized.</b>';
     for(const item of pending){
       const op=item.op||{},status=item.blocked?'Needs attention':item.next_retry_at&&new Date(item.next_retry_at)>new Date()?'Waiting for retry':'Waiting to sync';
@@ -721,21 +721,54 @@ function sheriTx(store,mode='readonly'){
   if(!sheriOfflineDb)throw new Error('Offline database not initialized');
   return sheriOfflineDb.transaction(store,mode).objectStore(store);
 }
+function sheriLocalScope(store,key,value={}){
+  const userId=session?.user?.id||'anonymous';
+  const merchantId=store==='merchants'?String(key):(value.merchant_id||value.op?.merchant_id||state.merchant?.id||'none');
+  return {userId,merchantId,storageKey:userId+'::'+merchantId+'::'+String(key)};
+}
 async function sheriPut(store,key,value){
   await sheriOpenLocalDb();
-  return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').put({key,...value});req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)})
+  const scope=sheriLocalScope(store,key,value);
+  const row={...value,key:scope.storageKey,local_key:String(key),user_scope:scope.userId,merchant_scope:scope.merchantId};
+  return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').put(row);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)});
 }
 async function sheriGet(store,key){
   await sheriOpenLocalDb();
-  return new Promise((resolve,reject)=>{const req=sheriTx(store).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)})
+  const scope=sheriLocalScope(store,key);
+  const scoped=await new Promise((resolve,reject)=>{const req=sheriTx(store).get(scope.storageKey);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});
+  if(scoped)return {...scoped,key:scoped.local_key||String(key)};
+  // Legacy shared-cache fallback is owner-only. Staff never inherit a prior
+  // user's IndexedDB records, even when they work in the same browser.
+  const legacy=await new Promise((resolve,reject)=>{const req=sheriTx(store).get(String(key));req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});
+  const isOwner=store==='merchants'?legacy?.user_id===scope.userId:
+    Boolean(legacy&&state.merchant?.user_id===scope.userId&&legacy.merchant_id===scope.merchantId);
+  return isOwner?{...legacy,key:legacy.local_key||String(key),_legacy:true}:null;
 }
 async function sheriGetAll(store){
   await sheriOpenLocalDb();
-  return new Promise((resolve,reject)=>{const req=sheriTx(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)})
+  const rows=await new Promise((resolve,reject)=>{const req=sheriTx(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)});
+  const userId=session?.user?.id||'anonymous',merchantId=state.merchant?.id;
+  const visible=rows.filter(row=>{
+    if(row.user_scope)return row.user_scope===userId&&(store==='merchants'||!merchantId||row.merchant_scope===merchantId);
+    if(store==='merchants')return row.user_id===userId;
+    if(store==='outbox')return Boolean(merchantId&&state.merchant?.user_id===userId&&(row.op?.merchant_id===merchantId||row.op?.record?.merchant_id===merchantId||row.op?.entry?.merchant_id===merchantId));
+    return Boolean(merchantId&&state.merchant?.user_id===userId&&row.merchant_id===merchantId);
+  });
+  const byKey=new Map();
+  for(const row of visible){
+    const localKey=row.local_key||row.key;
+    const previous=byKey.get(localKey);
+    if(!previous||(row.user_scope===userId&&previous.user_scope!==userId))byKey.set(localKey,{...row,key:localKey});
+  }
+  return [...byKey.values()];
 }
 async function sheriDelete(store,key){
   await sheriOpenLocalDb();
-  return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(key);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)})
+  const scope=sheriLocalScope(store,key);
+  await new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(scope.storageKey);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)});
+  const isOwner=store==='merchants'?state.merchant?.user_id===scope.userId:state.merchant?.user_id===scope.userId;
+  if(isOwner)await new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(String(key));req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)});
+  return true;
 }
 async function sheriSaveSnapshot(){
   if(!state.merchant)return;
@@ -757,14 +790,32 @@ async function sheriSaveAccountingSnapshot(){
   for(const [store,rows] of groups)for(const row of (rows||[]))await sheriPut(store,row.id||row.key,{merchant_id:mid,record:{...row}});
   if(state.accountingSettings)await sheriPut('accountingSettings','settings',{merchant_id:mid,record:{...state.accountingSettings}});
 }
+async function sheriPurgeLocalAccountingStores(merchantId,stores){
+  for(const store of stores){
+    const rows=await sheriGetAll(store);
+    for(const row of rows)if(row.merchant_id===merchantId)await sheriDelete(store,row.key);
+  }
+}
 async function sheriLoadAccountingSnapshot(merchantId){
   await sheriOpenLocalDb();
+  const canReports=sheriCan('view_financial_reports');
+  const canAudit=sheriCan('view_audit_log');
   const stores=['accounts','journalEntries','journalLines','invoices','bills','payments','bankAccounts','taxRates','recurringTransactions','accountingSettings','auditLog'];
   const vals=await Promise.all(stores.map(x=>sheriGetAll(x)));
   const [as,jes,jls,ins,bills,pays,banks,taxes,recs,sets]=vals;
   const pick=a=>a.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.accounts=pick(as); state.journalEntries=pick(jes); state.journalLines=pick(jls); state.invoices=pick(ins); state.bills=pick(bills); state.payments=pick(pays); state.bankAccounts=pick(banks); state.taxRates=pick(taxes); state.recurringTransactions=pick(recs); state.auditLog=pick(vals[10]||[]);
-  const setting=sets.find(x=>x.merchant_id===merchantId); state.accountingSettings=setting?.record||null;
+  state.accounts=pick(as); // Chart labels are needed for operational posting, not financial reporting.
+  state.taxRates=pick(taxes);state.accountingSettings=sets.find(x=>x.merchant_id===merchantId)?.record||null;
+  if(canReports){
+    state.journalEntries=pick(jes);state.journalLines=pick(jls);state.invoices=pick(ins);state.bills=pick(bills);
+    state.payments=pick(pays);state.bankAccounts=pick(banks);state.recurringTransactions=pick(recs);
+  }else{
+    state.journalEntries=[];state.journalLines=[];state.invoices=[];state.bills=[];state.payments=[];
+    state.bankAccounts=[];state.recurringTransactions=[];
+    await sheriPurgeLocalAccountingStores(merchantId,['journalEntries','journalLines','invoices','bills','payments','bankAccounts','recurringTransactions']);
+  }
+  state.auditLog=canAudit?pick(vals[10]||[]):[];
+  if(!canAudit)await sheriPurgeLocalAccountingStores(merchantId,['auditLog']);
   return true;
 }
 
@@ -921,14 +972,18 @@ async function sheriReconcileMerchantId(){
       const ops=await sheriGetAll('outbox');
       for(const item of ops){
         const op=item.op||{};
-        if(op.type==='merchant_upsert'&&op.record?.id===oldId)op.record.id=newId;
+        // The server merchant profile was already created/updated above; remove
+        // its stale local upsert. Re-key every other queued operation to the
+        // canonical merchant scope so scoped IndexedDB cannot strand the queue.
+        if(op.type==='merchant_upsert'&&op.record?.id===oldId){await sheriDelete('outbox',item.key);continue;}
+        if(op.merchant_id===oldId)op.merchant_id=newId;
         if(op.record?.merchant_id===oldId)op.record.merchant_id=newId;
-        await sheriPut('outbox',item.key,{...item,op});
+        if(op.entry?.merchant_id===oldId)op.entry.merchant_id=newId;
+        if(op.auditRow?.merchant_id===oldId)op.auditRow.merchant_id=newId;
+        if(Array.isArray(op.records))for(const row of op.records)if(row.merchant_id===oldId)row.merchant_id=newId;
+        await sheriDelete('outbox',item.key);
+        await sheriPut('outbox',item.key,{...item,merchant_id:newId,op});
       }
-      // The profile was already applied to the real server merchant. Remove
-      // only this stale merchant-upsert operation; data operations still sync.
-      const refreshed=await sheriGetAll('outbox');
-      for(const item of refreshed){if(item.op?.type==='merchant_upsert'&&item.op?.record?.id===newId)await sheriDelete('outbox',item.key)}
       await sheriDelete('merchants',oldId);
     }
     state.merchant={...data};
@@ -989,7 +1044,71 @@ async function sheriSyncJournalBatch(op){
     p_lines:lines.map(line=>({id:line.id,account_id:line.account_id,debit:line.debit,credit:line.credit,memo:line.memo||null}))
   });
   if(error)throw error;
-  if(data!==entry.id)throw new Error('Atomic journal synchronization returned an unexpected entry ID.');
+  if(!data)throw new Error('Atomic journal synchronization did not return an entry ID.');
+  if(data!==entry.id){
+    const lineIds=lines.map(line=>line.id);
+    state.journalEntries=(state.journalEntries||[]).filter(row=>row.id!==entry.id);
+    state.journalLines=(state.journalLines||[]).filter(row=>!lineIds.includes(row.id));
+    await sheriDelete('journalEntries',entry.id);
+    for(const lineId of lineIds)await sheriDelete('journalLines',lineId);
+    await sheriSaveAccountingSnapshot();
+  }
+}
+async function sheriSyncSaleVoidOperation(op){
+  const {data,error}=await sb.rpc('shericeri_void_sale',{
+    p_merchant_id:op.merchant_id,p_sale_id:op.id,p_transaction_id:op.transaction_id||null,
+    p_reason:op.reason,p_audit_id:op.audit_id
+  });
+  if(error)throw error;
+  if(!data?.ok)throw new Error('The server did not confirm this sale void.');
+  const ids=(Array.isArray(data.sale_ids)?data.sale_ids:[]).map(String);
+  if(!ids.length)throw new Error('The server did not return the sale lines for this void request.');
+  const localRows=(op.records||[]).filter(row=>(state.sales||[]).some(s=>s.id===row.id));
+  const pending=await sheriGetAll('outbox');
+  const hasPendingStock=(productId)=>pending.some(item=>{
+    const x=item.op||{};
+    if(x.type==='sale_void'&&x.audit_id===op.audit_id)return false;
+    const records=Array.isArray(x.records)?x.records:[];
+    return x.productId===productId||x.product_id===productId||(x.type==='product_upsert'&&x.record?.id===productId)||x.record?.product_id===productId||
+      records.some(r=>r.product_id===productId)||x.entry?.product_id===productId;
+  });
+  for(const update of (data.stock_updates||[])){
+    const p=product(update.product_id);if(!p)continue;
+    if(!hasPendingStock(update.product_id))p.stock=Number(update.stock||0);
+    else if(localRows.length){
+      const restored=localRows.filter(r=>r.product_id===update.product_id&&r.stock_applied!==false)
+        .reduce((n,r)=>n+Number(r.qty||0),0);
+      p.stock=Number(p.stock||0)+restored;
+    }
+    await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
+  }
+  state.sales=(state.sales||[]).filter(s=>!ids.includes(String(s.id)));
+  for(const saleId of ids)await sheriDelete('sales',saleId);
+  for(const entry of state.journalEntries||[]){
+    if(ids.includes(String(entry.source_id))&&['sale','sale_cogs'].includes(entry.source_type)&&!entry.voided){
+      entry.voided=true;entry.void_reason=op.reason;entry.voided_at=sheriNow();entry.voided_by=session?.user?.id||null;
+      await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});
+    }
+  }
+  if(data.audit_recorded&&op.auditRow&&sheriCan('view_audit_log')&&!state.auditLog.some(x=>x.id===op.audit_id)){
+    state.auditLog.unshift(op.auditRow);
+    await sheriPut('auditLog',op.audit_id,{merchant_id:state.merchant.id,record:{...op.auditRow}});
+  }
+  await sheriSaveSnapshot();await sheriSaveAccountingSnapshot();
+}
+async function sheriSyncSaleCartOperation(op){
+  const {data,error}=await sb.rpc('shericeri_sync_sale_cart',{
+    p_merchant_id:op.merchant_id,
+    p_sales:(op.records||[]).map(sheriServerRecord),
+    p_stock_checks:op.stock_checks||[]
+  });
+  if(error)throw error;
+  if(data?.stock_conflict){
+    for(const conflict of (data.conflicts||[])){
+      await sheriRecordConflict({type:'sale_cart_stock_conflict',transaction_id:op.transaction_id,invoice_number:op.records?.[0]?.invoice_number||null,...conflict,operation:op});
+    }
+  }
+  if(!data?.ok&&!data?.stock_conflict)throw new Error('Sale cart synchronization did not confirm a commit.');
 }
 async function sheriSyncSaleOperation(op){
   const {data,error}=await sb.rpc('shericeri_sync_sale_stock',{
@@ -1003,12 +1122,6 @@ async function sheriSyncSaleOperation(op){
     type:'stock_conflict',product_id:op.productId,local_stock:op.localStock,
     server_stock:data.server_stock,sale_id:op.record.id,operation:op
   });
-}
-async function sheriSyncVoidSale(op){
-  const {error}=await sb.rpc('shericeri_void_sale',{
-    p_merchant_id:op.merchant_id,p_sale_id:op.id,p_transaction_id:op.transaction_id||null,p_reason:op.reason,p_audit_id:op.audit_id
-  });
-  if(error)throw error;
 }
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
@@ -1046,6 +1159,7 @@ async function sheriSyncOutbox(){
       const refreshed=await sb.auth.getSession();
       if(refreshed?.data?.session){session=refreshed.data.session;}
     }catch(_){/* Supabase auto-refresh may still be completing; continue below. */}
+    if(!await sheriEnsureActiveSession())return;
     await sheriReconcileMerchantId();
     const now=Date.now();
     const items=(await sheriGetAll('outbox'))
@@ -1065,8 +1179,10 @@ async function sheriSyncOutbox(){
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
         else if(op.type==='product_delete'){const {error}=await sb.from('products').update({deleted:true}).eq('id',op.id);if(error)throw error}
+        else if(op.type==='sale_void'){await sheriSyncSaleVoidOperation(op)}
+        else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
-        else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
+        
         else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='expense_delete'){const {error}=await sb.from('expenses').delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='sale_delete'){const {error}=await sb.from('sales').delete().eq('id',op.id);if(error)throw error}
@@ -1103,8 +1219,10 @@ async function sheriSyncOutbox(){
               // Re-run this operation exactly once with the fresh token.
               if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
-              else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
-              else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
+              else if(op.type==='sale_void'){await sheriSyncSaleVoidOperation(op)}
+        else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
+        else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
+              
               else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
               else if(op.type==='purchase_delete'){const {error}=await sb.rpc('shericeri_delete_ordered_purchase',{p_merchant_id:op.merchant_id,p_purchase_id:op.id,p_reason:op.reason,p_audit_id:op.audit_id});if(error)throw error}
               else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
@@ -1154,8 +1272,8 @@ async function sheriSyncOutbox(){
 }
 
 function sheriOnlineEvents(){
-  window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sherriSyncKick()});
-  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)sherriSyncKick()});
+  window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — verifying access…');sheriEnsureActiveSession().then(ok=>{if(ok)sherriSyncKick()})});
+  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)sheriEnsureActiveSession().then(ok=>{if(ok)sherriSyncKick()})});
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator){
@@ -1573,12 +1691,63 @@ async function onAuthed(sess){
 async function signOut(){await sb.auth.signOut();session=null;location.reload()}
 
 // ── Data loading ─────────────────────────────────────────────────────────
+let sheriSessionValidation=null;
+let sheriRegisteredSessionId=null;
+let sheriLastSessionHeartbeat=0;
+function sheriJwtSessionId(){
+  try{
+    const segment=String(session?.access_token||'').split('.')[1];
+    if(!segment)return null;
+    const normalized=segment.replace(/-/g,'+').replace(/_/g,'/');
+    const binary=atob(normalized.padEnd(Math.ceil(normalized.length/4)*4,'='));
+    const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));
+    const payload=JSON.parse(new TextDecoder().decode(bytes));
+    return typeof payload.session_id==='string'?payload.session_id:null;
+  }catch(_){return null}
+}
+async function sheriEnsureActiveSession(){
+  if(!navigator.onLine||!session?.access_token||!state.merchant?.id)return true;
+  if(sheriSessionValidation)return sheriSessionValidation;
+  sheriSessionValidation=(async()=>{
+    const {data,error}=await sb.rpc('shericeri_validate_member_session',{p_merchant_id:state.merchant.id});
+    if(error){
+      sheriSetConnectivity('degraded','Unable to verify this account right now. Reconnect before accessing synced business data.');
+      console.warn('[AIBOS access] session validation failed',error);
+      return false;
+    }
+    if(data===true){
+      const sessionId=sheriJwtSessionId();
+      if(!sessionId){
+        try{await sb.auth.signOut({scope:'local'})}catch(_){}
+        session=null;location.reload();return false;
+      }
+      if(sessionId!==sheriRegisteredSessionId||Date.now()-sheriLastSessionHeartbeat>120000){
+        const {data:registered,error:registerError}=await sb.rpc('shericeri_register_member_session',{
+          p_merchant_id:state.merchant.id,p_session_id:sessionId,p_device_label:(navigator.userAgent||'Unknown device').slice(0,160)
+        });
+        if(registerError||registered!==true){
+          sheriSetConnectivity('degraded','This device session could not be registered or has been revoked.');
+          try{await sb.auth.signOut({scope:'local'})}catch(_){}
+          session=null;location.reload();return false;
+        }
+        sheriRegisteredSessionId=sessionId;sheriLastSessionHeartbeat=Date.now();
+      }
+      return true;
+    }
+    sheriSetConnectivity('degraded','This staff account or device session is disabled. Sign in again or contact the business owner.');
+    try{await sb.auth.signOut({scope:'local'})}catch(e){console.warn('[AIBOS access] local sign-out failed',e)}
+    session=null;location.reload();return false;
+  })();
+  try{return await sheriSessionValidation}finally{sheriSessionValidation=null}
+}
+
 async function loadAll(silent=false){
   const mId=state.merchant?.id; if(!mId)return;
+  if(navigator.onLine&&session?.access_token&&!await sheriEnsureActiveSession())return;
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
   if(hadLocal)render();
-  if(!navigator.onLine){await accEnsureBase();await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
+  if(!navigator.onLine){await accEnsureBase();if(sheriCan('view_financial_reports'))await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
   try{
     const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr},{data:memory,error:mErr},{data:customers,error:cErr},{data:suppliers,error:supErr},{data:purchases,error:purErr},{data:cashEntries,error:cashErr},{data:budgets,error:budErr}]=await Promise.all([
       sb.from('products').select('*').eq('merchant_id',mId).order('created_at'),
@@ -1667,7 +1836,7 @@ async function loadAll(silent=false){
       await sheriSaveAccountingSnapshot();
     }catch(e){console.warn('[Sheri accounting] server refresh failed; local accounting retained',e)}
     await accEnsureBase();
-    await accEnsureOperationalLedger();
+    if(sheriCan('view_financial_reports'))await accEnsureOperationalLedger();
     sheriSetConnectivity('online','Server data synced');
   }catch(err){
     sheriSetConnectivity('degraded','Using cached data — server refresh failed');
@@ -1892,7 +2061,14 @@ async function recordSale(){
   const rows=checked.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,product_id:x.product.id,product_name_snapshot:x.product.name,customer_id:custId,qty:x.qty,price:x.price,cost:x.product.cost,created_at:createdAt}));
   checked.forEach(x=>{x.product.stock-=x.qty});state.sales.push(...rows);await sheriSaveSnapshot();window.__lastReceipt={business:state.merchant.name,invoice,createdAt,total,items:checked.map(x=>({name:x.product.name,qty:x.qty,price:x.price}))};
   const pb=document.getElementById('printReceiptBtn');if(pb)pb.disabled=false;saleCart=[];renderSaleCart();render();sheriToast('Sale confirmed. Receipt '+invoice+' is ready to print.');
-  for(let i=0;i<rows.length;i++){const s=rows[i],p=checked[i].product;await sheriQueue({type:'sale_upsert',record:s,productId:p.id,localStock:p.stock,expectedServerStock:p.stock+checked[i].qty})}
+  const stockByProduct=new Map();
+  for(const item of checked){
+    const existing=stockByProduct.get(item.product.id);
+    if(existing)existing.qty+=item.qty;
+    else stockByProduct.set(item.product.id,{product_id:item.product.id,qty:item.qty,local_stock:Number(item.product.stock||0),expected_server_stock:Number(item.product.stock||0)+item.qty});
+  }
+  const stockChecks=[...stockByProduct.values()].map(({product_id,local_stock,expected_server_stock})=>({product_id,local_stock,expected_server_stock}));
+  await sheriQueue({type:'sale_cart_upsert',merchant_id:state.merchant.id,transaction_id:transactionId,records:rows,stock_checks:stockChecks});
   if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] background sync',e));
 }
 async function voidSale(id){
@@ -1904,28 +2080,21 @@ async function voidSale(id){
   const total=rows.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0);
   const reason=prompt('Enter the reason for voiding this sale (required):');
   if(!reason||reason.trim().length<3)return sheriToast('A clear void reason is required.','error');
-  const confirmText='Void '+(invoice?'entire invoice '+invoice:'this sale')+'?\\n'+rows.map(x=>(x.qty||0)+' × '+(x.product_name_snapshot||product(x.product_id)?.name||'Product')+' — '+money((x.qty||0)*(x.price||0))).join('\\n')+'\\nTotal: '+money(total)+'\\nReason: '+reason.trim();
+  const confirmText='Void '+(invoice?'entire invoice '+invoice:'this sale')+'?\n'+rows.map(x=>(x.qty||0)+' × '+(x.product_name_snapshot||product(x.product_id)?.name||'Product')+' — '+money((x.qty||0)*(x.price||0))).join('\n')+'\nTotal: '+money(total)+'\nReason: '+reason.trim();
   if(!confirm(confirmText))return;
-  const auditId=sheriUuid(),saleIds=rows.map(x=>x.id);
+  const saleIds=rows.map(x=>x.id),auditId=sheriUuid();
+  const existing=(await sheriGetAll('outbox')).some(x=>x.op?.type==='sale_void'&&(x.op.sale_ids?.some(v=>saleIds.includes(v))||(transactionId&&x.op.transaction_id===transactionId)));
+  if(existing)return sheriToast('A void request for this invoice is already waiting to sync.','warning');
   const auditRow={id:auditId,merchant_id:state.merchant.id,actor_user_id:session?.user?.id||null,action:'void',entity_type:'sale',entity_id:id,reason:reason.trim(),details:{actor_name:state.merchant?.user_id===session?.user?.id?'Owner':state.currentMembership?.full_name||session?.user?.email||'Staff',reason:reason.trim(),invoice_number:invoice||null,transaction_id:transactionId,amount:total,sale_ids:saleIds,line_count:rows.length},created_at:sheriNow()};
-  state.auditLog.unshift(auditRow);
-  await sheriPut('auditLog',auditId,{merchant_id:state.merchant.id,record:{...auditRow}});
-  for(const row of rows){
-    const p=product(row.product_id);if(p)p.stock=Number(p.stock||0)+Number(row.qty||0);
-    await sheriDelete('sales',row.id);
-  }
-  state.sales=state.sales.filter(x=>!saleIds.includes(x.id));
-  for(const entry of state.journalEntries||[]){
-    if(saleIds.includes(entry.source_id)&&['sale','sale_cogs'].includes(entry.source_type)&&!entry.voided){
-      entry.voided=true;entry.void_reason=reason.trim();entry.voided_at=sheriNow();entry.voided_by=session?.user?.id||null;
-      await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});
-    }
-  }
-  await sheriSaveSnapshot();await sheriSaveAccountingSnapshot();
-  await sheriQueue({type:'sale_void',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId});
+  for(const row of rows){row.void_pending=true;await sheriPut('sales',row.id,{merchant_id:state.merchant.id,record:{...row}})}
+  await sheriQueue({type:'sale_void',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId,sale_ids:saleIds,records:rows.map(x=>({...x})),auditRow});
   if(navigator.onLine)await sheriSyncOutbox();
-  render();sheriToast((invoice?'Invoice '+invoice:'Sale')+' voided with stock and accounting reversal recorded.');
+  const stillPending=(await sheriGetAll('outbox')).some(x=>x.op?.type==='sale_void'&&x.op.audit_id===auditId);
+  render();
+  if(stillPending)sheriToast('Void request is waiting for server confirmation. The sale remains active until the server accepts it.','warning');
+  else sheriToast((invoice?'Invoice '+invoice:'Sale')+' voided; stock and accounting were updated by the server.');
 }
+
 
 const sheriSearchValues={};
 function sheriSearchControl(key,target,placeholder,values){
@@ -1941,7 +2110,7 @@ function sheriSearchTable(input){
 function renderSales(){
   const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);
   const rows=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\''+s.id+'\')">Void</button>':''}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
+  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${s.void_pending?'<span class="muted">Void pending</span>':(sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\''+s.id+'\')">Void</button>':'')}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
 }
 
 // ── Products ─────────────────────────────────────────────────────────────
@@ -2425,7 +2594,39 @@ function renderForecast(){
 let teamLoadedForMerchant=null;
 async function loadTeamMembers(force=false){
  if(!state.merchant||!sb)return;if(!force&&teamLoadedForMerchant===state.merchant.id)return;teamLoadedForMerchant=state.merchant.id;
- try{const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,last_login_at').eq('merchant_id',state.merchant.id).order('created_at',{ascending:false});if(error)throw error;state.teamMembers=data||[];state.currentMembership=state.teamMembers.find(x=>x.user_id===session?.user?.id)||null;const can=state.merchant.user_id===session?.user?.id||state.currentMembership?.role==='admin'||(state.currentMembership?.role==='manager'&&state.currentMembership?.permissions?.manage_team===true);const card=document.getElementById('teamAccessCard');if(card)card.style.display=can?'block':'none';renderTeamMembers();renderTeamAuditTrail()}catch(e){teamLoadedForMerchant=null;console.warn('[AIBOS team]',e)}
+ try{const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,last_login_at').eq('merchant_id',state.merchant.id).order('created_at',{ascending:false});if(error)throw error;state.teamMembers=data||[];state.currentMembership=state.teamMembers.find(x=>x.user_id===session?.user?.id)||null;await loadTeamSessions();const can=state.merchant.user_id===session?.user?.id||state.currentMembership?.role==='admin'||(state.currentMembership?.role==='manager'&&state.currentMembership?.permissions?.manage_team===true);const card=document.getElementById('teamAccessCard');if(card)card.style.display=can?'block':'none';renderTeamMembers();renderTeamAuditTrail()}catch(e){teamLoadedForMerchant=null;console.warn('[AIBOS team]',e)}
+}
+async function loadTeamSessions(){
+ const host=document.getElementById('teamSessionsTable');if(!host)return;
+ const can=state.merchant?.user_id===session?.user?.id||sheriCan('manage_team');
+ if(!can){host.innerHTML='';state.teamSessions=[];return;}
+ const {data,error}=await sb.rpc('shericeri_list_member_sessions',{p_merchant_id:state.merchant.id});
+ if(error)throw error;
+ state.teamSessions=Array.isArray(data)?data:[];
+ renderTeamSessions();
+}
+function renderTeamSessions(){
+ const host=document.getElementById('teamSessionsTable');if(!host)return;
+ const rows=state.teamSessions||[];
+ const body=rows.map(x=>{
+   const action=x.revoked_at?'—':`<button class="btn small danger" onclick="revokeTeamDevice('${esc(x.session_id)}')">Revoke device</button>`;
+   return `<tr><td>${esc(x.member_name||'Staff')}</td><td>${esc(x.device_label||'Unknown device')}</td><td>${new Date(x.last_seen_at||x.created_at).toLocaleString()}</td><td>${x.revoked_at?'Revoked':'Active'}</td><td>${action}</td></tr>`;
+ }).join('');
+ host.innerHTML='<h3>Device sessions</h3>'+(rows.length?`<table class="table" style="min-width:760px"><tr><th>Team member</th><th>Device / browser</th><th>Last active</th><th>Status</th><th>Action</th></tr>${body}</table>`:'<div class="empty">No registered device sessions yet. Sessions appear when team members sign in.</div>');
+}
+async function revokeTeamDevice(sessionId){
+ const reason=prompt('Reason for revoking this device session (required):');
+ if(!reason||reason.trim().length<3)return sheriToast('A clear device-revocation reason is required.','error');
+ try{
+   const {data,error}=await sb.rpc('shericeri_revoke_member_session',{p_merchant_id:state.merchant.id,p_session_id:sessionId,p_reason:reason.trim()});
+   if(error)throw error;
+   if(data!==true)throw new Error('Device session was not found.');
+   if(sessionId===sheriJwtSessionId()){
+     await sb.auth.signOut({scope:'local'});session=null;location.reload();return;
+   }
+   await loadTeamSessions();
+   sheriToast('Device access revoked.');
+ }catch(e){sheriToast(e?.message||'Could not revoke device access.','error')}
 }
 function renderTeamMembers(){
  const host=document.getElementById('teamMembersTable');if(!host)return;
@@ -4774,8 +4975,14 @@ async function accCreateBankAccount(){await accEnsureBase();const name=document.
 async function accReconcileBank(id){const b=state.bankAccounts.find(x=>x.id===id);if(!b)return;const d=prompt('Reconciled through date (YYYY-MM-DD):',accToday());if(!d||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d))return alert('Use YYYY-MM-DD.');const statement=Number(prompt('Statement balance:',String(accNormalAmount(accAccount(b.account_id))||0)));if(!Number.isFinite(statement))return;const ledger=accNormalAmount(accAccount(b.account_id));b.last_reconciled_at=d;b.reconciled_balance=statement;b.reconciled_difference=statement-ledger;await accUpdate('bank_accounts',b);await accAudit('reconcile','bank_account',b.id,{statement,ledger,difference:b.reconciled_difference});render();}
 async function accCreateTaxRate(){const name=document.getElementById('accTaxName').value.trim(),rate=Number(document.getElementById('accTaxRate').value),type=document.getElementById('accTaxType').value;if(!name||rate<0)return alert('Enter a tax name and rate.');const row={id:sheriUuid(),merchant_id:state.merchant.id,name,rate,type,active:true,created_at:sheriNow()};state.taxRates.push(row);await sheriPut('taxRates',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'tax_rates',record:row});document.getElementById('accTaxName').value='';document.getElementById('accTaxRate').value='';render();}
 async function accCreateRecurring(){const description=document.getElementById('accRecDesc').value.trim(),amount=Number(document.getElementById('accRecAmount').value),frequency=document.getElementById('accRecFreq').value,next_run=document.getElementById('accRecNext').value||accToday();if(!description||amount<=0)return alert('Enter recurring transaction details.');const row={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,frequency,next_run,active:true,created_at:sheriNow()};state.recurringTransactions.push(row);await sheriPut('recurringTransactions',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'recurring_transactions',record:row});render();}
+async function sheriStableUuid(seed){
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(seed)));
+  const hex=Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,32).split('');
+  hex[12]='5';hex[16]='89ab'[parseInt(hex[16],16)&3];
+  const value=hex.join('');return value.slice(0,8)+'-'+value.slice(8,12)+'-'+value.slice(12,16)+'-'+value.slice(16,20)+'-'+value.slice(20);
+}
 function accNextDate(date,freq){const d=new Date(date+'T12:00:00');if(freq==='daily')d.setDate(d.getDate()+1);else if(freq==='weekly')d.setDate(d.getDate()+7);else d.setMonth(d.getMonth()+1);return d.toISOString().slice(0,10)}
-async function accRunDueRecurring(){const expense=accAccountCode('6000'),cash=accAccountCode('1000');for(const r of state.recurringTransactions.filter(x=>x.active&&x.next_run<=accToday())){await accPostEntry({date:r.next_run,description:r.description,sourceType:'recurring',sourceId:r.id+'-'+r.next_run,lines:[{accountId:expense.id,debit:r.amount},{accountId:cash.id,credit:r.amount}]});r.next_run=accNextDate(r.next_run,r.frequency);await accUpdate('recurring_transactions',r)}render();}
+async function accRunDueRecurring(){const expense=accAccountCode('6000'),cash=accAccountCode('1000');for(const r of state.recurringTransactions.filter(x=>x.active&&x.next_run<=accToday())){await accPostEntry({date:r.next_run,description:r.description,sourceType:'recurring',sourceId:await sheriStableUuid(r.id+':'+r.next_run),lines:[{accountId:expense.id,debit:r.amount},{accountId:cash.id,credit:r.amount}]});r.next_run=accNextDate(r.next_run,r.frequency);await accUpdate('recurring_transactions',r)}render();}
 async function accPostOpeningBalance(){const accountId=document.getElementById('accOpeningAccount').value,amount=Number(document.getElementById('accOpeningAmount').value),side=document.getElementById('accOpeningSide').value,date=document.getElementById('accOpeningDate').value||accToday();if(!accountId||amount<=0)return alert('Enter an opening balance.');const equity=accAccountCode('3000');await accPostEntry({date,description:'Opening balance',sourceType:'opening_balance',sourceId:sheriUuid(),lines:[{accountId,debit:side==='debit'?amount:0,credit:side==='credit'?amount:0},{accountId:equity.id,debit:side==='credit'?amount:0,credit:side==='debit'?amount:0}]});document.getElementById('accOpeningAmount').value='';render();}
 async function accSaveLockDate(){const date=document.getElementById('accLockDate').value||null;state.accountingSettings=state.accountingSettings||{id:sheriUuid(),merchant_id:state.merchant.id};state.accountingSettings.locked_through=date;state.accountingSettings.updated_at=sheriNow();await sheriPut('accountingSettings','settings',{merchant_id:state.merchant.id,record:{...state.accountingSettings}});await sheriQueue({type:'accounting_settings_upsert',record:{...state.accountingSettings}});render();}
 async function accRebuildFromOperations(){if(!confirm('Rebuild missing accounting entries from existing sales, purchases and expenses? Existing entries will be preserved; duplicates are skipped.'))return;await accEnsureBase();for(const s of state.sales){const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000'),total=s.qty*s.price,c=s.qty*(s.cost||0);await accPostEntry({date:String(s.created_at).slice(0,10),description:'Sale '+(s.product_name_snapshot||''),sourceType:'sale',sourceId:s.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});if(c>0)await accPostEntry({date:String(s.created_at).slice(0,10),description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:c},{accountId:inv.id,credit:c}]})}for(const p of state.purchases.filter(x=>x.status!=='ordered')){const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||p.qty*p.unit_cost);await accPostEntry({date:String(p.purchased_at||p.created_at).slice(0,10),description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]})}for(const e of state.expenses){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:String(e.created_at).slice(0,10),description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:Number(e.amount||0)},{accountId:cash.id,credit:Number(e.amount||0)}]})}alert('Accounting rebuild completed for records that did not already have ledger entries.');render();}

@@ -5,7 +5,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.kinya-tts]
-verify_jwt = true
+verify_jwt = false
 
 [functions.team-access]
 verify_jwt = false

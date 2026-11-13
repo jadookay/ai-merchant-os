@@ -41,15 +41,16 @@ Deno.serve(async (req: Request) => {
       const ip = req.headers.get("cf-connecting-ip") || "unknown";
       const ipHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))), b => b.toString(16).padStart(2, "0")).join("");
       const { data: merchant, error: merchantError } = await admin.from("merchants").select("id").eq("shericeri_id", Number(merchantCode)).maybeSingle();
-      if (merchantError || !merchant) return json({ error: "Business account ID was not recognized." }, 404);
+      if (merchantError) throw merchantError;
       const { data: verified, error: verifyError } = await admin.rpc("verify_merchant_member_pin", {
-        p_merchant_id: merchant.id,
-        p_identifier: identifier,
+        p_merchant_id: merchant?.id || null,
+        p_identifier: merchant ? identifier : merchantCode,
         p_pin: pin,
         p_ip_hash: ipHash,
       });
       if (verifyError) throw verifyError;
-      if (!verified?.ok) return json({ error: verified?.rate_limited ? "Too many attempts. Try again in 15 minutes." : "The sign-in details were not recognized." }, 401);
+      if (!merchant) return json({ error: verified?.rate_limited ? "Too many attempts. Try again in 15 minutes." : "The sign-in details were not recognized." }, verified?.rate_limited ? 429 : 401);
+      if (!verified?.ok) return json({ error: verified?.rate_limited ? "Too many attempts. Try again in 15 minutes." : "The sign-in details were not recognized." }, verified?.rate_limited ? 429 : 401);
 
       const { data: authUser, error: userError } = await admin.auth.admin.getUserById(verified.user_id);
       if (userError || !authUser?.user) throw userError || new Error("User account not found");
@@ -239,6 +240,7 @@ Deno.serve(async (req: Request) => {
         .select("id,user_id,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
+      if (status === "active" && target?.status === "suspended" && !pin) return json({ error: "Set a new 6–8 digit PIN before re-enabling this member." }, 400);
       const nextEmail = email === undefined ? target.email : email;
       const nextPhone = phone === undefined ? target.phone : phone;
       const nextUsername = username === undefined ? target.username : username;
@@ -258,6 +260,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status, updated_at: new Date().toISOString() };
+      if (status === "suspended") memberPatch.pin_hash = null;
       if (email !== undefined) memberPatch.email = email;
       if (phone !== undefined) memberPatch.phone = phone;
       if (username !== undefined) memberPatch.username = username;
@@ -266,6 +269,18 @@ Deno.serve(async (req: Request) => {
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
+      if (status === "suspended" && target.status !== "suspended") {
+        const { error: deviceError } = await admin.rpc("shericeri_revoke_member_sessions", {
+          p_merchant_id: merchantId, p_member_id: memberId,
+        });
+        if (deviceError) throw deviceError;
+        // Password rotation invalidates existing refresh sessions. RLS and the
+        // private session helper reject any still-unexpired access JWT as well.
+        const { error: revokeError } = await admin.auth.admin.updateUserById(target.user_id, {
+          password: randomPassword(),
+        });
+        if (revokeError) throw revokeError;
+      }
       if (email && email !== target.email) {
         const { error: authEmailError } = await admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true });
         if (authEmailError) {
@@ -275,7 +290,12 @@ Deno.serve(async (req: Request) => {
       }
       if (pin) {
         const { error: pinError } = await admin.rpc("set_merchant_member_pin", { p_member_id: memberId, p_pin: pin });
-        if (pinError) throw pinError;
+        if (pinError) {
+          if (target.status === "suspended" && status === "active") {
+            await admin.from("merchant_members").update({ status: "suspended", pin_hash: null }).eq("id", memberId).eq("merchant_id", merchantId);
+          }
+          throw pinError;
+        }
       }
       return json({ ok: true, member: updated });
     }
