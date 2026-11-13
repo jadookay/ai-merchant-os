@@ -743,3 +743,9 @@ test("sale void RPC checks authorization before acquiring the invoice lock", () 
   const fn=teamMigration.slice(teamMigration.indexOf("create or replace function public.shericeri_void_sale"),teamMigration.indexOf("revoke all on function public.shericeri_void_sale"));
   assert.ok(fn.indexOf("private.user_can_access_merchant(v_merchant_id,'manage_team')") < fn.indexOf("pg_advisory_xact_lock"));
 });
+
+test("sale void cannot report success for a missing or cross-merchant sale", () => {
+  const fn=teamMigration.slice(teamMigration.indexOf("create or replace function public.shericeri_void_sale"),teamMigration.indexOf("revoke all on function public.shericeri_void_sale"));
+  assert.ok(fn.includes("raise exception 'Sale not found or no longer available'"));
+  assert.ok(html.includes("if(!ids.length)throw new Error('The server did not return the sale lines for this void request.')"));
+});
