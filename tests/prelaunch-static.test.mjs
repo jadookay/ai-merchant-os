@@ -8,6 +8,7 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const releaseMigration = await readFile(new URL("../supabase/migrations/20261114010000_aibos_release_hardening.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -427,6 +428,59 @@ test("stock conflicts do not create partial sale or purchase records", () => {
   const purchase=teamMigration.slice(purchaseStart);
   assert.ok(purchase.indexOf("if v_current_stock<>p_expected_server_stock") < purchase.indexOf("insert into public.purchases"));
   assert.ok(purchase.includes("return jsonb_build_object('ok',false,'stock_conflict',true"));
+});
+
+test("sale void RPC cannot be reached through manage_finance alone", () => {
+  const start = teamMigration.indexOf("create or replace function public.shericeri_void_sale");
+  const end = teamMigration.indexOf("revoke all on function public.shericeri_void_sale", start);
+  assert.ok(start >= 0 && end > start);
+  const fn = teamMigration.slice(start, end);
+  assert.match(fn, /if not private\.user_can_access_merchant\(v_merchant_id,'manage_sales'\) then/);
+  assert.doesNotMatch(fn, /or private\.user_can_access_merchant\(v_merchant_id,'manage_finance'\)/);
+});
+
+test("operational insert permissions remain independent of team administration while edits and deletes stay manager-restricted", () => {
+  assert.match(teamMigration, /for insert to authenticated with check \(private\.user_can_access_merchant\(merchant_id,%L\)\)/);
+  assert.match(teamMigration, /private\.user_can_access_merchant\(merchant_id,''manage_team''\) and private\.user_can_access_merchant\(merchant_id,%L\)/);
+  assert.match(teamMigration, /if insert_perm is not null and t\.table_name not in/);
+});
+
+test("multi-line carts queue and synchronize as one atomic server operation", () => {
+  assert.match(html, /type:'sale_cart_upsert',merchant_id:state\.merchant\.id,transaction_id:transactionId/);
+  assert.match(html, /async function sheriSyncSaleCartOperation\(op\)[\s\S]*?sb\.rpc\('shericeri_sync_sale_cart'/);
+  const syncStart = html.indexOf("async function sheriSyncOutbox(){");
+  const syncEnd = html.indexOf("\\nfunction sheriOnlineEvents(){", syncStart);
+  assert.ok(syncStart >= 0 && syncEnd > syncStart);
+  const sync = html.slice(syncStart, syncEnd);
+  assert.equal((sync.match(/op\.type==='sale_cart_upsert'/g)||[]).length, 2,
+    "normal and 401 retry paths must both handle the cart RPC");
+  const start = releaseMigration.indexOf("create or replace function public.shericeri_sync_sale_cart");
+  const end = releaseMigration.indexOf("revoke all on function public.shericeri_sync_sale_cart", start);
+  assert.ok(start >= 0 && end > start);
+  const rpc = releaseMigration.slice(start, end);
+  assert.match(rpc, /order by \(value->>'product_id'\)::uuid[\\s\\S]*?for update/);
+  assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("update public.products"));
+  assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("insert into public.sales"));
+  assert.match(rpc, /partial sale cart with this transaction ID already exists/i);
+});
+
+test("PIN throttling locks independent identity and IP buckets and rejects concurrent bypasses", () => {
+  assert.match(releaseMigration, /v_identity_key := 'identity:'/);
+  assert.match(releaseMigration, /v_ip_key := 'ip:'/);
+  assert.match(releaseMigration, /perform 1[\\s\\S]*?order by attempt_key[\\s\\S]*?for update/);
+  assert.match(releaseMigration, /blocked_until=case[\\s\\S]*?interval '15 minutes'/);
+  assert.match(releaseMigration, /revoke all on function public\.verify_merchant_member_pin/);
+  assert.match(releaseMigration, /grant execute on function public\.verify_merchant_member_pin.*to service_role/);
+  assert.match(teamAccess, /const ip = req\.headers\.get\("cf-connecting-ip"\)/);
+  assert.match(teamAccess, /: "";/);
+});
+
+test("privileged accounting RPCs are not executable by anon or PUBLIC", () => {
+  assert.match(releaseMigration, /revoke all on function public\.shericeri_get_accounting_snapshot\(uuid\) from public,anon/);
+  assert.match(releaseMigration, /revoke all on function public\.shericeri_sync_journal_batch\(uuid,uuid,date,text,text,uuid,jsonb\) from public,anon/);
+  for (const fn of ["set_merchants_updated_at","set_accounting_settings_updated_at","prevent_locked_journal_entry","prevent_locked_journal_line"]) {
+    assert.ok(releaseMigration.includes("alter function public."+fn+"() set search_path = ''"));
+  }
 });
 
 test("voided server sales are excluded from the active sales workspace", () => {
