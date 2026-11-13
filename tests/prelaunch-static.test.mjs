@@ -433,7 +433,7 @@ test("stock conflicts do not create partial sale or purchase records", () => {
 });
 
 test("voided server sales are excluded from the active sales workspace", () => {
-  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales).filter(x=>!x.voided)"));
+  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales,sheriCan('view_sales')||sheriCan('manage_sales')).filter(x=>!x.voided)"));
 });
 
 
