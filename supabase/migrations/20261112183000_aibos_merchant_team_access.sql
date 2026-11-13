@@ -42,23 +42,43 @@ grant usage on schema private to authenticated;
 create or replace function private.user_can_access_merchant(p_merchant_id uuid,p_permission text default 'view_dashboard')
 returns boolean language sql stable security definer set search_path=''
 as $$
-  select exists(select 1 from public.merchants m where m.id=p_merchant_id and m.user_id=(select auth.uid()))
-  or exists(
-    select 1 from public.merchant_members mm
-    where mm.merchant_id=p_merchant_id and mm.user_id=(select auth.uid()) and mm.status='active'
-    and (
-      (mm.role='admin' and p_permission<>'manage_owner')
-      or (
-        coalesce((mm.permissions->>p_permission)::boolean,false)
-        and (p_permission not in ('manage_team','manage_sales') or mm.role='manager')
+  select exists(
+    select 1 from auth.sessions s
+    where s.id=nullif((select auth.jwt()->>'session_id'),'')::uuid
+      and s.user_id=(select auth.uid())
+  ) and (
+    exists(select 1 from public.merchants m where m.id=p_merchant_id and m.user_id=(select auth.uid()))
+    or exists(
+      select 1 from public.merchant_members mm
+      where mm.merchant_id=p_merchant_id and mm.user_id=(select auth.uid()) and mm.status='active'
+      and (
+        (mm.role='admin' and p_permission<>'manage_owner')
+        or (
+          coalesce((mm.permissions->>p_permission)::boolean,false)
+          and (p_permission not in ('manage_team','manage_sales') or mm.role='manager')
+        )
+        or p_permission in ('view_dashboard','member_active')
+        or (p_permission='view_inventory' and (coalesce((mm.permissions->>'create_sale')::boolean,false) or coalesce((mm.permissions->>'manage_inventory')::boolean,false)))
       )
-      or p_permission in ('view_dashboard','member_active')
-      or (p_permission='view_inventory' and (coalesce((mm.permissions->>'create_sale')::boolean,false) or coalesce((mm.permissions->>'manage_inventory')::boolean,false)))
     )
   );
 $$;
 revoke all on function private.user_can_access_merchant(uuid,text) from public,anon;
 grant execute on function private.user_can_access_merchant(uuid,text) to authenticated;
+
+-- Exposed validation endpoint lets the client detect revoked or disabled sessions
+-- when a device reconnects or returns to the foreground.
+create or replace function public.shericeri_validate_member_session(p_merchant_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path=''
+as $$
+  select private.user_can_access_merchant(p_merchant_id,'view_dashboard');
+$$;
+revoke all on function public.shericeri_validate_member_session(uuid) from public,anon;
+grant execute on function public.shericeri_validate_member_session(uuid) to authenticated;
 
 create or replace function public.set_merchant_member_pin(p_member_id uuid,p_pin text)
 returns void language plpgsql security definer set search_path=''
@@ -78,44 +98,75 @@ returns jsonb language plpgsql security definer set search_path=''
 as $$
 declare
   v_identifier text:=lower(trim(coalesce(p_identifier,'')));
+  v_identifier_key text;
+  v_ip_key text;
   v_key text;
-  v_attempt public.team_login_attempts%rowtype;
   v_member public.merchant_members%rowtype;
   v_count integer;
 begin
   if coalesce(auth.jwt()->>'role','')<>'service_role' then raise exception 'not authorized'; end if;
-  if p_merchant_id is null or length(v_identifier)<2 or p_pin !~ '^[0-9]{6,8}$' then return jsonb_build_object('ok',false); end if;
-  v_key:=encode(extensions.digest(p_merchant_id::text||':'||v_identifier||':'||coalesce(p_ip_hash,''),'sha256'),'hex');
-  select * into v_attempt from public.team_login_attempts where attempt_key=v_key for update;
-  if found and v_attempt.blocked_until is not null and v_attempt.blocked_until>now() then
-    return jsonb_build_object('ok',false,'rate_limited',true);
+  if p_merchant_id is null or length(v_identifier)<2
+     or p_pin is null or p_pin !~ '^[0-9]{6,8}$'
+     or coalesce(p_ip_hash,'') !~ '^[a-f0-9]{64}$' then
+    return jsonb_build_object('ok',false);
   end if;
+
+  -- One bucket follows the account identifier across IP changes; a second
+  -- bucket limits a single source IP across many guessed names/accounts.
+  v_identifier_key:='identifier:'||encode(extensions.digest(p_merchant_id::text||':'||v_identifier,'sha256'),'hex');
+  v_ip_key:='ip:'||encode(extensions.digest(p_merchant_id::text||':'||p_ip_hash,'sha256'),'hex');
+
+  perform 1 from public.team_login_attempts
+  where attempt_key in (v_identifier_key,v_ip_key)
+  order by attempt_key for update;
+  if exists(
+    select 1 from public.team_login_attempts
+    where attempt_key in (v_identifier_key,v_ip_key)
+      and blocked_until is not null and blocked_until>now()
+  ) then return jsonb_build_object('ok',false,'rate_limited',true); end if;
+
   select count(*) into v_count from public.merchant_members mm
   where mm.merchant_id=p_merchant_id and mm.status='active'
     and (lower(coalesce(mm.email,''))=v_identifier or lower(coalesce(mm.username,''))=v_identifier or lower(mm.full_name)=v_identifier
       or (coalesce(mm.phone,'')<>'' and regexp_replace(mm.phone,'[^0-9+]','','g')=regexp_replace(v_identifier,'[^0-9+]','','g')));
+
   if v_count<>1 then
-    insert into public.team_login_attempts(attempt_key,attempt_count,window_started_at,blocked_until) values(v_key,1,now(),null)
-    on conflict(attempt_key) do update set
-      attempt_count=case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then 1 else public.team_login_attempts.attempt_count+1 end,
-      window_started_at=case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then now() else public.team_login_attempts.window_started_at end,
-      blocked_until=case when public.team_login_attempts.attempt_count>=4 then now()+interval '15 minutes' else null end;
+    for v_key in select unnest(array[v_identifier_key,v_ip_key]) loop
+      insert into public.team_login_attempts(attempt_key,attempt_count,window_started_at,blocked_until)
+      values(v_key,1,now(),null)
+      on conflict(attempt_key) do update set
+        attempt_count=case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then 1 else public.team_login_attempts.attempt_count+1 end,
+        window_started_at=case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then now() else public.team_login_attempts.window_started_at end,
+        blocked_until=case
+          when (case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then 1 else public.team_login_attempts.attempt_count+1 end)
+             >= case when left(excluded.attempt_key,3)='ip:' then 20 else 5 end
+          then now()+interval '15 minutes' else null end;
+    end loop;
     return jsonb_build_object('ok',false);
   end if;
+
   select * into v_member from public.merchant_members mm
   where mm.merchant_id=p_merchant_id and mm.status='active'
     and (lower(coalesce(mm.email,''))=v_identifier or lower(coalesce(mm.username,''))=v_identifier or lower(mm.full_name)=v_identifier
       or (coalesce(mm.phone,'')<>'' and regexp_replace(mm.phone,'[^0-9+]','','g')=regexp_replace(v_identifier,'[^0-9+]','','g')))
   limit 1;
+
   if v_member.pin_hash is null or extensions.crypt(p_pin,v_member.pin_hash)<>v_member.pin_hash then
-    insert into public.team_login_attempts(attempt_key,attempt_count,window_started_at,blocked_until) values(v_key,1,now(),null)
-    on conflict(attempt_key) do update set
-      attempt_count=case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then 1 else public.team_login_attempts.attempt_count+1 end,
-      window_started_at=case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then now() else public.team_login_attempts.window_started_at end,
-      blocked_until=case when public.team_login_attempts.attempt_count>=4 then now()+interval '15 minutes' else null end;
+    for v_key in select unnest(array[v_identifier_key,v_ip_key]) loop
+      insert into public.team_login_attempts(attempt_key,attempt_count,window_started_at,blocked_until)
+      values(v_key,1,now(),null)
+      on conflict(attempt_key) do update set
+        attempt_count=case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then 1 else public.team_login_attempts.attempt_count+1 end,
+        window_started_at=case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then now() else public.team_login_attempts.window_started_at end,
+        blocked_until=case
+          when (case when public.team_login_attempts.window_started_at<now()-interval '15 minutes' then 1 else public.team_login_attempts.attempt_count+1 end)
+             >= case when left(excluded.attempt_key,3)='ip:' then 20 else 5 end
+          then now()+interval '15 minutes' else null end;
+    end loop;
     return jsonb_build_object('ok',false);
   end if;
-  delete from public.team_login_attempts where attempt_key=v_key;
+
+  delete from public.team_login_attempts where attempt_key=v_identifier_key;
   update public.merchant_members set last_login_at=now() where id=v_member.id;
   return jsonb_build_object('ok',true,'user_id',v_member.user_id,'merchant_id',v_member.merchant_id,'email',v_member.email,'phone',v_member.phone,'role',v_member.role);
 end;
