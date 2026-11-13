@@ -870,49 +870,82 @@ set search_path=''
 as $$
 declare
   v_merchant_id uuid;
+  v_sale_merchant_id uuid;
+  v_initial_transaction_id uuid;
   v_transaction_id uuid;
   v_invoice_number text;
   v_amount numeric;
   v_line_count integer;
   v_sale_ids jsonb;
+  v_stock_updates jsonb;
+  v_audit_recorded boolean:=false;
   v_sale_date date;
   v_lock date;
   v_original record;
   v_reversal_id uuid;
 begin
-  if p_sale_id is null or coalesce(length(trim(p_reason)),0)<3 then raise exception 'A clear void reason is required'; end if;
-  v_merchant_id:=coalesce(p_merchant_id,(select merchant_id from public.sales where id=p_sale_id));
-  if v_merchant_id is null then return jsonb_build_object('ok',true,'already_voided',true); end if;
-  -- Voiding is a manager-level destructive action. A finance permission alone
-  -- must never let a Cashier or Accountant void a sale through a direct RPC call.
+  if p_sale_id is null or p_audit_id is null or coalesce(length(trim(p_reason)),0)<3 then
+    raise exception 'A clear void reason and sale identifiers are required';
+  end if;
+
+  select merchant_id,transaction_id into v_sale_merchant_id,v_initial_transaction_id
+  from public.sales where id=p_sale_id;
+  if not found then return jsonb_build_object('ok',true,'already_voided',true,'sale_ids','[]'::jsonb,'stock_updates','[]'::jsonb,'audit_recorded',false); end if;
+  v_merchant_id:=coalesce(p_merchant_id,v_sale_merchant_id);
+  if v_merchant_id is distinct from v_sale_merchant_id then
+    return jsonb_build_object('ok',true,'already_voided',true,'sale_ids','[]'::jsonb,'stock_updates','[]'::jsonb,'audit_recorded',false);
+  end if;
+
+  -- Serialize all void requests for the same invoice before taking row locks.
+  perform pg_advisory_xact_lock(hashtextextended(v_merchant_id::text||':'||coalesce(v_initial_transaction_id::text,p_sale_id::text),0));
   if not (private.user_can_access_merchant(v_merchant_id,'manage_team')
       and private.user_can_access_merchant(v_merchant_id,'manage_sales')) then
     raise exception 'Only the owner, an administrator, or an authorized manager can void sales';
   end if;
-  -- Derive the transaction from the selected sale row. Never trust a caller-
-  -- supplied transaction ID to widen the target set to a different invoice.
+
   select transaction_id,invoice_number,created_at::date
     into v_transaction_id,v_invoice_number,v_sale_date
   from public.sales
   where merchant_id=v_merchant_id and id=p_sale_id
   for update;
-  if not found then return jsonb_build_object('ok',true,'already_voided',true); end if;
+  if not found then return jsonb_build_object('ok',true,'already_voided',true,'sale_ids','[]'::jsonb,'stock_updates','[]'::jsonb,'audit_recorded',false); end if;
+  if v_transaction_id is distinct from v_initial_transaction_id then
+    raise exception 'Sale transaction changed while the void was being processed; retry';
+  end if;
   if p_transaction_id is not null and p_transaction_id is distinct from v_transaction_id then
     raise exception 'Transaction ID does not match the selected sale';
   end if;
+
   perform 1 from public.sales
    where merchant_id=v_merchant_id
      and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
+   order by id
    for update;
+
   if not exists(select 1 from public.sales where merchant_id=v_merchant_id
       and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
       and coalesce(voided,false)=false) then
-    return jsonb_build_object('ok',true,'already_voided',true);
+    select coalesce(jsonb_agg(id),'[]'::jsonb) into v_sale_ids
+    from public.sales where merchant_id=v_merchant_id
+      and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id));
+    select coalesce(jsonb_agg(jsonb_build_object('product_id',p.id,'stock',p.stock)),'[]'::jsonb)
+      into v_stock_updates
+    from public.products p
+    where p.merchant_id=v_merchant_id and p.id in (
+      select distinct product_id from public.sales
+      where merchant_id=v_merchant_id and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
+        and product_id is not null
+    );
+    select exists(select 1 from public.audit_log where id=p_audit_id) into v_audit_recorded;
+    return jsonb_build_object('ok',true,'already_voided',true,'sale_ids',v_sale_ids,
+      'stock_updates',v_stock_updates,'audit_recorded',v_audit_recorded);
   end if;
+
   select locked_through into v_lock from public.accounting_settings where merchant_id=v_merchant_id;
   if v_lock is not null and (v_sale_date<=v_lock or current_date<=v_lock) then
     raise exception 'The sale or current accounting period is locked';
   end if;
+
   select coalesce(sum(qty*price),0),count(*),coalesce(jsonb_agg(id),'[]'::jsonb)
     into v_amount,v_line_count,v_sale_ids
   from public.sales
@@ -932,8 +965,8 @@ begin
   ) x
   where p.id=x.product_id and p.merchant_id=v_merchant_id;
 
-  -- Reverse each posted sale journal entry in the current open period. The original
-  -- entry and lines remain intact and are marked voided for a complete audit trail.
+  -- Reverse every posted sale/COGS entry in the current open period. Original
+  -- entries and lines remain intact and are marked voided for auditability.
   for v_original in
     select je.id,je.entry_date,je.description
     from public.journal_entries je
@@ -974,8 +1007,19 @@ begin
       'actor_name',case when exists(select 1 from public.merchants where id=v_merchant_id and user_id=auth.uid())
         then 'Owner' else coalesce((select full_name from public.merchant_members where merchant_id=v_merchant_id and user_id=auth.uid() and status='active' limit 1),'Staff') end),now())
   on conflict(id) do nothing;
+
+  select coalesce(jsonb_agg(jsonb_build_object('product_id',p.id,'stock',p.stock)),'[]'::jsonb)
+    into v_stock_updates
+  from public.products p
+  where p.merchant_id=v_merchant_id and p.id in (
+    select distinct product_id from public.sales
+    where merchant_id=v_merchant_id and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
+      and product_id is not null
+  );
+  select exists(select 1 from public.audit_log where id=p_audit_id) into v_audit_recorded;
   return jsonb_build_object('ok',true,'invoice_number',v_invoice_number,'transaction_id',v_transaction_id,
-    'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids);
+    'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids,
+    'stock_updates',v_stock_updates,'audit_recorded',v_audit_recorded);
 end;
 $$;
 revoke all on function public.shericeri_void_sale(uuid,uuid,uuid,text,uuid) from public,anon;
