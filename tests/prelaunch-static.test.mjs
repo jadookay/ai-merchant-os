@@ -10,6 +10,7 @@ const teamAccess = await readFile(new URL("../supabase/functions/team-access/ind
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
 const authorizationFixMigration = await readFile(new URL("../supabase/migrations/20261113150000_aibos_release_authorization_fixes.sql", import.meta.url), "utf8");
 const atomicCartMigration = await readFile(new URL("../supabase/migrations/20261113153000_aibos_atomic_cart_sync.sql", import.meta.url), "utf8");
+const pinRateLimitMigration = await readFile(new URL("../supabase/migrations/20261113160000_aibos_pin_rate_limit.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -589,4 +590,20 @@ test("legacy queued cart lines are grouped into one atomic retry and retained to
   assert.match(html, /_outboxKeys:group\.map\(x=>x\.key\)/);
   assert.match(html, /for\(const key of \(item\._outboxKeys\|\|\[item\.key\]\)\)await sheriDelete\('outbox',key\)/);
   assert.match(html, /for\(const key of \(item\._outboxKeys\|\|\[item\.key\]\)\)\{const original=sourceByKey\.get\(key\)/);
+});
+
+
+test("suspended team identities are banned in Auth and re-enabled without losing profile data", () => {
+  assert.match(teamAccess, /status !== target\.status/);
+  assert.match(teamAccess, /ban_duration: status === "suspended" \? "876000h" : "none"/);
+  assert.match(teamAccess, /if \(authStatusError\)[\s\S]*?status: target\.status[\s\S]*?email: target\.email[\s\S]*?phone: target\.phone[\s\S]*?username: target\.username/);
+  assert.match(teamMigration, /mm\.status='active'/);
+});
+
+test("PIN throttling follows the staff identity across IP changes and applies an IP-pair limit too", () => {
+  assert.match(pinRateLimitMigration, /v_identity:=v_member\.user_id::text/);
+  assert.match(pinRateLimitMigration, /v_key:=encode\(extensions\.digest\(p_merchant_id::text\|\|':'\|\|v_identity,'sha256'\)/);
+  assert.match(pinRateLimitMigration, /v_ip_key:=encode\(extensions\.digest\(v_key\|\|':'\|\|coalesce\(p_ip_hash,''\),'sha256'\)/);
+  assert.match(pinRateLimitMigration, /blocked_until>now\(\)/);
+  assert.match(pinRateLimitMigration, /revoke all on function public\.verify_merchant_member_pin\(uuid,text,text,text\) from public,anon,authenticated/);
 });
