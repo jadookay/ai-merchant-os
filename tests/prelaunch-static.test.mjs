@@ -580,3 +580,13 @@ test("new carts are queued and synchronized as one transaction in both sync path
   assert.equal((sync.match(/op\.type==='sale_cart'/g)||[]).length, 2,
     "normal sync and one-time auth retry must both support atomic cart operations");
 });
+
+
+test("legacy queued cart lines are grouped into one atomic retry and retained together on failure", () => {
+  assert.match(html, /const legacySaleGroups=new Map\(\),items=\[\]/);
+  assert.match(html, /op\.type==='sale_upsert'&&op\.record\?\.transaction_id/);
+  assert.match(html, /type:'sale_cart',merchant_id:records\[0\]\.merchant_id,transaction_id:transactionId/);
+  assert.match(html, /_outboxKeys:group\.map\(x=>x\.key\)/);
+  assert.match(html, /for\(const key of \(item\._outboxKeys\|\|\[item\.key\]\)\)await sheriDelete\('outbox',key\)/);
+  assert.match(html, /for\(const key of \(item\._outboxKeys\|\|\[item\.key\]\)\)\{const original=sourceByKey\.get\(key\)/);
+});
