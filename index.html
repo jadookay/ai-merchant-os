@@ -1574,11 +1574,15 @@ async function ensureMerchant(){
   if(own.error)throw own.error;
   if(own.data){state.merchant=own.data;await sheriPut('merchants',own.data.id,{user_id:own.data.user_id,record:{...own.data}});return true}
   // Staff identities are linked to a merchant through an active membership, not merchants.user_id.
-  let memberQuery=sb.from('merchant_members').select('id,merchant_id,user_id,full_name,role,permissions,status').eq('user_id',session.user.id).eq('status','active');
+  let memberQuery=sb.from('merchant_members').select('id,merchant_id,user_id,full_name,role,permissions,status').eq('user_id',session.user.id);
   if(window.__teamLoginMerchantId)memberQuery=memberQuery.eq('merchant_id',window.__teamLoginMerchantId);
   const memberResult=await sheriWithTimeout(memberQuery.limit(1).maybeSingle(),7000,'Team membership lookup timed out');
   if(memberResult.error)throw memberResult.error;
-  if(!memberResult.data)return false;
+  if(!memberResult.data){
+    if(window.__teamLoginMerchantId){await sb.auth.signOut();session=null;return false;}
+    return false;
+  }
+  if(memberResult.data.status!=='active'){await sb.auth.signOut();session=null;return false;}
   state.currentMembership=memberResult.data;
   const business=await sheriWithTimeout(sb.from('merchants').select('*').eq('id',memberResult.data.merchant_id).maybeSingle(),7000,'Team business lookup timed out');
   if(business.error)throw business.error;
@@ -1599,6 +1603,7 @@ async function onAuthed(sess){
   let complete=false;
   try{
     complete=await ensureMerchant();
+    if(!session?.user)return;
   }catch(e){
     console.warn('[Shericeri auth] merchant lookup failed',e);
     // Keep the authenticated user in the app. Existing local business data
