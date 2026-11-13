@@ -1067,10 +1067,36 @@ async function sheriSyncOutbox(){
     }catch(_){/* Supabase auto-refresh may still be completing; continue below. */}
     await sheriReconcileMerchantId();
     const now=Date.now();
-    const items=(await sheriGetAll('outbox'))
+    const originalItems=(await sheriGetAll('outbox'))
       .filter(item=>!item.blocked)
       .filter(item=>!item.next_retry_at||new Date(item.next_retry_at).getTime()<=now)
       .sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+    const sourceByKey=new Map(originalItems.map(x=>[x.key,x]));
+    const legacySaleGroups=new Map(),items=[];
+    for(const item of originalItems){
+      const op=item.op||{};
+      if(op.type==='sale_upsert'&&op.record?.transaction_id){
+        const key=op.record.transaction_id;
+        if(!legacySaleGroups.has(key))legacySaleGroups.set(key,[]);
+        legacySaleGroups.get(key).push(item);
+      }else items.push(item);
+    }
+    for(const [transactionId,group] of legacySaleGroups){
+      if(group.length===1){items.push(group[0]);continue;}
+      const records=group.map(x=>x.op.record),byProduct=new Map();
+      for(const x of group){
+        const op=x.op,id=op.productId||op.record.product_id;
+        if(!byProduct.has(id))byProduct.set(id,{product_id:id,qty:0,local_stock:Number(op.localStock),expected_server_stock:0});
+        const stock=byProduct.get(id);stock.qty+=Number(op.record.qty||0);
+        stock.local_stock=Number(op.localStock);
+      }
+      const stockChanges=[...byProduct.values()].map(x=>({...x,expected_server_stock:x.local_stock+x.qty}));
+      items.push({...group[0],_outboxKeys:group.map(x=>x.key),op:{
+        type:'sale_cart',merchant_id:records[0].merchant_id,transaction_id:transactionId,
+        invoice_number:records[0].invoice_number,records,stockChanges
+      }});
+    }
+    items.sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
     sheriSyncQueued=await sheriQueueCount();
     if(!items.length){
       sheriSetConnectivity('online',sheriSyncQueued?`${sheriSyncQueued} pending local change(s) — waiting to retry`:'Server data synced');
@@ -1110,7 +1136,7 @@ async function sheriSyncOutbox(){
         else if(op.type==='customer_upsert'){const {error}=await sb.from('customers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='customer_delete'){const {error}=await sb.from('customers').update({deleted:true}).eq('id',op.id);if(error)throw error}
         else throw new Error('Unsupported sync operation: '+String(op.type||'unknown'));
-        await sheriDelete('outbox',item.key);
+        for(const key of (item._outboxKeys||[item.key]))await sheriDelete('outbox',key);
         successCount++;
       }catch(err){
         // A 401 is an authentication-expiry condition, not a bad business row.
@@ -1149,7 +1175,7 @@ async function sheriSyncOutbox(){
         const info=sheriSyncErrorInfo(err);
         const attempts=(Number(item.attempts)||0)+1;
         const retryAt=new Date(Date.now()+sheriSyncDelayMs(attempts)).toISOString();
-        await sheriPut('outbox',item.key,{...item,attempts,last_error:info.message,last_status:info.status||null,last_failed_at:sheriNow(),next_retry_at:retryAt,blocked:!!info.permanent});
+        for(const key of (item._outboxKeys||[item.key])){const original=sourceByKey.get(key)||item;await sheriPut('outbox',key,{...original,attempts,last_error:info.message,last_status:info.status||null,last_failed_at:sheriNow(),next_retry_at:retryAt,blocked:!!info.permanent});}
         if(!firstFailure)firstFailure={op,error:err,info};
         console.warn('[Shericeri sync] operation failed; continuing with remaining queue',op,info);
         // A bad row must never freeze unrelated offline work. Leave this operation
