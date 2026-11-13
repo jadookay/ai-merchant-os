@@ -447,7 +447,7 @@ test("operational insert permissions remain independent of team administration w
 
 test("multi-line carts queue and synchronize as one atomic server operation", () => {
   assert.match(html, /type:'sale_cart_upsert',merchant_id:state\.merchant\.id,transaction_id:transactionId/);
-  assert.match(html, /async function sheriSyncSaleCartOperation\(op\)[\s\S]*?sb\.rpc\('shericeri_sync_sale_cart'/);
+  assert.match(html, /async function sheriSyncSaleCartOperation\(op,item\)[\s\S]*?sb\.rpc\('shericeri_sync_sale_cart'/);
   const syncStart = html.indexOf("async function sheriSyncOutbox(){");
   const syncEnd = html.indexOf("\nfunction sheriOnlineEvents(){", syncStart);
   assert.ok(syncStart >= 0 && syncEnd > syncStart);
