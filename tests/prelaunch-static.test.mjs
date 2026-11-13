@@ -646,3 +646,18 @@ test("sale void RPC derives invoice membership from the selected sale and reject
   assert.ok(teamMigration.includes("p_transaction_id is distinct from v_transaction_id"));
   assert.ok(teamMigration.includes("Transaction ID does not match the selected sale"));
 });
+
+test("offline IndexedDB cache is scoped to the authenticated user and merchant", () => {
+  assert.ok(html.includes("function sheriLocalScope(store,key,value={})"));
+  assert.ok(html.includes("user_scope:scope.userId"));
+  assert.ok(html.includes("row.user_scope===userId"));
+  assert.ok(html.includes("Legacy shared-cache fallback is owner-only"));
+  assert.ok(html.includes("state.merchant?.user_id===userId&&row.merchant_id===merchantId"));
+});
+
+test("staff without financial report access cannot load cached ledger or audit data", () => {
+  assert.ok(html.includes("const canReports=sheriCan('view_financial_reports')"));
+  assert.ok(html.includes("const canAudit=sheriCan('view_audit_log')"));
+  assert.ok(html.includes("await sheriPurgeLocalAccountingStores(merchantId,['journalEntries','journalLines','invoices','bills','payments','bankAccounts','recurringTransactions'])"));
+  assert.ok(html.includes("if(sheriCan('view_financial_reports'))await accEnsureOperationalLedger()"));
+});
