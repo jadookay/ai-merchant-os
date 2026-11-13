@@ -64,7 +64,7 @@ begin
        or coalesce(v_sale->>'invoice_number','')<>p_invoice_number
        or coalesce((v_sale->>'qty')::integer,0)<1
        or coalesce((v_sale->>'price')::numeric,-1)<0
-       or coalesce((v_sale->>'cost')::numeric,-1)<0 then
+       or coalesce((v_sale->>'cost')::numeric,0)<0 then
       raise exception 'A cart line has invalid identity, quantity, price or cost';
     end if;
     if exists(select 1 from public.sales where id=(v_sale->>'id')::uuid) then
@@ -116,7 +116,7 @@ begin
   for v_sale in select value from jsonb_array_elements(p_sales) loop
     insert into public.sales
     select (jsonb_populate_record(null::public.sales,
-      v_sale||jsonb_build_object('stock_applied',true,'voided',false))).*;
+      v_sale||jsonb_build_object('cost',coalesce(nullif(v_sale->>'cost','')::integer,0),'stock_applied',true,'voided',false))).*;
   end loop;
   for v_change in select value from jsonb_array_elements(p_stock_changes) loop
     update public.products
