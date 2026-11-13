@@ -8,6 +8,15 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const authorizationFixMigration = await readFile(new URL("../supabase/migrations/20261113150000_aibos_release_authorization_fixes.sql", import.meta.url), "utf8");
+const atomicCartMigration = await readFile(new URL("../supabase/migrations/20261113153000_aibos_atomic_cart_sync.sql", import.meta.url), "utf8");
+const pinRateLimitMigration = await readFile(new URL("../supabase/migrations/20261113160000_aibos_pin_rate_limit.sql", import.meta.url), "utf8");
+const storageMemoryMigration = await readFile(new URL("../supabase/migrations/20261112170000_aibos_priority_storage_memory.sql", import.meta.url), "utf8");
+const journalIntegrityMigration = await readFile(new URL("../supabase/migrations/20261113170000_aibos_journal_integrity.sql", import.meta.url), "utf8");
+const repairLegacyJournalsMigration = await readFile(new URL("../supabase/migrations/20261113180000_aibos_repair_legacy_sale_journals.sql", import.meta.url), "utf8");
+const sessionValidationMigration = await readFile(new URL("../supabase/migrations/20261113190000_aibos_member_session_validation.sql", import.meta.url), "utf8");
+const supabaseConfig = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
+const kinyaTts = await readFile(new URL("../supabase/functions/kinya-tts/index.ts", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -63,7 +72,7 @@ test("journal entries synchronize as one atomic RPC batch on normal and auth-ret
   const sync = html.slice(syncStart, syncEnd);
   const normalEnd = sync.indexOf("      }catch(err){");
   const retryStart = sync.indexOf("// Re-run this operation exactly once");
-  const retryEnd = sync.indexOf("await sheriDelete('outbox',item.key);", retryStart);
+  const retryEnd = sync.indexOf("for(const key of (item._outboxKeys||[item.key]))await sheriDelete('outbox',key);", retryStart);
   assert.ok(normalEnd > 0 && retryStart > normalEnd && retryEnd > retryStart, "expected normal and 401 retry sections");
 
   const countBatch = source => (source.match(/op\.type==='accounting_journal_batch'/g) || []).length;
@@ -122,12 +131,11 @@ test("product image picker matches the storage MIME allowlist", () => {
   assert.match(html, /!\['image\/jpeg','image\/png','image\/webp','image\/gif'\]\.includes\(file\.type\)/);
 });
 
-test("cloud memory and product image access are represented by a reviewed SQL patch", () => {
-  assert.match(schemaPatch, /create table if not exists public\.shericeri_memory/i);
-  assert.match(schemaPatch, /enable row level security/i);
-  assert.match(schemaPatch, /product_images_owner_insert/i);
-  assert.match(schemaPatch, /file_size_limit = 4194304/i);
-  assert.match(schemaPatch, /revoke execute on function public\.shericeri_sync_journal_batch/i);
+test("legacy storage patch is explicitly superseded by the ordered migration", () => {
+  assert.match(schemaPatch, /SUPERSEDED: do not execute this patch separately/);
+  assert.match(schemaPatch, /20261112170000_aibos_priority_storage_memory\.sql/);
+  assert.match(storageMemoryMigration, /create table if not exists public\.shericeri_memory/i);
+  assert.match(storageMemoryMigration, /insert into storage\.buckets/i);
 });
 
 test("all inline application scripts parse without syntax errors", () => {
@@ -430,7 +438,7 @@ test("stock conflicts do not create partial sale or purchase records", () => {
 });
 
 test("voided server sales are excluded from the active sales workspace", () => {
-  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales).filter(x=>!x.voided)"));
+  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales,sheriCan('view_sales')||sheriCan('manage_sales')).filter(x=>!x.voided)"));
 });
 
 
@@ -548,4 +556,248 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
   assert.ok(localeScript.includes("'cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe'"));
   assert.doesNotMatch(localeScript, /fetch\s*\(|https?:\/\//i);
   assert.ok(localeScript.includes("does not change business records"));
+});
+
+
+test("operational updates do not require team administration, while deletes remain manager-gated", () => {
+  assert.match(authorizationFixMigration, /for update to authenticated using \(private\.user_can_access_merchant\(merchant_id,%L\)\) with check \(private\.user_can_access_merchant\(merchant_id,%L\)\)/);
+  assert.match(authorizationFixMigration, /v_manager_action boolean:=p_action in \('delete','void'\)/);
+  assert.match(authorizationFixMigration, /v_manager_action and not private\.user_can_access_merchant\(p_merchant_id,'manage_team'\)/);
+  assert.match(authorizationFixMigration, /Only the owner, administrator or manager may void a sale/);
+  assert.match(authorizationFixMigration, /revoke execute on function public\.shericeri_get_accounting_snapshot\(uuid\) from public,anon/);
+  assert.match(authorizationFixMigration, /revoke execute on function public\.shericeri_sync_journal_batch\(uuid,uuid,date,text,text,uuid,jsonb\) from public,anon/);
+});
+
+test("multi-line cart sync validates all stock before inserting any sale or changing stock", () => {
+  assert.match(atomicCartMigration, /create or replace function public\.shericeri_sync_sale_cart/);
+  assert.match(atomicCartMigration, /for update/);
+  assert.match(atomicCartMigration, /if jsonb_array_length\(v_conflicts\)>0 then[\s\S]*?return jsonb_build_object\('ok',false,'stock_conflict',true/);
+  assert.ok(atomicCartMigration.indexOf("if jsonb_array_length(v_conflicts)>0 then") < atomicCartMigration.indexOf("insert into public.sales"));
+  assert.match(atomicCartMigration, /already_recorded/);
+  assert.match(atomicCartMigration, /db\.qty=\(s\.value->>'qty'\)::integer/);
+  assert.match(atomicCartMigration, /db\.price=\(s\.value->>'price'\)::integer/);
+  assert.match(atomicCartMigration, /db\.customer_id is not distinct from/);
+  assert.match(atomicCartMigration, /revoke all on function public\.shericeri_sync_sale_cart/);
+});
+
+test("new carts are queued and synchronized as one transaction in both sync paths", () => {
+  assert.match(html, /async function sheriSyncSaleCartOperation\(op\)[\s\S]*?sb\.rpc\('shericeri_sync_sale_cart'/);
+  assert.match(html, /type:'sale_cart',merchant_id:state\.merchant\.id,transaction_id:transactionId,invoice_number:invoice,records:rows,stockChanges/);
+  const syncStart = html.indexOf("async function sheriSyncOutbox(){");
+  const syncEnd = html.indexOf("\nfunction sheriOnlineEvents(){", syncStart);
+  const sync = html.slice(syncStart, syncEnd);
+  assert.equal((sync.match(/op\.type==='sale_cart'/g)||[]).length, 2,
+    "normal sync and one-time auth retry must both support atomic cart operations");
+});
+
+
+test("legacy queued cart lines are grouped into one atomic retry and retained together on failure", () => {
+  assert.match(html, /const legacySaleGroups=new Map\(\),items=\[\]/);
+  assert.match(html, /op\.type==='sale_upsert'&&op\.record\?\.id/);
+  assert.match(html, /op\.record\.transaction_id\|\|op\.record\.invoice_number\|\|op\.record\.id/);
+  assert.match(html, /type:'sale_cart',merchant_id:records\[0\]\.merchant_id,transaction_id:transactionId/);
+  assert.match(html, /_outboxKeys:group\.map\(x=>x\.key\)/);
+  assert.match(html, /for\(const key of \(item\._outboxKeys\|\|\[item\.key\]\)\)await sheriDelete\('outbox',key\)/);
+  assert.match(html, /for\(const key of \(item\._outboxKeys\|\|\[item\.key\]\)\)\{const original=sourceByKey\.get\(key\)/);
+});
+
+
+test("suspended team identities are banned in Auth and re-enabled without losing profile data", () => {
+  assert.match(teamAccess, /status !== target\.status/);
+  assert.match(teamAccess, /ban_duration: status === "suspended" \? "876000h" : "none"/);
+  assert.match(teamAccess, /if \(authStatusError\) \{\s*await rollbackMemberAndAuth\(\)/);
+  assert.match(teamAccess, /rollbackMemberAndAuth[\s\S]*?status: target\.status[\s\S]*?email: target\.email[\s\S]*?phone: target\.phone[\s\S]*?username: target\.username/);
+  assert.match(teamMigration, /mm\.status='active'/);
+});
+
+test("PIN throttling follows the staff identity across IP changes and applies an IP-pair limit too", () => {
+  assert.match(pinRateLimitMigration, /v_identity:=v_member\.user_id::text/);
+  assert.match(pinRateLimitMigration, /v_key:=encode\(extensions\.digest\(p_merchant_id::text\|\|':'\|\|v_identity,'sha256'\)/);
+  assert.match(pinRateLimitMigration, /v_ip_key:=encode\(extensions\.digest\(v_key\|\|':'\|\|coalesce\(p_ip_hash,''\),'sha256'\)/);
+  assert.match(pinRateLimitMigration, /blocked_until>now\(\)/);
+  assert.ok(pinRateLimitMigration.includes("if coalesce(auth.jwt()->>'role','')<>'service_role'"));
+  assert.match(pinRateLimitMigration, /revoke all on function public\.verify_merchant_member_pin\(uuid,text,text,text\) from public,anon,authenticated/);
+});
+
+
+test("staff cache reads are permission-gated and suspended or unverifiable memberships fail closed", () => {
+  assert.match(html, /member\.status!=='active'/);
+  assert.match(html, /if\(navigator\.onLine\)await loadTeamMembers\(true\)/);
+  assert.match(html, /function sheriCan\(permission\)[\s\S]*?member\.status!=='active'/);
+  assert.match(html, /state\.journalEntries=canReports\?pick\(jes\):\[\]/);
+  assert.match(html, /state\.auditLog=canAudit\?pick\(vals\[10\]\|\|\[\]\):\[\]/);
+  assert.match(html, /state\.sales=mergeKeepLocal\(sales,state\.sales,sheriCan\('view_sales'\)\|\|sheriCan\('manage_sales'\)\)/);
+  assert.match(html, /if\(!allowed\)return \[\]/);
+  assert.match(html, /setInterval\(\(\)=>\{if\(navigator\.onLine&&session\?\.user&&state\.merchant\)loadTeamMembers\(true\)\},60000\)/);
+});
+
+test("failed membership verification clears staff-only in-memory business and accounting data", () => {
+  assert.match(html, /state\.currentMembership=null;state\.products=\[\];state\.sales=\[\];state\.expenses=\[\]/);
+  assert.match(html, /state\.journalEntries=\[\];state\.journalLines=\[\];state\.invoices=\[\]/);
+});
+
+
+test("PIN login validates identifier length, numeric merchant code and exact PIN format", () => {
+  assert.ok(teamAccess.includes("identifier.length > 120"));
+  assert.ok(teamAccess.includes("!/^\\d{1,12}$/.test(merchantCode)"));
+  assert.ok(teamAccess.includes("!/^\\d{6,8}$/.test(pin)"));
+});
+
+
+test("suspended PIN users are rejected before merchant workspace lookup or onboarding", () => {
+  assert.match(html, /from\('merchant_members'\)\.select\('id,merchant_id,user_id,full_name,role,permissions,status'\)\.eq\('user_id',session\.user\.id\)/);
+  assert.ok(html.includes("if(memberResult.data.status!=='active'){"));
+  assert.ok(html.includes("await sheriDelete('meta','membership:'+session.user.id);"));
+  assert.ok(html.includes("await sb.auth.signOut();session=null;return false;"));
+  assert.match(html, /complete=await ensureMerchant\(\);\s*if\(!session\?\.user\)return;/);
+});
+
+
+test("team identity updates roll back database and Auth state if a later step fails", () => {
+  assert.match(teamAccess, /const rollbackMemberAndAuth = async \(\) =>/);
+  assert.match(teamAccess, /admin\.auth\.admin\.getUserById\(target\.user_id\)/);
+  assert.match(teamAccess, /if \(authStatusUpdated\)[\s\S]*?ban_duration: target\.status/);
+  assert.match(teamAccess, /if \(authEmailUpdated && originalAuthEmail\)[\s\S]*?email: originalAuthEmail/);
+  assert.match(teamAccess, /if \(pinError\) \{\s*await rollbackMemberAndAuth\(\)/);
+});
+
+
+test("clean staging receives Shericeri memory and the product-images bucket before team policies", () => {
+  assert.match(storageMemoryMigration, /create table if not exists public\.shericeri_memory/);
+  assert.match(storageMemoryMigration, /insert into storage\.buckets/);
+  assert.match(storageMemoryMigration, /file_size_limit[\s\S]*?4194304/);
+  assert.match(authorizationFixMigration, /create policy shericeri_memory_team_insert[\s\S]*?manage_finance/);
+});
+
+
+test("stock-conflicted cart invoices remain visible and can be retried against current server stock", () => {
+  assert.match(html, /conflicts\.length\+' conflicts need attention'/);
+  assert.match(html, /const conflictGroups=new Map\(\)/);
+  assert.match(html, /sheriRetryStockConflict\(this\.dataset\.conflict\)/);
+  assert.match(html, /async function sheriRetryStockConflict\(key\)[\s\S]*?from\('products'\)\.select\('id,stock'\)/);
+  assert.match(html, /if\(current<qty\)throw new Error\('Not enough server stock/);
+  assert.match(html, /row\.info\?\.operation\?\.transaction_id===op\.transaction_id/);
+});
+
+
+test("staff offline access uses a time-limited cached membership and respects its expiry", () => {
+  assert.match(html, /sheriGet\('meta','membership:'\+session\.user\.id\)/);
+  assert.ok(html.includes("member?.status==='active'&&Date.parse(member.cache_expires_at||'')>Date.now()"));
+  assert.match(html, /cache_expires_at:new Date\(Date\.now\(\)\+8\*60\*60\*1000\)/);
+  assert.match(html, /if\(!navigator\.onLine\)\{const expiry=Date\.parse\(member\.cache_expires_at\|\|''\);if\(!Number\.isFinite\(expiry\)\|\|expiry<=Date\.now\(\)\)return false;\}/);
+  assert.match(html, /async function signOut\(\)\{if\(session\?\.user\?\.id\)await sheriDelete\('meta','membership:'\+session\.user\.id\)/);
+});
+
+
+test("JWT changes preserve authenticated AIBOS voice and public Amatavida compatibility", () => {
+  assert.match(supabaseConfig, /\[functions\.kinya-tts\]\s*verify_jwt = true/);
+  assert.match(supabaseConfig, /\[functions\.team-access\]\s*verify_jwt = false/);
+  assert.match(supabaseConfig, /\[functions\.amatavida\]\s*verify_jwt = false/);
+  assert.match(html, /functions\/v1\/kinya-tts/);
+  assert.match(html, /'Authorization':'Bearer '\+currentSession\.access_token/);
+  assert.match(kinyaTts, /PINDO_API_TOKEN/);
+});
+
+
+test("legacy multi-line invoices are never partially retried when one line is blocked or delayed", () => {
+  assert.match(html, /const allOutbox=await sheriGetAll\('outbox'\)/);
+  assert.match(html, /const legacyState=new Map\(\)/);
+  assert.match(html, /if\(item\.blocked\)group\.blocked=true/);
+  assert.match(html, /if\(item\.next_retry_at&&new Date\(item\.next_retry_at\)\.getTime\(\)>now\)group\.waiting=true/);
+  assert.match(html, /return !group\?\.blocked&&!group\?\.waiting/);
+});
+
+
+test("journal sync enforces one active source posting and validates persisted balance", () => {
+  assert.match(journalIntegrityMigration, /create unique index if not exists journal_entries_merchant_source_active_unique/);
+  assert.match(journalIntegrityMigration, /This business event already has an active journal posting/);
+  assert.match(journalIntegrityMigration, /Journal entry ID is already used by a different posting/);
+  assert.match(journalIntegrityMigration, /Persisted journal entry is not balanced/);
+  assert.match(journalIntegrityMigration, /p_entry_date<=v_lock/);
+  assert.match(journalIntegrityMigration, /revoke all on function public\.shericeri_sync_journal_batch/);
+});
+
+
+test("all legacy sale queue records, including single-line invoices, use atomic cart sync", () => {
+  assert.match(html, /op\.type==='sale_upsert'&&op\.record\?\.id/);
+  assert.match(html, /const transactionId=group\[0\]\.op\.record\.transaction_id\|\|group\[0\]\.op\.record\.id/);
+  assert.match(html, /const invoiceNumber=group\[0\]\.op\.record\.invoice_number\|\|\('INV-LEGACY-'\+transactionId\)/);
+  assert.match(html, /type:'sale_cart',merchant_id:records\[0\]\.merchant_id,transaction_id:transactionId/);
+  assert.match(html, /select\('id,stock,deleted'\)/);
+  assert.match(html, /if\(serverProduct\.deleted\)throw new Error/);
+  assert.match(atomicCartMigration, /coalesce\(deleted,false\)=false for update/);
+});
+
+
+test("sale journal batches wait for the corresponding cart sync or stock-conflict resolution", () => {
+  assert.match(html, /async function sheriJournalDependsOnPendingSale\(op\)/);
+  assert.match(html, /queue\.some\(item=>containsSale\(item\.op\)\)\|\|conflicts\.some\(row=>containsSale\(row\.info\?\.operation\)\)/);
+  assert.match(html, /if\(await sheriJournalDependsOnPendingSale\(op\)\)continue/);
+  assert.match(html, /item\.op\?\.type==='sale_cart'\?0/);
+  assert.match(journalIntegrityMigration, /Sale must synchronize before its journal entry can post/);
+  assert.match(journalIntegrityMigration, /if v_sale_voided then return p_entry_id/);
+});
+
+
+test("voiding an unposted invoice cleans its sale queue, conflicts and unposted journals", () => {
+  assert.match(html, /async function sheriFinalizeUnpostedVoid\(op\)/);
+  assert.match(html, /if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\)/);
+  assert.match(html, /sale_records:rows/);
+  assert.match(html, /q\.type==='accounting_journal_batch'&&saleIds\.includes\(q\.entry\?\.source_id\)/);
+  assert.match(html, /sheriWriteAudit|shericeri_write_audit/);
+  assert.match(html, /operation\?\.type==='sale_void'/);
+  assert.match(html, /pending\)return; \/\/ The manager cancelled this invoice before it reached the server\./);
+});
+
+
+test("voided sale queues cannot race with cart sync or recreate revenue", () => {
+  assert.match(html, /pending=\(await sheriGetAll\('outbox'\)\)\.some\(item=>item\.op\?\.type==='sale_void'/);
+  assert.match(html, /if\(pending\)return; \/\/ The manager cancelled this invoice before it reached the server\./);
+  assert.match(html, /async function sheriSyncVoidSale\(op\)[\s\S]*?if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\)/);
+  assert.match(html, /async function sheriFinalizeUnpostedVoid\(op\)[\s\S]*?shericeri_write_audit/);
+  assert.match(html, /if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\);[\s\S]*?q\.type==='sale_cart'/);
+  assert.match(journalIntegrityMigration, /if v_sale_voided then return p_entry_id/);
+});
+
+
+test("legacy sale journal repair only fills missing expected lines and validates balances", () => {
+  assert.match(repairLegacyJournalsMigration, /source_type in \('sale','sale_cogs'\)/);
+  assert.match(repairLegacyJournalsMigration, /Cannot repair journal entry/);
+  assert.match(repairLegacyJournalsMigration, /Refusing automatic repair because journal entry/);
+  assert.match(repairLegacyJournalsMigration, /locked through/);
+  assert.match(repairLegacyJournalsMigration, /Automated repair: missing source debit line/);
+  assert.match(repairLegacyJournalsMigration, /Automated repair: missing source credit line/);
+  assert.match(repairLegacyJournalsMigration, /Journal repair did not balance entry/);
+  assert.doesNotMatch(repairLegacyJournalsMigration, /9036b1cc-d385|42595638-6eea/);
+});
+
+
+test("PIN throttling normalizes repeated whitespace before account-level hashing", () => {
+  assert.ok(pinRateLimitMigration.includes(String.raw`,'\s+',' ','g')`));
+});
+
+
+test("sale void refuses to reverse incomplete or unbalanced source journals", () => {
+  assert.match(authorizationFixMigration, /Sale journal is incomplete or unbalanced; reconcile it before voiding the sale/);
+  assert.match(authorizationFixMigration, /having count\(jl\.id\)<2 or abs\(coalesce\(sum\(jl\.debit\),0\)-coalesce\(sum\(jl\.credit\),0\)\)>0\.005/);
+});
+
+
+test("online and foreground access validates the active merchant membership server-side", () => {
+  assert.match(html, /async function sheriEnsureActiveSession\(\)/);
+  assert.match(html, /sb\.rpc\('shericeri_validate_member_session'/);
+  assert.match(html, /if\(navigator\.onLine&&session\?\.access_token&&!await sheriEnsureActiveSession\(\)\)return/);
+  assert.match(sessionValidationMigration, /mm\.status='active'/);
+  assert.match(sessionValidationMigration, /m\.user_id=\(select auth\.uid\(\)\)/);
+  assert.match(sessionValidationMigration, /revoke all on function public\.shericeri_validate_member_session/);
+  assert.match(html, /async function signOut\(\)\{if\(session\?\.user\?\.id\)await sheriDelete\('meta','membership:'\+session\.user\.id\)/);
+});
+
+
+test("offline staff cache expiry clears private workspace data and local session", () => {
+  assert.match(html, /function sheriScheduleOfflineMembershipExpiry\(member\)/);
+  assert.match(html, /if\(navigator\.onLine\|\|state\.currentMembership\?\.cache_expires_at!==cacheExpiry\)return/);
+  assert.match(html, /sb\.auth\.signOut\(\{scope:'local'\}\)/);
+  assert.match(html, /state\.merchant=null;state\.teamMembers=\[\]/);
+  assert.match(html, /sheriScheduleOfflineMembershipExpiry\(state\.currentMembership\)/);
 });

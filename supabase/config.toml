@@ -9,3 +9,6 @@ verify_jwt = true
 
 [functions.team-access]
 verify_jwt = false
+
+[functions.amatavida]
+verify_jwt = false
