@@ -896,12 +896,12 @@ begin
     return jsonb_build_object('ok',true,'already_voided',true,'sale_ids','[]'::jsonb,'stock_updates','[]'::jsonb,'audit_recorded',false);
   end if;
 
-  -- Serialize all void requests for the same invoice before taking row locks.
-  perform pg_advisory_xact_lock(hashtextextended(v_merchant_id::text||':'||coalesce(v_initial_transaction_id::text,p_sale_id::text),0));
   if not (private.user_can_access_merchant(v_merchant_id,'manage_team')
       and private.user_can_access_merchant(v_merchant_id,'manage_sales')) then
     raise exception 'Only the owner, an administrator, or an authorized manager can void sales';
   end if;
+  -- Serialize all authorized void requests for the same invoice before row locks.
+  perform pg_advisory_xact_lock(hashtextextended(v_merchant_id::text||':'||coalesce(v_initial_transaction_id::text,p_sale_id::text),0));
 
   select transaction_id,invoice_number,created_at::date
     into v_transaction_id,v_invoice_number,v_sale_date
