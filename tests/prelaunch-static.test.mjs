@@ -489,12 +489,12 @@ test("ordered purchase deletion uses the same guarded RPC after token refresh", 
 
 
 test("reports, sales and expenses include a calendar-year filter", () => {
-  assert.equal((html.match(/<option value="yearly">Yearly<\\/option>/g)||[]).length, 3);
-  assert.match(html, /else if\\(mode==='yearly'\\)start=sheriLocalDateKey\\(new Date\\(today\\.getFullYear\\(\\),0,1\\)\\)/);
+  assert.equal(html.split('<option value="yearly">Yearly</option>').length - 1, 3);
+  assert.ok(html.includes("else if(mode==='yearly')start=sheriLocalDateKey(new Date(today.getFullYear(),0,1))"));
 });
 
 test("team status is presented as an enabled/disabled control while preserving suspended backend state", () => {
-  assert.match(html, /m\\.status==='active'\\?'Enabled':m\\.status==='suspended'\\?'Disabled'/);
-  assert.match(html, /m\\.status==='active'\\?'Disable':'Enable'/);
-  assert.match(html, /const status=m\\.status==='active'\\?'suspended':'active'/);
+  assert.ok(html.includes("m.status==='active'?'Enabled':m.status==='suspended'?'Disabled'"));
+  assert.ok(html.includes("m.status==='active'?'Disable':'Enable'"));
+  assert.ok(html.includes("const status=m.status==='active'?'suspended':'active'"));
 });
