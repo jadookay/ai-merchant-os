@@ -8,6 +8,8 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const authorizationFixMigration = await readFile(new URL("../supabase/migrations/20261113150000_aibos_release_authorization_fixes.sql", import.meta.url), "utf8");
+const atomicCartMigration = await readFile(new URL("../supabase/migrations/20261113153000_aibos_atomic_cart_sync.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -548,4 +550,33 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
   assert.ok(localeScript.includes("'cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe'"));
   assert.doesNotMatch(localeScript, /fetch\s*\(|https?:\/\//i);
   assert.ok(localeScript.includes("does not change business records"));
+});
+
+
+test("operational updates do not require team administration, while deletes remain manager-gated", () => {
+  assert.match(authorizationFixMigration, /for update to authenticated using \(private\.user_can_access_merchant\(merchant_id,%L\)\) with check \(private\.user_can_access_merchant\(merchant_id,%L\)\)/);
+  assert.match(authorizationFixMigration, /v_manager_action boolean:=p_action in \('delete','void'\)/);
+  assert.match(authorizationFixMigration, /v_manager_action and not private\.user_can_access_merchant\(p_merchant_id,'manage_team'\)/);
+  assert.match(authorizationFixMigration, /Only the owner, administrator or manager may void a sale/);
+  assert.match(authorizationFixMigration, /revoke execute on function public\.shericeri_get_accounting_snapshot\(uuid\) from public,anon/);
+  assert.match(authorizationFixMigration, /revoke execute on function public\.shericeri_sync_journal_batch\(uuid,uuid,date,text,text,uuid,jsonb\) from public,anon/);
+});
+
+test("multi-line cart sync validates all stock before inserting any sale or changing stock", () => {
+  assert.match(atomicCartMigration, /create or replace function public\.shericeri_sync_sale_cart/);
+  assert.match(atomicCartMigration, /for update/);
+  assert.match(atomicCartMigration, /if jsonb_array_length\(v_conflicts\)>0 then[\s\S]*?return jsonb_build_object\('ok',false,'stock_conflict',true/);
+  assert.ok(atomicCartMigration.indexOf("if jsonb_array_length(v_conflicts)>0 then") < atomicCartMigration.indexOf("insert into public.sales"));
+  assert.match(atomicCartMigration, /already_recorded/);
+  assert.match(atomicCartMigration, /revoke all on function public\.shericeri_sync_sale_cart/);
+});
+
+test("new carts are queued and synchronized as one transaction in both sync paths", () => {
+  assert.match(html, /async function sheriSyncSaleCartOperation\(op\)[\s\S]*?sb\.rpc\('shericeri_sync_sale_cart'/);
+  assert.match(html, /type:'sale_cart',merchant_id:state\.merchant\.id,transaction_id:transactionId,invoice_number:invoice,records:rows,stockChanges/);
+  const syncStart = html.indexOf("async function sheriSyncOutbox(){");
+  const syncEnd = html.indexOf("\\nfunction sheriOnlineEvents(){", syncStart);
+  const sync = html.slice(syncStart, syncEnd);
+  assert.equal((sync.match(/op\.type==='sale_cart'/g)||[]).length, 2,
+    "normal sync and one-time auth retry must both support atomic cart operations");
 });
