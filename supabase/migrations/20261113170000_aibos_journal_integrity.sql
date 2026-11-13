@@ -32,6 +32,9 @@ declare
   v_existing_source_type text;
   v_existing_source_id uuid;
   v_existing_voided boolean;
+  v_persisted_debit numeric;
+  v_persisted_credit numeric;
+  v_persisted_count integer;
   v_lock date;
   v_authorized boolean:=false;
 begin
@@ -112,8 +115,16 @@ begin
       raise exception 'Journal line UUID belongs to another record';
     end if;
   end loop;
+  select coalesce(sum(debit),0),coalesce(sum(credit),0),count(*)
+    into v_persisted_debit,v_persisted_credit,v_persisted_count
+  from public.journal_lines
+  where merchant_id=p_merchant_id and journal_entry_id=p_entry_id;
+  if v_persisted_count<2 or v_persisted_debit<=0
+     or abs(v_persisted_debit-v_persisted_credit)>0.005 then
+    raise exception 'Persisted journal entry is not balanced';
+  end if;
   return p_entry_id;
 end;
-$$;
+$;
 revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon;
 grant execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) to authenticated;
