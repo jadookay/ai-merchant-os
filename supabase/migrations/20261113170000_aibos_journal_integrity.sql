@@ -32,6 +32,7 @@ declare
   v_existing_source_type text;
   v_existing_source_id uuid;
   v_existing_voided boolean;
+  v_sale_voided boolean;
   v_persisted_debit numeric;
   v_persisted_credit numeric;
   v_persisted_count integer;
@@ -55,10 +56,11 @@ begin
     v_authorized:=private.user_can_access_merchant(p_merchant_id,'manage_finance');
   end if;
   if not v_authorized then raise exception 'Not authorized to post this accounting entry'; end if;
-  if p_source_type in ('sale','sale_cogs') and not exists(
-    select 1 from public.sales where id=p_source_id and merchant_id=p_merchant_id and coalesce(voided,false)=false
-  ) then
-    return p_entry_id; -- A sale voided before its queued journal batch must never recreate revenue.
+  if p_source_type in ('sale','sale_cogs') then
+    select coalesce(voided,false) into v_sale_voided
+      from public.sales where id=p_source_id and merchant_id=p_merchant_id;
+    if not found then raise exception 'Sale must synchronize before its journal entry can post'; end if;
+    if v_sale_voided then return p_entry_id; end if;
   end if;
   if jsonb_typeof(p_lines)<>'array' or jsonb_array_length(p_lines)<2 then
     raise exception 'Journal batch requires at least two lines';
