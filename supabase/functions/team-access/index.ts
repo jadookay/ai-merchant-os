@@ -33,13 +33,18 @@ Deno.serve(async (req: Request) => {
     const action = String(body?.action || "");
 
     if (action === "login_with_pin") {
-      const identifier = String(body?.identifier || "").trim();
+      const identifier = String(body?.identifier || "").trim().slice(0, 160);
       const merchantCode = String(body?.merchant_code || "").trim();
       const pin = String(body?.pin || "");
-      if (!identifier || !merchantCode || pin.length < 6 || pin.length > 8 || !/^[0-9]+$/.test(pin)) return json({ error: "Enter your business ID, name, phone or email, and a 6–8 digit PIN." }, 400);
+      if (!identifier || !/^[0-9]{1,20}$/.test(merchantCode) || pin.length < 6 || pin.length > 8 || !/^[0-9]+$/.test(pin)) return json({ error: "Enter your business ID, name, phone or email, and a 6–8 digit PIN." }, 400);
 
-      const ip = req.headers.get("cf-connecting-ip") || "unknown";
-      const ipHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))), b => b.toString(16).padStart(2, "0")).join("");
+      // Cloudflare supplies the client IP at the edge. If unavailable, pass an
+      // empty value so the database still rate-limits the identifier key without
+      // putting every user behind a shared "unknown" IP into one lockout bucket.
+      const ip = req.headers.get("cf-connecting-ip");
+      const ipHash = ip
+        ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))), b => b.toString(16).padStart(2, "0")).join("")
+        : "";
       const { data: merchant, error: merchantError } = await admin.from("merchants").select("id").eq("shericeri_id", Number(merchantCode)).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account ID was not recognized." }, 404);
       const { data: verified, error: verifyError } = await admin.rpc("verify_merchant_member_pin", {
