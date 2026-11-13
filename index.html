@@ -763,8 +763,16 @@ async function sheriLoadAccountingSnapshot(merchantId){
   const vals=await Promise.all(stores.map(x=>sheriGetAll(x)));
   const [as,jes,jls,ins,bills,pays,banks,taxes,recs,sets]=vals;
   const pick=a=>a.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.accounts=pick(as); state.journalEntries=pick(jes); state.journalLines=pick(jls); state.invoices=pick(ins); state.bills=pick(bills); state.payments=pick(pays); state.bankAccounts=pick(banks); state.taxRates=pick(taxes); state.recurringTransactions=pick(recs); state.auditLog=pick(vals[10]||[]);
-  const setting=sets.find(x=>x.merchant_id===merchantId); state.accountingSettings=setting?.record||null;
+  const canReports=sheriCan('view_financial_reports'),canAudit=sheriCan('view_audit_log');
+  const canPost=sheriCan('create_sale')||sheriCan('manage_expenses')||sheriCan('manage_inventory')||sheriCan('manage_finance');
+  state.accounts=canPost||canReports?pick(as):[];
+  state.journalEntries=canReports?pick(jes):[];state.journalLines=canReports?pick(jls):[];
+  state.invoices=canReports?pick(ins):[];state.bills=canReports?pick(bills):[];
+  state.payments=canReports?pick(pays):[];state.bankAccounts=canReports?pick(banks):[];
+  state.taxRates=canReports?pick(taxes):[];state.recurringTransactions=canReports?pick(recs):[];
+  state.auditLog=canAudit?pick(vals[10]||[]):[];
+  const setting=sets.find(x=>x.merchant_id===merchantId);
+  state.accountingSettings=canReports||sheriCan('manage_finance')?setting?.record||null:null;
   return true;
 }
 
@@ -774,16 +782,16 @@ async function sheriLoadLocalSnapshot(merchantId){
   const [ps,ss,es,ms,cs,sups,purs,cash,buds]=await Promise.all([sheriGetAll('products'),sheriGetAll('sales'),sheriGetAll('expenses'),sheriGetAll('memory'),sheriGetAll('customers'),sheriGetAll('suppliers'),sheriGetAll('purchases'),sheriGetAll('cashEntries'),sheriGetAll('budgets')]);
   if(!m)return false;
   state.merchant=m.record||m;
-  state.products=ps.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.sales=ss.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.expenses=es.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.memory=ms.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x)
-    .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  state.customers=cs.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.suppliers=sups.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.purchases=purs.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.cashEntries=cash.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
-  state.budgets=buds.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
+  const rows=a=>a.filter(x=>x.merchant_id===merchantId).map(x=>x.record||x);
+  state.products=sheriCan('view_inventory')||sheriCan('manage_inventory')||sheriCan('create_sale')?rows(ps):[];
+  state.sales=sheriCan('view_sales')||sheriCan('manage_sales')?rows(ss):[];
+  state.expenses=sheriCan('view_expenses')||sheriCan('manage_expenses')?rows(es):[];
+  state.memory=sheriCan('view_financial_reports')||sheriCan('manage_finance')?rows(ms).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))):[];
+  state.customers=sheriCan('view_customers')||sheriCan('manage_customers')?rows(cs):[];
+  state.suppliers=sheriCan('view_suppliers')||sheriCan('manage_suppliers')?rows(sups):[];
+  state.purchases=sheriCan('view_inventory')||sheriCan('manage_inventory')?rows(purs):[];
+  state.cashEntries=sheriCan('view_financial_reports')||sheriCan('manage_finance')?rows(cash):[];
+  state.budgets=sheriCan('view_financial_reports')||sheriCan('manage_finance')?rows(buds):[];
   await sheriLoadAccountingSnapshot(merchantId);
   return true;
 }
@@ -1603,6 +1611,7 @@ async function onAuthed(sess){
     return;
   }
   if(complete&&merchantProfileComplete(state.merchant)){
+    if(navigator.onLine)await loadTeamMembers(true);
     document.getElementById('authScreen').style.display='none';
     document.getElementById('onboardingScreen').style.display='none';
     document.getElementById('appRoot').style.display='';
@@ -1622,7 +1631,8 @@ async function signOut(){await sb.auth.signOut();session=null;location.reload()}
 // ── Data loading ─────────────────────────────────────────────────────────
 async function loadAll(silent=false){
   const mId=state.merchant?.id; if(!mId)return;
-  // Local-first: render immediately even when connectivity is poor.
+  // Refresh membership before reading any shared device cache.
+  if(navigator.onLine)await loadTeamMembers(true);
   const hadLocal=await sheriLoadLocalSnapshot(mId);
   if(hadLocal)render();
   if(!navigator.onLine){await accEnsureBase();await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
@@ -1647,7 +1657,8 @@ async function loadAll(silent=false){
     // Server is authoritative for records it knows, but never erase a local
     // record that has not reached the server yet. This prevents a transient
     // empty/partial response from turning real merchant numbers into zeros.
-    const mergeKeepLocal=(serverRows,localRows)=>{
+    const mergeKeepLocal=(serverRows,localRows,allowed=true)=>{
+      if(!allowed)return [];
       const sr=serverRows||[], lr=localRows||[];
       // An empty server response is not treated as proof that the merchant has
       // no data. Keep the local snapshot until a real non-empty authoritative
@@ -1663,22 +1674,27 @@ async function loadAll(silent=false){
       }
       return [...sm.values()];
     };
-    state.products=mergeKeepLocal(products,state.products);state.sales=mergeKeepLocal(sales,state.sales).filter(x=>!x.voided);state.expenses=mergeKeepLocal(expenses,state.expenses);
-    // Memory/customers failing to load should never block the rest of the
-    // app — fall back to whatever's cached locally rather than throwing
-    // the whole sync.
-    if(!mErr)state.memory=mergeKeepLocal(memory,state.memory);
-    else console.warn('[Sheri memory] server refresh failed, using local cache',mErr);
-    if(!cErr)state.customers=mergeKeepLocal(customers,state.customers);
-    else console.warn('[Sheri customers] server refresh failed, using local cache',cErr);
-    if(!supErr)state.suppliers=mergeKeepLocal(suppliers,state.suppliers);
-    else console.warn('[Sheri suppliers] server refresh failed, using local cache',supErr);
-    if(!purErr)state.purchases=mergeKeepLocal(purchases,state.purchases);
-    else console.warn('[Sheri purchases] server refresh failed, using local cache',purErr);
-    if(!cashErr)state.cashEntries=mergeKeepLocal(cashEntries,state.cashEntries);
-    else console.warn('[Sheri cash] server refresh failed, using local cache',cashErr);
-    if(!budErr)state.budgets=mergeKeepLocal(budgets,state.budgets);
-    else console.warn('[Sheri budgets] server refresh failed, using local cache',budErr);
+    state.products=mergeKeepLocal(products,state.products,sheriCan('view_inventory')||sheriCan('manage_inventory')||sheriCan('create_sale'));
+    state.sales=mergeKeepLocal(sales,state.sales,sheriCan('view_sales')||sheriCan('manage_sales')).filter(x=>!x.voided);
+    state.expenses=mergeKeepLocal(expenses,state.expenses,sheriCan('view_expenses')||sheriCan('manage_expenses'));
+    if(!mErr)state.memory=mergeKeepLocal(memory,state.memory,sheriCan('view_financial_reports')||sheriCan('manage_finance'));
+    else if(!(sheriCan('view_financial_reports')||sheriCan('manage_finance')))state.memory=[];
+    else console.warn('[Sheri memory] server refresh failed, using permitted local cache',mErr);
+    if(!cErr)state.customers=mergeKeepLocal(customers,state.customers,sheriCan('view_customers')||sheriCan('manage_customers'));
+    else if(!(sheriCan('view_customers')||sheriCan('manage_customers')))state.customers=[];
+    else console.warn('[Sheri customers] server refresh failed, using permitted local cache',cErr);
+    if(!supErr)state.suppliers=mergeKeepLocal(suppliers,state.suppliers,sheriCan('view_suppliers')||sheriCan('manage_suppliers'));
+    else if(!(sheriCan('view_suppliers')||sheriCan('manage_suppliers')))state.suppliers=[];
+    else console.warn('[Sheri suppliers] server refresh failed, using permitted local cache',supErr);
+    if(!purErr)state.purchases=mergeKeepLocal(purchases,state.purchases,sheriCan('view_inventory')||sheriCan('manage_inventory'));
+    else if(!(sheriCan('view_inventory')||sheriCan('manage_inventory')))state.purchases=[];
+    else console.warn('[Sheri purchases] server refresh failed, using permitted local cache',purErr);
+    if(!cashErr)state.cashEntries=mergeKeepLocal(cashEntries,state.cashEntries,sheriCan('view_financial_reports')||sheriCan('manage_finance'));
+    else if(!(sheriCan('view_financial_reports')||sheriCan('manage_finance')))state.cashEntries=[];
+    else console.warn('[Sheri cash] server refresh failed, using permitted local cache',cashErr);
+    if(!budErr)state.budgets=mergeKeepLocal(budgets,state.budgets,sheriCan('view_financial_reports')||sheriCan('manage_finance'));
+    else if(!(sheriCan('view_financial_reports')||sheriCan('manage_finance')))state.budgets=[];
+    else console.warn('[Sheri budgets] server refresh failed, using permitted local cache',budErr);
     await sheriSaveSnapshot();
     try{
       const q=await Promise.all([
@@ -1703,10 +1719,18 @@ async function loadAll(silent=false){
         ['bankAccounts',q[6].data,q[6].error],['taxRates',q[7].data,q[7].error],['recurringTransactions',q[8].data,q[8].error],
         ['auditLog',q[10].data,q[10].error]
       ];
+      const canReports=sheriCan('view_financial_reports'),canAudit=sheriCan('view_audit_log');
+      const canPost=sheriCan('create_sale')||sheriCan('manage_expenses')||sheriCan('manage_inventory')||sheriCan('manage_finance');
+      const accountingAccess={accounts:canPost||canReports,journalEntries:canReports,journalLines:canReports,
+        invoices:canReports,bills:canReports,payments:canReports,bankAccounts:canReports,
+        taxRates:canReports,recurringTransactions:canReports,auditLog:canAudit};
       for(const [key,rows,error] of accountingMerges){
-        if(!error)state[key]=mergeKeepLocal(rows,state[key]);
+        const allowed=accountingAccess[key]===true;
+        if(!allowed)state[key]=[];
+        else if(!error)state[key]=mergeKeepLocal(rows,state[key],true);
       }
-      if(!q[9].error){
+      if(!canReports&&!sheriCan('manage_finance'))state.accountingSettings=null;
+      else if(!q[9].error){
         const localSetting=state.accountingSettings;
         const serverSetting=q[9].data;
         state.accountingSettings=serverSetting||localSetting||null;
@@ -1863,7 +1887,7 @@ function sheriRecentActivitiesHtml(){
   for(const p of state.payments||[])rows.push({when:p.payment_date||p.created_at,type:p.direction==='receipt'?'Customer receipt':'Payment',title:p.reference||p.source_type||'Payment',amount:p.direction==='receipt'?Number(p.amount||0):-Number(p.amount||0)});
   return rows.filter(x=>sheriDateInReportRange(x.when)).sort((a,b)=>String(b.when||'').localeCompare(String(a.when||''))).slice(0,7).map(x=>'<div class="row"><div><b>'+esc(x.title)+'</b><div class="sub">'+esc(x.type)+' · '+esc(x.when?new Date(x.when).toLocaleString():'Time unavailable')+'</div></div><b>'+money(x.amount)+'</b></div>').join('')||'<div class="empty">No recent activity in this date range.</div>';
 }
-function sheriCan(permission){if(!session?.user||!state.merchant)return false;if(state.merchant.user_id===session.user.id)return true;if(state.currentMembership?.role==='admin')return true;if(['manage_team','manage_sales'].includes(permission)&&state.currentMembership?.role!=='manager')return false;return state.currentMembership?.permissions?.[permission]===true}
+function sheriCan(permission){if(!session?.user||!state.merchant)return false;if(state.merchant.user_id===session.user.id)return true;const member=state.currentMembership;if(!member||member.status!=='active')return false;if(member.role==='admin')return true;if(['manage_team','manage_sales'].includes(permission)&&member.role!=='manager')return false;return member.permissions?.[permission]===true}
 function sheriPermissionButton(permission,html){return sheriCan(permission)?html:''}
 function render(){
   if(!state.merchant)return;
@@ -2476,7 +2500,7 @@ function renderForecast(){
 let teamLoadedForMerchant=null;
 async function loadTeamMembers(force=false){
  if(!state.merchant||!sb)return;if(!force&&teamLoadedForMerchant===state.merchant.id)return;teamLoadedForMerchant=state.merchant.id;
- try{const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,last_login_at').eq('merchant_id',state.merchant.id).order('created_at',{ascending:false});if(error)throw error;state.teamMembers=data||[];state.currentMembership=state.teamMembers.find(x=>x.user_id===session?.user?.id)||null;const can=state.merchant.user_id===session?.user?.id||state.currentMembership?.role==='admin'||(state.currentMembership?.role==='manager'&&state.currentMembership?.permissions?.manage_team===true);const card=document.getElementById('teamAccessCard');if(card)card.style.display=can?'block':'none';renderTeamMembers();renderTeamAuditTrail()}catch(e){teamLoadedForMerchant=null;console.warn('[AIBOS team]',e)}
+ try{const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,last_login_at').eq('merchant_id',state.merchant.id).order('created_at',{ascending:false});if(error)throw error;state.teamMembers=data||[];state.currentMembership=state.teamMembers.find(x=>x.user_id===session?.user?.id)||null;const can=state.merchant.user_id===session?.user?.id||state.currentMembership?.role==='admin'||(state.currentMembership?.role==='manager'&&state.currentMembership?.permissions?.manage_team===true);const card=document.getElementById('teamAccessCard');if(card)card.style.display=can?'block':'none';renderTeamMembers();renderTeamAuditTrail()}catch(e){teamLoadedForMerchant=null;state.teamMembers=[];if(state.merchant?.user_id!==session?.user?.id)state.currentMembership=null;console.warn('[AIBOS team]',e)}
 }
 function renderTeamMembers(){
  const host=document.getElementById('teamMembersTable');if(!host)return;
