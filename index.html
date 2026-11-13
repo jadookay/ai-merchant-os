@@ -1097,6 +1097,7 @@ async function sheriSyncOutbox(){
       const refreshed=await sb.auth.getSession();
       if(refreshed?.data?.session){session=refreshed.data.session;}
     }catch(_){/* Supabase auto-refresh may still be completing; continue below. */}
+    if(!(await sheriValidateCurrentMembership()))return;
     await sheriReconcileMerchantId();
     const now=Date.now();
     const allOutboxItems=await sheriGetAll('outbox');
@@ -1256,9 +1257,35 @@ if('serviceWorker' in navigator){
     if(event.data?.type==='SHERICERI_SW_READY')sheriDiagSet?.('Service Worker version',event.data.version);
   });
 }
+async function sheriValidateCurrentMembership(){
+  if(!session?.user?.id||!state.merchant||!navigator.onLine)return true;
+  if(state.merchant.user_id===session.user.id)return true;
+  const {data,error}=await sb.from('merchant_members')
+    .select('id,merchant_id,user_id,full_name,role,permissions,status')
+    .eq('merchant_id',state.merchant.id).eq('user_id',session.user.id).maybeSingle();
+  if(error)throw error;
+  if(!data||data.status!=='active'){
+    try{await sb.auth.signOut()}catch(_){}
+    session=null;state.currentMembership=null;state.teamMembers=[];
+    const app=document.getElementById('appRoot'),auth=document.getElementById('authScreen');
+    if(app)app.style.display='none';
+    if(auth)auth.style.display='flex';
+    setAuthStatus('Access to this business has been disabled. Contact the owner or manager.',true);
+    state.merchant=null;
+    return false;
+  }
+  state.currentMembership=data;
+  return true;
+}
 async function sheriServerHeartbeat(){
   if(!session?.user?.id||!navigator.onLine)return false;
   try{
+    if(state.merchant&&state.merchant.user_id!==session.user.id){
+      const active=await sheriValidateCurrentMembership();
+      if(!active)return false;
+      if(sheriSyncQueued===0)sheriSetConnectivity('online','Staff access verified');
+      return true;
+    }
     const {data,error}=await sb.from('merchants').select('id,shericeri_id').eq('user_id',session.user.id).limit(1).maybeSingle();
     if(error)throw error;
     if(data){
@@ -1667,6 +1694,7 @@ async function signOut(){await sb.auth.signOut();session=null;location.reload()}
 // ── Data loading ─────────────────────────────────────────────────────────
 async function loadAll(silent=false){
   const mId=state.merchant?.id; if(!mId)return;
+  if(navigator.onLine&&!(await sheriValidateCurrentMembership()))return;
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
   if(hadLocal)render();
