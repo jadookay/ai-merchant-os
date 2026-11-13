@@ -1125,9 +1125,25 @@ async function sheriSyncOutbox(){
     if(navigator.onLine)await loadTeamMembers(true);
     if(!session?.access_token)return;
     const now=Date.now();
-    const originalItems=(await sheriGetAll('outbox'))
+    const allOutbox=await sheriGetAll('outbox');
+    const legacyState=new Map();
+    for(const item of allOutbox){
+      const op=item.op||{},transactionId=op.type==='sale_upsert'?op.record?.transaction_id:null;
+      if(!transactionId)continue;
+      if(!legacyState.has(transactionId))legacyState.set(transactionId,{blocked:false,waiting:false});
+      const group=legacyState.get(transactionId);
+      if(item.blocked)group.blocked=true;
+      if(item.next_retry_at&&new Date(item.next_retry_at).getTime()>now)group.waiting=true;
+    }
+    const originalItems=allOutbox
       .filter(item=>!item.blocked)
       .filter(item=>!item.next_retry_at||new Date(item.next_retry_at).getTime()<=now)
+      .filter(item=>{
+        const op=item.op||{},transactionId=op.type==='sale_upsert'?op.record?.transaction_id:null;
+        if(!transactionId)return true;
+        const group=legacyState.get(transactionId);
+        return !group?.blocked&&!group?.waiting;
+      })
       .sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
     const sourceByKey=new Map(originalItems.map(x=>[x.key,x]));
     const legacySaleGroups=new Map(),items=[];
