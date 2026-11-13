@@ -9,7 +9,7 @@ const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_sto
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
-const previewScript = [...previewHtml.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)].map(x => x[1]).join("\\n");
+const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
 
 
