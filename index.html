@@ -1099,23 +1099,28 @@ async function sheriSyncOutbox(){
     }catch(_){/* Supabase auto-refresh may still be completing; continue below. */}
     await sheriReconcileMerchantId();
     const now=Date.now();
-    const queuedItems=(await sheriGetAll('outbox'))
+    const allOutboxItems=await sheriGetAll('outbox');
+    const queuedItems=allOutboxItems
       .filter(item=>!item.blocked)
       .filter(item=>!item.next_retry_at||new Date(item.next_retry_at).getTime()<=now)
       .sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
-    const legacySaleGroups=new Map(),items=[];
-    for(const queued of queuedItems){
+    const legacySaleGroups=new Map();
+    for(const queued of allOutboxItems){
       const op=queued.op||{};
       if(op.type==='sale_upsert'&&op.record?.transaction_id){
         const key=String(op.record.transaction_id);
         if(!legacySaleGroups.has(key))legacySaleGroups.set(key,[]);
         legacySaleGroups.get(key).push(queued);
-      }else items.push(queued);
+      }
     }
+    const legacySaleKeys=new Set([...legacySaleGroups.values()].flat().map(x=>x.key));
+    const items=queuedItems.filter(x=>!legacySaleKeys.has(x.key));
     // Upgrade old per-line offline queues to one transaction-level operation
     // before sending anything. A partially synced legacy invoice is rejected
     // by the server RPC and surfaced for manual reconciliation.
     for(const [transactionId,group] of legacySaleGroups){
+      const groupReady=group.every(x=>!x.blocked&&(!x.next_retry_at||new Date(x.next_retry_at).getTime()<=now));
+      if(!groupReady)continue;
       const records=group.map(x=>x.op.record),stockChanges=[];
       for(const queued of group){
         const op=queued.op,productId=op.productId||op.record.product_id;
