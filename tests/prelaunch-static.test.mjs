@@ -607,3 +607,20 @@ test("PIN throttling follows the staff identity across IP changes and applies an
   assert.match(pinRateLimitMigration, /blocked_until>now\(\)/);
   assert.match(pinRateLimitMigration, /revoke all on function public\.verify_merchant_member_pin\(uuid,text,text,text\) from public,anon,authenticated/);
 });
+
+
+test("staff cache reads are permission-gated and suspended or unverifiable memberships fail closed", () => {
+  assert.match(html, /member\.status!=='active'/);
+  assert.match(html, /if\(navigator\.onLine\)await loadTeamMembers\(true\)/);
+  assert.match(html, /function sheriCan\(permission\)[\s\S]*?member\.status!=='active'/);
+  assert.match(html, /state\.journalEntries=canReports\?pick\(jes\):\[\]/);
+  assert.match(html, /state\.auditLog=canAudit\?pick\(vals\[10\]\|\|\[\]\):\[\]/);
+  assert.match(html, /state\.sales=mergeKeepLocal\(sales,state\.sales,sheriCan\('view_sales'\)\|\|sheriCan\('manage_sales'\)\)/);
+  assert.match(html, /if\(!allowed\)return \[\]/);
+  assert.match(html, /setInterval\(\(\)=>\{if\(navigator\.onLine&&session\?\.user&&state\.merchant\)loadTeamMembers\(true\)\},60000\)/);
+});
+
+test("failed membership verification clears staff-only in-memory business and accounting data", () => {
+  assert.match(html, /state\.currentMembership=null;state\.products=\[\];state\.sales=\[\];state\.expenses=\[\]/);
+  assert.match(html, /state\.journalEntries=\[\];state\.journalLines=\[\];state\.invoices=\[\]/);
+});
