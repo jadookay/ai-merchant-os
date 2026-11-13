@@ -8,6 +8,10 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
+const previewScript = [...previewHtml.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)].map(x => x[1]).join("\\n");
+new vm.Script(previewScript, { filename: "preview/index.html" });
+
 
 test("team managers cannot create administrator accounts or grant permissions they do not hold", () => {
   assert.match(teamAccess, /if \(role === "admin" && !isPrivilegedGrantor\)/);
@@ -497,4 +501,14 @@ test("team status is presented as an enabled/disabled control while preserving s
   assert.ok(html.includes("m.status==='active'?'Enabled':m.status==='suspended'?'Disabled'"));
   assert.ok(html.includes("m.status==='active'?'Disable':'Enable'"));
   assert.ok(html.includes("const status=m.status==='active'?'suspended':'active'"));
+});
+
+test("safe preview contains inventory movements, reports and device-session controls", () => {
+  assert.match(previewHtml, /Stock Movements/);
+  assert.match(previewHtml, /Business performance reports/);
+  assert.match(previewHtml, /Signed-in devices/);
+  assert.match(previewHtml, /function recordMovement/);
+  assert.match(previewHtml, /function revokeAllDevices/);
+  assert.match(previewHtml, /Security simulation only/);
+  assert.doesNotMatch(previewHtml, /supabase\\.co|fetch\\s*\\(/i);
 });
