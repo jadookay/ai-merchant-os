@@ -501,10 +501,10 @@ declare
   v_conflicts jsonb:='[]'::jsonb;
 begin
   if p_merchant_id is null
-     or jsonb_typeof(p_sales)<>'array'
+     or coalesce(jsonb_typeof(p_sales),'')<>'array'
      or jsonb_array_length(p_sales)<1
      or jsonb_array_length(p_sales)>100
-     or jsonb_typeof(p_stock_checks)<>'array'
+     or coalesce(jsonb_typeof(p_stock_checks),'')<>'array'
      or jsonb_array_length(p_stock_checks)<1 then
     raise exception 'Sale cart payload is invalid';
   end if;
@@ -584,7 +584,8 @@ begin
     from jsonb_array_elements(p_stock_checks)
     order by (value->>'product_id')::uuid
   loop
-    if v_check.expected_server_stock<0 or v_check.local_stock<0 then
+    if v_check.expected_server_stock is null or v_check.local_stock is null
+       or v_check.expected_server_stock<0 or v_check.local_stock<0 then
       raise exception 'Stock check quantities cannot be negative';
     end if;
     select coalesce(stock,0) into v_current_stock
