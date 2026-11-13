@@ -1099,15 +1099,19 @@ async function sheriFinalizeUnpostedVoid(op){
   }
   const conflicts=await sheriGetAll('conflicts');
   for(const row of conflicts){if(row.info?.operation?.transaction_id===transactionId)await sheriDelete('conflicts',row.key);}
-  const entries=(state.journalEntries||[]).filter(e=>saleIds.includes(e.source_id)&&['sale','sale_cogs'].includes(e.source_type));
-  const entryIds=entries.map(e=>e.id);
-  const lines=(state.journalLines||[]).filter(l=>entryIds.includes(l.journal_entry_id));
+  const storedEntries=(await sheriGetAll('journalEntries')).filter(row=>{
+    const entry=row.record||row;return row.merchant_id===op.merchant_id&&saleIds.includes(entry.source_id)&&['sale','sale_cogs'].includes(entry.source_type);
+  });
+  const entryIds=storedEntries.map(row=>row.key);
+  const storedLines=(await sheriGetAll('journalLines')).filter(row=>{
+    const line=row.record||row;return row.merchant_id===op.merchant_id&&entryIds.includes(line.journal_entry_id);
+  });
   state.journalEntries=(state.journalEntries||[]).filter(e=>!entryIds.includes(e.id));
   state.journalLines=(state.journalLines||[]).filter(l=>!entryIds.includes(l.journal_entry_id));
   state.sales=(state.sales||[]).filter(s=>!saleIds.includes(s.id));
   for(const id of saleIds)await sheriDelete('sales',id);
-  for(const entry of entries)await sheriDelete('journalEntries',entry.id);
-  for(const line of lines)await sheriDelete('journalLines',line.id);
+  for(const row of storedEntries)await sheriDelete('journalEntries',row.key);
+  for(const row of storedLines)await sheriDelete('journalLines',row.key);
   const productIds=[...new Set((op.sale_records||[]).map(x=>x.product_id).filter(Boolean))];
   if(productIds.length&&navigator.onLine){
     const {data,error}=await sb.from('products').select('id,stock').eq('merchant_id',op.merchant_id).in('id',productIds);
