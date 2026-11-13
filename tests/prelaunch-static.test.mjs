@@ -484,6 +484,19 @@ test("PIN throttling locks independent identity and IP buckets and rejects concu
   assert.match(teamAccess, /: "";/);
 });
 
+test("database hardening covers all ten unindexed foreign keys and hoists auth.uid from row policies", () => {
+  const fkIndexes = [
+    "bank_accounts_account_merchant_fk_idx","bills_supplier_fk_idx","invoices_customer_fk_idx",
+    "journal_lines_account_merchant_fk_idx","journal_lines_entry_merchant_fk_idx",
+    "payments_account_merchant_fk_idx","recurring_transactions_merchant_fk_idx",
+    "sales_customer_fk_idx","sales_product_fk_idx","tax_rates_merchant_fk_idx"
+  ];
+  for (const name of fkIndexes) assert.ok(releaseMigration.includes("create index if not exists "+name));
+  assert.match(releaseMigration, /for p in[\s\S]*?from pg_policies[\s\S]*?replace\(p\.qual,'auth\.uid\(\)','\(select auth\.uid\(\)\)'\)/);
+  assert.match(releaseMigration, /alter policy %I on %I\.%I/);
+  assert.match(releaseMigration, /not like '%\( select auth\.uid\(\)%'/);
+});
+
 test("suspending a staff member revokes refresh sessions and the client revalidates active membership", () => {
   assert.match(releaseMigration, /create or replace function public\.revoke_merchant_member_sessions\(p_user_id uuid\)/);
   assert.match(releaseMigration, /delete from auth\.sessions where user_id=p_user_id/);
