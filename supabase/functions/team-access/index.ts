@@ -219,6 +219,7 @@ Deno.serve(async (req: Request) => {
       if (!["admin", "manager", "cashier", "inventory", "accountant", "custom"].includes(role)) return json({ error: "Invalid team role." }, 400);
       if (!["active", "suspended"].includes(status)) return json({ error: "Invalid team status." }, 400);
       if (pin && !/^\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
+      if (status === "active" && target?.status === "suspended" && !pin) return json({ error: "Set a new 6–8 digit PIN before re-enabling this member." }, 400);
 
       const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
@@ -236,7 +237,7 @@ Deno.serve(async (req: Request) => {
       }
       const privileged = callerRole === "owner" || callerRole === "admin";
       const { data: target, error: targetError } = await admin.from("merchant_members")
-        .select("id,user_id,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
+        .select("id,user_id,role,status,email,phone,username,pin_hash").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
       const nextEmail = email === undefined ? target.email : email;
@@ -258,6 +259,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status, updated_at: new Date().toISOString() };
+      if (status === "suspended") memberPatch.pin_hash = null;
       if (email !== undefined) memberPatch.email = email;
       if (phone !== undefined) memberPatch.phone = phone;
       if (username !== undefined) memberPatch.username = username;
@@ -266,6 +268,14 @@ Deno.serve(async (req: Request) => {
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
+      if (status === "suspended" && target.status !== "suspended") {
+        // Password rotation invalidates existing refresh sessions. RLS and the
+        // private session helper reject any still-unexpired access JWT as well.
+        const { error: revokeError } = await admin.auth.admin.updateUserById(target.user_id, {
+          password: randomPassword(),
+        });
+        if (revokeError) throw revokeError;
+      }
       if (email && email !== target.email) {
         const { error: authEmailError } = await admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true });
         if (authEmailError) {
@@ -275,7 +285,12 @@ Deno.serve(async (req: Request) => {
       }
       if (pin) {
         const { error: pinError } = await admin.rpc("set_merchant_member_pin", { p_member_id: memberId, p_pin: pin });
-        if (pinError) throw pinError;
+        if (pinError) {
+          if (target.status === "suspended" && status === "active") {
+            await admin.from("merchant_members").update({ status: "suspended", pin_hash: null }).eq("id", memberId).eq("merchant_id", merchantId);
+          }
+          throw pinError;
+        }
       }
       return json({ ok: true, member: updated });
     }
