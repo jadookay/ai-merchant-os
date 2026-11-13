@@ -689,3 +689,12 @@ test("JWT changes preserve authenticated AIBOS voice and public Amatavida compat
   assert.match(html, /'Authorization':'Bearer '\+currentSession\.access_token/);
   assert.match(kinyaTts, /PINDO_API_TOKEN/);
 });
+
+
+test("legacy multi-line invoices are never partially retried when one line is blocked or delayed", () => {
+  assert.match(html, /const allOutbox=await sheriGetAll\('outbox'\)/);
+  assert.match(html, /const legacyState=new Map\(\)/);
+  assert.match(html, /if\(item\.blocked\)group\.blocked=true/);
+  assert.match(html, /if\(item\.next_retry_at&&new Date\(item\.next_retry_at\)\.getTime\(\)>now\)group\.waiting=true/);
+  assert.match(html, /return !group\?\.blocked&&!group\?\.waiting/);
+});
