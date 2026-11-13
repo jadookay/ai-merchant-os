@@ -1151,7 +1151,7 @@ async function sheriSyncOutbox(){
       .filter(item=>!item.blocked)
       .filter(item=>!item.next_retry_at||new Date(item.next_retry_at).getTime()<=now)
       .filter(item=>{
-        const op=item.op||{},transactionId=op.type==='sale_upsert'?op.record?.transaction_id:null;
+        const op=item.op||{},transactionId=op.type==='sale_upsert'?(op.record?.transaction_id||op.record?.invoice_number||op.record?.id):null;
         if(!transactionId)return true;
         const group=legacyState.get(transactionId);
         return !group?.blocked&&!group?.waiting;
