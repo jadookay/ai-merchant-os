@@ -140,7 +140,7 @@ begin
     raise exception 'A clear void reason is required';
   end if;
   v_merchant_id:=coalesce(p_merchant_id,(select merchant_id from public.sales where id=p_sale_id));
-  if v_merchant_id is null then return jsonb_build_object('ok',true,'already_voided',true); end if;
+  if v_merchant_id is null then return jsonb_build_object('ok',true,'already_voided',true,'not_found',true); end if;
   if not private.user_can_access_merchant(v_merchant_id,'manage_sales') then
     raise exception 'Only the owner, administrator or manager may void a sale';
   end if;
@@ -155,11 +155,11 @@ begin
     and (id=p_sale_id or (p_transaction_id is not null and transaction_id=p_transaction_id))
   order by case when id=p_sale_id then 0 else 1 end
   limit 1;
-  if not found then return jsonb_build_object('ok',true,'already_voided',true); end if;
+  if not found then return jsonb_build_object('ok',true,'already_voided',true,'not_found',true); end if;
   if not exists(select 1 from public.sales where merchant_id=v_merchant_id
       and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
       and coalesce(voided,false)=false) then
-    return jsonb_build_object('ok',true,'already_voided',true);
+    return jsonb_build_object('ok',true,'already_voided',true,'not_found',false);
   end if;
   select locked_through into v_lock from public.accounting_settings where merchant_id=v_merchant_id;
   if v_lock is not null and (v_sale_date<=v_lock or current_date<=v_lock) then
@@ -223,7 +223,7 @@ begin
       'actor_name',case when exists(select 1 from public.merchants where id=v_merchant_id and user_id=auth.uid())
         then 'Owner' else coalesce((select full_name from public.merchant_members where merchant_id=v_merchant_id and user_id=auth.uid() and status='active' limit 1),'Staff') end),now())
   on conflict(id) do nothing;
-  return jsonb_build_object('ok',true,'invoice_number',v_invoice_number,'transaction_id',v_transaction_id,
+  return jsonb_build_object('ok',true,'not_found',false,'invoice_number',v_invoice_number,'transaction_id',v_transaction_id,
     'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids);
 end;
 $$;
