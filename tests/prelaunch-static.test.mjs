@@ -520,3 +520,27 @@ test("safe preview includes mandatory stock reasons, date reports and separated 
   assert.match(previewHtml, /function revokeDevice/);
   assert.match(previewHtml, /function removeStaff/);
 });
+
+
+test("AIBOS language switch supports English, everyday Kinyarwanda and French without external translation calls", () => {
+  const localeStart = html.indexOf("/* AIBOS_I18N_V1");
+  assert.ok(localeStart >= 0, "missing localization module");
+  const localeScriptStart = html.lastIndexOf("<script>", localeStart) + 8;
+  const localeScriptEnd = html.indexOf("</script>", localeStart);
+  assert.ok(localeScriptStart >= 8 && localeScriptEnd > localeScriptStart);
+  const localeScript = html.slice(localeScriptStart, localeScriptEnd);
+  new vm.Script(localeScript, { filename: "AIBOS_I18N_V1" });
+  assert.ok(html.includes('id="aibosLanguageSelect"'));
+  assert.ok(html.includes('<option value="rw">Ikinyarwanda</option>'));
+  assert.ok(html.includes('<option value="fr">Français</option>'));
+  assert.ok(localeScript.includes("localStorage.setItem('aibos_language',current)"));
+  assert.ok(localeScript.includes("'record sale':'Andika igurisha'"));
+  assert.ok(localeScript.includes("'profit':'Inyungu'"));
+  assert.ok(localeScript.includes("'revenue':'Amafaranga yinjiye'"));
+  assert.ok(localeScript.includes("'record sale':'Enregistrer une vente'"));
+  assert.ok(localeScript.includes("'profit':'Bénéfice'"));
+  assert.ok(localeScript.includes("new MutationObserver"));
+  assert.ok(localeScript.includes("aibos:languagechange"));
+  assert.doesNotMatch(localeScript, /fetch\\s*\\(|https?:\\/\\//i);
+  assert.ok(localeScript.includes("does not change business records"));
+});
