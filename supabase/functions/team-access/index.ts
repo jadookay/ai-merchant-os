@@ -269,6 +269,10 @@ Deno.serve(async (req: Request) => {
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
       if (status === "suspended" && target.status !== "suspended") {
+        const { error: deviceError } = await admin.rpc("shericeri_revoke_member_sessions", {
+          p_merchant_id: merchantId, p_member_id: memberId,
+        });
+        if (deviceError) throw deviceError;
         // Password rotation invalidates existing refresh sessions. RLS and the
         // private session helper reject any still-unexpired access JWT as well.
         const { error: revokeError } = await admin.auth.admin.updateUserById(target.user_id, {
