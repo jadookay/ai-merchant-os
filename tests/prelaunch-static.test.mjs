@@ -449,7 +449,7 @@ test("multi-line carts queue and synchronize as one atomic server operation", ()
   assert.match(html, /type:'sale_cart_upsert',merchant_id:state\.merchant\.id,transaction_id:transactionId/);
   assert.match(html, /async function sheriSyncSaleCartOperation\(op\)[\s\S]*?sb\.rpc\('shericeri_sync_sale_cart'/);
   const syncStart = html.indexOf("async function sheriSyncOutbox(){");
-  const syncEnd = html.indexOf("\\nfunction sheriOnlineEvents(){", syncStart);
+  const syncEnd = html.indexOf("\nfunction sheriOnlineEvents(){", syncStart);
   assert.ok(syncStart >= 0 && syncEnd > syncStart);
   const sync = html.slice(syncStart, syncEnd);
   assert.equal((sync.match(/op\.type==='sale_cart_upsert'/g)||[]).length, 2,
@@ -458,7 +458,7 @@ test("multi-line carts queue and synchronize as one atomic server operation", ()
   const end = releaseMigration.indexOf("revoke all on function public.shericeri_sync_sale_cart", start);
   assert.ok(start >= 0 && end > start);
   const rpc = releaseMigration.slice(start, end);
-  assert.match(rpc, /order by \(value->>'product_id'\)::uuid[\\s\\S]*?for update/);
+  assert.match(rpc, /order by \(value->>'product_id'\)::uuid[\s\S]*?for update/);
   assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("update public.products"));
   assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("insert into public.sales"));
   assert.match(rpc, /partial sale cart with this transaction ID already exists/i);
@@ -467,8 +467,8 @@ test("multi-line carts queue and synchronize as one atomic server operation", ()
 test("PIN throttling locks independent identity and IP buckets and rejects concurrent bypasses", () => {
   assert.match(releaseMigration, /v_identity_key := 'identity:'/);
   assert.match(releaseMigration, /v_ip_key := 'ip:'/);
-  assert.match(releaseMigration, /perform 1[\\s\\S]*?order by attempt_key[\\s\\S]*?for update/);
-  assert.match(releaseMigration, /blocked_until=case[\\s\\S]*?interval '15 minutes'/);
+  assert.match(releaseMigration, /perform 1[\s\S]*?order by attempt_key[\s\S]*?for update/);
+  assert.match(releaseMigration, /blocked_until=case[\s\S]*?interval '15 minutes'/);
   assert.match(releaseMigration, /revoke all on function public\.verify_merchant_member_pin/);
   assert.match(releaseMigration, /grant execute on function public\.verify_merchant_member_pin.*to service_role/);
   assert.match(teamAccess, /const ip = req\.headers\.get\("cf-connecting-ip"\)/);
