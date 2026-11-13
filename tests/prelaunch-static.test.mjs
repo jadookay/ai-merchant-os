@@ -608,3 +608,22 @@ test("online and foreground app access is revalidated before cached data or outb
   assert.ok(html.includes("if(!await sheriEnsureActiveSession())return;"));
   assert.ok(html.includes("window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)sheriEnsureActiveSession()"));
 });
+
+test("device session registration and manager revocation are server-enforced", () => {
+  assert.ok(teamMigration.includes("create table if not exists public.merchant_member_sessions"));
+  assert.ok(teamMigration.includes("shericeri_register_member_session"));
+  assert.ok(teamMigration.includes("shericeri_list_member_sessions"));
+  assert.ok(teamMigration.includes("shericeri_revoke_member_session"));
+  assert.ok(teamMigration.includes("shericeri_revoke_member_sessions"));
+  assert.ok(teamMigration.includes("d.revoked_at is not null"));
+  assert.ok(teamAccess.includes("shericeri_revoke_member_sessions"));
+  assert.ok(html.includes("sheriJwtSessionId()"));
+  assert.ok(html.includes("sheriRegisterCurrentDevice") || html.includes("shericeri_register_member_session"));
+  assert.ok(html.includes("revokeTeamDevice"));
+  assert.ok(html.includes("id=\"teamSessionsTable\""));
+});
+
+test("accounting snapshot is gated by financial report permission and audit permission separately", () => {
+  assert.ok(teamMigration.includes("Not authorized for financial reports"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(p_merchant_id,'view_audit_log')"));
+});
