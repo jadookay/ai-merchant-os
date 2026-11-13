@@ -35,14 +35,14 @@ begin
   -- usernames or source addresses to evade the 15-minute lockout.
   v_identity_key := 'identity:' || encode(extensions.digest(p_merchant_id::text||':'||v_identifier,'sha256'),'hex');
   if coalesce(p_ip_hash,'') ~ '^[0-9a-f]{64}$' then
-    v_ip_key := 'ip:' || encode(extensions.digest(p_merchant_id::text||':'||p_ip_hash,'sha256'),'hex');
+    v_ip_key := 'ip:' || encode(extensions.digest(p_ip_hash,'sha256'),'hex');
   end if;
 
   -- Materialize and lock both throttle buckets before checking them. Concurrent
   -- attempts for the same identity or IP therefore serialize on the same rows.
   insert into public.team_login_attempts(attempt_key,attempt_count,window_started_at)
   select k,0,now()
-  from unnest(array_remove(array[v_identity_key,v_ip_key],null)) as k
+  from unnest(array_remove(array[v_identity_key,v_ip_key],null)) as keys(attempt_key)
   on conflict(attempt_key) do nothing;
   perform 1
   from public.team_login_attempts
@@ -92,14 +92,17 @@ begin
           else public.team_login_attempts.attempt_count+1
         end,
         window_started_at=case
-          when public.team_login_attempts.window_started_at < now()-interval '15 minutes' then now()
+          when public.team_login_attempts.window_started_at < now()-interval '15 minutes'
+            or public.team_login_attempts.attempt_count+1 >= case when v_key=v_ip_key then 20 else 5 end
+          then now()
           else public.team_login_attempts.window_started_at
         end,
         blocked_until=case
           when (case
             when public.team_login_attempts.window_started_at < now()-interval '15 minutes' then 1
             else public.team_login_attempts.attempt_count+1
-          end) >= 5 then now()+interval '15 minutes'
+          end) >= case when v_key=v_ip_key then 20 else 5 end
+          then now()+interval '15 minutes'
           else null
         end;
     end loop;
@@ -107,7 +110,7 @@ begin
   end if;
 
   delete from public.team_login_attempts
-  where attempt_key = any(array_remove(array[v_identity_key,v_ip_key],null));
+  where attempt_key = v_identity_key;
   update public.merchant_members set last_login_at=now() where id=v_member.id;
   return jsonb_build_object(
     'ok',true,'user_id',v_member.user_id,'merchant_id',v_member.merchant_id,
