@@ -673,7 +673,7 @@ async function sheriTogglePendingSync(){
   try{
     const pending=(await sheriGetAll('outbox')).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
     const blocked=pending.filter(x=>x.blocked).length;
-    const labels={sale_cart_upsert:'Sale cart recorded',sale_cart_stock_conflict:'Sale cart stock conflict',sale_upsert:'Sale recorded',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
+    const labels={sale_void:'Sale void request',sale_cart_upsert:'Sale cart recorded',sale_cart_stock_conflict:'Sale cart stock conflict',sale_upsert:'Sale recorded',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
     let out='<b>'+pending.length+' pending activities</b> · '+blocked+' need attention';if(!pending.length)out='<b>Everything is synchronized.</b>';
     for(const item of pending){
       const op=item.op||{},status=item.blocked?'Needs attention':item.next_retry_at&&new Date(item.next_retry_at)>new Date()?'Waiting for retry':'Waiting to sync';
@@ -1050,6 +1050,47 @@ async function sheriSyncJournalBatch(op){
     await sheriSaveAccountingSnapshot();
   }
 }
+async function sheriSyncSaleVoidOperation(op){
+  const {data,error}=await sb.rpc('shericeri_void_sale',{
+    p_merchant_id:op.merchant_id,p_sale_id:op.id,p_transaction_id:op.transaction_id||null,
+    p_reason:op.reason,p_audit_id:op.audit_id
+  });
+  if(error)throw error;
+  if(!data?.ok)throw new Error('The server did not confirm this sale void.');
+  const ids=(data.sale_ids||op.sale_ids||[]).map(String);
+  const localRows=(op.records||[]).filter(row=>(state.sales||[]).some(s=>s.id===row.id));
+  const pending=await sheriGetAll('outbox');
+  const hasPendingStock=(productId)=>pending.some(item=>{
+    const x=item.op||{};
+    if(x.type==='sale_void'&&x.audit_id===op.audit_id)return false;
+    const records=Array.isArray(x.records)?x.records:[];
+    return x.productId===productId||x.record?.product_id===productId||
+      records.some(r=>r.product_id===productId)||x.entry?.product_id===productId;
+  });
+  for(const update of (data.stock_updates||[])){
+    const p=product(update.product_id);if(!p)continue;
+    if(!hasPendingStock(update.product_id))p.stock=Number(update.stock||0);
+    else if(localRows.length){
+      const restored=localRows.filter(r=>r.product_id===update.product_id&&r.stock_applied!==false)
+        .reduce((n,r)=>n+Number(r.qty||0),0);
+      p.stock=Number(p.stock||0)+restored;
+    }
+    await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
+  }
+  state.sales=(state.sales||[]).filter(s=>!ids.includes(String(s.id)));
+  for(const saleId of ids)await sheriDelete('sales',saleId);
+  for(const entry of state.journalEntries||[]){
+    if(ids.includes(String(entry.source_id))&&['sale','sale_cogs'].includes(entry.source_type)&&!entry.voided){
+      entry.voided=true;entry.void_reason=op.reason;entry.voided_at=sheriNow();entry.voided_by=session?.user?.id||null;
+      await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});
+    }
+  }
+  if(data.audit_recorded&&op.auditRow&&sheriCan('view_audit_log')&&!state.auditLog.some(x=>x.id===op.audit_id)){
+    state.auditLog.unshift(op.auditRow);
+    await sheriPut('auditLog',op.audit_id,{merchant_id:state.merchant.id,record:{...op.auditRow}});
+  }
+  await sheriSaveSnapshot();await sheriSaveAccountingSnapshot();
+}
 async function sheriSyncSaleCartOperation(op){
   const {data,error}=await sb.rpc('shericeri_sync_sale_cart',{
     p_merchant_id:op.merchant_id,
@@ -1139,6 +1180,7 @@ async function sheriSyncOutbox(){
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
         else if(op.type==='product_delete'){const {error}=await sb.from('products').update({deleted:true}).eq('id',op.id);if(error)throw error}
+        else if(op.type==='sale_void'){await sheriSyncSaleVoidOperation(op)}
         else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
         else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
@@ -1178,7 +1220,8 @@ async function sheriSyncOutbox(){
               // Re-run this operation exactly once with the fresh token.
               if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
-              else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
+              else if(op.type==='sale_void'){await sheriSyncSaleVoidOperation(op)}
+        else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
               else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
               else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
@@ -2038,28 +2081,21 @@ async function voidSale(id){
   const total=rows.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0);
   const reason=prompt('Enter the reason for voiding this sale (required):');
   if(!reason||reason.trim().length<3)return sheriToast('A clear void reason is required.','error');
-  const confirmText='Void '+(invoice?'entire invoice '+invoice:'this sale')+'?\\n'+rows.map(x=>(x.qty||0)+' × '+(x.product_name_snapshot||product(x.product_id)?.name||'Product')+' — '+money((x.qty||0)*(x.price||0))).join('\\n')+'\\nTotal: '+money(total)+'\\nReason: '+reason.trim();
+  const confirmText='Void '+(invoice?'entire invoice '+invoice:'this sale')+'?\n'+rows.map(x=>(x.qty||0)+' × '+(x.product_name_snapshot||product(x.product_id)?.name||'Product')+' — '+money((x.qty||0)*(x.price||0))).join('\n')+'\nTotal: '+money(total)+'\nReason: '+reason.trim();
   if(!confirm(confirmText))return;
-  const auditId=sheriUuid(),saleIds=rows.map(x=>x.id);
+  const saleIds=rows.map(x=>x.id),auditId=sheriUuid();
+  const existing=(await sheriGetAll('outbox')).some(x=>x.op?.type==='sale_void'&&(x.op.transaction_id===transactionId||x.op.sale_ids?.some(v=>saleIds.includes(v))));
+  if(existing)return sheriToast('A void request for this invoice is already waiting to sync.','warning');
   const auditRow={id:auditId,merchant_id:state.merchant.id,actor_user_id:session?.user?.id||null,action:'void',entity_type:'sale',entity_id:id,reason:reason.trim(),details:{actor_name:state.merchant?.user_id===session?.user?.id?'Owner':state.currentMembership?.full_name||session?.user?.email||'Staff',reason:reason.trim(),invoice_number:invoice||null,transaction_id:transactionId,amount:total,sale_ids:saleIds,line_count:rows.length},created_at:sheriNow()};
-  state.auditLog.unshift(auditRow);
-  await sheriPut('auditLog',auditId,{merchant_id:state.merchant.id,record:{...auditRow}});
-  for(const row of rows){
-    const p=product(row.product_id);if(p)p.stock=Number(p.stock||0)+Number(row.qty||0);
-    await sheriDelete('sales',row.id);
-  }
-  state.sales=state.sales.filter(x=>!saleIds.includes(x.id));
-  for(const entry of state.journalEntries||[]){
-    if(saleIds.includes(entry.source_id)&&['sale','sale_cogs'].includes(entry.source_type)&&!entry.voided){
-      entry.voided=true;entry.void_reason=reason.trim();entry.voided_at=sheriNow();entry.voided_by=session?.user?.id||null;
-      await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});
-    }
-  }
-  await sheriSaveSnapshot();await sheriSaveAccountingSnapshot();
-  await sheriQueue({type:'sale_void',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId});
+  for(const row of rows){row.void_pending=true;await sheriPut('sales',row.id,{merchant_id:state.merchant.id,record:{...row}})}
+  await sheriQueue({type:'sale_void',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:auditId,transaction_id:transactionId,sale_ids:saleIds,records:rows.map(x=>({...x})),auditRow});
   if(navigator.onLine)await sheriSyncOutbox();
-  render();sheriToast((invoice?'Invoice '+invoice:'Sale')+' voided with stock and accounting reversal recorded.');
+  const stillPending=(await sheriGetAll('outbox')).some(x=>x.op?.type==='sale_void'&&x.op.audit_id===auditId);
+  render();
+  if(stillPending)sheriToast('Void request is waiting for server confirmation. The sale remains active until the server accepts it.','warning');
+  else sheriToast((invoice?'Invoice '+invoice:'Sale')+' voided; stock and accounting were updated by the server.');
 }
+
 
 const sheriSearchValues={};
 function sheriSearchControl(key,target,placeholder,values){
@@ -2075,7 +2111,7 @@ function sheriSearchTable(input){
 function renderSales(){
   const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);
   const rows=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\''+s.id+'\')">Void</button>':''}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
+  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${s.void_pending?'<span class="muted">Void pending</span>':(sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\\''+s.id+'\\')">Void</button>':'')}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
 }
 
 // ── Products ─────────────────────────────────────────────────────────────
