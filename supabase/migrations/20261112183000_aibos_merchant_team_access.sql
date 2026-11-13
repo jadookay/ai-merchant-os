@@ -890,11 +890,9 @@ begin
 
   select merchant_id,transaction_id into v_sale_merchant_id,v_initial_transaction_id
   from public.sales where id=p_sale_id;
-  if not found then return jsonb_build_object('ok',true,'already_voided',true,'sale_ids','[]'::jsonb,'stock_updates','[]'::jsonb,'audit_recorded',false); end if;
+  if not found then raise exception 'Sale not found or no longer available'; end if;
   v_merchant_id:=coalesce(p_merchant_id,v_sale_merchant_id);
-  if v_merchant_id is distinct from v_sale_merchant_id then
-    return jsonb_build_object('ok',true,'already_voided',true,'sale_ids','[]'::jsonb,'stock_updates','[]'::jsonb,'audit_recorded',false);
-  end if;
+  if v_merchant_id is distinct from v_sale_merchant_id then raise exception 'Sale not found or no longer available'; end if;
 
   if not (private.user_can_access_merchant(v_merchant_id,'manage_team')
       and private.user_can_access_merchant(v_merchant_id,'manage_sales')) then
