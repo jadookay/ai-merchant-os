@@ -770,3 +770,8 @@ test("legacy sale journal repair only fills missing expected lines and validates
   assert.match(repairLegacyJournalsMigration, /Journal repair did not balance entry/);
   assert.doesNotMatch(repairLegacyJournalsMigration, /9036b1cc-d385|42595638-6eea/);
 });
+
+
+test("PIN throttling normalizes repeated whitespace before account-level hashing", () => {
+  assert.ok(pinRateLimitMigration.includes(String.raw`regexp_replace(lower(trim(coalesce(p_identifier,''))), '\\s+', ' ', 'g')`));
+});
