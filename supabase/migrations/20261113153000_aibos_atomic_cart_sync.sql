@@ -47,6 +47,11 @@ begin
              and db.merchant_id=p_merchant_id
              and db.transaction_id=p_transaction_id
              and db.invoice_number=p_invoice_number
+             and db.product_id=(s.value->>'product_id')::uuid
+             and db.qty=(s.value->>'qty')::integer
+             and db.price=(s.value->>'price')::integer
+             and db.cost=coalesce(nullif(s.value->>'cost','')::integer,0)
+             and db.customer_id is not distinct from nullif(s.value->>'customer_id','')::uuid
              and coalesce(db.stock_applied,false)=true
          )
        ) then
