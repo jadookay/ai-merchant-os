@@ -13,6 +13,7 @@ const atomicCartMigration = await readFile(new URL("../supabase/migrations/20261
 const pinRateLimitMigration = await readFile(new URL("../supabase/migrations/20261113160000_aibos_pin_rate_limit.sql", import.meta.url), "utf8");
 const storageMemoryMigration = await readFile(new URL("../supabase/migrations/20261112170000_aibos_priority_storage_memory.sql", import.meta.url), "utf8");
 const journalIntegrityMigration = await readFile(new URL("../supabase/migrations/20261113170000_aibos_journal_integrity.sql", import.meta.url), "utf8");
+const repairLegacyJournalsMigration = await readFile(new URL("../supabase/migrations/20261113180000_aibos_repair_legacy_sale_journals.sql", import.meta.url), "utf8");
 const supabaseConfig = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
 const kinyaTts = await readFile(new URL("../supabase/functions/kinya-tts/index.ts", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
@@ -755,4 +756,16 @@ test("voided sale queues cannot race with cart sync or recreate revenue", () => 
   assert.match(html, /async function sheriFinalizeUnpostedVoid\(op\)[\s\S]*?shericeri_write_audit/);
   assert.match(html, /if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\);[\s\S]*?q\.type==='sale_cart'/);
   assert.match(journalIntegrityMigration, /if\(v_sale_voided\) then return p_entry_id/);
+});
+
+
+test("legacy sale journal repair only fills missing expected lines and validates balances", () => {
+  assert.match(repairLegacyJournalsMigration, /source_type in \('sale','sale_cogs'\)/);
+  assert.match(repairLegacyJournalsMigration, /Cannot repair journal entry/);
+  assert.match(repairLegacyJournalsMigration, /Refusing automatic repair because journal entry/);
+  assert.match(repairLegacyJournalsMigration, /locked through/);
+  assert.match(repairLegacyJournalsMigration, /Automated repair: missing source debit line/);
+  assert.match(repairLegacyJournalsMigration, /Automated repair: missing source credit line/);
+  assert.match(repairLegacyJournalsMigration, /Journal repair did not balance entry/);
+  assert.doesNotMatch(repairLegacyJournalsMigration, /9036b1cc-d385|42595638-6eea/);
 });
