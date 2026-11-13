@@ -462,12 +462,21 @@ test("multi-line carts queue and synchronize as one atomic server operation", ()
   assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("update public.products"));
   assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("insert into public.sales"));
   assert.match(rpc, /partial sale cart with this transaction ID already exists/i);
+  assert.match(html, /const allOutboxItems=await sheriGetAll\('outbox'\)/);
+  assert.match(html, /const groupReady=group\.every\(x=>!x\.blocked/);
+  assert.match(html, /conflict\.status=422/);
+  assert.match(html, /server stock is insufficient/);
 });
 
 test("PIN throttling locks independent identity and IP buckets and rejects concurrent bypasses", () => {
   assert.match(releaseMigration, /v_identity_key := 'identity:'/);
   assert.match(releaseMigration, /v_ip_key := 'ip:'/);
+  assert.match(releaseMigration, /digest\(p_ip_hash,'sha256'\)/);
+  assert.match(releaseMigration, /coalesce\(p_pin,''\) !~ '\^\[0-9\]\+'/);
+  assert.match(releaseMigration, /length\(coalesce\(p_pin,''\)\) not between 6 and 8 then/);
   assert.match(releaseMigration, /perform 1[\s\S]*?order by attempt_key[\s\S]*?for update/);
+  assert.match(releaseMigration, /then 20 else 5 end/);
+  assert.match(releaseMigration, /where attempt_key = v_identity_key/);
   assert.match(releaseMigration, /blocked_until=case[\s\S]*?interval '15 minutes'/);
   assert.match(releaseMigration, /revoke all on function public\.verify_merchant_member_pin/);
   assert.match(releaseMigration, /grant execute on function public\.verify_merchant_member_pin.*to service_role/);
