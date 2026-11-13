@@ -1064,7 +1064,7 @@ async function sheriSyncSaleVoidOperation(op){
     const x=item.op||{};
     if(x.type==='sale_void'&&x.audit_id===op.audit_id)return false;
     const records=Array.isArray(x.records)?x.records:[];
-    return x.productId===productId||x.record?.product_id===productId||
+    return x.productId===productId||x.product_id===productId||x.record?.product_id===productId||
       records.some(r=>r.product_id===productId)||x.entry?.product_id===productId;
   });
   for(const update of (data.stock_updates||[])){
@@ -2084,7 +2084,7 @@ async function voidSale(id){
   const confirmText='Void '+(invoice?'entire invoice '+invoice:'this sale')+'?\n'+rows.map(x=>(x.qty||0)+' × '+(x.product_name_snapshot||product(x.product_id)?.name||'Product')+' — '+money((x.qty||0)*(x.price||0))).join('\n')+'\nTotal: '+money(total)+'\nReason: '+reason.trim();
   if(!confirm(confirmText))return;
   const saleIds=rows.map(x=>x.id),auditId=sheriUuid();
-  const existing=(await sheriGetAll('outbox')).some(x=>x.op?.type==='sale_void'&&(x.op.transaction_id===transactionId||x.op.sale_ids?.some(v=>saleIds.includes(v))));
+  const existing=(await sheriGetAll('outbox')).some(x=>x.op?.type==='sale_void'&&(x.op.sale_ids?.some(v=>saleIds.includes(v))||(transactionId&&x.op.transaction_id===transactionId)));
   if(existing)return sheriToast('A void request for this invoice is already waiting to sync.','warning');
   const auditRow={id:auditId,merchant_id:state.merchant.id,actor_user_id:session?.user?.id||null,action:'void',entity_type:'sale',entity_id:id,reason:reason.trim(),details:{actor_name:state.merchant?.user_id===session?.user?.id?'Owner':state.currentMembership?.full_name||session?.user?.email||'Staff',reason:reason.trim(),invoice_number:invoice||null,transaction_id:transactionId,amount:total,sale_ids:saleIds,line_count:rows.length},created_at:sheriNow()};
   for(const row of rows){row.void_pending=true;await sheriPut('sales',row.id,{merchant_id:state.merchant.id,record:{...row}})}
@@ -2111,7 +2111,7 @@ function sheriSearchTable(input){
 function renderSales(){
   const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);
   const rows=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${s.void_pending?'<span class="muted">Void pending</span>':(sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\\''+s.id+'\\')">Void</button>':'')}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
+  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${s.void_pending?'<span class="muted">Void pending</span>':(sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\''+s.id+'\')">Void</button>':'')}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
 }
 
 // ── Products ─────────────────────────────────────────────────────────────
