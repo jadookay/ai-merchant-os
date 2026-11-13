@@ -694,13 +694,16 @@ declare
   v_cart_qty integer;
   v_conflicts jsonb:='[]'::jsonb;
 begin
-  if p_merchant_id is null
-     or coalesce(jsonb_typeof(p_sales),'')<>'array'
-     or jsonb_array_length(p_sales)<1
-     or jsonb_array_length(p_sales)>100
-     or coalesce(jsonb_typeof(p_stock_checks),'')<>'array'
-     or jsonb_array_length(p_stock_checks)<1 then
-    raise exception 'Sale cart payload is invalid';
+  if p_merchant_id is null then raise exception 'Sale cart merchant is required'; end if;
+  if coalesce(jsonb_typeof(p_sales),'')<>'array' then raise exception 'Sale cart payload must be a JSON array'; end if;
+  if jsonb_array_length(p_sales)<1 or jsonb_array_length(p_sales)>100 then raise exception 'Sale cart must contain between 1 and 100 lines'; end if;
+  if exists(select 1 from jsonb_array_elements(p_sales) x where jsonb_typeof(x.value)<>'object') then
+    raise exception 'Every sale cart line must be a JSON object';
+  end if;
+  if coalesce(jsonb_typeof(p_stock_checks),'')<>'array' then raise exception 'Sale stock checks must be a JSON array'; end if;
+  if jsonb_array_length(p_stock_checks)<1 then raise exception 'Sale cart stock checks are required'; end if;
+  if exists(select 1 from jsonb_array_elements(p_stock_checks) x where jsonb_typeof(x.value)<>'object') then
+    raise exception 'Every stock check must be a JSON object';
   end if;
   if not private.user_can_access_merchant(p_merchant_id,'create_sale') then
     raise exception 'Not authorized to record sales';
@@ -752,11 +755,19 @@ begin
         where s.id=(x.value->>'id')::uuid
           and s.merchant_id=p_merchant_id
           and s.transaction_id=v_transaction_id
+          and s.invoice_number=v_invoice_number
       )
     ) then
       return jsonb_build_object('ok',true,'already_recorded',true,'inserted_count',0);
     end if;
     raise exception 'Sale cart is partially present; refusing a partial retry';
+  end if;
+  if exists(
+    select 1 from public.sales s
+    where s.merchant_id=p_merchant_id
+      and (s.transaction_id=v_transaction_id or s.invoice_number=v_invoice_number)
+  ) then
+    raise exception 'This sale transaction or invoice identifier is already in use';
   end if;
 
   if (select count(*) from jsonb_array_elements(p_stock_checks))
@@ -783,7 +794,7 @@ begin
       raise exception 'Stock check quantities cannot be negative';
     end if;
     select coalesce(stock,0) into v_current_stock
-    from public.products where id=v_check.product_id and merchant_id=p_merchant_id for update;
+    from public.products where id=v_check.product_id and merchant_id=p_merchant_id and deleted=false for update;
     if not found then raise exception 'A cart product was not found for this business'; end if;
     select coalesce(sum((value->>'qty')::integer),0) into v_cart_qty
     from jsonb_array_elements(p_sales)
