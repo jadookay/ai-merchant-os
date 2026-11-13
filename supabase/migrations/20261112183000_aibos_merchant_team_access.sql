@@ -871,18 +871,21 @@ begin
       and private.user_can_access_merchant(v_merchant_id,'manage_sales')) then
     raise exception 'Only the owner, an administrator, or an authorized manager can void sales';
   end if;
-  perform 1 from public.sales
-   where merchant_id=v_merchant_id
-     and (id=p_sale_id or (p_transaction_id is not null and transaction_id=p_transaction_id))
-   for update;
-  select coalesce(transaction_id,p_transaction_id),invoice_number,created_at::date
+  -- Derive the transaction from the selected sale row. Never trust a caller-
+  -- supplied transaction ID to widen the target set to a different invoice.
+  select transaction_id,invoice_number,created_at::date
     into v_transaction_id,v_invoice_number,v_sale_date
   from public.sales
-  where merchant_id=v_merchant_id
-    and (id=p_sale_id or (p_transaction_id is not null and transaction_id=p_transaction_id))
-  order by case when id=p_sale_id then 0 else 1 end
-  limit 1;
+  where merchant_id=v_merchant_id and id=p_sale_id
+  for update;
   if not found then return jsonb_build_object('ok',true,'already_voided',true); end if;
+  if p_transaction_id is not null and p_transaction_id is distinct from v_transaction_id then
+    raise exception 'Transaction ID does not match the selected sale';
+  end if;
+  perform 1 from public.sales
+   where merchant_id=v_merchant_id
+     and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
+   for update;
   if not exists(select 1 from public.sales where merchant_id=v_merchant_id
       and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
       and coalesce(voided,false)=false) then
