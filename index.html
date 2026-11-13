@@ -1004,20 +1004,55 @@ async function sheriSyncSaleOperation(op){
     server_stock:data.server_stock,sale_id:op.record.id,operation:op
   });
 }
-async function sheriSyncSaleCartOperation(op){
-  const {data,error}=await sb.rpc('shericeri_sync_sale_cart',{
+async function sheriSyncSaleCartOperation(op,item){
+  const send=()=>sb.rpc('shericeri_sync_sale_cart',{
     p_merchant_id:op.merchant_id,
     p_transaction_id:op.transaction_id,
     p_sales:(op.records||[]).map(sheriServerRecord),
     p_stock_changes:op.stockChanges||[]
   });
+  let {data,error}=await send();
   if(error)throw error;
   if(data?.stock_conflict){
-    await sheriRecordConflict({
-      type:'cart_stock_conflict',merchant_id:op.merchant_id,
-      transaction_id:op.transaction_id,invoice_number:op.invoice_number||null,
-      conflicts:data.conflicts||[],operation:op
-    });
+    // Rebase once against current server stock when the complete cart still fits.
+    // The RPC will re-lock and revalidate all products; a second conflict blocks
+    // the outbox item instead of silently dropping an invoice.
+    const ids=(op.stockChanges||[]).map(x=>x.product_id);
+    const {data:serverProducts,error:stockError}=await sb.from('products')
+      .select('id,stock').eq('merchant_id',op.merchant_id).in('id',ids);
+    if(stockError)throw stockError;
+    const byId=new Map((serverProducts||[]).map(x=>[x.id,Number(x.stock||0)]));
+    const insufficient=(op.stockChanges||[]).filter(x=>!byId.has(x.product_id)||byId.get(x.product_id)<Number(x.quantity||0));
+    if(insufficient.length){
+      await sheriRecordConflict({
+        type:'cart_stock_conflict',merchant_id:op.merchant_id,
+        transaction_id:op.transaction_id,invoice_number:op.invoice_number||null,
+        conflicts:data.conflicts||[],insufficient_products:insufficient,operation:op
+      });
+      const conflict=new Error('Cart stock conflict: server stock is insufficient for one or more products. Review stock and retry this pending invoice.');
+      conflict.status=422;throw conflict;
+    }
+    op.stockChanges=(op.stockChanges||[]).map(x=>({
+      ...x,expected_server_stock:byId.get(x.product_id),
+      local_stock:byId.get(x.product_id)-Number(x.quantity||0)
+    }));
+    for(const change of op.stockChanges){
+      const p=product(change.product_id);
+      if(p){p.stock=change.local_stock;await sheriPut('products',p.id,{merchant_id:op.merchant_id,record:{...p}});}
+    }
+    if(item)await sheriPut('outbox',item.key,{...item,op});
+    const retry=await send();
+    if(retry.error)throw retry.error;
+    data=retry.data;
+    if(data?.stock_conflict){
+      await sheriRecordConflict({
+        type:'cart_stock_conflict',merchant_id:op.merchant_id,
+        transaction_id:op.transaction_id,invoice_number:op.invoice_number||null,
+        conflicts:data.conflicts||[],operation:op
+      });
+      const conflict=new Error('Cart stock changed again during synchronization. This invoice remains pending for review.');
+      conflict.status=422;throw conflict;
+    }
   }
 }
 async function sheriSyncVoidSale(op){
@@ -1082,7 +1117,7 @@ async function sheriSyncOutbox(){
         else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
         else if(op.type==='product_delete'){const {error}=await sb.from('products').update({deleted:true}).eq('id',op.id);if(error)throw error}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
-        else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
+        else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op,item)}
         else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
         else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='expense_delete'){const {error}=await sb.from('expenses').delete().eq('id',op.id);if(error)throw error}
