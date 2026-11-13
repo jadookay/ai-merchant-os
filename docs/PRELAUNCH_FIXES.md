@@ -59,7 +59,7 @@ No database migration or Edge Function deployment is performed by this branch.
 
 ## Additional regression coverage
 
-The static regression suite now contains 44 tests. Run with:
+The static regression suite contained 44 tests at that earlier checkpoint; the November 13 additions bring it to 56 tests, all passing in run 43376754467. Run with:
 
 ```bash
 node --test tests/prelaunch-static.test.mjs
