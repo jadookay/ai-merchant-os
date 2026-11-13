@@ -725,3 +725,13 @@ test("all legacy sale queue records, including single-line invoices, use atomic 
   assert.match(html, /if\(serverProduct\.deleted\)throw new Error/);
   assert.match(atomicCartMigration, /coalesce\(deleted,false\)=false for update/);
 });
+
+
+test("sale journal batches wait for the corresponding cart sync or stock-conflict resolution", () => {
+  assert.match(html, /async function sheriJournalDependsOnPendingSale\(op\)/);
+  assert.match(html, /queue\.some\(item=>containsSale\(item\.op\)\)\|\|conflicts\.some\(row=>containsSale\(row\.info\?\.operation\)\)/);
+  assert.match(html, /if\(await sheriJournalDependsOnPendingSale\(op\)\)continue/);
+  assert.match(html, /item\.op\?\.type==='sale_cart'\?0/);
+  assert.match(journalIntegrityMigration, /Sale must synchronize before its journal entry can post/);
+  assert.match(journalIntegrityMigration, /if\(v_sale_voided\) then return p_entry_id/);
+});
