@@ -39,7 +39,14 @@ begin
       t.table_name||'_team_update',t.table_name,write_perm,write_perm
     );
   end loop;
-end $$;
+end $;
+
+-- Shericeri memory is business context. Allow staff with finance-management
+-- responsibility to add memories; ordinary staff still cannot read it by default.
+drop policy if exists shericeri_memory_team_insert on public.shericeri_memory;
+create policy shericeri_memory_team_insert on public.shericeri_memory
+  for insert to authenticated
+  with check (private.user_can_access_merchant(merchant_id,'manage_finance'));
 
 -- A user may record the audit event for an allowed operational update. Deletes and
 -- voids still require manager/admin authority (manage_team is role-gated).
