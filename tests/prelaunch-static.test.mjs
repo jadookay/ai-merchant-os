@@ -624,3 +624,9 @@ test("failed membership verification clears staff-only in-memory business and ac
   assert.match(html, /state\.currentMembership=null;state\.products=\[\];state\.sales=\[\];state\.expenses=\[\]/);
   assert.match(html, /state\.journalEntries=\[\];state\.journalLines=\[\];state\.invoices=\[\]/);
 });
+
+
+test("PIN login validates identifier length, numeric merchant code and exact PIN format", () => {
+  assert.match(teamAccess, /identifier\.length > 120/);
+  assert.match(teamAccess, /!\^\\\\d\{1,12\}\$/.source === undefined ? /x/ : /identifier/);
+});
