@@ -4892,5 +4892,279 @@ const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const be
 const _v14_1_addExpense=addExpense;addExpense=async function(){const before=state.expenses.length;await _v14_1_addExpense();if(state.expenses.length>before){const e=state.expenses[state.expenses.length-1];try{await accEnsureBase();const ex=accAccountCode('6000'),cash=accAccountCode('1000'),amount=Number(e.amount||0);if(amount<=0)throw new Error('Expense amount must be positive.');await accPostEntry({date:String(e.created_at||sheriNow()).slice(0,10),description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});await accAudit('create','expense',e.id,{amount})}catch(err){console.warn('[Sheri accounting] expense ledger failed',err);alert('Expense was saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
 
 </script>
+
+<div id="aibosLanguageSwitcher" style="position:fixed;right:12px;top:12px;z-index:10050;display:flex;align-items:center;gap:6px;padding:6px 8px;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 2px 10px rgba(15,23,42,.10);font-size:12px;color:#334155">
+  <label for="aibosLanguageSelect" id="aibosLanguageLabel">Language / Ururimi / Langue</label>
+  <select id="aibosLanguageSelect" aria-label="Choose app language" style="width:auto;min-width:112px;padding:5px 7px;border:1px solid #cbd5e1;border-radius:7px;background:#fff;color:#111827">
+    <option value="en">English</option><option value="rw">Ikinyarwanda</option><option value="fr">Français</option>
+  </select>
+</div>
+<script>
+/* AIBOS_I18N_V1 — user-facing interface localization.
+   English remains the source language. Kinyarwanda favors clear everyday Rwandan
+   merchant wording; French uses standard business/accounting vocabulary.
+   The selected language is device-local and does not change business records,
+   account settings, currency, dates, or Shericeri's separate voice-language setting. */
+(function(){
+  'use strict';
+  if(window.AIBOS_I18N&&window.AIBOS_I18N.version==='1')return;
+  const dictionaries={
+    rw:{
+      'good morning,':'Mwaramutse,',
+      'dashboard':'Incamake','record sale':'Andika igurisha','record a sale':'Andika igurisha',
+      'records':'Ibyanditswe','aibos command center':'Igenzura ry’ubucuruzi',
+      'ai advisor':'Umujyanama w’ubucuruzi (AI)','shericeri':'Shericeri','settings':'Igenamiterere',
+      'money':'Amafaranga','inventory':'Ububiko','inventory / stock':'Ububiko bw’ibicuruzwa',
+      'stock':'Ibicuruzwa biri mu bubiko','products':'Ibicuruzwa','sales':'Ibyagurishijwe',
+      'expenses':'Amafaranga yakoreshejwe','customers':'Abakiriya','suppliers':'Abagemura ibicuruzwa',
+      'purchases':'Ibyaguzwe','reports':'Raporo','financial reports':'Raporo z’imari',
+      'management reports':'Raporo z’ubuyobozi','report period':'Igihe cya raporo',
+      'general ledger':'Igitabo cy’ibaruramari','audit trail':'Amateka y’ibikorwa',
+      'team access & responsibilities':'Uburenganzira n’inshingano by’abakozi',
+      'team members':'Abakozi','add team member':'Ongeraho umukozi','refresh team':'Kongera kureba abakozi',
+      'full name':'Amazina yose','username (optional)':'Izina ukoresha (si ngombwa)',
+      'email':'Imeyili','phone':'Telefoni','pin (6–8 digits)':'PIN (imibare 6–8)',
+      'role':'Inshingano','responsibilities':'Imirimo ashinzwe',
+      'cashier':'Uwakira amafaranga','inventory officer':'Ushinzwe ububiko',
+      'accountant':'Umucungamutungo','manager':'Umuyobozi','admin':'Ushinzwe ubuyobozi',
+      'custom':'Ibindi','owner':'Nyir’ubucuruzi','staff':'Umukozi',
+      'view and record sales':'Kureba no kwandika ibyagurishijwe',
+      'edit / void / delete sales':'Guhindura, guhagarika cyangwa gusiba igurisha',
+      'view and manage inventory':'Kureba no gucunga ububiko',
+      'view and manage expenses':'Kureba no kwandika amafaranga yakoreshejwe',
+      'view financial reports':'Kureba raporo z’imari',
+      'manage accounting and finance':'Gucunga ibaruramari n’imari',
+      'manage customers':'Gucunga abakiriya','manage suppliers and purchases':'Gucunga abagemura n’ibyaguzwe',
+      'view audit trail':'Kureba amateka y’ibikorwa','manage team access':'Gucunga uburenganzira bw’abakozi',
+      'enable':'Emera gukoresha','disable':'Hagarika gukoresha','enabled':'Arakoresha','disabled':'Yahagaritswe',
+      'active':'Arakora','suspended':'Yahagaritswe','save':'Bika','cancel':'Reka',
+      'delete':'Siba','edit':'Hindura','update':'Vugurura','add':'Ongeraho','remove':'Kuraho',
+      'search':'Shakisha','filter':'Shungura','clear':'Siba ibyo wahisemo','close':'Funga',
+      'back':'Subira inyuma','refresh':'Ongera urebe','submit':'Ohereza','confirm':'Emeza',
+      'continue':'Komeza','sign out':'Sohoka','sign in':'Injira','login':'Kwinjira',
+      'export backup':'Bika kopi y’amakuru','import backup':'Shyiramo kopi y’amakuru',
+      'add sample products':'Ongeraho ibicuruzwa by’igerageza',
+      'business / merchant name':'Izina ry’ubucuruzi','primary category':'Icyiciro cy’ubucuruzi',
+      'tin number':'Nimero y’isoresha (TIN)','fiscal year':'Umwaka w’ibaruramari',
+      'country':'Igihugu','currency':'Ifaranga','save settings':'Bika igenamiterere',
+      'online':'Internet irakora','offline':'Nta internet ihari','sync now':'Ohereza amakuru kuri sisitemu',
+      'pending activity':'Ibikorwa bitaroherezwa','pending activities':'Ibikorwa bitaroherezwa',
+      'offline status':'Imiterere ya internet','checking server…':'Turimo kugenzura seriveri…',
+      'good morning':'Mwaramutse','your business':'Ubucuruzi bwawe',
+      'products, stock levels, imports and stock history.':'Ibicuruzwa, ingano yabyo mu bubiko, ibyinjijwe n’amateka yabyo.',
+      'record and review business expenses.':'Andika kandi urebe amafaranga ubucuruzi bwakoresheje.',
+      'revenue':'Amafaranga yinjiye','profit':'Inyungu','net profit':'Inyungu nyayo',
+      'gross profit':'Inyungu mbere yo gukuramo andi mafaranga','loss':'Igihombo',
+      'cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe','cogs':'Ikiguzi cy’ibyagurishijwe',
+      'expenses':'Amafaranga yakoreshejwe','quantity':'Umubare','qty':'Umubare',
+      'price':'Igiciro','selling price':'Igiciro cyo kugurisha','cost':'Ikiguzi',
+      'unit cost':'Ikiguzi cya kimwe','total':'Igiteranyo','date':'Itariki',
+      'today':'Uyu munsi','this week':'Iki cyumweru','this month':'Uku kwezi',
+      'this year':'Uyu mwaka','custom range':'Igihe wahisemo','yearly':'Umwaka wose',
+      'daily':'Buri munsi','weekly':'Buri cyumweru','monthly':'Buri kwezi',
+      'top-selling products':'Ibicuruzwa byagurishijwe cyane',
+      'best-selling products':'Ibicuruzwa bigurishwa cyane',
+      'highest-profit products':'Ibicuruzwa byinjiriza inyungu nyinshi',
+      'inventory value':'Agaciro k’ibiri mu bubiko','stock in':'Ibyinjiye mu bubiko',
+      'stock out':'Ibyasohotse mu bubiko','stock balance':'Ibiri mu bubiko',
+      'stock movement':'Imigendekere y’ibicuruzwa','stock movements':'Ibyinjiye n’ibyasohotse mu bubiko',
+      'received':'Byakiriwe','adjustment':'Gukosora umubare','write-off':'Ibyangiritse cyangwa byatakaye',
+      'customer return':'Ibyagaruwe n’umukiriya','reason':'Impamvu','reason required':'Ugomba kwandika impamvu',
+      'recorded by':'Byanditswe na','created by':'Byakozwe na','last updated':'Iheruka kuvugururwa',
+      'audit log':'Amateka y’impinduka','activity history':'Amateka y’ibikorwa',
+      'transaction':'Igikorwa cy’amafaranga','transactions':'Ibikorwa by’amafaranga',
+      'invoice':'Inyemezabuguzi','receipt':'Inyemezabwishyu','customer':'Umukiriya',
+      'product':'Igicuruzwa','category':'Icyiciro','description':'Ibisobanuro',
+      'notes':'Icyitonderwa','status':'Imiterere','amount':'Amafaranga',
+      'payment method':'Uburyo bwo kwishyura','cash':'Amafaranga mu ntoki',
+      'mobile money':'Mobile Money','bank':'Banki','paid':'Byishyuwe','unpaid':'Ntibyishyuwe',
+      'low stock':'Ibicuruzwa biri hafi gushira','reorder':'Kongera ibicuruzwa mu bubiko',
+      'expiry date':'Itariki ntarengwa yo gukoresha','expired':'Byarengeje igihe',
+      'save changes':'Bika impinduka','confirm sale':'Emeza igurisha',
+      'record sale':'Andika igurisha','add product':'Ongeraho igicuruzwa',
+      'edit product':'Hindura igicuruzwa','delete product':'Siba igicuruzwa',
+      'void sale':'Hagarika igurisha','void reason':'Impamvu yo guhagarika igurisha',
+      'are you sure?':'Urabyemeza?','no data found':'Nta makuru abonetse',
+      'no records found':'Nta byanditswe bibonetse','loading…':'Birimo gufunguka…',
+      'save':'Bika','success':'Byagenze neza','error':'Habaye ikibazo',
+      'please try again.':'Ongera ugerageze.','required':'Birakenewe',
+      'optional':'Si ngombwa','select':'Hitamo','choose language':'Hitamo ururimi',
+      'language / ururimi / langue':'Ururimi / Language / Langue',
+      'english':'Icyongereza','kinyarwanda':'Ikinyarwanda','french':'Igifaransa',
+      'continue to my business':'Komeza ku bucuruzi bwanjye',
+      'your data is stored in your supabase account, synced across devices.':'Amakuru yawe abikwa kuri konti yawe kandi akoherezwa ku bikoresho ukoresha.',
+      'create individual logins and assign each employee only the responsibilities and access they need.':'Ha buri mukozi uburyo bwe bwo kwinjira, umuhe gusa uburenganzira n’imirimo akeneye.',
+      'enter the reason':'Andika impamvu','morning shift, stock receiving, daily cash close':'Urugero: akazi ko mu gitondo, kwakira ibicuruzwa, kubara amafaranga ku munsi',
+      'view and record sales':'Kureba no kwandika ibyagurishijwe',
+      'sales history':'Amateka y’ibyagurishijwe','expense history':'Amateka y’amafaranga yakoreshejwe',
+      'financial summary':'Incamake y’imari','cash flow':'Uko amafaranga yinjira n’asohoka',
+      'accounts receivable':'Amafaranga abakiriya bakurimo','accounts payable':'Amafaranga ugomba kwishyura',
+      'trial balance':'Urutonde rw’uko konti zingana','balance sheet':'Imbonerahamwe y’umutungo n’imyenda',
+      'income statement':'Raporo y’inyungu n’igihombo','journal entries':'Ibyanditswe mu gitabo cy’ibaruramari',
+      'check ledger integrity':'Genzura niba ibaruramari ritunganye',
+      'data':'Amakuru','export':'Ohereza hanze','import':'Injiza amakuru',
+      'refresh team':'Ongera urebe abakozi','team access':'Uburenganzira bw’abakozi',
+      'permissions':'Uburenganzira','responsibility':'Inshingano','manager access':'Uburenganzira bw’umuyobozi',
+      'owner / admin':'Nyir’ubucuruzi / Ushinzwe ubuyobozi',
+      'only an owner, admin or authorized manager can void sales.':'Guhagarika igurisha byemewe kuri nyir’ubucuruzi, ushinzwe ubuyobozi cyangwa umuyobozi wabiherewe uburenganzira gusa.'
+    },
+    fr:{
+      'dashboard':'Tableau de bord','record sale':'Enregistrer une vente','record a sale':'Enregistrer une vente',
+      'records':'Registres','aibos command center':'Centre de gestion AIBOS',
+      'ai advisor':'Conseiller IA','shericeri':'Shericeri','settings':'Paramètres',
+      'money':'Finances','inventory':'Stock','inventory / stock':'Stock / Inventaire',
+      'products':'Produits','sales':'Ventes','expenses':'Dépenses','customers':'Clients',
+      'suppliers':'Fournisseurs','purchases':'Achats','reports':'Rapports',
+      'financial reports':'Rapports financiers','management reports':'Rapports de gestion',
+      'report period':'Période du rapport','general ledger':'Grand livre','audit trail':'Journal d’audit',
+      'team access & responsibilities':'Accès et responsabilités de l’équipe',
+      'team members':'Membres de l’équipe','add team member':'Ajouter un membre',
+      'refresh team':'Actualiser l’équipe','full name':'Nom complet',
+      'username (optional)':'Nom d’utilisateur (facultatif)','email':'E-mail','phone':'Téléphone',
+      'pin (6–8 digits)':'Code PIN (6 à 8 chiffres)','role':'Rôle','responsibilities':'Responsabilités',
+      'cashier':'Caissier','inventory officer':'Responsable du stock','accountant':'Comptable',
+      'manager':'Gestionnaire','admin':'Administrateur','custom':'Personnalisé',
+      'owner':'Propriétaire','staff':'Employé',
+      'view and record sales':'Consulter et enregistrer les ventes',
+      'edit / void / delete sales':'Modifier, annuler ou supprimer les ventes',
+      'view and manage inventory':'Consulter et gérer le stock',
+      'view and manage expenses':'Consulter et gérer les dépenses',
+      'view financial reports':'Consulter les rapports financiers',
+      'manage accounting and finance':'Gérer la comptabilité et les finances',
+      'manage customers':'Gérer les clients','manage suppliers and purchases':'Gérer les fournisseurs et les achats',
+      'view audit trail':'Consulter le journal d’audit','manage team access':'Gérer les accès de l’équipe',
+      'enable':'Activer','disable':'Désactiver','enabled':'Activé','disabled':'Désactivé',
+      'active':'Actif','suspended':'Suspendu','save':'Enregistrer','cancel':'Annuler',
+      'delete':'Supprimer','edit':'Modifier','update':'Mettre à jour','add':'Ajouter',
+      'remove':'Retirer','search':'Rechercher','filter':'Filtrer','clear':'Effacer',
+      'close':'Fermer','back':'Retour','refresh':'Actualiser','submit':'Soumettre',
+      'confirm':'Confirmer','continue':'Continuer','sign out':'Se déconnecter',
+      'sign in':'Se connecter','login':'Connexion','export backup':'Exporter une sauvegarde',
+      'import backup':'Importer une sauvegarde','add sample products':'Ajouter des produits de démonstration',
+      'business / merchant name':'Nom de l’entreprise / du commerce','primary category':'Catégorie principale',
+      'tin number':'Numéro d’identification fiscale (TIN)','fiscal year':'Exercice fiscal',
+      'country':'Pays','currency':'Devise','online':'En ligne','offline':'Hors ligne',
+      'sync now':'Synchroniser maintenant','pending activity':'Activités en attente',
+      'pending activities':'Activités en attente','offline status':'État hors ligne',
+      'checking server…':'Vérification du serveur…','good morning':'Bonjour',
+      'your business':'Votre commerce','revenue':'Chiffre d’affaires','profit':'Bénéfice',
+      'net profit':'Bénéfice net','gross profit':'Marge brute','loss':'Perte',
+      'cost of goods sold':'Coût des marchandises vendues','cogs':'Coût des ventes',
+      'quantity':'Quantité','qty':'Qté','price':'Prix','selling price':'Prix de vente',
+      'cost':'Coût','unit cost':'Coût unitaire','total':'Total','date':'Date',
+      'today':'Aujourd’hui','this week':'Cette semaine','this month':'Ce mois-ci',
+      'this year':'Cette année','custom range':'Période personnalisée','yearly':'Annuel',
+      'daily':'Quotidien','weekly':'Hebdomadaire','monthly':'Mensuel',
+      'top-selling products':'Produits les plus vendus','best-selling products':'Meilleures ventes',
+      'highest-profit products':'Produits les plus rentables','inventory value':'Valeur du stock',
+      'stock in':'Entrées de stock','stock out':'Sorties de stock','stock balance':'Stock disponible',
+      'stock movement':'Mouvement de stock','stock movements':'Mouvements de stock',
+      'received':'Réceptionné','adjustment':'Ajustement','write-off':'Mise au rebut',
+      'customer return':'Retour client','reason':'Motif','reason required':'Motif obligatoire',
+      'recorded by':'Enregistré par','created by':'Créé par','last updated':'Dernière mise à jour',
+      'audit log':'Journal d’audit','activity history':'Historique des activités',
+      'transaction':'Transaction','transactions':'Transactions','invoice':'Facture',
+      'receipt':'Reçu','customer':'Client','product':'Produit','category':'Catégorie',
+      'description':'Description','notes':'Notes','status':'Statut','amount':'Montant',
+      'payment method':'Mode de paiement','cash':'Espèces','mobile money':'Mobile Money',
+      'bank':'Banque','paid':'Payé','unpaid':'Impayé','low stock':'Stock faible',
+      'reorder':'Réapprovisionner','expiry date':'Date d’expiration','expired':'Expiré',
+      'save changes':'Enregistrer les modifications','confirm sale':'Confirmer la vente',
+      'add product':'Ajouter un produit','edit product':'Modifier le produit',
+      'delete product':'Supprimer le produit','void sale':'Annuler la vente',
+      'void reason':'Motif d’annulation','are you sure?':'Êtes-vous sûr ?',
+      'no data found':'Aucune donnée trouvée','no records found':'Aucun enregistrement trouvé',
+      'loading…':'Chargement…','success':'Succès','error':'Erreur',
+      'please try again.':'Veuillez réessayer.','required':'Obligatoire',
+      'optional':'Facultatif','select':'Sélectionner','choose language':'Choisir la langue',
+      'language / ururimi / langue':'Langue / Language / Ururimi',
+      'english':'Anglais','kinyarwanda':'Kinyarwanda','french':'Français',
+      'continue to my business':'Accéder à mon commerce',
+      'your data is stored in your supabase account, synced across devices.':'Vos données sont stockées dans votre compte et synchronisées entre vos appareils.',
+      'create individual logins and assign each employee only the responsibilities and access they need.':'Créez un accès individuel pour chaque employé et attribuez uniquement les droits nécessaires.',
+      'sales history':'Historique des ventes','expense history':'Historique des dépenses',
+      'financial summary':'Résumé financier','cash flow':'Flux de trésorerie',
+      'accounts receivable':'Comptes clients à recevoir','accounts payable':'Dettes fournisseurs',
+      'trial balance':'Balance générale','balance sheet':'Bilan','income statement':'Compte de résultat',
+      'journal entries':'Écritures comptables','check ledger integrity':'Vérifier l’intégrité du grand livre',
+      'data':'Données','export':'Exporter','import':'Importer','team access':'Accès de l’équipe',
+      'permissions':'Autorisations','responsibility':'Responsabilité','manager access':'Accès du gestionnaire',
+      'owner / admin':'Propriétaire / Administrateur',
+      'only an owner, admin or authorized manager can void sales.':'Seul le propriétaire, un administrateur ou un gestionnaire autorisé peut annuler une vente.'
+    }
+  };
+  const originals=new WeakMap();
+  const supported=['en','rw','fr'];
+  let current='en';
+  const normalize=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
+  function translateString(original,lang){
+    if(lang==='en')return original;
+    const dict=dictionaries[lang]||{};
+    const key=normalize(original);
+    if(dict[key])return dict[key];
+    const leading=(String(original).match(/^\s*/)||[''])[0],trailing=(String(original).match(/\s*$/)||[''])[0];
+    return leading+String(original).trim()+trailing;
+  }
+  function translateNode(node){
+    if(!node||node.nodeType!==Node.TEXT_NODE)return;
+    if(!originals.has(node))originals.set(node,node.nodeValue);
+    const source=originals.get(node);
+    const translated=translateString(source,current);
+    if(node.nodeValue!==translated)node.nodeValue=translated;
+  }
+  const attrs=['placeholder','title','aria-label'];
+  function translateElement(el){
+    if(!el||el.nodeType!==Node.ELEMENT_NODE)return;
+    attrs.forEach(attr=>{
+      if(!el.hasAttribute(attr))return;
+      const key='data-aibos-original-'+attr;
+      if(!el.hasAttribute(key))el.setAttribute(key,el.getAttribute(attr));
+      const source=el.getAttribute(key);
+      const translated=translateString(source,current);
+      if(el.getAttribute(attr)!==translated)el.setAttribute(attr,translated);
+    });
+    if(el.tagName==='INPUT'&&el.type==='submit'){
+      if(!el.hasAttribute('data-aibos-original-value'))el.setAttribute('data-aibos-original-value',el.value);
+      el.value=translateString(el.getAttribute('data-aibos-original-value'),current);
+    }
+  }
+  function walk(root){
+    if(root.nodeType===Node.TEXT_NODE){translateNode(root);return;}
+    if(root.nodeType!==Node.ELEMENT_NODE&&root!==document)return;
+    if(root.nodeType===Node.ELEMENT_NODE)translateElement(root);
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    let node;while((node=walker.nextNode()))translateNode(node);
+    if(root.querySelectorAll)root.querySelectorAll('*').forEach(translateElement);
+  }
+  function applyLanguage(lang){
+    current=supported.includes(lang)?lang:'en';
+    try{localStorage.setItem('aibos_language',current)}catch(_){}
+    document.documentElement.lang=current==='rw'?'rw':current;
+    walk(document.body);
+    const label=document.getElementById('aibosLanguageLabel');
+    if(label)label.textContent=current==='rw'?'Ururimi':'Langue / Ururimi / Language';
+    const picker=document.getElementById('aibosLanguageSelect');
+    if(picker&&picker.value!==current)picker.value=current;
+    window.dispatchEvent(new CustomEvent('aibos:languagechange',{detail:{language:current}}));
+  }
+  function init(){
+    const picker=document.getElementById('aibosLanguageSelect');
+    if(!picker)return;
+    let saved='en';try{saved=localStorage.getItem('aibos_language')||'en'}catch(_){}
+    picker.addEventListener('change',()=>applyLanguage(picker.value));
+    applyLanguage(saved);
+    const observer=new MutationObserver(records=>{
+      for(const record of records){
+        if(record.type==='characterData')translateNode(record.target);
+        for(const node of record.addedNodes||[])walk(node);
+        if(record.type==='attributes')translateElement(record.target);
+      }
+    });
+    observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:attrs});
+    window.AIBOS_I18N={version:'1',getLanguage:()=>current,setLanguage:applyLanguage,translate:(s,lang)=>translateString(s,lang||current)};
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script>
 </body>
 </html>
