@@ -21,6 +21,18 @@ begin
       when t.table_name='purchases' then 'manage_inventory'
       else 'manage_finance'
     end;
+    -- UPDATE also needs a SELECT policy. Allow the assigned operator to see
+    -- the rows they are authorized to maintain, without granting report access.
+    execute format('drop policy if exists %I on public.%I',t.table_name||'_team_select',t.table_name);
+    execute format(
+      'create policy %I on public.%I for select to authenticated using (private.user_can_access_merchant(merchant_id,%L) or private.user_can_access_merchant(merchant_id,%L))',
+      t.table_name||'_team_select',t.table_name,
+      case t.table_name
+        when 'products' then 'view_inventory' when 'expenses' then 'view_expenses'
+        when 'customers' then 'view_customers' when 'suppliers' then 'view_suppliers'
+        when 'purchases' then 'view_inventory' else 'view_financial_reports' end,
+      write_perm
+    );
     execute format('drop policy if exists %I on public.%I',t.table_name||'_team_update',t.table_name);
     execute format(
       'create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,%L))',
@@ -217,3 +229,11 @@ revoke execute on function public.shericeri_get_accounting_snapshot(uuid) from p
 grant execute on function public.shericeri_get_accounting_snapshot(uuid) to authenticated;
 revoke execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon;
 grant execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) to authenticated;
+
+
+-- Trigger functions below use fully-qualified public table names (or built-ins only),
+-- so an empty search_path is safe and removes mutable-search-path warnings.
+alter function public.set_merchants_updated_at() set search_path='';
+alter function public.set_accounting_settings_updated_at() set search_path='';
+alter function public.prevent_locked_journal_entry() set search_path='';
+alter function public.prevent_locked_journal_line() set search_path='';
