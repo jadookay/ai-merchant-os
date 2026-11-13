@@ -774,3 +774,9 @@ test("legacy sale journal repair only fills missing expected lines and validates
 test("PIN throttling normalizes repeated whitespace before account-level hashing", () => {
   assert.ok(pinRateLimitMigration.includes(String.raw`,'\s+',' ','g')`));
 });
+
+
+test("sale void refuses to reverse incomplete or unbalanced source journals", () => {
+  assert.match(authorizationFixMigration, /Sale journal is incomplete or unbalanced; reconcile it before voiding the sale/);
+  assert.match(authorizationFixMigration, /having count\(jl\.id\)<2 or abs\(coalesce\(sum\(jl\.debit\),0\)-coalesce\(sum\(jl\.credit\),0\)\)>0\.005/);
+});
