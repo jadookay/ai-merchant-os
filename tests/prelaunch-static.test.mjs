@@ -627,7 +627,7 @@ test("failed membership verification clears staff-only in-memory business and ac
 
 
 test("PIN login validates identifier length, numeric merchant code and exact PIN format", () => {
-  assert.match(teamAccess, /identifier\\.length > 120/);
-  assert.match(teamAccess, /!\\/\\^\\\\d\\{1,12\\}\\$\\/\\.test\\(merchantCode\\)/);
-  assert.match(teamAccess, /!\\/\\^\\\\d\\{6,8\\}\\$\\/\\.test\\(pin\\)/);
+  assert.ok(teamAccess.includes("identifier.length > 120"));
+  assert.ok(teamAccess.includes("!/^\\d{1,12}$/.test(merchantCode)"));
+  assert.ok(teamAccess.includes("!/^\\d{6,8}$/.test(pin)"));
 });
