@@ -28,6 +28,22 @@ create table if not exists public.team_login_attempts (
   window_started_at timestamptz not null default now(),
   blocked_until timestamptz
 );
+create table if not exists public.merchant_member_sessions (
+  id uuid primary key default gen_random_uuid(),
+  merchant_id uuid not null references public.merchants(id) on delete cascade,
+  member_id uuid references public.merchant_members(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  session_id uuid not null,
+  device_label text not null default 'Unknown device' check (length(trim(device_label)) between 2 and 160),
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  unique (merchant_id,session_id)
+);
+create index if not exists merchant_member_sessions_member_last_seen_idx
+  on public.merchant_member_sessions(merchant_id,member_id,last_seen_at desc);
+alter table public.merchant_member_sessions enable row level security;
+revoke all on public.merchant_member_sessions from public,anon,authenticated;
 alter table public.merchant_members enable row level security;
 alter table public.team_login_attempts enable row level security;
 revoke all on public.merchant_members from anon,authenticated;
@@ -46,6 +62,11 @@ as $$
     select 1 from auth.sessions s
     where s.id=nullif((select auth.jwt()->>'session_id'),'')::uuid
       and s.user_id=(select auth.uid())
+  ) and not exists(
+    select 1 from public.merchant_member_sessions d
+    where d.merchant_id=p_merchant_id
+      and d.session_id=nullif((select auth.jwt()->>'session_id'),'')::uuid
+      and d.revoked_at is not null
   ) and (
     exists(select 1 from public.merchants m where m.id=p_merchant_id and m.user_id=(select auth.uid()))
     or exists(
@@ -65,6 +86,128 @@ as $$
 $$;
 revoke all on function private.user_can_access_merchant(uuid,text) from public,anon;
 grant execute on function private.user_can_access_merchant(uuid,text) to authenticated;
+
+
+-- Register each browser/device session independently. A revoked session can
+-- never re-register itself, even if its JWT has not expired yet.
+create or replace function public.shericeri_register_member_session(
+  p_merchant_id uuid,
+  p_session_id uuid,
+  p_device_label text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_member_id uuid;
+  v_id uuid;
+  v_device text:=left(regexp_replace(trim(coalesce(p_device_label,'Unknown device')),'[^[:print:]]','','g'),160);
+begin
+  if p_session_id is null
+     or p_session_id is distinct from nullif((select auth.jwt()->>'session_id'),'')::uuid
+     or not private.user_can_access_merchant(p_merchant_id,'view_dashboard') then
+    return false;
+  end if;
+  select id into v_member_id from public.merchant_members
+  where merchant_id=p_merchant_id and user_id=(select auth.uid()) and status='active'
+  limit 1;
+  if not exists(select 1 from public.merchants where id=p_merchant_id and user_id=(select auth.uid()))
+     and v_member_id is null then
+    return false;
+  end if;
+  insert into public.merchant_member_sessions(merchant_id,member_id,user_id,session_id,device_label)
+  values(p_merchant_id,v_member_id,(select auth.uid()),p_session_id,
+    case when length(trim(v_device))<2 then 'Unknown device' else v_device end)
+  on conflict(merchant_id,session_id) do update
+    set device_label=excluded.device_label,last_seen_at=now()
+    where public.merchant_member_sessions.revoked_at is null
+  returning id into v_id;
+  return v_id is not null;
+end;
+$$;
+revoke all on function public.shericeri_register_member_session(uuid,uuid,text) from public,anon;
+grant execute on function public.shericeri_register_member_session(uuid,uuid,text) to authenticated;
+
+create or replace function public.shericeri_list_member_sessions(p_merchant_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+begin
+  if not private.user_can_access_merchant(p_merchant_id,'manage_team') then
+    raise exception 'Not authorized to view device sessions';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'session_id',d.session_id,'member_id',d.member_id,'user_id',d.user_id,
+      'member_name',coalesce(mm.full_name,'Owner'),
+      'device_label',d.device_label,'created_at',d.created_at,
+      'last_seen_at',d.last_seen_at,'revoked_at',d.revoked_at
+    ) order by d.last_seen_at desc)
+    from public.merchant_member_sessions d
+    left join public.merchant_members mm on mm.id=d.member_id
+    where d.merchant_id=p_merchant_id
+      and d.last_seen_at>now()-interval '90 days'
+  ),'[]'::jsonb);
+end;
+$$;
+revoke all on function public.shericeri_list_member_sessions(uuid) from public,anon;
+grant execute on function public.shericeri_list_member_sessions(uuid) to authenticated;
+
+create or replace function public.shericeri_revoke_member_session(
+  p_merchant_id uuid,
+  p_session_id uuid,
+  p_reason text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_row public.merchant_member_sessions%rowtype;
+begin
+  if coalesce(length(trim(p_reason)),0)<3 then raise exception 'A clear device revocation reason is required'; end if;
+  if not private.user_can_access_merchant(p_merchant_id,'manage_team') then
+    raise exception 'Not authorized to revoke device sessions';
+  end if;
+  select * into v_row from public.merchant_member_sessions
+  where merchant_id=p_merchant_id and session_id=p_session_id for update;
+  if not found then return false; end if;
+  if v_row.revoked_at is null then
+    update public.merchant_member_sessions set revoked_at=now()
+    where id=v_row.id;
+    insert into public.audit_log(id,merchant_id,actor_user_id,action,entity_type,entity_id,reason,details,created_at)
+    values(gen_random_uuid(),p_merchant_id,auth.uid(),'revoke_session','team_session',v_row.id,trim(p_reason),
+      jsonb_build_object('member_id',v_row.member_id,'user_id',v_row.user_id,'device_label',v_row.device_label),now());
+  end if;
+  return true;
+end;
+$$;
+revoke all on function public.shericeri_revoke_member_session(uuid,uuid,text) from public,anon;
+grant execute on function public.shericeri_revoke_member_session(uuid,uuid,text) to authenticated;
+
+-- The service-role-only suspension hook revokes every registered device for a member.
+create or replace function public.shericeri_revoke_member_sessions(p_merchant_id uuid,p_member_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare v_count integer;
+begin
+  if coalesce(auth.jwt()->>'role','')<>'service_role' then raise exception 'not authorized'; end if;
+  update public.merchant_member_sessions set revoked_at=coalesce(revoked_at,now())
+  where merchant_id=p_merchant_id and member_id=p_member_id and revoked_at is null;
+  get diagnostics v_count=row_count;
+  return v_count;
+end;
+$$;
+revoke all on function public.shericeri_revoke_member_sessions(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.shericeri_revoke_member_sessions(uuid,uuid) to service_role;
 
 -- Exposed validation endpoint lets the client detect revoked or disabled sessions
 -- when a device reconnects or returns to the foreground.
@@ -932,10 +1075,36 @@ revoke all on function public.shericeri_sync_purchase_stock(jsonb,uuid,integer,i
 grant execute on function public.shericeri_sync_purchase_stock(jsonb,uuid,integer,integer,integer,integer) to authenticated;
 
 
--- The legacy accounting snapshot and journal RPCs must not be callable by anon.
--- Authenticated calls are still checked against merchant ownership/permissions in
--- the function body and RLS policies.
+
+-- Financial snapshots are visible only to users explicitly assigned report access.
+-- Audit rows are separately gated by the audit-log permission.
+create or replace function public.shericeri_get_accounting_snapshot(p_merchant_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+begin
+  if not private.user_can_access_merchant(p_merchant_id,'view_financial_reports') then
+    raise exception 'Not authorized for financial reports';
+  end if;
+  return jsonb_build_object(
+    'accounts',coalesce((select jsonb_agg(x order by x.code) from (select * from public.chart_of_accounts where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'journalEntries',coalesce((select jsonb_agg(x order by x.entry_date desc) from (select * from public.journal_entries where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'journalLines',coalesce((select jsonb_agg(x) from (select * from public.journal_lines where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'invoices',coalesce((select jsonb_agg(x order by x.issue_date desc) from (select * from public.invoices where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'bills',coalesce((select jsonb_agg(x order by x.issue_date desc) from (select * from public.bills where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'payments',coalesce((select jsonb_agg(x order by x.payment_date desc) from (select * from public.payments where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'bankAccounts',coalesce((select jsonb_agg(x order by x.name) from (select * from public.bank_accounts where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'taxRates',coalesce((select jsonb_agg(x order by x.name) from (select * from public.tax_rates where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'recurringTransactions',coalesce((select jsonb_agg(x order by x.next_run) from (select * from public.recurring_transactions where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'accountingSettings',(select to_jsonb(x) from (select * from public.accounting_settings where merchant_id=p_merchant_id limit 1) x),
+    'auditLog',case when private.user_can_access_merchant(p_merchant_id,'view_audit_log')
+      then coalesce((select jsonb_agg(x order by x.created_at desc) from (select * from public.audit_log where merchant_id=p_merchant_id order by created_at desc limit 100) x),'[]'::jsonb)
+      else '[]'::jsonb end
+  );
+end;
+$$;
 revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon;
 grant execute on function public.shericeri_get_accounting_snapshot(uuid) to authenticated;
-revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon;
-grant execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) to authenticated;
+
