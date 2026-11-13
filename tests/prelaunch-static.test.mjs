@@ -573,6 +573,9 @@ test("multi-line cart sync validates all stock before inserting any sale or chan
   assert.match(atomicCartMigration, /if jsonb_array_length\(v_conflicts\)>0 then[\s\S]*?return jsonb_build_object\('ok',false,'stock_conflict',true/);
   assert.ok(atomicCartMigration.indexOf("if jsonb_array_length(v_conflicts)>0 then") < atomicCartMigration.indexOf("insert into public.sales"));
   assert.match(atomicCartMigration, /already_recorded/);
+  assert.match(atomicCartMigration, /db\.qty=\(s\.value->>'qty'\)::integer/);
+  assert.match(atomicCartMigration, /db\.price=\(s\.value->>'price'\)::integer/);
+  assert.match(atomicCartMigration, /db\.customer_id is not distinct from/);
   assert.match(atomicCartMigration, /revoke all on function public\.shericeri_sync_sale_cart/);
 });
 
