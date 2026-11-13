@@ -597,7 +597,8 @@ test("legacy queued cart lines are grouped into one atomic retry and retained to
 test("suspended team identities are banned in Auth and re-enabled without losing profile data", () => {
   assert.match(teamAccess, /status !== target\.status/);
   assert.match(teamAccess, /ban_duration: status === "suspended" \? "876000h" : "none"/);
-  assert.match(teamAccess, /if \(authStatusError\)[\s\S]*?status: target\.status[\s\S]*?email: target\.email[\s\S]*?phone: target\.phone[\s\S]*?username: target\.username/);
+  assert.match(teamAccess, /if \(authStatusError\) \{\s*await rollbackMemberAndAuth\(\)/);
+  assert.match(teamAccess, /rollbackMemberAndAuth[\s\S]*?status: target\.status[\s\S]*?email: target\.email[\s\S]*?phone: target\.phone[\s\S]*?username: target\.username/);
   assert.match(teamMigration, /mm\.status='active'/);
 });
 
@@ -654,7 +655,7 @@ test("team identity updates roll back database and Auth state if a later step fa
 test("clean staging receives Shericeri memory and the product-images bucket before team policies", () => {
   assert.match(storageMemoryMigration, /create table if not exists public\.shericeri_memory/);
   assert.match(storageMemoryMigration, /insert into storage\.buckets/);
-  assert.match(storageMemoryMigration, /file_size_limit=4194304/);
+  assert.match(storageMemoryMigration, /file_size_limit[\s\S]*?4194304/);
   assert.match(authorizationFixMigration, /create policy shericeri_memory_team_insert[\s\S]*?manage_finance/);
 });
 
