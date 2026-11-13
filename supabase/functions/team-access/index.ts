@@ -236,7 +236,7 @@ Deno.serve(async (req: Request) => {
       }
       const privileged = callerRole === "owner" || callerRole === "admin";
       const { data: target, error: targetError } = await admin.from("merchant_members")
-        .select("id,user_id,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
+        .select("id,user_id,full_name,role,status,email,phone,username,permissions,responsibility").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
       const nextEmail = email === undefined ? target.email : email;
