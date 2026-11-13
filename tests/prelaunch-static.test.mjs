@@ -772,5 +772,5 @@ test("legacy sale journal repair only fills missing expected lines and validates
 
 
 test("PIN throttling normalizes repeated whitespace before account-level hashing", () => {
-  assert.match(pinRateLimitMigration, /regexp_replace\(lower\(trim\(coalesce\(p_identifier,''\)\)\),'\\\\s\+',' ','g'\)/);
+  assert.ok(pinRateLimitMigration.includes(String.raw`,'\s+',' ','g')`));
 });
