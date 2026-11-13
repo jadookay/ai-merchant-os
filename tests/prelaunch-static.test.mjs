@@ -130,12 +130,11 @@ test("product image picker matches the storage MIME allowlist", () => {
   assert.match(html, /!\['image\/jpeg','image\/png','image\/webp','image\/gif'\]\.includes\(file\.type\)/);
 });
 
-test("cloud memory and product image access are represented by a reviewed SQL patch", () => {
-  assert.match(schemaPatch, /create table if not exists public\.shericeri_memory/i);
-  assert.match(schemaPatch, /enable row level security/i);
-  assert.match(schemaPatch, /product_images_owner_insert/i);
-  assert.match(schemaPatch, /file_size_limit = 4194304/i);
-  assert.match(schemaPatch, /revoke execute on function public\.shericeri_sync_journal_batch/i);
+test("legacy storage patch is explicitly superseded by the ordered migration", () => {
+  assert.match(priorityStoragePatch, /SUPERSEDED: do not execute this patch separately/);
+  assert.match(priorityStoragePatch, /20261112170000_aibos_priority_storage_memory\.sql/);
+  assert.match(storageMemoryMigration, /create table if not exists public\.shericeri_memory/i);
+  assert.match(storageMemoryMigration, /insert into storage\.buckets/i);
 });
 
 test("all inline application scripts parse without syntax errors", () => {
@@ -773,5 +772,5 @@ test("legacy sale journal repair only fills missing expected lines and validates
 
 
 test("PIN throttling normalizes repeated whitespace before account-level hashing", () => {
-  assert.ok(pinRateLimitMigration.includes(String.raw`regexp_replace(lower(trim(coalesce(p_identifier,''))), '\s+', ' ', 'g')`));
+  assert.match(pinRateLimitMigration, /regexp_replace\(lower\(trim\(coalesce\(p_identifier,''\)\)\),'\\\\s\+',' ','g'\)/);
 });
