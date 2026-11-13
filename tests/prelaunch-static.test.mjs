@@ -575,7 +575,7 @@ test("new carts are queued and synchronized as one transaction in both sync path
   assert.match(html, /async function sheriSyncSaleCartOperation\(op\)[\s\S]*?sb\.rpc\('shericeri_sync_sale_cart'/);
   assert.match(html, /type:'sale_cart',merchant_id:state\.merchant\.id,transaction_id:transactionId,invoice_number:invoice,records:rows,stockChanges/);
   const syncStart = html.indexOf("async function sheriSyncOutbox(){");
-  const syncEnd = html.indexOf("\\nfunction sheriOnlineEvents(){", syncStart);
+  const syncEnd = html.indexOf("\nfunction sheriOnlineEvents(){", syncStart);
   const sync = html.slice(syncStart, syncEnd);
   assert.equal((sync.match(/op\.type==='sale_cart'/g)||[]).length, 2,
     "normal sync and one-time auth retry must both support atomic cart operations");
