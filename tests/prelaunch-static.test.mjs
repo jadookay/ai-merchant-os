@@ -735,7 +735,7 @@ test("sale journal batches wait for the corresponding cart sync or stock-conflic
   assert.match(html, /if\(await sheriJournalDependsOnPendingSale\(op\)\)continue/);
   assert.match(html, /item\.op\?\.type==='sale_cart'\?0/);
   assert.match(journalIntegrityMigration, /Sale must synchronize before its journal entry can post/);
-  assert.match(journalIntegrityMigration, /if\(v_sale_voided\) then return p_entry_id/);
+  assert.match(journalIntegrityMigration, /if v_sale_voided then return p_entry_id/);
 });
 
 
@@ -756,7 +756,7 @@ test("voided sale queues cannot race with cart sync or recreate revenue", () => 
   assert.match(html, /async function sheriSyncVoidSale\(op\)[\s\S]*?if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\)/);
   assert.match(html, /async function sheriFinalizeUnpostedVoid\(op\)[\s\S]*?shericeri_write_audit/);
   assert.match(html, /if\(data\?\.not_found\)await sheriFinalizeUnpostedVoid\(op\);[\s\S]*?q\.type==='sale_cart'/);
-  assert.match(journalIntegrityMigration, /if\(v_sale_voided\) then return p_entry_id/);
+  assert.match(journalIntegrityMigration, /if v_sale_voided then return p_entry_id/);
 });
 
 
