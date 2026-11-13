@@ -14,6 +14,7 @@ const pinRateLimitMigration = await readFile(new URL("../supabase/migrations/202
 const storageMemoryMigration = await readFile(new URL("../supabase/migrations/20261112170000_aibos_priority_storage_memory.sql", import.meta.url), "utf8");
 const journalIntegrityMigration = await readFile(new URL("../supabase/migrations/20261113170000_aibos_journal_integrity.sql", import.meta.url), "utf8");
 const repairLegacyJournalsMigration = await readFile(new URL("../supabase/migrations/20261113180000_aibos_repair_legacy_sale_journals.sql", import.meta.url), "utf8");
+const sessionValidationMigration = await readFile(new URL("../supabase/migrations/20261113190000_aibos_member_session_validation.sql", import.meta.url), "utf8");
 const supabaseConfig = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
 const kinyaTts = await readFile(new URL("../supabase/functions/kinya-tts/index.ts", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
@@ -779,4 +780,15 @@ test("PIN throttling normalizes repeated whitespace before account-level hashing
 test("sale void refuses to reverse incomplete or unbalanced source journals", () => {
   assert.match(authorizationFixMigration, /Sale journal is incomplete or unbalanced; reconcile it before voiding the sale/);
   assert.match(authorizationFixMigration, /having count\(jl\.id\)<2 or abs\(coalesce\(sum\(jl\.debit\),0\)-coalesce\(sum\(jl\.credit\),0\)\)>0\.005/);
+});
+
+
+test("online and foreground access validates the active merchant membership server-side", () => {
+  assert.match(html, /async function sheriEnsureActiveSession\(\)/);
+  assert.match(html, /sb\.rpc\('shericeri_validate_member_session'/);
+  assert.match(html, /if\(navigator\.onLine&&session\?\.access_token&&!await sheriEnsureActiveSession\(\)\)return/);
+  assert.match(sessionValidationMigration, /mm\.status='active'/);
+  assert.match(sessionValidationMigration, /m\.user_id=\(select auth\.uid\(\)\)/);
+  assert.match(sessionValidationMigration, /revoke all on function public\.shericeri_validate_member_session/);
+  assert.match(html, /async function signOut\(\)\{if\(session\?\.user\?\.id\)await sheriDelete\('meta','membership:'\+session\.user\.id\)/);
 });
