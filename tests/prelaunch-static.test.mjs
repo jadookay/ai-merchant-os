@@ -605,6 +605,7 @@ test("PIN throttling follows the staff identity across IP changes and applies an
   assert.match(pinRateLimitMigration, /v_key:=encode\(extensions\.digest\(p_merchant_id::text\|\|':'\|\|v_identity,'sha256'\)/);
   assert.match(pinRateLimitMigration, /v_ip_key:=encode\(extensions\.digest\(v_key\|\|':'\|\|coalesce\(p_ip_hash,''\),'sha256'\)/);
   assert.match(pinRateLimitMigration, /blocked_until>now\(\)/);
+  assert.ok(pinRateLimitMigration.includes("if coalesce(auth.jwt()->>'role','')<>'service_role'"));
   assert.match(pinRateLimitMigration, /revoke all on function public\.verify_merchant_member_pin\(uuid,text,text,text\) from public,anon,authenticated/);
 });
 
