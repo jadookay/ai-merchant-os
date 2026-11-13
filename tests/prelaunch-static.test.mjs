@@ -549,3 +549,25 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
   assert.doesNotMatch(localeScript, /fetch\s*\(|https?:\/\//i);
   assert.ok(localeScript.includes("does not change business records"));
 });
+
+
+test("multi-line cart sale sync is one atomic, idempotent server operation", () => {
+  const salesMigration = teamMigration;
+  assert.match(salesMigration, /create or replace function public\\.shericeri_sync_sale_cart/);
+  assert.match(salesMigration, /pg_advisory_xact_lock/);
+  assert.match(salesMigration, /stock_conflict/);
+  assert.match(salesMigration, /partially present; refusing a partial retry/);
+  assert.match(salesMigration, /grant execute on function public\\.shericeri_sync_sale_cart\\(uuid,jsonb,jsonb\\) to authenticated/);
+  assert.match(html, /type:'sale_cart_upsert',merchant_id:state\\.merchant\\.id,transaction_id:transactionId,records:rows,stock_checks:stockChecks/);
+  assert.match(html, /op\\.type==='sale_cart_upsert'\\)\\{await sheriSyncSaleCartOperation\\(op\\)\\}/);
+});
+
+test("sale void RPC requires manager-level access plus the sales permission", () => {
+  assert.match(teamMigration, /user_can_access_merchant\\(v_merchant_id,'manage_team'\\)[\\s\\S]*?and private\\.user_can_access_merchant\\(v_merchant_id,'manage_sales'\\)/);
+  assert.match(teamMigration, /Only the owner, an administrator, or an authorized manager can void sales/);
+});
+
+test("sale void metadata migration adds the voided state used by the server RPC", () => {
+  assert.match(teamMigration, /set voided=true,void_reason=trim\\(p_reason\\),voided_at=now\\(\\),voided_by=auth\\.uid\\(\\)/);
+  assert.match(html, /voided/);
+});
