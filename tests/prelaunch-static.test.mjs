@@ -486,3 +486,15 @@ test("ordered purchase deletion uses the same guarded RPC after token refresh", 
   assert.ok((html.match(/sb\.rpc\('shericeri_delete_ordered_purchase'/g)||[]).length>=2);
   assert.ok(teamMigration.includes("if v_purchase.status<>'ordered' then"));
 });
+
+
+test("reports, sales and expenses include a calendar-year filter", () => {
+  assert.equal((html.match(/<option value="yearly">Yearly<\\/option>/g)||[]).length, 3);
+  assert.match(html, /else if\\(mode==='yearly'\\)start=sheriLocalDateKey\\(new Date\\(today\\.getFullYear\\(\\),0,1\\)\\)/);
+});
+
+test("team status is presented as an enabled/disabled control while preserving suspended backend state", () => {
+  assert.match(html, /m\\.status==='active'\\?'Enabled':m\\.status==='suspended'\\?'Disabled'/);
+  assert.match(html, /m\\.status==='active'\\?'Disable':'Enable'/);
+  assert.match(html, /const status=m\\.status==='active'\\?'suspended':'active'/);
+});
