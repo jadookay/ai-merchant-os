@@ -751,6 +751,7 @@ async function sheriGetAll(store){
   const visible=rows.filter(row=>{
     if(row.user_scope)return row.user_scope===userId&&(store==='merchants'||!merchantId||row.merchant_scope===merchantId);
     if(store==='merchants')return row.user_id===userId;
+    if(store==='outbox')return Boolean(merchantId&&state.merchant?.user_id===userId&&(row.op?.merchant_id===merchantId||row.op?.record?.merchant_id===merchantId||row.op?.entry?.merchant_id===merchantId));
     return Boolean(merchantId&&state.merchant?.user_id===userId&&row.merchant_id===merchantId);
   });
   const byKey=new Map();
