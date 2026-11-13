@@ -1065,7 +1065,7 @@ async function sheriSyncSaleVoidOperation(op){
     const x=item.op||{};
     if(x.type==='sale_void'&&x.audit_id===op.audit_id)return false;
     const records=Array.isArray(x.records)?x.records:[];
-    return x.productId===productId||x.product_id===productId||x.record?.product_id===productId||
+    return x.productId===productId||x.product_id===productId||(x.type==='product_upsert'&&x.record?.id===productId)||x.record?.product_id===productId||
       records.some(r=>r.product_id===productId)||x.entry?.product_id===productId;
   });
   for(const update of (data.stock_updates||[])){
