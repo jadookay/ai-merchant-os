@@ -682,14 +682,21 @@ async function sheriTogglePendingSync(){
       const reason=item.last_error||(item.blocked?'The server rejected this activity. Review permissions or the reported data error.':item.next_retry_at?'A previous sync attempt failed; automatic retry is scheduled.':'Saved on this device and waiting for the next sync attempt.');
       out+='<div class="sheri-pending-item"><b>'+esc(labels[op.type]||String(op.type||'Business update').replace(/_/g,' '))+'</b> <span class="pill">'+status+'</span><div class="sub">'+esc(item.created_at?new Date(item.created_at).toLocaleString():'Time unavailable')+' · attempts: '+(Number(item.attempts)||0)+'</div><div>'+esc(reason)+'</div>'+(item.next_retry_at?'<div class="sub">Next retry: '+esc(new Date(item.next_retry_at).toLocaleString())+'</div>':'')+'</div>';
     }
+    const conflictGroups=new Map();
     for(const conflict of conflicts){
+      const info=conflict.info||{},op=info.operation||{},groupKey=op.transaction_id||conflict.key;
+      if(!conflictGroups.has(groupKey))conflictGroups.set(groupKey,{...conflict,count:0});
+      conflictGroups.get(groupKey).count++;
+    }
+    for(const conflict of conflictGroups.values()){
       const info=conflict.info||{},op=info.operation||{};
       const title=info.type==='stock_conflict'?'Stock changed on the server':String(info.type||'Sync conflict').replace(/_/g,' ');
+      const productName=state.products.find(p=>p.id===info.product_id)?.name||'Product';
       const detail=info.type==='stock_conflict'
-        ?'Invoice '+esc(info.invoice_number||op.invoice_number||'—')+' · local stock '+esc(info.local_stock??'—')+' · server stock '+esc(info.server_stock??'—')+' · quantity '+esc(info.quantity??'—')
+        ?'Invoice '+esc(info.invoice_number||op.invoice_number||'—')+' · '+esc(productName)+' · local stock '+esc(info.local_stock??'—')+' · server stock '+esc(info.server_stock??'—')+' · quantity '+esc(info.quantity??'—')+(conflict.count>1?' · '+conflict.count+' stock checks need refresh':'')
         :'This activity needs review before it can be synchronized.';
       out+='<div class="sheri-pending-item"><b>'+title+'</b><div>'+detail+'</div><div class="sub">'+esc(conflict.created_at?new Date(conflict.created_at).toLocaleString():'Time unavailable')+'</div>';
-      if(info.type==='stock_conflict'&&op.type==='sale_cart'&&sheriCan('create_sale'))out+='<button class="btn small" onclick="sheriRetryStockConflict(\''+esc(conflict.key)+'\')">Refresh stock and retry invoice</button>';
+      if(info.type==='stock_conflict'&&op.type==='sale_cart'&&sheriCan('create_sale'))out+='<button class="btn small" data-conflict="'+esc(conflict.key)+'" onclick="sheriRetryStockConflict(this.dataset.conflict)">Refresh stock and retry invoice</button>';
       else out+='<div class="sub">Resolve the stock or record mismatch, then contact the manager if a retry is still needed.</div>';
       out+='</div>';
     }
@@ -917,9 +924,12 @@ async function sheriRetryStockConflict(key){
     for(const change of stockChanges){const p=product(change.product_id);if(p)p.stock=change.local_stock;}
     await sheriSaveSnapshot();
     await sheriQueue({...op,stockChanges});
-    await sheriDelete('conflicts',key);
+    const related=await sheriGetAll('conflicts');
+    for(const row of related){if(row.info?.operation?.transaction_id===op.transaction_id)await sheriDelete('conflicts',row.key);}
     if(navigator.onLine)await sheriSyncOutbox();
     render();
+    const panel=document.getElementById('sheriPendingSyncPanel');
+    if(panel?.style.display==='block'){panel.style.display='none';await sheriTogglePendingSync();}
     sheriToast('Invoice returned to the sync queue using the latest server stock.');
   }catch(e){sheriToast(e?.message||'Could not retry this invoice.','error');}
 }
@@ -1050,7 +1060,7 @@ async function sheriSyncSaleCartOperation(op){
     for(const conflict of (data.conflicts||[])){
       await sheriRecordConflict({
         type:'stock_conflict',product_id:conflict.product_id,
-        local_stock:conflict.local_stock,server_stock:conflict.server_stock,
+        local_stock:conflict.local_stock,server_stock:conflict.server_stock,quantity:conflict.quantity,
         transaction_id:op.transaction_id,invoice_number:op.invoice_number,operation:op
       });
     }
