@@ -131,8 +131,8 @@ test("product image picker matches the storage MIME allowlist", () => {
 });
 
 test("legacy storage patch is explicitly superseded by the ordered migration", () => {
-  assert.match(priorityStoragePatch, /SUPERSEDED: do not execute this patch separately/);
-  assert.match(priorityStoragePatch, /20261112170000_aibos_priority_storage_memory\.sql/);
+  assert.match(schemaPatch, /SUPERSEDED: do not execute this patch separately/);
+  assert.match(schemaPatch, /20261112170000_aibos_priority_storage_memory\.sql/);
   assert.match(storageMemoryMigration, /create table if not exists public\.shericeri_memory/i);
   assert.match(storageMemoryMigration, /insert into storage\.buckets/i);
 });
