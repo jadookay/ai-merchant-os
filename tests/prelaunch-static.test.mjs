@@ -792,3 +792,12 @@ test("online and foreground access validates the active merchant membership serv
   assert.match(sessionValidationMigration, /revoke all on function public\.shericeri_validate_member_session/);
   assert.match(html, /async function signOut\(\)\{if\(session\?\.user\?\.id\)await sheriDelete\('meta','membership:'\+session\.user\.id\)/);
 });
+
+
+test("offline staff cache expiry clears private workspace data and local session", () => {
+  assert.match(html, /function sheriScheduleOfflineMembershipExpiry\(member\)/);
+  assert.match(html, /if\(navigator\.onLine\|\|state\.currentMembership\?\.cache_expires_at!==cacheExpiry\)return/);
+  assert.match(html, /sb\.auth\.signOut\(\{scope:'local'\}\)/);
+  assert.match(html, /state\.merchant=null;state\.teamMembers=\[\]/);
+  assert.match(html, /sheriScheduleOfflineMembershipExpiry\(state\.currentMembership\)/);
+});
