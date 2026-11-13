@@ -546,6 +546,6 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
   assert.ok(localeScript.includes("window.prompt=(message,defaultValue)=>"));
   assert.ok(localeScript.includes("phraseFragments"));
   assert.ok(localeScript.includes("'cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe'"));
-  assert.doesNotMatch(localeScript, /fetch\\s*\\(|https?:\\/\\//i);
+  assert.doesNotMatch(localeScript, /fetch\s*\(|https?:\/\//i);
   assert.ok(localeScript.includes("does not change business records"));
 });
