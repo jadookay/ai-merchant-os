@@ -704,3 +704,12 @@ test("legacy owner outbox records remain recoverable without exposing them to st
   assert.ok(html.includes("if(store==='outbox')return Boolean(merchantId&&state.merchant?.user_id===userId"));
   assert.ok(html.includes("row.op?.entry?.merchant_id===merchantId"));
 });
+
+test("unknown merchant-code attempts are rate-limited without account enumeration", () => {
+  assert.ok(teamMigration.includes("unknown-merchant:"));
+  assert.ok(teamMigration.includes("global-ip:"));
+  assert.ok(teamMigration.includes("if p_merchant_id is null then"));
+  assert.ok(teamAccess.includes("p_merchant_id: merchant?.id || null"));
+  assert.ok(teamAccess.includes("verified?.rate_limited ? 429 : 401"));
+  assert.ok(teamAccess.includes("The sign-in details were not recognized."));
+});
