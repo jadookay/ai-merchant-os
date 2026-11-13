@@ -5,10 +5,13 @@ on:
     branches:
       - fix/prelaunch-priority-one-2026-11-11
       - feat/aibos-team-controls-cart-expiry-sheri-context
+      - fix/aibos-release-blockers-2026-11-13
   pull_request:
     branches:
       - main
       - fix/prelaunch-priority-one-2026-11-11
+      - feat/aibos-team-controls-cart-expiry-sheri-context
+      - fix/aibos-release-blockers-2026-11-13
   workflow_dispatch:
 
 jobs:
