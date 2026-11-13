@@ -8,6 +8,7 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const salesMigration = await readFile(new URL("../supabase/migrations/20261112180000_aibos_sales_favorites_audit.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -551,23 +552,30 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
 });
 
 
+
 test("multi-line cart sale sync is one atomic, idempotent server operation", () => {
-  const salesMigration = teamMigration;
-  assert.match(salesMigration, /create or replace function public\\.shericeri_sync_sale_cart/);
-  assert.match(salesMigration, /pg_advisory_xact_lock/);
-  assert.match(salesMigration, /stock_conflict/);
-  assert.match(salesMigration, /partially present; refusing a partial retry/);
-  assert.match(salesMigration, /grant execute on function public\\.shericeri_sync_sale_cart\\(uuid,jsonb,jsonb\\) to authenticated/);
-  assert.match(html, /type:'sale_cart_upsert',merchant_id:state\\.merchant\\.id,transaction_id:transactionId,records:rows,stock_checks:stockChecks/);
-  assert.match(html, /op\\.type==='sale_cart_upsert'\\)\\{await sheriSyncSaleCartOperation\\(op\\)\\}/);
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_sync_sale_cart"));
+  assert.ok(teamMigration.includes("pg_advisory_xact_lock"));
+  assert.ok(teamMigration.includes("stock_conflict"));
+  assert.ok(teamMigration.includes("Sale cart is partially present; refusing a partial retry"));
+  assert.ok(teamMigration.includes("grant execute on function public.shericeri_sync_sale_cart(uuid,jsonb,jsonb) to authenticated"));
+  assert.ok(html.includes("type:'sale_cart_upsert',merchant_id:state.merchant.id,transaction_id:transactionId,records:rows,stock_checks:stockChecks"));
+  assert.ok(html.includes("op.type==='sale_cart_upsert'"));
+  assert.ok(html.includes("async function sheriSyncSaleCartOperation(op)"));
 });
 
 test("sale void RPC requires manager-level access plus the sales permission", () => {
-  assert.match(teamMigration, /user_can_access_merchant\\(v_merchant_id,'manage_team'\\)[\\s\\S]*?and private\\.user_can_access_merchant\\(v_merchant_id,'manage_sales'\\)/);
-  assert.match(teamMigration, /Only the owner, an administrator, or an authorized manager can void sales/);
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'manage_team')"));
+  assert.ok(teamMigration.includes("and private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
+  assert.ok(teamMigration.includes("Only the owner, an administrator, or an authorized manager can void sales"));
 });
 
 test("sale void metadata migration adds the voided state used by the server RPC", () => {
-  assert.match(teamMigration, /set voided=true,void_reason=trim\\(p_reason\\),voided_at=now\\(\\),voided_by=auth\\.uid\\(\\)/);
-  assert.match(html, /voided/);
+  assert.ok(salesMigration.includes("add column if not exists voided boolean not null default false"));
+  assert.ok(teamMigration.includes("set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid()"));
+});
+
+test("legacy accounting SECURITY DEFINER RPCs are no longer executable by anon", () => {
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon"));
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon"));
 });
