@@ -12,6 +12,8 @@ const authorizationFixMigration = await readFile(new URL("../supabase/migrations
 const atomicCartMigration = await readFile(new URL("../supabase/migrations/20261113153000_aibos_atomic_cart_sync.sql", import.meta.url), "utf8");
 const pinRateLimitMigration = await readFile(new URL("../supabase/migrations/20261113160000_aibos_pin_rate_limit.sql", import.meta.url), "utf8");
 const storageMemoryMigration = await readFile(new URL("../supabase/migrations/20261112170000_aibos_priority_storage_memory.sql", import.meta.url), "utf8");
+const supabaseConfig = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
+const kinyaTts = await readFile(new URL("../supabase/functions/kinya-tts/index.ts", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -676,4 +678,14 @@ test("staff offline access uses a time-limited cached membership and respects it
   assert.match(html, /cache_expires_at:new Date\(Date\.now\(\)\+8\*60\*60\*1000\)/);
   assert.match(html, /if\(!navigator\.onLine&&Date\.parse\(member\.cache_expires_at\|\|''\)<=Date\.now\(\)\)return false/);
   assert.match(html, /async function signOut\(\)\{if\(session\?\.user\?\.id\)await sheriDelete\('meta','membership:'\+session\.user\.id\)/);
+});
+
+
+test("JWT changes preserve authenticated AIBOS voice and public Amatavida compatibility", () => {
+  assert.match(supabaseConfig, /\[functions\.kinya-tts\]\s*verify_jwt = true/);
+  assert.match(supabaseConfig, /\[functions\.team-access\]\s*verify_jwt = false/);
+  assert.match(supabaseConfig, /\[functions\.amatavida\]\s*verify_jwt = false/);
+  assert.match(html, /functions\/v1\/kinya-tts/);
+  assert.match(html, /'Authorization':'Bearer '\+currentSession\.access_token/);
+  assert.match(kinyaTts, /PINDO_API_TOKEN/);
 });
