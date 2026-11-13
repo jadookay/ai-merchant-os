@@ -725,3 +725,13 @@ test("sale voiding is server-confirmed before local stock and sales are changed"
   assert.ok(html.includes("op.type==='sale_void'"));
   assert.ok(html.includes("s.void_pending?'<span class=\"muted\">Void pending</span>'"));
 });
+
+test("pending voids do not collide across unrelated legacy single-sale records", () => {
+  assert.ok(html.includes("x.op.sale_ids?.some(v=>saleIds.includes(v))||(transactionId&&x.op.transaction_id===transactionId)"));
+});
+
+test("sales void buttons render valid JavaScript and pending status", () => {
+  assert.ok(html.includes(String.raw`onclick="voidSale(\''+s.id+'\')"`)===false);
+  assert.ok(html.includes(String.raw`onclick="voidSale(\''+s.id+'\')"`)===false);
+  assert.ok(html.includes("s.void_pending?'<span class=\"muted\">Void pending</span>'"));
+});
