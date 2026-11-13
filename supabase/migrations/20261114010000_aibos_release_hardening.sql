@@ -26,7 +26,10 @@ begin
     raise exception 'not authorized';
   end if;
   if p_merchant_id is null or length(v_identifier) < 2 or length(v_identifier) > 160
-     or coalesce(p_pin,'') !~ '^[0-9]{6,8}
+     or coalesce(p_pin,'') !~ '^[0-9]+'
+     or length(coalesce(p_pin,'')) not between 6 and 8 then
+    return jsonb_build_object('ok',false);
+  end if;
 
   -- Independent identity and network keys prevent attackers rotating either
   -- usernames or source addresses to evade the 15-minute lockout.
