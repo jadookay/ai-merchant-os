@@ -749,3 +749,11 @@ test("sale void cannot report success for a missing or cross-merchant sale", () 
   assert.ok(fn.includes("raise exception 'Sale not found or no longer available'"));
   assert.ok(html.includes("if(!ids.length)throw new Error('The server did not return the sale lines for this void request.')"));
 });
+
+test("offline merchant reconciliation re-scopes all pending operations to the canonical merchant ID", () => {
+  assert.ok(html.includes("Re-key every other queued operation to the"));
+  assert.ok(html.includes("if(op.merchant_id===oldId)op.merchant_id=newId"));
+  assert.ok(html.includes("if(op.entry?.merchant_id===oldId)op.entry.merchant_id=newId"));
+  assert.ok(html.includes("if(Array.isArray(op.records))for(const row of op.records)"));
+  assert.ok(html.includes("await sheriPut('outbox',item.key,{...item,merchant_id:newId,op})"));
+});
