@@ -1123,12 +1123,6 @@ async function sheriSyncSaleOperation(op){
     server_stock:data.server_stock,sale_id:op.record.id,operation:op
   });
 }
-async function sheriSyncVoidSale(op){
-  const {error}=await sb.rpc('shericeri_void_sale',{
-    p_merchant_id:op.merchant_id,p_sale_id:op.id,p_transaction_id:op.transaction_id||null,p_reason:op.reason,p_audit_id:op.audit_id
-  });
-  if(error)throw error;
-}
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
   if(sheriCan('manage_team')){
