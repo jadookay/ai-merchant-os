@@ -1112,6 +1112,17 @@ async function sheriSyncPurchaseOperation(op){
     local_cost:op.localCost,server_cost:data.server_cost,purchase_id:op.record.id,operation:op
   });
 }
+async function sheriJournalDependsOnPendingSale(op){
+  const entry=op?.entry;
+  if(op?.type!=='accounting_journal_batch'||!['sale','sale_cogs'].includes(entry?.source_type)||!entry?.source_id)return false;
+  const [queue,conflicts]=await Promise.all([sheriGetAll('outbox'),sheriGetAll('conflicts')]);
+  const containsSale=operation=>{
+    if(operation?.type==='sale_cart')return (operation.records||[]).some(row=>row.id===entry.source_id);
+    if(operation?.type==='sale_upsert')return operation.record?.id===entry.source_id;
+    return false;
+  };
+  return queue.some(item=>containsSale(item.op))||conflicts.some(row=>containsSale(row.info?.operation));
+}
 async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy)return;
   sheriSyncBusy=true;
@@ -1129,7 +1140,7 @@ async function sheriSyncOutbox(){
     const allOutbox=await sheriGetAll('outbox');
     const legacyState=new Map();
     for(const item of allOutbox){
-      const op=item.op||{},transactionId=op.type==='sale_upsert'?op.record?.transaction_id:null;
+      const op=item.op||{},transactionId=op.type==='sale_upsert'?(op.record?.transaction_id||op.record?.invoice_number||op.record?.id):null;
       if(!transactionId)continue;
       if(!legacyState.has(transactionId))legacyState.set(transactionId,{blocked:false,waiting:false});
       const group=legacyState.get(transactionId);
@@ -1173,7 +1184,11 @@ async function sheriSyncOutbox(){
         invoice_number:invoiceNumber,records,stockChanges
       }});
     }
-    items.sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+    items.sort((a,b)=>{
+      const rank=item=>item.op?.type==='sale_cart'?0:
+        item.op?.type==='accounting_journal_batch'&&['sale','sale_cogs'].includes(item.op.entry?.source_type)?2:1;
+      return rank(a)-rank(b)||String(a.created_at).localeCompare(String(b.created_at));
+    });
     sheriSyncQueued=await sheriQueueCount();
     if(!items.length){
       sheriSetConnectivity('online',sheriSyncQueued?`${sheriSyncQueued} pending local change(s) — waiting to retry`:'Server data synced');
@@ -1183,6 +1198,7 @@ async function sheriSyncOutbox(){
     let successCount=0,failedCount=0,firstFailure=null;
     for(const item of items){
       const op=item.op||{};
+      if(await sheriJournalDependsOnPendingSale(op))continue;
       try{
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
@@ -1241,7 +1257,7 @@ async function sheriSyncOutbox(){
               else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
               else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else throw err;
-              await sheriDelete('outbox',item.key);
+              for(const key of (item._outboxKeys||[item.key]))await sheriDelete('outbox',key);
               successCount++;
               continue;
             }
