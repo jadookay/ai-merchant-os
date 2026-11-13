@@ -1057,7 +1057,8 @@ async function sheriSyncSaleVoidOperation(op){
   });
   if(error)throw error;
   if(!data?.ok)throw new Error('The server did not confirm this sale void.');
-  const ids=(data.sale_ids||op.sale_ids||[]).map(String);
+  const ids=(Array.isArray(data.sale_ids)?data.sale_ids:[]).map(String);
+  if(!ids.length)throw new Error('The server did not return the sale lines for this void request.');
   const localRows=(op.records||[]).filter(row=>(state.sales||[]).some(s=>s.id===row.id));
   const pending=await sheriGetAll('outbox');
   const hasPendingStock=(productId)=>pending.some(item=>{
