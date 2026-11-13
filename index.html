@@ -1113,7 +1113,7 @@ async function sheriFinalizeUnpostedVoid(op){
   for(const row of storedEntries)await sheriDelete('journalEntries',row.key);
   for(const row of storedLines)await sheriDelete('journalLines',row.key);
   const productIds=[...new Set((op.sale_records||[]).map(x=>x.product_id).filter(Boolean))];
-  if(productIds.length&&navigator.onLine){
+  if(productIds.length&&navigator.onLine&&(sheriCan('view_inventory')||sheriCan('manage_inventory')||sheriCan('create_sale'))){
     const {data,error}=await sb.from('products').select('id,stock').eq('merchant_id',op.merchant_id).in('id',productIds);
     if(error)throw error;
     for(const row of data||[]){const p=product(row.id);if(p)p.stock=Number(row.stock||0);}
