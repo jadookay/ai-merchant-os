@@ -1061,6 +1061,7 @@ async function sheriSyncOutbox(){
       if(refreshed?.data?.session){session=refreshed.data.session;}
     }catch(_){/* Supabase auto-refresh may still be completing; continue below. */}
     await sheriReconcileMerchantId();
+    if(!await sheriEnsureActiveSession())return;
     const now=Date.now();
     const items=(await sheriGetAll('outbox'))
       .filter(item=>!item.blocked)
@@ -1169,8 +1170,8 @@ async function sheriSyncOutbox(){
 }
 
 function sheriOnlineEvents(){
-  window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sherriSyncKick()});
-  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)sherriSyncKick()});
+  window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — verifying access…');sheriEnsureActiveSession().then(ok=>{if(ok)sherriSyncKick()})});
+  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)sheriEnsureActiveSession().then(ok=>{if(ok)sherriSyncKick()})});
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator){
@@ -1588,8 +1589,30 @@ async function onAuthed(sess){
 async function signOut(){await sb.auth.signOut();session=null;location.reload()}
 
 // ── Data loading ─────────────────────────────────────────────────────────
+let sheriSessionValidation=null;
+async function sheriEnsureActiveSession(){
+  if(!navigator.onLine||!session?.access_token||!state.merchant?.id)return true;
+  if(sheriSessionValidation)return sheriSessionValidation;
+  sheriSessionValidation=(async()=>{
+    const {data,error}=await sb.rpc('shericeri_validate_member_session',{p_merchant_id:state.merchant.id});
+    if(error){
+      sheriSetConnectivity('degraded','Unable to verify this account right now. Reconnect before accessing synced business data.');
+      console.warn('[AIBOS access] session validation failed',error);
+      return false;
+    }
+    if(data===true)return true;
+    sheriSetConnectivity('degraded','This staff account is disabled or its session has been revoked. Sign in again or contact the business owner.');
+    try{await sb.auth.signOut({scope:'local'})}catch(e){console.warn('[AIBOS access] local sign-out failed',e)}
+    session=null;
+    location.reload();
+    return false;
+  })();
+  try{return await sheriSessionValidation}finally{sheriSessionValidation=null}
+}
+
 async function loadAll(silent=false){
   const mId=state.merchant?.id; if(!mId)return;
+  if(navigator.onLine&&session?.access_token&&!await sheriEnsureActiveSession())return;
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
   if(hadLocal)render();
