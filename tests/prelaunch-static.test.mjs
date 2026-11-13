@@ -639,3 +639,10 @@ test("session validation runs before merchant reconciliation and outbox work", (
   assert.ok(html.includes("if(!await sheriEnsureActiveSession())return;\n    await sheriReconcileMerchantId();"));
   assert.ok(html.includes("sale_cart_upsert:'Sale cart recorded'"));
 });
+
+test("sale void RPC derives invoice membership from the selected sale and rejects mismatched transaction IDs", () => {
+  assert.ok(teamMigration.includes("Derive the transaction from the selected sale row"));
+  assert.ok(teamMigration.includes("where merchant_id=v_merchant_id and id=p_sale_id"));
+  assert.ok(teamMigration.includes("p_transaction_id is distinct from v_transaction_id"));
+  assert.ok(teamMigration.includes("Transaction ID does not match the selected sale"));
+});
