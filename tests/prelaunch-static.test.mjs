@@ -676,5 +676,10 @@ test("journal line batches reject malformed objects and duplicate line IDs", () 
 });
 
 test("recurring journal source identifiers remain valid UUIDs", () => {
-  assert.ok(html.includes("sourceType:'recurring',sourceId:sheriUuid()"));
+  assert.ok(html.includes("sourceType:'recurring',sourceId:await sheriStableUuid(r.id+':'+r.next_run)"));
+});
+
+test("recurring journal sources use deterministic UUIDs per scheduled occurrence", () => {
+  assert.ok(html.includes("async function sheriStableUuid(seed)"));
+  assert.ok(html.includes("sourceId:await sheriStableUuid(r.id+':'+r.next_run)"));
 });
