@@ -600,3 +600,11 @@ test("suspending a team member clears the PIN and invalidates refresh sessions",
   assert.ok(teamAccess.includes("Set a new 6–8 digit PIN before re-enabling this member."));
   assert.ok(teamAccess.includes('status: "suspended", pin_hash: null'));
 });
+
+test("online and foreground app access is revalidated before cached data or outbox sync", () => {
+  assert.ok(html.includes("async function sheriEnsureActiveSession()"));
+  assert.ok(html.includes("sb.rpc('shericeri_validate_member_session'"));
+  assert.ok(html.includes("if(navigator.onLine&&session?.access_token&&!await sheriEnsureActiveSession())return;"));
+  assert.ok(html.includes("if(!await sheriEnsureActiveSession())return;"));
+  assert.ok(html.includes("window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine)sheriEnsureActiveSession()"));
+});
