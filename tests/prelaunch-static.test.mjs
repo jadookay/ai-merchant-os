@@ -657,3 +657,13 @@ test("clean staging receives Shericeri memory and the product-images bucket befo
   assert.match(storageMemoryMigration, /file_size_limit=4194304/);
   assert.match(authorizationFixMigration, /create policy shericeri_memory_team_insert[\s\S]*?manage_finance/);
 });
+
+
+test("stock-conflicted cart invoices remain visible and can be retried against current server stock", () => {
+  assert.match(html, /conflicts\.length\+' conflicts need attention'/);
+  assert.match(html, /const conflictGroups=new Map\(\)/);
+  assert.match(html, /sheriRetryStockConflict\(this\.dataset\.conflict\)/);
+  assert.match(html, /async function sheriRetryStockConflict\(key\)[\s\S]*?from\('products'\)\.select\('id,stock'\)/);
+  assert.match(html, /if\(current<qty\)throw new Error\('Not enough server stock/);
+  assert.match(html, /row\.info\?\.operation\?\.transaction_id===op\.transaction_id/);
+});
