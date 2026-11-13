@@ -7,6 +7,7 @@ const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
 const quickService = await readFile(new URL("../supabase/functions/quick-service/index.ts", import.meta.url), "utf8");
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
+const config = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
 const salesMigration = await readFile(new URL("../supabase/migrations/20261112180000_aibos_sales_favorites_audit.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
@@ -687,4 +688,19 @@ test("recurring journal sources use deterministic UUIDs per scheduled occurrence
 test("Kinyarwanda TTS keeps the live JWT setting until voice callers are verified", () => {
   assert.ok(config.includes("[functions.kinya-tts]\nverify_jwt = false"));
   assert.ok(config.includes("[functions.team-access]\nverify_jwt = false"));
+});
+
+test("all inline application scripts parse without syntax errors", () => {
+  const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)];
+  for (const match of scripts) {
+    const attrs = match[1] || "";
+    const body = match[2] || "";
+    if (/type=["'](?:application\\/json|module)["']/i.test(attrs) || !body.trim()) continue;
+    new vm.Script(body, { filename: "index.html inline script" });
+  }
+});
+
+test("legacy owner outbox records remain recoverable without exposing them to staff", () => {
+  assert.ok(html.includes("if(store==='outbox')return Boolean(merchantId&&state.merchant?.user_id===userId"));
+  assert.ok(html.includes("row.op?.entry?.merchant_id===merchantId"));
 });
