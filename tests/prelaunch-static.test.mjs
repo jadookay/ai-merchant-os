@@ -668,3 +668,12 @@ test("stock-conflicted cart invoices remain visible and can be retried against c
   assert.match(html, /if\(current<qty\)throw new Error\('Not enough server stock/);
   assert.match(html, /row\.info\?\.operation\?\.transaction_id===op\.transaction_id/);
 });
+
+
+test("staff offline access uses a time-limited cached membership and respects its expiry", () => {
+  assert.match(html, /sheriGet\('meta','membership:'\+session\.user\.id\)/);
+  assert.match(html, /member\?\.status==='active'&&Date\.parse\(member\.cache_expires_at\|\|' '\)>Date\.now\(\)/);
+  assert.match(html, /cache_expires_at:new Date\(Date\.now\(\)\+8\*60\*60\*1000\)/);
+  assert.match(html, /if\(!navigator\.onLine&&Date\.parse\(member\.cache_expires_at\|\|''\)<=Date\.now\(\)\)return false/);
+  assert.match(html, /async function signOut\(\)\{if\(session\?\.user\?\.id\)await sheriDelete\('meta','membership:'\+session\.user\.id\)/);
+});
