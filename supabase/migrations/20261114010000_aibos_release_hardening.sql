@@ -311,3 +311,45 @@ end;
 $$;
 revoke all on function public.revoke_merchant_member_sessions(uuid) from public,anon,authenticated;
 grant execute on function public.revoke_merchant_member_sessions(uuid) to service_role;
+
+
+-- Cover the ten foreign keys identified by the live performance advisor.
+create index if not exists bank_accounts_account_merchant_fk_idx on public.bank_accounts(account_id,merchant_id);
+create index if not exists bills_supplier_fk_idx on public.bills(supplier_id);
+create index if not exists invoices_customer_fk_idx on public.invoices(customer_id);
+create index if not exists journal_lines_account_merchant_fk_idx on public.journal_lines(account_id,merchant_id);
+create index if not exists journal_lines_entry_merchant_fk_idx on public.journal_lines(journal_entry_id,merchant_id);
+create index if not exists payments_account_merchant_fk_idx on public.payments(account_id,merchant_id);
+create index if not exists recurring_transactions_merchant_fk_idx on public.recurring_transactions(merchant_id);
+create index if not exists sales_customer_fk_idx on public.sales(customer_id);
+create index if not exists sales_product_fk_idx on public.sales(product_id);
+create index if not exists tax_rates_merchant_fk_idx on public.tax_rates(merchant_id);
+
+-- Hoist auth.uid() out of per-row RLS evaluation without changing policy logic.
+-- Policies already using a scalar subquery are left untouched.
+do $$
+declare
+  p record;
+  v_using text;
+  v_check text;
+  v_stmt text;
+begin
+  for p in
+    select schemaname,tablename,policyname,qual,with_check
+    from pg_policies
+    where schemaname='public'
+      and (
+        (coalesce(qual,'') like '%auth.uid()%' and lower(coalesce(qual,'')) not like '%( select auth.uid()%')
+        or
+        (coalesce(with_check,'') like '%auth.uid()%' and lower(coalesce(with_check,'')) not like '%( select auth.uid()%')
+      )
+  loop
+    v_using := case when p.qual is null then null else replace(p.qual,'auth.uid()','(select auth.uid())') end;
+    v_check := case when p.with_check is null then null else replace(p.with_check,'auth.uid()','(select auth.uid())') end;
+    v_stmt := format('alter policy %I on %I.%I',p.policyname,p.schemaname,p.tablename);
+    if v_using is not null then v_stmt := v_stmt || format(' using (%s)',v_using); end if;
+    if v_check is not null then v_stmt := v_stmt || format(' with check (%s)',v_check); end if;
+    execute v_stmt;
+  end loop;
+end;
+$$;
