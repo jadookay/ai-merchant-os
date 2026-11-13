@@ -638,7 +638,7 @@ test("PIN login validates identifier length, numeric merchant code and exact PIN
 
 test("suspended PIN users are rejected before merchant workspace lookup or onboarding", () => {
   assert.match(html, /from\('merchant_members'\)\.select\('id,merchant_id,user_id,full_name,role,permissions,status'\)\.eq\('user_id',session\.user\.id\)/);
-  assert.match(html, /if\(memberResult\.data\.status!=='active'\)\{await sb\.auth\.signOut\(\);session=null;return false;\}/);
+  assert.match(html, /if\(memberResult\.data\.status!=='active'\)\{await sheriDelete\('meta','membership:'\+session\.user\.id\);await sb\.auth\.signOut\(\);session=null;return false;\}/);
   assert.match(html, /complete=await ensureMerchant\(\);\s*if\(!session\?\.user\)return;/);
 });
 
