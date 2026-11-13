@@ -715,7 +715,7 @@ test("sale voiding is server-confirmed before local stock and sales are changed"
   assert.ok(html.includes("data.stock_updates||[]"));
   assert.ok(html.includes("data.audit_recorded&&op.auditRow"));
   assert.ok(html.includes("op.type==='sale_void'"));
-  assert.ok(html.includes("s.void_pending?'<span class=\"muted\">Void pending</span>'"));
+  assert.ok(html.includes(`s.void_pending?'<span class="muted">Void pending</span>'`));
 });
 
 test("pending voids do not collide across unrelated legacy single-sale records", () => {
