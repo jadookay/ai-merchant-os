@@ -737,6 +737,37 @@ async function sheriDelete(store,key){
   await sheriOpenLocalDb();
   return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(key);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)})
 }
+async function sheriClearMerchantLocalData(merchantId){
+  if(!merchantId)return;
+  const stores=['merchants','products','sales','expenses','outbox','conflicts','memory','customers','suppliers','purchases','cashEntries','budgets','accounts','journalEntries','journalLines','invoices','bills','payments','bankAccounts','taxRates','recurringTransactions','accountingSettings','auditLog'];
+  for(const store of stores){
+    const rows=await sheriGetAll(store);
+    for(const row of rows){
+      const op=row.op||row.info?.operation||{};
+      const recordMatches=row.merchant_id===merchantId||row.record?.merchant_id===merchantId||
+        op.merchant_id===merchantId||op.record?.merchant_id===merchantId||
+        (Array.isArray(op.records)&&op.records.some(x=>x?.merchant_id===merchantId))||
+        (Array.isArray(row.info?.sale_ids)&&row.info?.merchant_id===merchantId);
+      const merchantMatches=store==='merchants'&&(row.key===merchantId||row.record?.id===merchantId);
+      if(recordMatches||merchantMatches)await sheriDelete(store,row.key);
+    }
+  }
+  if(state.merchant?.id===merchantId){
+    state.merchant=null;state.currentMembership=null;
+    for(const key of ['products','sales','expenses','memory','customers','suppliers','purchases','cashEntries','budgets','accounts','journalEntries','journalLines','invoices','bills','payments','bankAccounts','taxRates','recurringTransactions','auditLog'])state[key]=[];
+    state.accountingSettings=null;
+  }
+}
+async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id){
+  if(!merchantId||!session?.user?.id)return true;
+  if(state.merchant?.user_id===session.user.id)return true;
+  const {data,error}=await sb.from('merchant_members').select('status').eq('merchant_id',merchantId).eq('user_id',session.user.id).maybeSingle();
+  if(error)throw error;
+  if(data?.status==='active')return true;
+  await sheriClearMerchantLocalData(merchantId);
+  try{await sb.auth.signOut({scope:'local'})}catch(_){}
+  return false;
+}
 async function sheriSaveSnapshot(){
   if(!state.merchant)return;
   await sheriPut('merchants',state.merchant.id,{record:{...state.merchant}});
@@ -1057,6 +1088,7 @@ async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy)return;
   sheriSyncBusy=true;
   try{
+    if(!(await sheriVerifyActiveStaffMembership(state.merchant.id)))return;
     // Inheritance-safe auth guard: an expired access token must never turn a
     // perfectly valid offline queue into a permanent blocked queue item.
     try{
@@ -1533,11 +1565,16 @@ async function ensureMerchant(){
   if(own.error)throw own.error;
   if(own.data){state.merchant=own.data;await sheriPut('merchants',own.data.id,{user_id:own.data.user_id,record:{...own.data}});return true}
   // Staff identities are linked to a merchant through an active membership, not merchants.user_id.
-  let memberQuery=sb.from('merchant_members').select('id,merchant_id,user_id,full_name,role,permissions,status').eq('user_id',session.user.id).eq('status','active');
+  let memberQuery=sb.from('merchant_members').select('id,merchant_id,user_id,full_name,role,permissions,status').eq('user_id',session.user.id);
   if(window.__teamLoginMerchantId)memberQuery=memberQuery.eq('merchant_id',window.__teamLoginMerchantId);
   const memberResult=await sheriWithTimeout(memberQuery.limit(1).maybeSingle(),7000,'Team membership lookup timed out');
   if(memberResult.error)throw memberResult.error;
   if(!memberResult.data)return false;
+  if(memberResult.data.status!=='active'){
+    await sheriClearMerchantLocalData(memberResult.data.merchant_id);
+    try{await sb.auth.signOut({scope:'local'})}catch(_){}
+    return false;
+  }
   state.currentMembership=memberResult.data;
   const business=await sheriWithTimeout(sb.from('merchants').select('*').eq('id',memberResult.data.merchant_id).maybeSingle(),7000,'Team business lookup timed out');
   if(business.error)throw business.error;
@@ -1594,6 +1631,7 @@ async function signOut(){await sb.auth.signOut();session=null;location.reload()}
 // ── Data loading ─────────────────────────────────────────────────────────
 async function loadAll(silent=false){
   const mId=state.merchant?.id; if(!mId)return;
+  if(navigator.onLine&&!(await sheriVerifyActiveStaffMembership(mId)))return;
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
   if(hadLocal)render();
