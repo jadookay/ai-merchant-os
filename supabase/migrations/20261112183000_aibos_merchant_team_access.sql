@@ -165,7 +165,7 @@ begin
      or not private.user_can_access_merchant(p_merchant_id,'manage_inventory') then
     raise exception 'Not authorized to adjust inventory';
   end if;
-  if p_product_id is null or p_expected_stock is null or p_quantity_delta=0 or coalesce(length(trim(p_reason)),0)<3 then
+  if p_product_id is null or p_expected_stock is null or p_quantity_delta is null or p_quantity_delta=0 or coalesce(length(trim(p_reason)),0)<3 then
     raise exception 'A product, non-zero quantity and clear reason are required';
   end if;
   if p_movement_type not in ('adjustment','customer_return','supplier_return','writeoff') then
@@ -190,7 +190,7 @@ begin
 end;
 $;
 revoke all on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) from public,anon;
-grant execute on function public.shericeri_adjust_product_stock(uuid,uuid,integer,text,text,uuid) to authenticated;
+grant execute on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) to authenticated;
 
 create or replace function public.shericeri_get_inventory_movement_report(
   p_merchant_id uuid,p_start_date date default null,p_end_date date default null
