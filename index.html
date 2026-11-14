@@ -3431,7 +3431,7 @@ function sheriSyncLangSelectors(source){
   if(page&&page.value!==value)page.value=value;
   if(hero&&hero.value!==value)hero.value=value;
   try{const appLang=value.slice(0,2).toLowerCase();if(window.AIBOS_I18N?.getLanguage?.()!==appLang)window.AIBOS_I18N?.setLanguage?.(appLang);}catch(_){}
-  if(typeof sheriDiagSet==='function'sheriDiagSet('Selected language',value);
+  if(typeof sheriDiagSet==='function')sheriDiagSet('Selected language',value);
   try{ ensureVoicesLoaded().then(()=>{
     const v=pickVoice(value);
     if(typeof sheriDiagSet==='function')sheriDiagSet('Selected TTS voice',v?`${v.name} (${v.lang})`:(sheriIsKinyarwanda()?'No rw-RW voice exposed; bridge/device fallback required':'platform default'));
