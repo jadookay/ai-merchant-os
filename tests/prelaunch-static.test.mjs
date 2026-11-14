@@ -549,3 +549,29 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
   assert.doesNotMatch(localeScript, /fetch\s*\(|https?:\/\//i);
   assert.ok(localeScript.includes("does not change business records"));
 });
+
+
+test("multi-product invoices synchronize atomically through one server RPC", () => {
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_sync_sale_cart"));
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_sync_sale_cart(jsonb,jsonb) from public,anon"));
+  assert.ok(teamMigration.includes("grant execute on function public.shericeri_sync_sale_cart(jsonb,jsonb) to authenticated"));
+  const cartStart=teamMigration.indexOf("create or replace function public.shericeri_sync_sale_cart");
+  const cartEnd=teamMigration.indexOf("revoke all on function public.shericeri_sync_sale_cart",cartStart);
+  const cartSql=teamMigration.slice(cartStart,cartEnd);
+  assert.ok(cartSql.indexOf("if jsonb_array_length(v_conflicts)>0") < cartSql.indexOf("insert into public.sales"));
+  assert.ok(cartSql.indexOf("if jsonb_array_length(v_conflicts)>0") < cartSql.indexOf("update public.products"));
+  assert.ok(cartSql.includes("for update"));
+  assert.ok(cartSql.includes("already_recorded"));
+  assert.ok(cartSql.includes("partial server record"));
+  assert.ok(html.includes("sb.rpc('shericeri_sync_sale_cart'"));
+  assert.ok(html.includes("type:'sale_cart_upsert',records:rows,stockChecks"));
+  assert.ok(html.includes("if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}"));
+  assert.ok(html.includes("sale_cart_upsert:'Sale invoice recorded'"));
+});
+
+test("sale cart stock checks aggregate repeated product lines before one atomic sync", () => {
+  assert.ok(html.includes("new Map(checked.map(x=>[x.product.id,x.product]))"));
+  assert.ok(html.includes("checked.filter(x=>x.product.id===p.id).reduce((n,x)=>n+x.qty,0)"));
+  assert.ok(html.includes("expected_server_stock:Number(p.stock||0)+qty"));
+  assert.ok(html.includes("local_stock:Number(p.stock||0),qty"));
+});
