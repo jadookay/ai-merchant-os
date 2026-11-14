@@ -1171,6 +1171,11 @@ async function sheriSyncOutbox(){
     let successCount=0,failedCount=0,firstFailure=null;
     for(const item of items){
       const op=item.op||{};
+      if(op.type==='sale_void'&&op.transaction_id){
+        const queued=await sheriGetAll('outbox');
+        const saleDependency=queued.find(x=>x.op?.type==='sale_cart_upsert'&&x.op.transaction_id===op.transaction_id);
+        if(saleDependency)continue;
+      }
       try{
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
@@ -2276,7 +2281,7 @@ async function saveProduct(){
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
   }else{
-    const p={id:sheriUuid(),merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,created_at:now,updated_at:now};
+    const p={id:sheriUuid(),merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,opening_stock_qty:stock||0,opening_stock_cost:cost,opening_stock_value:(stock||0)*cost,created_at:now,updated_at:now};
     state.products.push(p);openingStockProduct=p;
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
@@ -4926,6 +4931,20 @@ async function accEnsureBase(){
 async function accEnsureOperationalLedger(){
   if(!state.merchant)return;
   await accEnsureBase();
+  // Rebuild opening inventory from immutable creation-time values, not today's stock.
+  for(const p of (state.products||[])){
+    const qty=Number(p.opening_stock_qty||0);
+    const value=Number(p.opening_stock_value??(qty*Number(p.opening_stock_cost||0)));
+    if(qty>0&&value>0){
+      const inv=accAccountCode('1200'),equity=accAccountCode('3000');
+      if(inv&&equity)await accPostEntry({
+        date:String(p.created_at||sheriNow()).slice(0,10),
+        description:'Opening inventory '+(p.name||''),
+        sourceType:'product_opening_stock',sourceId:p.id,
+        lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]
+      });
+    }
+  }
   // Rebuild only missing source entries. accPostEntry is idempotent by source_type/source_id.
   for(const s of (state.sales||[])){
     const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');
