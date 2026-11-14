@@ -679,6 +679,8 @@ const SHERI_LOCAL_DB_VERSION=14;
 let sheriOfflineDb=null;
 let sheriConnectivity=navigator.onLine?'online':'offline';
 let sheriSyncBusy=false;
+let sheriSyncBatchDepth=0;
+let accServerSnapshotAuthoritative=false;
 let sheriSyncQueued=0;
 let sheriSyncRetryTimer=null;
 let sheriOfflineVoiceNote='';
@@ -899,8 +901,16 @@ async function sheriQueue(op){
   await sheriPut('outbox',key,{created_at:sheriNow(),op,attempts:0,blocked:false});
   await sheriQueueCount();
   sheriSetConnectivity(sheriConnectivity);
-  if(navigator.onLine)sherriSyncKick();
+  if(navigator.onLine&&sheriSyncBatchDepth===0)sherriSyncKick();
   return key;
+}
+async function sheriWithSyncBatch(task){
+  sheriSyncBatchDepth++;
+  try{return await task();}
+  finally{
+    sheriSyncBatchDepth=Math.max(0,sheriSyncBatchDepth-1);
+    if(sheriSyncBatchDepth===0&&navigator.onLine)sherriSyncKick();
+  }
 }
 async function sheriQueueMemory(category,content){
   if(!state.merchant||!content||!content.trim())return null;
@@ -1178,7 +1188,7 @@ async function sheriSyncPurchaseOperation(op){
   });
 }
 async function sheriSyncOutbox(){
-  if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy)return;
+  if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy||sheriSyncBatchDepth>0)return;
   sheriSyncBusy=true;
   try{
     if(!(await sheriVerifyActiveStaffMembership(state.merchant.id)))return;
@@ -1768,6 +1778,7 @@ async function signOut(){sheriStopMerchantRealtime();await sb.auth.signOut({scop
 
 // ── Data loading ─────────────────────────────────────────────────────────
 async function loadAll(silent=false){
+  accServerSnapshotAuthoritative=false;
   const mId=state.merchant?.id; if(!mId)return;
   if(navigator.onLine&&!(await sheriVerifyActiveStaffMembership(mId)))return;
   // Local-first: render immediately even when connectivity is poor.
@@ -1887,9 +1898,9 @@ async function loadAll(silent=false){
         state.accountingSettings=pendingSettings?(localSetting||serverSetting||null):(serverSetting||null);
       }
       await sheriSaveAccountingSnapshot();
-    }catch(e){console.warn('[Sheri accounting] server refresh failed; local accounting retained',e)}
-    await accEnsureBase();
-    await accEnsureOperationalLedger();
+      accServerSnapshotAuthoritative=sheriCan('view_financial_reports')&&accountingMerges.every(([,rows,error])=>!error)&&!q[9].error;
+    }catch(e){accServerSnapshotAuthoritative=false;console.warn('[Sheri accounting] server refresh failed; local accounting retained',e)}
+    await sheriWithSyncBatch(async()=>{await accEnsureBase();await accEnsureOperationalLedger();});
     sheriSetConnectivity('online','Server data synced');
   }catch(err){
     sheriSetConnectivity('degraded','Using cached data — server refresh failed');
@@ -5103,22 +5114,30 @@ async function accEnsureBase(){
   await sheriSaveAccountingSnapshot();
 }
 async function accEnsureOperationalLedger(){
-  if(!state.merchant)return;
+  // Rebuilding historical ledger entries requires an authoritative server
+  // snapshot and full finance/report access. Staff without those permissions
+  // must never infer an empty ledger from RLS and create duplicate journals.
+  if(!state.merchant||!navigator.onLine||!accServerSnapshotAuthoritative||
+     !sheriCan('manage_team')||!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return;
   await accEnsureBase();
-  // Rebuild only missing source entries. accPostEntry is idempotent by source_type/source_id.
-  for(const s of (state.sales||[])){
+  const safePost=async payload=>{
+    try{return await accPostEntry(payload)}
+    catch(e){console.warn('[Shericeri ledger repair] entry left unchanged for review',payload.sourceType,payload.sourceId,e);return null}
+  };
+  // Voided sales are retained for history but must never be re-posted as revenue/COGS.
+  for(const s of (state.sales||[]).filter(x=>!x.voided)){
     const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');
     const total=Number(s.qty||0)*Number(s.price||0), cost=Number(s.qty||0)*Number(s.cost||0), date=String(s.created_at||s.sold_at||s.date||sheriNow()).slice(0,10);
-    if(total>0&&cash&&sales)await accPostEntry({date,description:'Sale '+(s.product_name_snapshot||''),sourceType:'sale',sourceId:s.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});
-    if(cost>0&&inv&&cogs)await accPostEntry({date,description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:cost},{accountId:inv.id,credit:cost}]});
+    if(total>0&&cash&&sales)await safePost({date,description:'Sale '+(s.product_name_snapshot||''),sourceType:'sale',sourceId:s.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});
+    if(cost>0&&inv&&cogs)await safePost({date,description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:cost},{accountId:inv.id,credit:cost}]});
   }
   for(const e of (state.expenses||[])){
     const ex=accAccountCode('6000'),cash=accAccountCode('1000'),amount=Number(e.amount||0),date=String(e.created_at||e.date||sheriNow()).slice(0,10);
-    if(amount>0&&ex&&cash)await accPostEntry({date,description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});
+    if(amount>0&&ex&&cash)await safePost({date,description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});
   }
   for(const p of (state.purchases||[]).filter(x=>x.status!=='ordered')){
     const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||Number(p.qty||0)*Number(p.unit_cost||p.cost||0)),date=String(p.purchased_at||p.created_at||sheriNow()).slice(0,10);
-    if(total>0&&inv&&ap)await accPostEntry({date,description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});
+    if(total>0&&inv&&ap)await safePost({date,description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});
   }
   await sheriSaveAccountingSnapshot();
 }
@@ -5129,11 +5148,32 @@ async function accPostEntry({date,description,sourceType,sourceId,lines}){
   for(const x of lines){const d=Number(x.debit||0),c=Number(x.credit||0);if(!x.accountId||!Number.isFinite(d)||!Number.isFinite(c)||d<0||c<0||((d===0)===(c===0))||(!d&&!c))throw new Error('Invalid debit/credit line. No ledger entry was saved.');if(!accAccount(x.accountId))throw new Error('Ledger account is missing. No ledger entry was saved.');}
   const debit=lines.reduce((s,x)=>s+Number(x.debit||0),0),credit=lines.reduce((s,x)=>s+Number(x.credit||0),0);
   if(!Number.isFinite(debit)||!Number.isFinite(credit)||Math.abs(debit-credit)>0.005||debit<=0)throw new Error('Accounting entry is not balanced. No ledger entry was saved.');
-  if(sourceType&&sourceId&&state.journalEntries.some(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided))return state.journalEntries.find(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided);
-  const now=sheriNow(),entry={id:sheriUuid(),merchant_id:state.merchant.id,entry_date:date||accToday(),description,source_type:sourceType||null,source_id:sourceId||null,created_at:now,voided:false};
-  state.journalEntries.push(entry);await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});
-  const syncLines=[];
-  for(const x of lines){const line={id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now};state.journalLines.push(line);syncLines.push(line);await sheriPut('journalLines',line.id,{merchant_id:state.merchant.id,record:{...line}})}
+  const existingEntry=sourceType&&sourceId?(state.journalEntries||[]).find(x=>x.source_type===sourceType&&x.source_id===sourceId&&!x.voided):null;
+  const now=sheriNow(),entry=existingEntry||{id:sheriUuid(),merchant_id:state.merchant.id,entry_date:date||accToday(),description,source_type:sourceType||null,source_id:sourceId||null,created_at:now,voided:false};
+  const existingLines=existingEntry?(state.journalLines||[]).filter(x=>x.journal_entry_id===entry.id):[];
+  const used=new Set(),syncLines=[],missing=[];
+  for(const x of lines){
+    const match=existingLines.find(l=>!used.has(l.id)&&l.account_id===x.accountId&&
+      Math.abs(Number(l.debit||0)-Number(x.debit||0))<=0.005&&
+      Math.abs(Number(l.credit||0)-Number(x.credit||0))<=0.005);
+    if(match){used.add(match.id);syncLines.push(match);continue;}
+    const line={id:sheriUuid(),merchant_id:state.merchant.id,journal_entry_id:entry.id,account_id:x.accountId,
+      debit:Number(x.debit||0),credit:Number(x.credit||0),memo:x.memo||null,created_at:now};
+    missing.push(line);syncLines.push(line);
+  }
+  const unexpected=existingLines.filter(l=>!used.has(l.id));
+  if(unexpected.length)throw new Error('Existing journal lines conflict with the source transaction. No automatic change was made; review this entry manually.');
+  if(existingEntry&&!missing.length){
+    const existingDebit=existingLines.reduce((s,x)=>s+Number(x.debit||0),0);
+    const existingCredit=existingLines.reduce((s,x)=>s+Number(x.credit||0),0);
+    if(existingLines.length>=2&&Math.abs(existingDebit-existingCredit)<=0.005)return existingEntry;
+    throw new Error('Existing journal entry is incomplete. No safe repair could be identified.');
+  }
+  if(!existingEntry){state.journalEntries.push(entry);await sheriPut('journalEntries',entry.id,{merchant_id:state.merchant.id,record:{...entry}});}
+  for(const line of missing){state.journalLines.push(line);await sheriPut('journalLines',line.id,{merchant_id:state.merchant.id,record:{...line}});}
+  // Send the full expected line set. The server RPC skips existing line IDs
+  // and inserts only missing ones, so a one-sided historical entry is repaired
+  // without duplicating its already-posted side.
   await sheriQueue({type:'accounting_journal_batch',entry,lines:syncLines});
   await sheriSaveAccountingSnapshot();
   return entry;
@@ -6796,6 +6836,19 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
 </script>
 <script>
 (function(){const nav=document.querySelector('.nav button[data-view="shericeri"]');const source=document.querySelector('.sheri-launcher .sheri-thumb');if(nav&&source&&!nav.querySelector('.sheri-thumb'))nav.replaceChildren(source.cloneNode(true),document.createTextNode(' Shericeri'));})();
+
+function sheriWrapSyncBatch(name){
+  const original=window[name];
+  if(typeof original!=='function'||original.__sheriSyncBatchWrapped)return;
+  const wrapped=function(...args){return sheriWithSyncBatch(()=>original.apply(this,args));};
+  wrapped.__sheriSyncBatchWrapped=true;
+  window[name]=wrapped;
+}
+[
+  'recordSale','saveProduct','deleteProduct','addExpense','deleteExpense','addOSPurchase',
+  'accEnsureBase','accEnsureOperationalLedger','accCreateInvoice','accCreateBill','accCreatePayment',
+  'accCreateBankAccount','accCreateTaxRate','accCreateRecurring','accPostOpeningBalance','accCreateAdjustment'
+].forEach(sheriWrapSyncBatch);
 </script>
 </body>
 </html>
