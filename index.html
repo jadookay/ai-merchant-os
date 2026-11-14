@@ -2213,7 +2213,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
 .statement-total-row{font-weight:800;border-top:1px solid var(--line)}
 @media(max-width:900px) and (min-width:651px){#appRoot .side{width:190px!important}#appRoot .main{margin-left:190px!important;width:calc(100% - 190px)!important}}
 @media(max-width:650px){
- #appRoot .side{position:static!important;inset:auto!important;width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:9px 10px!important}
+ #appRoot .side{position:sticky!important;top:0!important;inset:auto!important;width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:9px 10px!important}
  #appRoot .side .nav{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px}
  #appRoot .side .nav button{flex:1 1 calc(33.333% - 4px);width:auto;min-width:0;padding:8px 5px!important}
  #appRoot .main{margin:0!important;width:100%!important;max-width:100%!important;padding:8px 12px 12px!important}
@@ -2298,8 +2298,8 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
       const net=periodIncome-periodCogs-operatingExpenses-taxExpense,pretax=net+taxExpense;
       const plEl=document.getElementById('accPL'),bsEl=document.getElementById('accBS');
       const prefix=el=>(el?.innerHTML||'').match(/^(.*?)(?=<div class="row")/s)?.[1]||'';
-      const periodText='<div class="statement-period">For the period ended '+esc(end)+(start?' (from '+esc(start)+')':'')+' · '+esc(state.merchant?.currency||'')+'</div>';
-      const asAt='<div class="statement-period">As at '+esc(end)+' · '+esc(state.merchant?.currency||'')+'</div>';
+      const periodText='<div class="statement-period"><span>For the period ended</span> '+esc(end)+(start?' (from '+esc(start)+')':'')+' · '+esc(state.merchant?.currency||'')+'</div>';
+      const asAt='<div class="statement-period"><span>As at</span> '+esc(end)+' · '+esc(state.merchant?.currency||'')+'</div>';
       if(bsEl){
         const cashAccounts=currentAssets.filter(a=>['1000','1010','1020'].includes(String(a.code)));
         const receivables=currentAssets.filter(a=>String(a.code)==='1100');
@@ -6569,6 +6569,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'sales revenue':'Amafaranga yavuye mu igurisha','sales returns & discounts':'Ibyagaruwe n’ibiciro byagabanyijwe',
     'other income':'Andi mafaranga yinjiye','total revenue':'Igiteranyo cy’amafaranga yinjiye','cost of sales':'Ikiguzi cy’ibicuruzwa byagurishijwe',
     'gross profit':'Inyungu mbumbe','operating expenses':'Amafaranga yakoreshejwe mu bikorwa','income tax expense':'Umusoro ku nyungu',
+    'total cost of sales':'Igiteranyo cy’ikiguzi cy’ibicuruzwa byagurishijwe','total operating expenses':'Igiteranyo cy’amafaranga yakoreshejwe mu bikorwa','total income tax expense':'Igiteranyo cy’umusoro ku nyungu','total other / non-current assets':'Igiteranyo cy’undi mutungo w’igihe kirekire','total current liabilities':'Igiteranyo cy’imyenda y’igihe gito','total other / non-current liabilities':'Igiteranyo cy’indi myenda y’igihe kirekire','for the period ended':'Mu gihe cyarangiye ku','as at':'Ku itariki ya','total revenue':'Igiteranyo cy’amafaranga yinjiye','total current assets':'Igiteranyo cy’umutungo w’igihe gito','total equity':'Igiteranyo cy’igishoro n’inyungu zasigaye','total liabilities and equity':'Igiteranyo cy’imyenda n’igishoro',
     'profit before tax':'Inyungu mbere y’umusoro','profit for the period':'Inyungu y’igihe cyatoranyijwe',
     'cash on hand':'Amafaranga mu ntoki','bank accounts':'Amafaranga kuri banki','mobile money':'Amafaranga kuri Mobile Money',
     'accounts receivable':'Amafaranga abakiriya bakurimo','accounts payable':'Amafaranga ugomba kwishyura','input tax receivable':'Umusoro wishyuwe utegereje kugaruzwa',
@@ -6588,6 +6589,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'as at':'Au','statement of profit or loss':'État du résultat net','for the period ended':'Pour la période close le',
     'sales revenue':'Chiffre d’affaires','sales returns & discounts':'Retours sur ventes et rabais','other income':'Autres produits',
     'total revenue':'Total des produits','cost of sales':'Coût des ventes','gross profit':'Marge brute',
+    'total cost of sales':'Total du coût des ventes','total operating expenses':'Total des charges opérationnelles','total income tax expense':'Total de la charge d’impôt sur le résultat','total other / non-current assets':'Total des autres actifs / actifs non courants','total current liabilities':'Total des passifs courants','total other / non-current liabilities':'Total des autres passifs / passifs non courants','for the period ended':'Pour la période close le','as at':'Au','total current assets':'Total des actifs courants','total equity':'Total des capitaux propres','total liabilities and equity':'Total des passifs et des capitaux propres',
     'operating expenses':'Charges opérationnelles','income tax expense':'Charge d’impôt sur le résultat',
     'profit before tax':'Résultat avant impôt','profit for the period':'Résultat de la période',
     'cash on hand':'Espèces en caisse','bank accounts':'Comptes bancaires','mobile money':'Mobile Money',
