@@ -1893,8 +1893,8 @@ function restockForecast(withinDays=14){
 // whatever windowDays is) comparison, not a projection into the future.
 function revenueTrend(windowDays=7){
   const recentCutoff=sheriDaysAgo(windowDays),priorCutoff=sheriDaysAgo(windowDays*2);
-  const recentRevenue=state.sales.filter(s=>s.created_at>=recentCutoff).reduce((sum,s)=>sum+s.qty*s.price,0);
-  const priorRevenue=state.sales.filter(s=>s.created_at>=priorCutoff&&s.created_at<recentCutoff).reduce((sum,s)=>sum+s.qty*s.price,0);
+  const recentRevenue=state.sales.filter(s=>!s.voided&&s.created_at>=recentCutoff).reduce((sum,s)=>sum+s.qty*s.price,0);
+  const priorRevenue=state.sales.filter(s=>!s.voided&&s.created_at>=priorCutoff&&s.created_at<recentCutoff).reduce((sum,s)=>sum+s.qty*s.price,0);
   if(priorRevenue===0){
     if(recentRevenue===0)return{direction:'flat',changePct:null,recentRevenue,priorRevenue,windowDays};
     return{direction:'up',changePct:null,recentRevenue,priorRevenue,windowDays}; // no prior baseline to compute a % from
@@ -1911,7 +1911,7 @@ function revenueTrend(windowDays=7){
 function dailyProfitTrend(windowDays=7){
   const recentCutoff=sheriDaysAgo(windowDays),priorCutoff=sheriDaysAgo(windowDays*2);
   const profitInWindow=(from,to)=>{
-    const salesRev=state.sales.filter(s=>s.created_at>=from&&(!to||s.created_at<to))
+    const salesRev=state.sales.filter(s=>!s.voided&&s.created_at>=from&&(!to||s.created_at<to))
       .reduce((sum,s)=>sum+s.qty*(s.price-(s.cost??0)),0);
     const exp=state.expenses.filter(e=>e.created_at>=from&&(!to||e.created_at<to))
       .reduce((sum,e)=>sum+e.amount,0);
@@ -1932,7 +1932,7 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset
 
 function sheriRecentActivitiesHtml(){
   const rows=[];
-  for(const s of state.sales||[])rows.push({when:s.created_at,type:'Sale',title:s.product_name_snapshot||product(s.product_id)?.name||'Sale',amount:Number(s.qty||0)*Number(s.price||0)});
+  for(const s of state.sales||[])if(!s.voided)rows.push({when:s.created_at,type:'Sale',title:s.product_name_snapshot||product(s.product_id)?.name||'Sale',amount:Number(s.qty||0)*Number(s.price||0)});\n  for(const s of state.sales||[])if(s.voided)rows.push({when:s.voided_at||s.created_at,type:'Voided sale',title:(s.product_name_snapshot||product(s.product_id)?.name||'Sale')+' — '+(s.void_reason||'No reason recorded'),amount:0});
   for(const e of state.expenses||[])rows.push({when:e.created_at,type:'Expense',title:e.description||'Expense',amount:-Number(e.amount||0)});
   for(const p of state.purchases||[])if(p.status!=='ordered')rows.push({when:p.purchased_at||p.created_at,type:'Purchase',title:p.product_name_snapshot||product(p.product_id)?.name||'Purchase',amount:-Number(p.total||Number(p.qty||0)*Number(p.unit_cost||0))});
   for(const c of state.cashEntries||[])rows.push({when:c.occurred_at||c.created_at,type:c.kind==='income'?'Cash income':c.kind==='expense'?'Cash expense':'Cash transfer',title:c.description||'Cash movement',amount:c.kind==='income'?Number(c.amount||0):c.kind==='expense'?-Number(c.amount||0):0});
@@ -2082,7 +2082,7 @@ function sheriSearchTable(input){
 function renderSales(){
   const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);
   const rows=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr class="${s.voided?'voided-sale':''}"><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${s.voided?'<span class="pill">Voided</span><div class="sub">'+esc(s.void_reason||'No reason recorded')+'</div>':(sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\\''+s.id+'\\')">Void</button>':'—')}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
+  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th>Status / reason</th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr class="${s.voided?'voided-sale':''}"><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${s.voided?'<span class="pill">Voided</span><div class="sub">'+esc(s.void_reason||'No reason recorded')+'</div>':(sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\\''+s.id+'\\')">Void</button>':'—')}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
 }
 
 // ── Products ─────────────────────────────────────────────────────────────
@@ -2891,7 +2891,7 @@ function offlineAnswer(q){
   if(q.includes('restock')||q.includes('stock')){if(!low.length)return 'Your current stock levels are above the reorder thresholds.';return `I would prioritize <b>${low.map(p=>esc(p.name)).join(', ')}</b>.`}
   if(q.includes('best')||q.includes('top')||(q.includes('product')&&(q.includes('sell')||q.includes('perform')))){const top=bestProducts().slice(0,3).filter(p=>p.rev>0);if(!top.length)return 'Not enough sales recorded yet to rank products.';return 'Based on recorded revenue: '+top.map((p,i)=>`<br>${i+1}. <b>${esc(p.name)}</b> — ${money(p.rev)} revenue, ${money(p.profit)} estimated profit`).join('')}
   if(q.includes('profit')||q.includes('doing')||q.includes('make'))return `Your estimated profit is <b>${money(pr)}</b>. Revenue is <b>${money(rev)}</b>, estimated cost of goods is <b>${money(cogs())}</b>, and expenses are <b>${money(totalExpenses())}</b>.`;
-  if(q.includes('sale')||q.includes('sell'))return `You have recorded <b>${state.sales.length}</b> transactions totaling <b>${money(rev)}</b>. Best product so far: <b>${best&&best.rev>0?esc(best.name):'not enough data'}</b>.`;
+  if(q.includes('sale')||q.includes('sell'))return `You have recorded <b>${state.sales.filter(s=>!s.voided).length}</b> active transactions totaling <b>${money(rev)}</b>. Best product so far: <b>${best&&best.rev>0?esc(best.name):'not enough data'}</b>.`;
   return `I can currently analyze <b>sales, inventory, revenue, expenses and estimated profit</b>. Try: "How am I doing?", "What should I restock?", "Which product sells best?" or "How much profit did I make?"`;
 }
 
@@ -5836,6 +5836,72 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
   };
   phraseFragments.rw.push(...pendingFragments.rw);
   phraseFragments.fr.push(...pendingFragments.fr);
+  Object.assign(dictionaries.rw,{
+    'sale':'Igurisha','expense':'Amafaranga yakoreshejwe','purchase':'Ibyaguzwe','product':'Igicuruzwa',
+    'inventory adjustment':'Ihinduka ry’umubare w’ibicuruzwa','sale invoice recorded':'Inyemezabuguzi y’igurisha yanditswe',
+    'sale recorded':'Igurisha ryanditswe','product saved':'Igicuruzwa cyabitswe','product deleted':'Igicuruzwa cyasibwe',
+    'expense recorded':'Amafaranga yakoreshejwe yanditswe','expense deleted':'Amafaranga yakoreshejwe yasibwe',
+    'accounting entry':'Ibyanditswe mu ibaruramari','accounting record':'Inyandiko y’ibaruramari',
+    'shericeri memory':'Ububiko bw’ibyo Shericeri yibuka','business profile':'Amakuru y’ubucuruzi',
+    'purchase recorded':'Ibyaguzwe byanditswe','cash movement':'Igikorwa cy’amafaranga',
+    'budget updated':'Bije yavuguruwe','business update':'Amakuru y’ubucuruzi',
+    'needs attention':'Bikeneye kwitabwaho','revoked':'Byakuweho','signed out / expired':'Yasohotse / igihe cyarangiye',
+    'current session':'Iyi sesiyo','active':'Birakora','revoke session':'Hagarika iyi sesiyo',
+    'staff member':'Umukozi','platform':'Igikoresho gikoresha sisitemu','record':'Inyandiko',
+    'recent audit trail':'Amateka aheruka y’ibikorwa','recent audit log':'Amateka aheruka y’impinduka',
+    'no audited changes have been recorded yet.':'Nta mpinduka zirandikwa mu mateka y’igenzura.',
+    'no staff device sessions have been registered yet.':'Nta gikoresho cy’umukozi kirandikwa kugeza ubu.',
+    'unknown device':'Igikoresho kitazwi','time unavailable':'Igihe kitazwi',
+    'status / reason':'Imiterere / impamvu','voided sale':'Igurisha ryahagaritswe',
+    'no reason recorded':'Nta mpamvu yanditswe','sale (voided)':'Igurisha ryahagaritswe',
+    'cash movement':'Igikorwa cy’amafaranga','supplier':'Ugemura ibicuruzwa',
+    'accounts payable':'Amafaranga tugomba kwishyura abagemura',
+    'receivable balance':'Amafaranga umukiriya akirimo','outstanding balance':'Amafaranga atarishyurwa',
+    'payment received':'Ubwishyu bwakiriwe','payment made':'Ubwishyu bwakozwe',
+    'refund':'Gusubiza amafaranga','refunds':'Amafaranga yasubijwe',
+    'credit note':'Inyandiko igabanya umwenda','debit note':'Inyandiko yongera umwenda',
+    'tax payable':'Umusoro ugomba kwishyurwa','tax receivable':'Umusoro ugomba kwishyurwa n’abandi',
+    'cash balance':'Amafaranga asigaye mu ntoki','bank balance':'Amafaranga asigaye muri banki',
+    'account balance':'Amafaranga asigaye kuri konti','reconciliation':'Guhuza ibitabo n’inyandiko za banki',
+    'journal':'Igitabo cy’ibaruramari','journal entry':'Icyanditswe mu gitabo cy’ibaruramari',
+    'debit':'Debit (umubare wandikwa ibumoso)','credit':'Credit (umubare wandikwa iburyo)',
+    'opening balance':'Amafaranga yatangiranye na konti','closing balance':'Amafaranga asigaye konti ifunze',
+    'financial position':'Imiterere y’umutungo n’imyenda','gross margin':'Inyungu rusange ku byagurishijwe',
+    'net margin':'Inyungu isigara nyuma y’ibyakoreshejwe','operating expenses':'Amafaranga akoreshwa mu mikorere y’ubucuruzi',
+    'cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe','accounts receivable aging':'Igihe imyenda y’abakiriya imaze',
+    'inventory turnover':'Inshuro ibicuruzwa bisimburana mu bubiko','stock valuation':'Agaciro k’ibicuruzwa biri mu bubiko',
+    'voided sale history':'Amateka y’igurisha ryahagaritswe','status / reason':'Imiterere / impamvu'
+  });
+  Object.assign(dictionaries.fr,{
+    'sale':'Vente','expense':'Dépense','purchase':'Achat','product':'Produit',
+    'inventory adjustment':'Ajustement de stock','sale invoice recorded':'Facture de vente enregistrée',
+    'sale recorded':'Vente enregistrée','product saved':'Produit enregistré','product deleted':'Produit supprimé',
+    'expense recorded':'Dépense enregistrée','expense deleted':'Dépense supprimée',
+    'accounting entry':'Écriture comptable','accounting record':'Enregistrement comptable',
+    'shericeri memory':'Mémoire Shericeri','business profile':'Profil commercial',
+    'purchase recorded':'Achat enregistré','cash movement':'Mouvement de trésorerie',
+    'budget updated':'Budget mis à jour','business update':'Mise à jour commerciale',
+    'needs attention':'À traiter','revoked':'Révoqué','signed out / expired':'Déconnecté / expiré',
+    'current session':'Session actuelle','active':'Actif','revoke session':'Révoquer la session',
+    'staff member':'Membre du personnel','platform':'Plateforme','record':'Enregistrement',
+    'recent audit trail':'Piste d’audit récente','recent audit log':'Journal d’audit récent',
+    'no audited changes have been recorded yet.':'Aucune modification auditée n’a encore été enregistrée.',
+    'no staff device sessions have been registered yet.':'Aucune session d’appareil du personnel n’a encore été enregistrée.',
+    'unknown device':'Appareil inconnu','time unavailable':'Heure indisponible',
+    'status / reason':'Statut / motif','voided sale':'Vente annulée','no reason recorded':'Aucun motif enregistré',
+    'sale (voided)':'Vente annulée','supplier':'Fournisseur',
+    'accounts payable':'Dettes fournisseurs','receivable balance':'Solde des créances clients',
+    'outstanding balance':'Solde impayé','payment received':'Paiement reçu','payment made':'Paiement effectué',
+    'refund':'Remboursement','refunds':'Remboursements','credit note':'Avoir','debit note':'Note de débit',
+    'tax payable':'Taxe à payer','tax receivable':'Taxe à récupérer','cash balance':'Solde de caisse',
+    'bank balance':'Solde bancaire','account balance':'Solde du compte',
+    'reconciliation':'Rapprochement bancaire','journal':'Journal comptable','journal entry':'Écriture comptable',
+    'debit':'Débit','credit':'Crédit','opening balance':'Solde initial','closing balance':'Solde de clôture',
+    'financial position':'Situation financière','gross margin':'Marge brute','net margin':'Marge nette',
+    'operating expenses':'Charges d’exploitation','cost of goods sold':'Coût des marchandises vendues',
+    'accounts receivable aging':'Ancienneté des créances clients','inventory turnover':'Rotation des stocks',
+    'stock valuation':'Valorisation du stock','voided sale history':'Historique des ventes annulées'
+  });
   const originals=new WeakMap();
   const supported=['en','rw','fr'];
   let current='en';
