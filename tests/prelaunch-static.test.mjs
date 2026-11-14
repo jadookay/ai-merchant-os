@@ -565,3 +565,22 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
   assert.doesNotMatch(localeScript, /fetch\s*\(|https?:\/\//i);
   assert.ok(localeScript.includes("does not change business records"));
 });
+
+
+test("accounting SECURITY DEFINER RPCs revoke anonymous/public execution and enforce merchant permissions", () => {
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon;"));
+  assert.ok(teamMigration.includes("grant execute on function public.shericeri_get_accounting_snapshot(uuid) to authenticated;"));
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon;"));
+  assert.ok(teamMigration.includes("grant execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) to authenticated;"));
+  const snapshotStart=teamMigration.indexOf("create or replace function public.shericeri_get_accounting_snapshot");
+  const snapshotEnd=teamMigration.indexOf("revoke all on function public.shericeri_get_accounting_snapshot",snapshotStart);
+  const snapshot=teamMigration.slice(snapshotStart,snapshotEnd);
+  assert.ok(snapshot.includes("v_can_view_reports"));
+  assert.ok(snapshot.includes("Not authorized for merchant accounting data"));
+  assert.ok(snapshot.includes("set search_path=''"));
+  const journalStart=teamMigration.indexOf("create or replace function public.shericeri_sync_journal_batch");
+  const journalEnd=teamMigration.indexOf("revoke all on function public.shericeri_sync_journal_batch",journalStart);
+  const journal=teamMigration.slice(journalStart,journalEnd);
+  assert.ok(journal.includes("private.user_can_access_merchant(p_merchant_id"));
+  assert.ok(journal.includes("Journal entry is not balanced"));
+});
