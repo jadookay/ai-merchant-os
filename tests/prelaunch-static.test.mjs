@@ -624,3 +624,12 @@ test("team access is bound to an individually revocable authenticated device ses
   assert.ok(html.includes("id=\"teamDevicesTable\""));
   assert.ok(html.includes("function revokeTeamDeviceSession(sessionId)"));
 });
+
+
+test("revoked Supabase sessions are rejected even while an old access JWT remains unexpired", () => {
+  assert.ok(teamMigration.includes("exists(select 1 from auth.sessions a where a.id=ds.session_id and a.user_id=ds.user_id)"));
+  assert.ok(teamMigration.includes("ds.revoked_at is null"));
+  assert.ok(teamAccess.includes("function sessionIdFromJwt(token: string)"));
+  assert.ok(teamAccess.includes("hasActiveDeviceSession(admin, merchantId, callerData.user.id, bearer)"));
+  assert.ok(teamAccess.includes("This device session is no longer authorized. Sign in again."));
+});
