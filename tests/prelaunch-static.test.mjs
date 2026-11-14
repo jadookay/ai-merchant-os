@@ -661,3 +661,11 @@ test("inventory movement ledger records stock changes and gates valuation separa
   assert.ok(html.includes("sheri_get_inventory_movement_report"));
   assert.ok(html.includes("type:'inventory_adjustment'"));
 });
+
+
+test("legacy direct sale deletion is blocked so stock and accounting reversals cannot be bypassed", () => {
+  assert.ok(html.includes("Direct sale deletion is disabled; use the audited sale-void workflow."));
+  assert.ok(html.includes("async function sheriSyncProductOperation(op)"));
+  assert.ok(html.includes("const {stock,...metadata}=record"));
+  assert.ok(html.includes("sheri_adjust_product_stock"));
+});
