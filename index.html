@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.25 Incognito auth + complete RW/FR UI coverage + localized AI Advisor">
+<meta name="app-version" content="V14.4.28 Live sync, six-digit IDs, localized pending activity and ledger integrity controls">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -714,7 +714,7 @@ function sheriPendingActivityDetails(op){
 }
 async function sheriTogglePendingSync(){
   const panel=document.getElementById('sheriPendingSyncPanel');if(!panel)return;
-  panel.style.maxHeight='320px';panel.style.overflowY='auto';panel.style.overscrollBehavior='contain';panel.style.overscrollBehavior='contain';
+  panel.style.maxHeight='440px';panel.style.overflowY='auto';panel.style.overscrollBehavior='contain';
   const opening=panel.style.display!=='block';panel.style.display=opening?'block':'none';if(!opening)return;
   panel.innerHTML='<b>'+esc(sheriPendingText('Loading pending activities…'))+'</b>';
   try{
