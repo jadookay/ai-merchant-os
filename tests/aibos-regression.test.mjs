@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
+const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
 const voidBlock = html.slice(html.indexOf("async function voidSale(id){"), html.indexOf("const sheriSearchValues"));
 
 test("Kinyarwanda covers core finance and stock terms", () => {
@@ -165,4 +166,19 @@ test("record confirmation immediately queues sync and schedules the next pending
   assert.ok(queue.includes("await sheriPut('outbox',key"));
   assert.ok(queue.includes("if(navigator.onLine)sherriSyncKick()"));
   assert.ok(html.includes("const delay=Math.max(0,Math.min(2147483000,dueAt-Date.now()))"));
+});
+
+
+test("pending activity details are translated for Kinyarwanda and French users", () => {
+  assert.ok(html.includes("function sheriPendingText(value)"));
+  assert.ok(html.includes("'waiting to sync':'Birategereje koherezwa'"));
+  assert.ok(html.includes("'waiting to sync':'En attente de synchronisation'"));
+  assert.ok(html.includes("pending activities on this device"));
+});
+
+test("Realtime access to device and inventory movement rows remains permission-scoped", () => {
+  assert.ok(realtimeRlsMigration.includes("merchant_device_sessions_team_select"));
+  assert.ok(realtimeRlsMigration.includes("private.user_can_access_merchant(merchant_id,'manage_team')"));
+  assert.ok(realtimeRlsMigration.includes("inventory_movements_cost_view_select"));
+  assert.ok(realtimeRlsMigration.includes("private.user_can_access_merchant(merchant_id,'view_inventory_costs')"));
 });
