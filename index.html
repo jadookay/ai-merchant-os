@@ -5031,25 +5031,27 @@ function accAdjustTypeChanged(){
 }
 async function accCreateAdjustment(){
   await accEnsureBase();
-  const type=document.getElementById('accAdjType').value,accountId=document.getElementById('accAdjAccount').value,date=document.getElementById('accAdjDate').value||accToday(),desc=document.getElementById('accAdjDesc').value.trim()||type,qty=Number(document.getElementById('accAdjQty').value)||0,productId=document.getElementById('accAdjProduct').value||null;
+  const type=document.getElementById('accAdjType').value,accountId=document.getElementById('accAdjAccount').value,date=document.getElementById('accAdjDate').value||accToday(),desc=document.getElementById('accAdjDesc').value.trim(),qty=Number(document.getElementById('accAdjQty').value)||0,productId=document.getElementById('accAdjProduct').value||null;
+  if(desc.length<3)return alert('Enter a clear reason for this adjustment.');
   if(accPeriodLocked(date))return alert('This adjustment date is inside a locked accounting period.');
-  const salesRet=accAccountCode('4050'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');let amount=Number(document.getElementById('accAdjAmount').value),lines=[],p=null;
+  const salesRet=accAccountCode('4050'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');let amount=Number(document.getElementById('accAdjAmount').value),lines=[],p=null,stockBefore=null;
   if(type==='stock_writeoff'||type==='stock_gain'){
     p=product(productId);if(!p||qty<=0)return alert('Choose a product and enter a positive quantity for a stock adjustment.');
+    stockBefore=Number(p.stock||0);
     if(type==='stock_writeoff'&&qty>Number(p.stock||0))return alert('The write-off quantity cannot exceed the current stock.');
     amount=qty*Number(p.cost||0);if(!Number.isFinite(amount)||amount<=0)return alert('The product must have a positive unit cost before its stock value can be adjusted.');
     if(type==='stock_writeoff'){lines=[{accountId:accAccountCode('6000').id,debit:amount},{accountId:inv.id,credit:amount}];p.stock=Number(p.stock||0)-qty;}
     else{lines=[{accountId:inv.id,debit:amount},{accountId:accAccountCode('3000').id,credit:amount}];p.stock=Number(p.stock||0)+qty;}
   }else{
     if(!Number.isFinite(amount)||amount<=0||!accountId)return alert('Enter a positive amount and choose a cash/bank account.');
-    if(type==='sales_return'){lines=[{accountId:salesRet.id,debit:amount},{accountId:accountId,credit:amount}];if(qty>0&&productId){p=product(productId);const cost=(Number(p?.cost)||0)*qty;if(cost>0)lines.push({accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost});if(p)p.stock=(Number(p.stock)||0)+qty;}}
+    if(type==='sales_return'){lines=[{accountId:salesRet.id,debit:amount},{accountId:accountId,credit:amount}];if(qty>0&&productId){p=product(productId);if(p)stockBefore=Number(p.stock||0);const cost=(Number(p?.cost)||0)*qty;if(cost>0)lines.push({accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost});if(p)p.stock=(Number(p.stock)||0)+qty;}}
     else if(type==='sales_discount'){lines=[{accountId:salesRet.id,debit:amount},{accountId:accountId,credit:amount}];}
-    else{lines=[{accountId:accAccountCode('2000').id,debit:amount},{accountId:inv.id,credit:amount}];if(qty>0&&productId){p=product(productId);if(p)p.stock=Math.max(0,Number(p.stock||0)-qty);}}
+    else{lines=[{accountId:accAccountCode('2000').id,debit:amount},{accountId:inv.id,credit:amount}];if(qty>0&&productId){p=product(productId);if(p){stockBefore=Number(p.stock||0);p.stock=Math.max(0,Number(p.stock||0)-qty);}}}
   }
   const confirmText='Record '+type.replace(/_/g,' ')+'?\n'+desc+'\nQuantity: '+(qty||'—')+'\nValue: '+money(amount);if(!confirm(confirmText))return;
   if(p){p.updated_at=sheriNow();await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}});}
   await accPostEntry({date,description:desc,sourceType:type,sourceId:sheriUuid(),lines});
-  await accAudit('create','adjustment',null,{type,amount,quantity:qty,product_id:productId});
+  await accAudit('create','adjustment',p?.id||null,{type,amount,quantity:qty,product_id:productId,product_name:p?.name||null,stock_before:stockBefore,stock_after:p?Number(p.stock||0):null,stock_delta:p&&stockBefore!==null?Number(p.stock||0)-stockBefore:null,reason:desc});
   document.getElementById('accAdjAmount').value='';document.getElementById('accAdjDesc').value='';document.getElementById('accAdjQty').value='0';render();sheriToast('Adjustment recorded.');
 }
 function accInvoicePdf(id){const i=state.invoices.find(x=>x.id===id);if(!i||!window.jspdf)return alert('PDF engine is not available.');const {jsPDF}=window.jspdf;const d=new jsPDF();d.text(state.merchant.name||'Business',20,20);d.text(i.invoice_number,150,20);d.text('Customer: '+(accCustomer(i.customer_id)?.name||'Walk-in'),20,32);d.text('Issue: '+i.issue_date+'  Due: '+i.due_date,20,40);if(d.autoTable)d.autoTable({startY:50,head:[['Description','Qty','Unit','Total']],body:(i.items||[]).map(x=>[x.description,x.qty,money(x.unit_price),money(x.qty*x.unit_price)]).concat([['','','Subtotal',money(i.subtotal)],['','','Tax',money(i.tax_amount)],['','','Total',money(i.total)]] )});d.save(i.invoice_number+'.pdf')}
