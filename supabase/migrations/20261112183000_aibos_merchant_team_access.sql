@@ -39,6 +39,25 @@ create schema if not exists private;
 revoke all on schema private from public,anon;
 grant usage on schema private to authenticated;
 
+create table if not exists public.merchant_device_sessions (
+  id uuid primary key default gen_random_uuid(),
+  merchant_id uuid not null references public.merchants(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  session_id uuid not null,
+  device_id text not null check (length(device_id) between 16 and 128),
+  device_name text not null check (length(trim(device_name)) between 2 and 100),
+  platform text,
+  created_at timestamptz not null default now(),
+  last_seen_at timestamptz not null default now(),
+  revoked_at timestamptz,
+  revoked_by uuid references auth.users(id) on delete set null,
+  unique (merchant_id,session_id)
+);
+create index if not exists merchant_device_sessions_user_idx
+  on public.merchant_device_sessions(merchant_id,user_id,last_seen_at desc);
+alter table public.merchant_device_sessions enable row level security;
+revoke all on public.merchant_device_sessions from public,anon,authenticated;
+
 create or replace function private.user_can_access_merchant(p_merchant_id uuid,p_permission text default 'view_dashboard')
 returns boolean language sql stable security definer set search_path=''
 as $$
@@ -46,6 +65,12 @@ as $$
   or exists(
     select 1 from public.merchant_members mm
     where mm.merchant_id=p_merchant_id and mm.user_id=(select auth.uid()) and mm.status='active'
+    and exists(
+      select 1 from public.merchant_device_sessions ds
+      where ds.merchant_id=mm.merchant_id and ds.user_id=mm.user_id
+        and ds.session_id=nullif(auth.jwt()->>'session_id','')::uuid
+        and ds.revoked_at is null
+    )
     and (
       (mm.role='admin' and p_permission<>'manage_owner')
       or (
@@ -59,6 +84,114 @@ as $$
 $$;
 revoke all on function private.user_can_access_merchant(uuid,text) from public,anon;
 grant execute on function private.user_can_access_merchant(uuid,text) to authenticated;
+
+create or replace function public.shericeri_register_device_session(
+  p_merchant_id uuid,
+  p_device_id text,
+  p_device_name text,
+  p_platform text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $
+declare
+  v_user_id uuid:=auth.uid();
+  v_session_id uuid:=nullif(auth.jwt()->>'session_id','')::uuid;
+  v_rows integer;
+begin
+  if v_user_id is null or v_session_id is null then
+    raise exception 'A valid authenticated session is required';
+  end if;
+  if p_merchant_id is null or coalesce(length(p_device_id),0)<16
+     or coalesce(length(trim(p_device_name)),0)<2 then
+    raise exception 'Device identity is incomplete';
+  end if;
+  if exists(select 1 from public.merchants m where m.id=p_merchant_id and m.user_id=v_user_id) then
+    return jsonb_build_object('ok',true,'owner',true);
+  end if;
+  if not exists(
+    select 1 from public.merchant_members mm
+    where mm.merchant_id=p_merchant_id and mm.user_id=v_user_id and mm.status='active'
+  ) then
+    return jsonb_build_object('ok',false,'revoked',true);
+  end if;
+
+  insert into public.merchant_device_sessions(
+    merchant_id,user_id,session_id,device_id,device_name,platform,created_at,last_seen_at
+  ) values(
+    p_merchant_id,v_user_id,v_session_id,p_device_id,left(trim(p_device_name),100),left(coalesce(p_platform,''),40),now(),now()
+  )
+  on conflict(merchant_id,session_id) do update
+    set last_seen_at=now(),device_name=excluded.device_name,platform=excluded.platform
+    where public.merchant_device_sessions.revoked_at is null
+      and public.merchant_device_sessions.device_id=excluded.device_id;
+  get diagnostics v_rows=row_count;
+  if v_rows=0 then
+    if exists(select 1 from public.merchant_device_sessions ds
+      where ds.merchant_id=p_merchant_id and ds.session_id=v_session_id and ds.revoked_at is not null) then
+      return jsonb_build_object('ok',false,'revoked',true);
+    end if;
+    return jsonb_build_object('ok',false,'device_mismatch',true);
+  end if;
+  return jsonb_build_object('ok',true,'owner',false,'session_id',v_session_id);
+end;
+$;
+revoke all on function public.shericeri_register_device_session(uuid,text,text,text) from public,anon;
+grant execute on function public.shericeri_register_device_session(uuid,text,text,text) to authenticated;
+
+create or replace function public.shericeri_list_device_sessions(p_merchant_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $
+begin
+  if not private.user_can_access_merchant(p_merchant_id,'manage_team') then
+    raise exception 'Not authorized to view device sessions';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'session_id',ds.session_id,'user_id',ds.user_id,'member_name',coalesce(mm.full_name,'Owner'),
+      'role',coalesce(mm.role,'owner'),'device_name',ds.device_name,'platform',ds.platform,
+      'device_id',ds.device_id,'created_at',ds.created_at,'last_seen_at',ds.last_seen_at,
+      'revoked_at',ds.revoked_at,'current',ds.session_id=nullif(auth.jwt()->>'session_id','')::uuid
+    ) order by ds.last_seen_at desc)
+    from public.merchant_device_sessions ds
+    left join public.merchant_members mm on mm.merchant_id=ds.merchant_id and mm.user_id=ds.user_id
+    where ds.merchant_id=p_merchant_id
+  ),'[]'::jsonb);
+end;
+$;
+revoke all on function public.shericeri_list_device_sessions(uuid) from public,anon;
+grant execute on function public.shericeri_list_device_sessions(uuid) to authenticated;
+
+create or replace function public.shericeri_revoke_device_session(
+  p_merchant_id uuid,
+  p_session_id uuid
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $
+begin
+  if not private.user_can_access_merchant(p_merchant_id,'manage_team') then
+    raise exception 'Not authorized to revoke device sessions';
+  end if;
+  if p_session_id is null then raise exception 'A device session is required'; end if;
+  if p_session_id=nullif(auth.jwt()->>'session_id','')::uuid then
+    raise exception 'Use Sign out on this device to end the current session';
+  end if;
+  update public.merchant_device_sessions
+    set revoked_at=coalesce(revoked_at,now()),revoked_by=auth.uid()
+    where merchant_id=p_merchant_id and session_id=p_session_id;
+  return jsonb_build_object('ok',true,'revoked',found);
+end;
+$;
+revoke all on function public.shericeri_revoke_device_session(uuid,uuid) from public,anon;
+grant execute on function public.shericeri_revoke_device_session(uuid,uuid) to authenticated;
 
 create or replace function public.set_merchant_member_pin(p_member_id uuid,p_pin text)
 returns void language plpgsql security definer set search_path=''
