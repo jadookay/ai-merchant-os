@@ -2804,7 +2804,7 @@ async function importData(input){
         for(const x of parsed.budgets){await sb.from('budgets').insert({merchant_id:mId,month:x.month,category:x.category,amount:x.amount,deleted:!!x.deleted});}
       }
       await loadAll();render();alert('Data imported.');
-    }catch(err){alert('That file does not look like a valid AI Business OS backup, or the database migration is not installed yet.');}
+    }catch(err){alert('That file does not look like a valid AI Business OS (AIBOS) backup, or the database migration is not installed yet.');}
   };
   reader.readAsText(file);input.value='';
 }
@@ -5502,7 +5502,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'your data is stored in your supabase account, synced across devices.':'Amakuru yawe abikwa kuri konti yawe kandi akoherezwa ku bikoresho ukoresha.',
     'your shericeri id:':'Nimero ya Shericeri yawe:','(say this number if you contact support)':'(Tanga iyi nimero uhamagaye ubufasha)',
     'deleted products stay in your sales history but disappear from the inventory list and sale form.':'Ibicuruzwa wasibye biguma mu mateka y’igurisha, ariko ntibigaragara ku rutonde rw’ububiko cyangwa aho wandikira igurisha.',
-    'ai business os • supabase + groq backend • not a financial or lending decision engine.':'AI Business OS • Supabase na Groq • Ntabwo ari sisitemu ifata ibyemezo by’imari cyangwa inguzanyo.',
+    'ai business os • supabase + groq backend • not a financial or lending decision engine.':'AI Business OS (AIBOS) • Supabase na Groq • Ntabwo ari sisitemu ifata ibyemezo by’imari cyangwa inguzanyo.',
     '⌂ dashboard':'⌂ Incamake','＋ record sale':'＋ Andika igurisha','▦ records':'▦ Ibyanditswe',
     '◈ aibos command center':'◈ Igenzura ry’ubucuruzi','✦ ai advisor':'✦ Umujyanama wa AI',
     '🎙️ shericeri':'🎙️ Shericeri','⚙ settings':'⚙ Igenamiterere','+ record sale':'+ Andika igurisha',
@@ -5639,7 +5639,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'your shericeri id:':'Votre identifiant Shericeri :',
     '(say this number if you contact support)':'(Communiquez ce numéro au support)',
     'deleted products stay in your sales history but disappear from the inventory list and sale form.':'Les produits supprimés restent dans l’historique des ventes, mais disparaissent de la liste de stock et du formulaire de vente.',
-    'ai business os • supabase + groq backend • not a financial or lending decision engine.':'AI Business OS • Backend Supabase + Groq • Ne constitue pas un moteur de décision financière ou de crédit.',
+    'ai business os • supabase + groq backend • not a financial or lending decision engine.':'AI Business OS (AIBOS) • Backend Supabase + Groq • Ne constitue pas un moteur de décision financière ou de crédit.',
     '⌂ dashboard':'⌂ Tableau de bord','＋ record sale':'＋ Enregistrer une vente','▦ records':'▦ Registres',
     '◈ aibos command center':'◈ Centre de gestion AIBOS','✦ ai advisor':'✦ Conseiller IA',
     '🎙️ shericeri':'🎙️ Shericeri','⚙ settings':'⚙ Paramètres','+ record sale':'+ Enregistrer une vente',
@@ -6039,7 +6039,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'revoke this device session? it will lose access on its next server request.':'Révoquer cette session d’appareil ? Elle perdra son accès lors de sa prochaine requête au serveur.',
     'add sample products so you can test the app? this will not remove existing data.':'Ajouter des produits de démonstration pour tester l’application ? Les données existantes ne seront pas supprimées.',
     'data imported.':'Données importées.',
-    'that file does not look like a valid ai business os backup, or the database migration is not installed yet.':'Ce fichier ne semble pas être une sauvegarde valide d’AI Business OS, ou la migration de base de données n’est pas encore installée.',
+    'that file does not look like a valid ai business os backup, or the database migration is not installed yet.':'Ce fichier ne semble pas être une sauvegarde valide d’AI Business OS (AIBOS), ou la migration de base de données n’est pas encore installée.',
     'type a question first, then tap 🔍 to search the web for it.':'Saisissez d’abord une question, puis appuyez sur 🔍 pour lancer une recherche sur le Web.',
     'enter a supplier name.':'Saisissez le nom du fournisseur.',
     'choose a product and enter a whole-number quantity and valid unit cost.':'Choisissez un produit et saisissez une quantité entière ainsi qu’un coût unitaire valide.',
