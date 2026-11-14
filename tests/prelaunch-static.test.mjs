@@ -633,3 +633,13 @@ test("revoked Supabase sessions are rejected even while an old access JWT remain
   assert.ok(teamAccess.includes("hasActiveDeviceSession(admin, merchantId, callerData.user.id, bearer)"));
   assert.ok(teamAccess.includes("This device session is no longer authorized. Sign in again."));
 });
+
+
+test("device sign-out is local and revoked Supabase auth sessions cannot re-register", () => {
+  assert.ok(html.includes("sb.auth.signOut({scope:'local'})"));
+  assert.ok(teamMigration.includes("shericeri_is_auth_session_active"));
+  assert.ok(teamMigration.includes("if not exists(select 1 from auth.sessions a where a.id=v_session_id and a.user_id=v_user_id)"));
+  assert.ok(teamMigration.includes("'auth_session_active',exists(select 1 from auth.sessions"));
+  assert.ok(teamAccess.includes('admin.rpc("shericeri_is_auth_session_active"'));
+  assert.ok(html.includes("!d.auth_session_active?'Signed out / expired'"));
+});
