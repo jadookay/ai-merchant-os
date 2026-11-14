@@ -4913,7 +4913,8 @@ async function accEnsureBase(){
   if(!Array.isArray(state.accounts))state.accounts=[];
   if(!sheriCan('manage_team')||!sheriCan('manage_finance')){
     const missing=ACC_DEFAULT_ACCOUNTS.some(([code])=>!state.accounts.some(a=>a.code===code));
-    if(missing){
+    const canSeed=['create_sale','manage_expenses','manage_inventory','manage_finance'].some(sheriCan);
+    if(missing&&canSeed){
       if(!navigator.onLine)throw new Error('Operational accounting accounts are not cached. Reconnect once so the secure setup can finish.');
       const {data,error}=await sb.rpc('shericeri_ensure_operational_accounts',{p_merchant_id:state.merchant.id});
       if(error)throw error;
@@ -4932,7 +4933,7 @@ async function accEnsureOperationalLedger(){
   if(!state.merchant)return;
   await accEnsureBase();
   // Rebuild opening inventory from immutable creation-time values, not today's stock.
-  for(const p of (state.products||[])){
+  if(sheriCan('manage_inventory'))for(const p of (state.products||[])){
     const qty=Number(p.opening_stock_qty||0);
     const value=Number(p.opening_stock_value??(qty*Number(p.opening_stock_cost||0)));
     if(qty>0&&value>0){
@@ -4946,17 +4947,17 @@ async function accEnsureOperationalLedger(){
     }
   }
   // Rebuild only missing source entries. accPostEntry is idempotent by source_type/source_id.
-  for(const s of (state.sales||[])){
+  if(sheriCan('create_sale'))for(const s of (state.sales||[])){
     const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');
     const total=Number(s.qty||0)*Number(s.price||0), cost=Number(s.qty||0)*Number(s.cost||0), date=String(s.created_at||s.sold_at||s.date||sheriNow()).slice(0,10);
     if(total>0&&cash&&sales)await accPostEntry({date,description:'Sale '+(s.product_name_snapshot||''),sourceType:'sale',sourceId:s.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});
     if(cost>0&&inv&&cogs)await accPostEntry({date,description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:cost},{accountId:inv.id,credit:cost}]});
   }
-  for(const e of (state.expenses||[])){
+  if(sheriCan('manage_expenses'))for(const e of (state.expenses||[])){
     const ex=accAccountCode('6000'),cash=accAccountCode('1000'),amount=Number(e.amount||0),date=String(e.created_at||e.date||sheriNow()).slice(0,10);
     if(amount>0&&ex&&cash)await accPostEntry({date,description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});
   }
-  for(const p of (state.purchases||[]).filter(x=>x.status!=='ordered')){
+  if(sheriCan('manage_inventory'))for(const p of (state.purchases||[]).filter(x=>x.status!=='ordered')){
     const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||Number(p.qty||0)*Number(p.unit_cost||p.cost||0)),date=String(p.purchased_at||p.created_at||sheriNow()).slice(0,10);
     if(total>0&&inv&&ap)await accPostEntry({date,description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});
   }
