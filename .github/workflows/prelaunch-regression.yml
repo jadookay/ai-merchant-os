@@ -3,6 +3,7 @@ name: AIBOS pre-launch regression checks
 on:
   push:
     branches:
+      - main
       - fix/prelaunch-priority-one-2026-11-11
       - feat/aibos-team-controls-cart-expiry-sheri-context
   pull_request:
