@@ -2052,7 +2052,7 @@ async function voidSale(id){
   const confirmText='Void '+(invoice?'entire invoice '+invoice:'this sale')+'?\\n'+rows.map(x=>(x.qty||0)+' × '+(x.product_name_snapshot||product(x.product_id)?.name||'Product')+' — '+money((x.qty||0)*(x.price||0))).join('\\n')+'\\nTotal: '+money(total)+'\\nReason: '+reason.trim();
   if(!confirm(confirmText))return;
   const auditId=sheriUuid(),saleIds=rows.map(x=>x.id);
-  const auditRow={id:auditId,merchant_id:state.merchant.id,actor_user_id:session?.user?.id||null,action:'void',entity_type:'sale',entity_id:id,reason:reason.trim(),details:{actor_name:state.merchant?.user_id===session?.user?.id?'Owner':state.currentMembership?.full_name||session?.user?.email||'Staff',reason:reason.trim(),invoice_number:invoice||null,transaction_id:transactionId,amount:total,sale_ids:saleIds,line_count:rows.length},created_at:sheriNow()};
+  const auditRow={id:auditId,merchant_id:state.merchant.id,actor_user_id:session?.user?.id||null,action:'void',entity_type:'sale',entity_id:id,reason:reason.trim(),details:{actor_name:state.merchant?.user_id===session?.user?.id?'Owner':state.currentMembership?.full_name||session?.user?.email||'Staff',reason:reason.trim(),invoice_number:invoice||null,transaction_id:transactionId,amount:total,sale_ids:saleIds,line_count:rows.length,lines:rows.map(row=>({product_id:row.product_id,product_name:row.product_name_snapshot||product(row.product_id)?.name||'Product',qty:Number(row.qty||0)}))},created_at:sheriNow()};
   state.auditLog.unshift(auditRow);
   await sheriPut('auditLog',auditId,{merchant_id:state.merchant.id,record:{...auditRow}});
   for(const row of rows){
@@ -2261,9 +2261,10 @@ async function saveProduct(){
   const isEditing=!!editingProductId;if(isEditing&&!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can edit existing products.','error');let editReason=null;if(isEditing){editReason=prompt('Reason for editing this product (required):');if(!editReason||!editReason.trim())return sheriToast('A reason is required to edit a product.','error');}
   if(!confirm((isEditing?'Update':'Save')+' product?\\n'+name+'\\nCost: '+money(cost)+' · Selling price: '+money(sell)+'\\nStock: '+stock+' · Reorder level: '+reorder))return;
   const now=sheriNow();
-  let openingStockProduct=null;
+  let openingStockProduct=null,stockBefore=null;
   if(editingProductId){
     const p=product(editingProductId); if(!p)return;
+    stockBefore=Number(p.stock)||0;
     Object.assign(p,{name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,updated_at:now});
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
@@ -2273,8 +2274,14 @@ async function saveProduct(){
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
   }
-  let openingWarning='';if(openingStockProduct&&openingStockProduct.stock>0&&openingStockProduct.cost>0){try{await accEnsureBase();const inv=accAccountCode('1200'),equity=accAccountCode('3000'),value=openingStockProduct.stock*openingStockProduct.cost;await accPostEntry({date:now.slice(0,10),description:'Opening inventory '+name,sourceType:'product_opening_stock',sourceId:openingStockProduct.id,lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]});}catch(err){openingWarning=' Opening stock was saved but its accounting entry needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] opening inventory posting failed',err);}}
-  if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name});
+  let openingWarning='';if(openingStockProduct&&openingStockProduct.stock>0){
+    await accAudit('create','adjustment',openingStockProduct.id,{product_name:name,stock_before:0,stock_after:openingStockProduct.stock,stock_delta:openingStockProduct.stock,reason:'Opening stock'});
+    if(openingStockProduct.cost>0){try{await accEnsureBase();const inv=accAccountCode('1200'),equity=accAccountCode('3000'),value=openingStockProduct.stock*openingStockProduct.cost;await accPostEntry({date:now.slice(0,10),description:'Opening inventory '+name,sourceType:'product_opening_stock',sourceId:openingStockProduct.id,lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]});}catch(err){openingWarning=' Opening stock was saved but its accounting entry needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] opening inventory posting failed',err);}}
+  }
+  if(isEditing){
+    await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name});
+    if(stockBefore!==null&&stockBefore!==stock)await accAudit('edit','adjustment',editingProductId,{reason:editReason.trim(),product_name:name,stock_before:stockBefore,stock_after:stock,stock_delta:stock-stockBefore});
+  }
   if(navigator.onLine)await sheriSyncOutbox();
   document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast((isEditing?'Product updated.':'Product saved.')+openingWarning,openingWarning?'warning':'success');
 }
