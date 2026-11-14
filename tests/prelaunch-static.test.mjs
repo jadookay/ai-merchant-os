@@ -484,6 +484,21 @@ test("PIN throttling locks independent identity and IP buckets and rejects concu
   assert.match(teamAccess, /: "";/);
 });
 
+test("inventory movement report includes sales, received purchases, stock corrections and void reversals", () => {
+  assert.match(html, /Stock movement history/);
+  assert.match(html, /function renderInventoryMovements\(\)/);
+  assert.match(html, /type:'Sale out'[\s\S]*?quantity:-Math\.abs/);
+  assert.match(html, /type:'Purchase in'[\s\S]*?status==='ordered'/);
+  assert.match(html, /type:'Stock adjustment'/);
+  assert.match(html, /type:'Sale void reversal'/);
+  assert.match(html, /inventoryMovementFrom/);
+  assert.match(html, /inventoryMovementTo/);
+  assert.match(html, /accAudit\('create','adjustment'/);
+  assert.match(html, /accAudit\('edit','adjustment'/);
+  assert.match(teamMigration, /'lines',v_lines/);
+  assert.match(teamMigration, /'product_name',product_name_snapshot,'qty',qty/);
+});
+
 test("database hardening covers all ten unindexed foreign keys and hoists auth.uid from row policies", () => {
   const fkIndexes = [
     "bank_accounts_account_merchant_fk_idx","bills_supplier_fk_idx","invoices_customer_fk_idx",
