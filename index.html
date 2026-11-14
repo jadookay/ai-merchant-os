@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.19 Kinyarwanda Low-Latency Voice + Female Voice + Loud Playback + Punctuation-Safe TTS">
+<meta name="app-version" content="V14.4.24 Incognito-safe auth + Kinyarwanda/French localization + void history">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -6372,7 +6372,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
   }
   function applyLanguage(lang){
     current=supported.includes(lang)?lang:'en';
-    try{localStorage.setItem('aibos_language',current)}catch(_){}
+    try{window.localStorage.setItem('aibos_language',current)}catch(_){try{window.sessionStorage.setItem('aibos_language',current)}catch(__){}}
     document.documentElement.lang=current==='rw'?'rw':current;
     walk(document.body);
     const label=document.getElementById('aibosLanguageLabel');
@@ -6385,7 +6385,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
   function init(){
     const picker=document.getElementById('aibosLanguageSelect');
     if(!picker)return;
-    let saved='en';try{saved=localStorage.getItem('aibos_language')||'en'}catch(_){}
+    let saved='en';try{saved=window.localStorage.getItem('aibos_language')||'en'}catch(_){try{saved=window.sessionStorage.getItem('aibos_language')||'en'}catch(__){}}
     picker.addEventListener('change',()=>applyLanguage(picker.value));
     if(!window.__AIBOS_I18N_DIALOGS){
       const nativeAlert=window.alert.bind(window),nativeConfirm=window.confirm.bind(window),nativePrompt=window.prompt.bind(window);
