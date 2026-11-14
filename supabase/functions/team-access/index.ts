@@ -257,6 +257,15 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // Revoke every registered device before suspending the membership.
+      // The database authorization helper also checks revoked_at on every request.
+      if (status === "suspended") {
+        const { error: revokeError } = await admin.from("merchant_device_sessions")
+          .update({ revoked_at: new Date().toISOString(), revoked_by: callerData.user.id })
+          .eq("merchant_id", merchantId).eq("user_id", target.user_id).is("revoked_at", null);
+        if (revokeError) throw revokeError;
+      }
+
       const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status, updated_at: new Date().toISOString() };
       if (email !== undefined) memberPatch.email = email;
       if (phone !== undefined) memberPatch.phone = phone;
