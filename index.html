@@ -758,12 +758,29 @@ async function sheriClearMerchantLocalData(merchantId){
     state.accountingSettings=null;
   }
 }
+function sheriDeviceIdentity(){
+  let id='';
+  try{id=localStorage.getItem('aibos_device_id')||'';if(!id){id=sheriUuid();localStorage.setItem('aibos_device_id',id)}}catch(_){}
+  if(!id)throw new Error('Secure device storage is unavailable. Sign in again after enabling browser storage.');
+  const ua=navigator.userAgent||'';
+  const platform=/Android/i.test(ua)?'Android':/iPhone|iPad|iPod/i.test(ua)?'iOS':/Windows/i.test(ua)?'Windows':/Macintosh/i.test(ua)?'macOS':'Web';
+  const browser=/Edg\//i.test(ua)?'Edge':/Firefox\//i.test(ua)?'Firefox':/Chrome\//i.test(ua)?'Chrome':/Safari\//i.test(ua)?'Safari':'Browser';
+  return {id,name:(platform+' '+browser+' device').slice(0,100),platform};
+}
+async function sheriRegisterDeviceSession(merchantId){
+  const device=sheriDeviceIdentity();
+  const {data,error}=await sb.rpc('shericeri_register_device_session',{
+    p_merchant_id:merchantId,p_device_id:device.id,p_device_name:device.name,p_platform:device.platform
+  });
+  if(error)throw error;
+  return data?.ok===true;
+}
 async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id){
   if(!merchantId||!session?.user?.id)return true;
   if(state.merchant?.user_id===session.user.id)return true;
   const {data,error}=await sb.from('merchant_members').select('status').eq('merchant_id',merchantId).eq('user_id',session.user.id).maybeSingle();
   if(error)throw error;
-  if(data?.status==='active')return true;
+  if(data?.status==='active'&&await sheriRegisterDeviceSession(merchantId))return true;
   await sheriClearMerchantLocalData(merchantId);
   try{await sb.auth.signOut({scope:'local'})}catch(_){}
   return false;
@@ -1570,7 +1587,7 @@ async function ensureMerchant(){
   const memberResult=await sheriWithTimeout(memberQuery.limit(1).maybeSingle(),7000,'Team membership lookup timed out');
   if(memberResult.error)throw memberResult.error;
   if(!memberResult.data)return false;
-  if(memberResult.data.status!=='active'){
+  if(memberResult.data.status!=='active'||!(await sheriRegisterDeviceSession(memberResult.data.merchant_id))){
     await sheriClearMerchantLocalData(memberResult.data.merchant_id);
     try{await sb.auth.signOut({scope:'local'})}catch(_){}
     return false;
