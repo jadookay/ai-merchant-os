@@ -232,7 +232,8 @@ test("sales and expenses confirm before saving and post balanced journal entries
   assert.ok(saleStart >= 0 && saleEnd > saleStart, "expected the complete sale recording function");
   const sale = html.slice(saleStart, saleEnd);
   assert.ok(sale.includes("confirm('Confirm sale?"), "sale must be confirmed before it is recorded");
-  assert.ok(sale.includes("sheriToast('Sale confirmed."), "sale confirmation must be immediate");
+  assert.ok(sale.includes("sheriToast(sheriLocalized('Sale captured."), "sale acknowledgement must appear before durable persistence");
+  assert.ok(sale.indexOf("sheriToast(sheriLocalized('Sale captured.") < sale.indexOf("await sheriSaveSnapshot()"), "sale acknowledgement must not wait for full snapshot persistence");), "sale confirmation must be immediate");
   assert.ok(sale.includes("Promise.resolve().then(()=>sheriSyncOutbox())"), "background sync must not delay the sale confirmation");
 
   const saleAccountingStart = html.indexOf("const _v14_1_recordSale=recordSale");
@@ -332,7 +333,8 @@ test("favorite products are ordered before other products and expiry alerts reac
   assert.ok(html.includes("Number(!!b.favorite)-Number(!!a.favorite)"));
   assert.ok(html.includes("expiryAlerts=activeProducts()"));
   assert.ok(html.includes("expiry_date"));
-  assert.ok(html.includes("systemSnapshot:{merchant:state.merchant,products:state.products"));
+  assert.ok(html.includes("systemSnapshot:sheriAiSystemSnapshot(businessCalendar)"));
+  assert.ok(html.includes("expiryAttention"));
 });
 
 test("voice entry requires an explicit stop, review, use or discard action", () => {
@@ -343,14 +345,14 @@ test("voice entry requires an explicit stop, review, use or discard action", () 
 });
 
 test("Shericeri receives operational, accounting, team, calendar, image and formula context", () => {
-  assert.ok(html.includes("teamMembers:state.teamMembers||[]"));
-  assert.ok(html.includes("calendar:businessCalendar"));
+  assert.ok(html.includes("function sheriAiSystemSnapshot(calendar)"));
+  assert.ok(html.includes("teamMembers:a.team?(state.teamMembers||[]):[]"));
+  assert.ok(html.includes("calendar:(calendar||[]).filter"));
   assert.ok(html.includes("currentDateTime,currentTimeZone,businessCalendar"));
-  assert.ok(html.includes("productImages:state.products.filter(p=>p.image_url)"));
-  assert.ok(html.includes("settings:{merchant:state.merchant,accounting:state.accountingSettings}"));
-  assert.ok(html.includes("accountingSettings:state.accountingSettings"));
-  assert.ok(html.includes("products:state.products"));
-  assert.ok(html.includes("formulas:{revenue:"));
+  assert.ok(html.includes("productImages:a.inventory?(state.products||[]).filter"));
+  assert.ok(html.includes("accountingSettings:a.finance?state.accountingSettings:null"));
+  assert.ok(html.includes("products,sales,expenses:a.expenses?"));
+  assert.ok(html.includes("formulas:a.finance?"));
 });
 
 test("sales, expenses and reports support daily, weekly, monthly and custom calendar date ranges", () => {
