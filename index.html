@@ -297,7 +297,7 @@ window.ensurePdfJs=async function(){
 <main class="main">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 16px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px;position:sticky;top:8px;z-index:20">
     <div><b id="sheriConnectivityLabel">🟢 Online</b> <span id="sheriSyncLabel" style="opacity:.72">Checking server…</span></div>
-    <div style="display:flex;gap:6px"><button class="btn small secondary" onclick="sheriTogglePendingSync()">Pending activity</button><button class="btn small secondary" onclick="sheriSyncOutbox()">Sync now</button><button class="btn small secondary" onclick="sheriOfflineDiagnostics()">Offline status</button></div>
+    <div style="display:flex;gap:6px"><button id="sheriPendingSyncButton" class="btn small secondary" onclick="sheriTogglePendingSync()">Pending activity</button><button class="btn small secondary" onclick="sheriSyncOutbox()">Sync now</button><button class="btn small secondary" onclick="sheriOfflineDiagnostics()">Offline status</button></div>
   </div>
 <div id="sheriPendingSyncPanel" class="sheri-pending-panel" aria-live="polite"></div>
 <section id="dashboard" class="view active">
@@ -693,8 +693,22 @@ function sheriToast(message,kind='success'){
   el.textContent=String(message||'');el.style.background=kind==='error'?'#7f1d1d':kind==='warning'?'#78350f':'#172554';
   clearTimeout(window._sheriToastTimer);window._sheriToastTimer=setTimeout(()=>el.remove(),4200);
 }
+function sheriPendingActivityDetails(op){
+  const r=op.record||{},fmt=v=>money(Number(v||0));
+  if(op.type==='sale_cart_upsert'){const rows=op.records||op.sales||[],total=rows.reduce((s,x)=>s+Number(x.qty||0)*Number(x.price||0),0);return rows.length+' line(s) · Total '+fmt(total);}
+  if(op.type==='sale_upsert')return (r.product_name_snapshot||'Sale')+' · '+Number(r.qty||0)+' × '+fmt(r.price)+' = '+fmt(Number(r.qty||0)*Number(r.price||0));
+  if(op.type==='expense_upsert')return (r.description||'Expense')+' · '+fmt(r.amount);
+  if(op.type==='product_upsert')return (r.name||'Product')+' · Stock '+Number(r.stock||0)+' · Cost value '+fmt(Number(r.stock||0)*Number(r.cost||0));
+  if(op.type==='inventory_adjustment')return (product(op.product_id)?.name||'Product')+' · Quantity '+(Number(op.quantity_delta)>0?'+':'')+Number(op.quantity_delta||0)+' · '+(op.reason||'Adjustment');
+  if(op.type==='purchase_upsert')return (r.product_name_snapshot||'Purchase')+' · '+Number(r.qty||0)+' × '+fmt(r.unit_cost)+' = '+fmt(Number(r.qty||0)*Number(r.unit_cost||0));
+  if(op.type==='cash_upsert')return (r.description||'Cash movement')+' · '+fmt(r.amount);
+  if(op.type==='accounting_journal_batch')return (op.entry?.description||'Journal entry')+' · Debit '+fmt((op.lines||[]).reduce((s,x)=>s+Number(x.debit||0),0));
+  if(op.type==='accounting_upsert')return (r.name||r.description||op.table||'Accounting record')+(r.amount!=null?' · '+fmt(r.amount):'');
+  return r.name||r.description||r.reason||'Saved activity; details will appear after synchronization';
+}
 async function sheriTogglePendingSync(){
   const panel=document.getElementById('sheriPendingSyncPanel');if(!panel)return;
+  panel.style.maxHeight='360px';panel.style.overflowY='auto';panel.style.overscrollBehavior='contain';
   const opening=panel.style.display!=='block';panel.style.display=opening?'block':'none';if(!opening)return;
   panel.innerHTML='<b>Loading pending activities…</b>';
   try{
@@ -705,7 +719,7 @@ async function sheriTogglePendingSync(){
     for(const item of pending){
       const op=item.op||{},status=item.blocked?'Needs attention':item.next_retry_at&&new Date(item.next_retry_at)>new Date()?'Waiting for retry':'Waiting to sync';
       const reason=item.last_error||(item.blocked?'The server rejected this activity. Review permissions or the reported data error.':item.next_retry_at?'A previous sync attempt failed; automatic retry is scheduled.':'Saved on this device and waiting for the next sync attempt.');
-      out+='<div class="sheri-pending-item"><b>'+esc(labels[op.type]||String(op.type||'Business update').replace(/_/g,' '))+'</b> <span class="pill">'+status+'</span><div class="sub">'+esc(item.created_at?new Date(item.created_at).toLocaleString():'Time unavailable')+' · attempts: '+(Number(item.attempts)||0)+'</div><div>'+esc(reason)+'</div>'+(item.next_retry_at?'<div class="sub">Next retry: '+esc(new Date(item.next_retry_at).toLocaleString())+'</div>':'')+'</div>';
+      out+='<div class="sheri-pending-item"><b>'+esc(labels[op.type]||String(op.type||'Business update').replace(/_/g,' '))+'</b> <span class="pill">'+status+'</span><div>'+esc(sheriPendingActivityDetails(op))+'</div><div class="sub">'+esc(item.created_at?new Date(item.created_at).toLocaleString():'Time unavailable')+' · attempts: '+(Number(item.attempts)||0)+'</div><div>'+esc(reason)+'</div>'+(item.next_retry_at?'<div class="sub">Next retry: '+esc(new Date(item.next_retry_at).toLocaleString())+'</div>':'')+'</div>';
     }
     out+='<div class="actions" style="margin-top:10px"><button class="btn small secondary" onclick="sheriTogglePendingSync()">Close</button>'+(blocked?'<button class="btn small" onclick="sheriRetryBlockedWithConfirm()">Review and retry blocked items</button>':'')+'</div>';panel.innerHTML=out;
   }catch(e){panel.innerHTML='<b>Could not read pending activities.</b><div class="sub">'+esc(e?.message||String(e))+'</div>';}
@@ -723,6 +737,8 @@ function sheriSetConnectivity(mode,reason=''){
   const el=document.getElementById('sheriConnectivityLabel'); if(el)el.textContent=`${dot} ${label}`;
   const bar=document.getElementById('sheriOfflineBar'); if(bar)bar.style.background=mode==='offline'?'#fef2f2':mode==='degraded'?'#fffbeb':'#f8fafc';
   const sync=document.getElementById('sheriSyncLabel'); if(sync)sync.textContent=reason||`${sheriSyncQueued} pending local change(s)`;
+  const pendingButton=document.getElementById('sheriPendingSyncButton');
+  if(pendingButton)pendingButton.textContent=`Pending activity (${Number(sheriSyncQueued)||0})`;
 }
 let sheriMemoryOnly=false;
 const sheriMemoryStores=new Map();
@@ -786,11 +802,19 @@ async function sheriRegisterDeviceSession(merchantId){
     p_merchant_id:merchantId,p_device_id:device.id,p_device_name:device.name,p_platform:device.platform
   });
   if(error)throw error;
-  return data?.ok===true;
+  if(data?.ok!==true){
+    const reason=data?.device_mismatch?'This login is already registered to another device.':
+      data?.revoked?'This device session has been revoked.':'The server did not authorize this device session.';
+    throw new Error(reason);
+  }
+  return true;
 }
 async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id){
   if(!merchantId||!session?.user?.id)return true;
-  if(state.merchant?.user_id===session.user.id)return true;
+  if(state.merchant?.user_id===session.user.id){
+    try{await sheriRegisterDeviceSession(merchantId)}catch(e){console.warn('[Shericeri device] owner session registration failed',e)}
+    return true;
+  }
   const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,role,permissions,responsibility,status').eq('merchant_id',merchantId).eq('user_id',session.user.id).maybeSingle();
   if(error)throw error;
   if(data?.status==='active'&&await sheriRegisterDeviceSession(merchantId)){state.currentMembership=data;return true;}
@@ -859,7 +883,7 @@ async function sheriScheduleSyncRetry(){
     const pending=(await sheriGetAll('outbox')).filter(item=>!item.blocked);
     if(!pending.length)return;
     const dueAt=Math.min(...pending.map(item=>item.next_retry_at?new Date(item.next_retry_at).getTime():Date.now()));
-    const delay=Math.max(250,Math.min(2147483000,dueAt-Date.now()));
+    const delay=Math.max(0,Math.min(2147483000,dueAt-Date.now()));
     sheriSyncRetryTimer=setTimeout(()=>{sheriSyncRetryTimer=null;if(navigator.onLine)sherriSyncKick();},delay);
   }catch(e){console.warn('[Shericeri sync] retry scheduling failed',e);}
 }
@@ -932,6 +956,8 @@ async function sheriRegisterBackgroundSync(){
 async function sheriQueueCount(){
   const items=await sheriGetAll('outbox');
   sheriSyncQueued=items.filter(x=>!x.blocked).length;
+  const pendingButton=document.getElementById('sheriPendingSyncButton');
+  if(pendingButton)pendingButton.textContent=`Pending activity (${sheriSyncQueued})`;
   return sheriSyncQueued;
 }
 
@@ -1650,6 +1676,38 @@ async function ensureMerchant(){
   return true;
 }
 async function completeOnboarding(){const name=document.getElementById('onboardName').value.trim(),tin=document.getElementById('onboardTin').value.trim()||null,fy=document.getElementById('onboardFiscalYear').value||null,country=document.getElementById('onboardCountry').value,currency=document.getElementById('onboardCurrency').value,status=document.getElementById('onboardStatus');if(!name||!country||!currency){status.textContent='Business name, country and currency are required.';status.className='sub auth-status bad';return}status.textContent='Saving your business profile…';const record={user_id:session.user.id,name,category:state.merchant?.category||'Other',tin,fiscal_year:fy?Number(fy):null,country,currency};try{let result;if(navigator.onLine){result=state.merchant?.id&&!state.merchant._localOnly?await sb.from('merchants').update(record).eq('id',state.merchant.id).select().single():await sb.from('merchants').insert(record).select().single();if(result.error)throw result.error;state.merchant=result.data}else{state.merchant={id:state.merchant?.id||sheriUuid(),...record,_localOnly:true};await sheriQueue({type:'merchant_upsert',record:{...state.merchant}})}await sheriSaveSnapshot();document.getElementById('onboardingScreen').style.display='none';document.getElementById('appRoot').style.display='';await loadAll();render();if(navigator.onLine)checkAdvisor()}catch(e){status.textContent='Could not save your business profile: '+String(e.message||e);status.className='sub auth-status bad'}}
+let sheriRealtimeChannel=null;
+let sheriRealtimeMerchantId=null;
+let sheriRealtimeRefreshTimer=null;
+function sheriStopMerchantRealtime(){
+  if(sheriRealtimeRefreshTimer){clearTimeout(sheriRealtimeRefreshTimer);sheriRealtimeRefreshTimer=null;}
+  if(sheriRealtimeChannel&&sb){try{sb.removeChannel(sheriRealtimeChannel)}catch(e){console.warn('[Shericeri realtime] unsubscribe failed',e)}}
+  sheriRealtimeChannel=null;sheriRealtimeMerchantId=null;
+}
+function sheriSubscribeMerchantRealtime(merchantId){
+  if(!sb||!merchantId||!session?.access_token)return;
+  if(sheriRealtimeChannel&&sheriRealtimeMerchantId===merchantId)return;
+  sheriStopMerchantRealtime();
+  const tables=['products','sales','expenses','purchases','inventory_movements','journal_entries','journal_lines',
+    'chart_of_accounts','invoices','bills','payments','bank_accounts','tax_rates','recurring_transactions',
+    'accounting_settings','audit_log','customers','suppliers','budgets','shericeri_memory','cash_entries',
+    'merchant_members','merchant_device_sessions'];
+  let channel=sb.channel('aibos-live-'+merchantId);
+  for(const table of tables){
+    channel=channel.on('postgres_changes',{event:'*',schema:'public',table,filter:'merchant_id=eq.'+merchantId},()=>{
+      if(sheriRealtimeRefreshTimer)clearTimeout(sheriRealtimeRefreshTimer);
+      sheriRealtimeRefreshTimer=setTimeout(()=>{
+        sheriRealtimeRefreshTimer=null;
+        if(state.merchant?.id!==merchantId||!session?.access_token)return;
+        loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
+      },220);
+    });
+  }
+  sheriRealtimeMerchantId=merchantId;
+  sheriRealtimeChannel=channel.subscribe((status,error)=>{
+    if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.warn('[Shericeri realtime] subscription issue',error||status);
+  });
+}
 async function onAuthed(sess){
   if(!sess?.user)return;
   session=sess;
@@ -1669,6 +1727,7 @@ async function onAuthed(sess){
       document.getElementById('onboardingScreen').style.display='none';
       document.getElementById('appRoot').style.display='';
       render();
+      sheriSubscribeMerchantRealtime(state.merchant.id);
       const n=document.getElementById('shericeriNotice');
       if(n)n.textContent='Signed in. Using your saved business profile while the server reconnects.';
       return;
@@ -1682,6 +1741,7 @@ async function onAuthed(sess){
     document.getElementById('onboardingScreen').style.display='none';
     document.getElementById('appRoot').style.display='';
     render();
+    sheriSubscribeMerchantRealtime(state.merchant.id);
     sheriWithTimeout(loadAll(true),9000,'Business data refresh timed out').then(()=>render()).catch(e=>{
       console.warn('[Shericeri login] background data refresh failed',e);
       const n=document.getElementById('shericeriNotice');
@@ -1692,7 +1752,7 @@ async function onAuthed(sess){
     else{const n=document.getElementById('shericeriNotice');if(n)n.textContent='Offline mode — saved business data is still available.'}
   }else showOnboarding()
 }
-async function signOut(){await sb.auth.signOut({scope:'local'});session=null;location.reload()}
+async function signOut(){sheriStopMerchantRealtime();await sb.auth.signOut({scope:'local'});session=null;location.reload()}
 
 // ── Data loading ─────────────────────────────────────────────────────────
 async function loadAll(silent=false){
@@ -1723,40 +1783,63 @@ async function loadAll(silent=false){
     // Server is authoritative for records it knows, but never erase a local
     // record that has not reached the server yet. This prevents a transient
     // empty/partial response from turning real merchant numbers into zeros.
-    const mergeKeepLocal=(serverRows,localRows)=>{
-      const sr=serverRows||[], lr=localRows||[];
-      // An empty server response is not treated as proof that the merchant has
-      // no data. Keep the local snapshot until a real non-empty authoritative
-      // response arrives. This protects against transient RLS/network/schema
-      // responses turning a populated dashboard into zeroes.
-      if(sr.length===0&&lr.length>0)return lr.map(x=>({...x,_serverConfirmed:x._serverConfirmed??false}));
-      const sm=new Map(sr.map(x=>[x.id,{...x,_serverConfirmed:true}]));
-      for(const x of lr){
-        if(sm.has(x.id)&&x._serverConfirmed===false){
-          // Preserve a local mutation (such as a pending void) until its server operation succeeds.
-          sm.set(x.id,{...x,_serverConfirmed:false});
-        }else if(!sm.has(x.id)){
-          const keep=!x._serverConfirmed||sheriSyncQueued>0;
-          if(keep)sm.set(x.id,{...x,_serverConfirmed:false});
+    const pendingOutbox=await sheriGetAll('outbox');
+    const pendingIdsFor=(store)=>{
+      const ids=new Set();
+      const typeMap={
+        products:['product_upsert','product_delete','inventory_adjustment'],
+        sales:['sale_cart_upsert','sale_upsert','sale_void','sale_delete'],
+        expenses:['expense_upsert','expense_delete'],memory:['memory_insert'],
+        customers:['customer_upsert','customer_delete'],suppliers:['supplier_upsert','supplier_delete'],
+        purchases:['purchase_upsert','purchase_delete'],cashEntries:['cash_upsert','cash_delete'],
+        budgets:['budget_upsert','budget_delete'],accounts:['accounting_upsert'],
+        journalEntries:['accounting_journal_batch'],journalLines:['accounting_journal_batch'],
+        invoices:['accounting_upsert'],bills:['accounting_upsert'],payments:['accounting_upsert'],
+        bankAccounts:['accounting_upsert'],taxRates:['accounting_upsert'],
+        recurringTransactions:['accounting_upsert'],auditLog:['accounting_upsert']
+      };
+      for(const item of pendingOutbox){
+        const op=item.op||{};
+        if(!(typeMap[store]||[]).includes(op.type))continue;
+        if(op.type==='accounting_upsert'){
+          const tableMap={accounts:'chart_of_accounts',invoices:'invoices',bills:'bills',payments:'payments',
+            bankAccounts:'bank_accounts',taxRates:'tax_rates',recurringTransactions:'recurring_transactions',auditLog:'audit_log'};
+          if(op.table!==tableMap[store])continue;
         }
+        if(op.record?.id)ids.add(op.record.id);
+        if(op.id)ids.add(op.id);
+        if(op.product_id&&store==='products')ids.add(op.product_id);
+        if(op.sale_id&&store==='sales')ids.add(op.sale_id);
+        if(op.entry?.id&&store==='journalEntries')ids.add(op.entry.id);
+        if(Array.isArray(op.records))for(const x of op.records)if(x?.id)ids.add(x.id);
+        if(Array.isArray(op.lines)&&store==='journalLines')for(const x of op.lines)if(x?.id)ids.add(x.id);
+      }
+      return ids;
+    };
+    const mergeKeepLocal=(serverRows,localRows,store)=>{
+      const sm=new Map((serverRows||[]).map(x=>[x.id,{...x,_serverConfirmed:true}]));
+      for(const x of (localRows||[])){
+        // Only an operation still present in the durable outbox may override
+        // the server snapshot. A stale IndexedDB row is never treated as truth.
+        if(pendingIdsFor(store).has(x.id))sm.set(x.id,{...x,_serverConfirmed:false});
       }
       return [...sm.values()];
     };
-    state.products=mergeKeepLocal(products,state.products);state.sales=mergeKeepLocal(sales,state.sales);state.expenses=mergeKeepLocal(expenses,state.expenses);
+    state.products=mergeKeepLocal(products,state.products,'products');state.sales=mergeKeepLocal(sales,state.sales,'sales');state.expenses=mergeKeepLocal(expenses,state.expenses,'expenses');
     // Memory/customers failing to load should never block the rest of the
     // app — fall back to whatever's cached locally rather than throwing
     // the whole sync.
-    if(!mErr)state.memory=mergeKeepLocal(memory,state.memory);
+    if(!mErr)state.memory=mergeKeepLocal(memory,state.memory,'memory');
     else console.warn('[Sheri memory] server refresh failed, using local cache',mErr);
-    if(!cErr)state.customers=mergeKeepLocal(customers,state.customers);
+    if(!cErr)state.customers=mergeKeepLocal(customers,state.customers,'customers');
     else console.warn('[Sheri customers] server refresh failed, using local cache',cErr);
-    if(!supErr)state.suppliers=mergeKeepLocal(suppliers,state.suppliers);
+    if(!supErr)state.suppliers=mergeKeepLocal(suppliers,state.suppliers,'suppliers');
     else console.warn('[Sheri suppliers] server refresh failed, using local cache',supErr);
-    if(!purErr)state.purchases=mergeKeepLocal(purchases,state.purchases);
+    if(!purErr)state.purchases=mergeKeepLocal(purchases,state.purchases,'purchases');
     else console.warn('[Sheri purchases] server refresh failed, using local cache',purErr);
-    if(!cashErr)state.cashEntries=mergeKeepLocal(cashEntries,state.cashEntries);
+    if(!cashErr)state.cashEntries=mergeKeepLocal(cashEntries,state.cashEntries,'cashEntries');
     else console.warn('[Sheri cash] server refresh failed, using local cache',cashErr);
-    if(!budErr)state.budgets=mergeKeepLocal(budgets,state.budgets);
+    if(!budErr)state.budgets=mergeKeepLocal(budgets,state.budgets,'budgets');
     else console.warn('[Sheri budgets] server refresh failed, using local cache',budErr);
     await sheriSaveSnapshot();
     try{
@@ -1783,12 +1866,13 @@ async function loadAll(silent=false){
         ['auditLog',q[10].data,q[10].error]
       ];
       for(const [key,rows,error] of accountingMerges){
-        if(!error)state[key]=mergeKeepLocal(rows,state[key]);
+        if(!error)state[key]=mergeKeepLocal(rows,state[key],key);
       }
       if(!q[9].error){
         const localSetting=state.accountingSettings;
         const serverSetting=q[9].data;
-        state.accountingSettings=serverSetting||localSetting||null;
+        const pendingSettings=pendingOutbox.some(x=>x.op?.type==='accounting_settings_upsert');
+        state.accountingSettings=pendingSettings?(localSetting||serverSetting||null):(serverSetting||null);
       }
       await sheriSaveAccountingSnapshot();
     }catch(e){console.warn('[Sheri accounting] server refresh failed; local accounting retained',e)}
@@ -5115,6 +5199,22 @@ function sheriApplyDateRange(mode,fromId,toId){
 function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('reportPeriod')?.value||'all','reportStartDate','reportEndDate');}
 function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
+function accLedgerIntegrity(endDate=null){
+  const totals=new Map();
+  for(const line of state.journalLines||[]){
+    const key=line.journal_entry_id,v=totals.get(key)||{count:0,debit:0,credit:0};
+    v.count++;v.debit+=Number(line.debit||0);v.credit+=Number(line.credit||0);totals.set(key,v);
+  }
+  const invalid=[];
+  for(const entry of state.journalEntries||[]){
+    if(entry.voided)continue;
+    const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
+    if(endDate&&date>endDate)continue;
+    const v=totals.get(entry.id)||{count:0,debit:0,credit:0};
+    if(v.count<2||v.debit<=0||Math.abs(v.debit-v.credit)>0.005)invalid.push({entry,count:v.count,debit:v.debit,credit:v.credit,difference:v.debit-v.credit});
+  }
+  return {invalidCount:invalid.length,invalid};
+}
 function accReportTotals(startDate=null,endDate=null){const by={};for(const a of state.accounts)by[a.code]=0;const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));for(const line of state.journalLines||[]){const entry=entries.get(line.journal_entry_id);if(!entry||entry.voided)continue;const date=String(entry.entry_date||entry.created_at||'').slice(0,10);if(endDate&&date>endDate)continue;if(startDate&&date<startDate)continue;const account=state.accounts.find(a=>a.id===line.account_id);if(!account)continue;const raw=Number(line.debit||0)-Number(line.credit||0);by[account.code]+=['liability','equity','income'].includes(account.type)?-raw:raw;}return by}
 
 const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);if(state.expenses.some(x=>x.id===id))return;try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
@@ -5146,14 +5246,16 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
   // source-of-truth calculations as Dashboard until ledger data exists.
   const ledgerReady=Array.isArray(state.accounts)&&state.accounts.length>0&&Array.isArray(state.journalEntries);
   if(!ledgerReady){
-    const salesInRange=state.sales.filter(x=>sheriDateInReportRange(x.created_at)),expensesInRange=state.expenses.filter(x=>sheriDateInReportRange(x.created_at)),cashEntriesInRange=(state.cashEntries||[]).filter(x=>sheriDateInReportRange(x.occurred_at||x.created_at)),cashNetInRange=cashEntriesInRange.reduce((sum,x)=>sum+(x.kind==='income'?Number(x.amount||0):x.kind==='expense'?-Number(x.amount||0):0),0),paymentsInRange=(state.payments||[]).filter(x=>sheriDateInReportRange(x.payment_date||x.created_at)),inc=salesInRange.reduce((s,x)=>s+x.qty*x.price,0),cg=salesInRange.reduce((s,x)=>s+x.qty*(x.cost??0),0),ex=expensesInRange.reduce((s,x)=>s+s.amount,0),net=inc-cg-ex,inv=osInventoryValue();
+    const salesInRange=state.sales.filter(x=>!x.voided&&sheriDateInReportRange(x.created_at)),expensesInRange=state.expenses.filter(x=>sheriDateInReportRange(x.created_at)),cashEntriesInRange=(state.cashEntries||[]).filter(x=>sheriDateInReportRange(x.occurred_at||x.created_at)),cashNetInRange=cashEntriesInRange.reduce((sum,x)=>sum+(x.kind==='income'?Number(x.amount||0):x.kind==='expense'?-Number(x.amount||0):0),0),paymentsInRange=(state.payments||[]).filter(x=>sheriDateInReportRange(x.payment_date||x.created_at)),inc=salesInRange.reduce((s,x)=>s+x.qty*x.price,0),cg=salesInRange.reduce((s,x)=>s+x.qty*(x.cost??0),0),ex=expensesInRange.reduce((s,x)=>s+s.amount,0),net=inc-cg-ex,inv=osInventoryValue();
     document.getElementById('reportMetrics').innerHTML=[['Revenue',money(inc),''],['Net profit',money(net),net>=0?'good':'bad'],['Inventory',money(inv),''],['Transactions',String(salesInRange.length),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');
     document.getElementById('accPL').innerHTML=`<div class="row"><span>Revenue</span><b>${money(inc)}</b></div><div class="row"><span>COGS</span><b>${money(cg)}</b></div><div class="row"><span>Gross profit</span><b>${money(inc-cg)}</b></div><div class="row"><span>Operating expenses</span><b>${money(ex)}</b></div><div class="row"><span>Net profit</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Showing operational business totals. Full financial statements become ledger-based after the accounting migration is installed.</div>`;
     document.getElementById('accBS').innerHTML=`<div class="row"><span>Inventory at cost</span><b>${money(inv)}</b></div><div class="row"><span>Cash movement in selected period</span><b>${money(cashNetInRange)}</b></div><div class="sub" style="margin-top:10px">Balance-sheet accounts are not yet available. No missing value is being invented.</div>`;
     document.getElementById('accCF').innerHTML=`<div class="row"><span>Cash movements net</span><b>${money(cashNetInRange)}</b></div><div class="row"><span>Customer receipts recorded</span><b>${money(paymentsInRange.filter(x=>x.direction==='receipt').reduce((s,x)=>s+Number(x.amount||0),0))}</b></div><div class="row"><span>Supplier / expense payments recorded</span><b>${money(paymentsInRange.filter(x=>x.direction==='payment').reduce((s,x)=>s+Number(x.amount||0),0))}</b></div>`;
     document.getElementById('accTB').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accGL').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accAudit').innerHTML='<div class="empty">Audit trail will appear after accounting setup.</div>';return;
   }
-  const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd),income=(state.accounts||[]).filter(a=>a.type==='income').reduce((s,a)=>s+b[a.code],0),cogs=(state.accounts||[]).filter(a=>a.type==='cogs').reduce((s,a)=>s+b[a.code],0),exp=(state.accounts||[]).filter(a=>a.type==='expense').reduce((s,a)=>s+b[a.code],0),net=income-cogs-exp,assets=(state.accounts||[]).filter(a=>a.type==='asset').reduce((s,a)=>s+bs[a.code],0),liab=(state.accounts||[]).filter(a=>a.type==='liability').reduce((s,a)=>s+bs[a.code],0),cumulativeNet=(state.accounts||[]).filter(a=>a.type==='income').reduce((s,a)=>s+bs[a.code],0)-(state.accounts||[]).filter(a=>a.type==='cogs'||a.type==='expense').reduce((s,a)=>s+bs[a.code],0),equity=(state.accounts||[]).filter(a=>a.type==='equity').reduce((s,a)=>s+bs[a.code],0)+cumulativeNet;const cashFlow=accCashFlowForPeriod(reportStart,reportEnd);document.getElementById('reportMetrics').innerHTML=[['Revenue',money(income),''],['Net profit',money(net),net>=0?'good':'bad'],['Assets',money(assets),''],['Liabilities',money(liab),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');document.getElementById('accPL').innerHTML=`<div class="row"><span>Revenue</span><b>${money(income)}</b></div><div class="row"><span>COGS</span><b>${money(cogs)}</b></div><div class="row"><span>Gross profit</span><b>${money(income-cogs)}</b></div><div class="row"><span>Operating expenses</span><b>${money(exp)}</b></div><div class="row"><span>Output tax payable</span><b>${money(Math.max(0,b['2100']||0))}</b></div><div class="row"><span>Input tax receivable</span><b>${money(Math.max(0,b['2110']||0))}</b></div><div class="row"><span>Net profit</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Overdue receivables: ${money((state.invoices||[]).filter(x=>x.due_date<accToday()&&accInvoiceStatus(x)!=='paid').reduce((s,x)=>s+x.total-accInvoicePaid(x),0))} • Overdue payables: ${money((state.bills||[]).filter(x=>x.due_date<accToday()&&accBillStatus(x)!=='paid').reduce((s,x)=>s+x.total-accBillPaid(x),0))}</div>`;document.getElementById('accBS').innerHTML=`<div class="row"><span>Total assets</span><b>${money(assets)}</b></div><div class="row"><span>Total liabilities</span><b>${money(liab)}</b></div><div class="row"><span>Equity incl. current profit</span><b>${money(equity)}</b></div><div class="sub" style="margin-top:8px">${Math.abs(assets-(liab+equity))<0.01?'✓ Balance sheet balances.':'⚠ Balance sheet is not yet balanced — check opening balances and historical entries.'}</div>`;document.getElementById('accCF').innerHTML=`<div class="row"><span>Cash inflows in period</span><b>${money(cashFlow.inflows)}</b></div><div class="row"><span>Cash outflows in period</span><b>${money(cashFlow.outflows)}</b></div><div class="row"><span>Net cash flow in period</span><b>${money(cashFlow.net)}</b></div>`;const tb=(state.accounts||[]).filter(a=>Math.abs(bs[a.code])>0.005).map(a=>`<tr><td>${esc(a.code)}</td><td>${esc(a.name)}</td><td>${money(a.normal_balance==='debit'?Math.max(0,bs[a.code]):0)}</td><td>${money(a.normal_balance==='credit'?Math.max(0,bs[a.code]):0)}</td></tr>`).join('');document.getElementById('accTB').innerHTML=`<table class="table"><tr><th>Code</th><th>Account</th><th>Debit</th><th>Credit</th></tr>${tb}</table>`;const gl=(state.journalEntries||[]).filter(e=>sheriDateInReportRange(e.entry_date||e.created_at)).slice().sort((a,b)=>String(b.created_at||b.entry_date).localeCompare(String(a.created_at||a.entry_date))).slice(0,30);document.getElementById('accGL').innerHTML=gl.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr>${gl.map(e=>{const ls=accLinesForEntry(e.id);return ls.map(l=>`<tr><td>${esc(e.entry_date)}</td><td>${esc(e.description)} — ${esc(accAccount(l.account_id)?.name||'')}</td><td>${l.debit?money(l.debit):''}</td><td>${l.credit?money(l.credit):''}</td></tr>`).join('')}).join('')}</table>`:'<div class="empty">No journal entries yet.</div>';document.getElementById('accAudit').innerHTML=state.auditLog.length?`<table class="table"><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Reason</th><th>Details</th></tr>${state.auditLog.filter(x=>sheriDateInReportRange(x.created_at)).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,20).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audit events yet.</div>';}
+  const integrity=accLedgerIntegrity(reportEnd);
+  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' journal entr'+(integrity.invalidCount===1?'y is':'ies are')+' missing lines or out of balance. Review the General Ledger before relying on these totals.</div>':'';
+  const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd),income=(state.accounts||[]).filter(a=>a.type==='income').reduce((s,a)=>s+b[a.code],0),cogs=(state.accounts||[]).filter(a=>a.type==='cogs').reduce((s,a)=>s+b[a.code],0),exp=(state.accounts||[]).filter(a=>a.type==='expense').reduce((s,a)=>s+b[a.code],0),net=income-cogs-exp,assets=(state.accounts||[]).filter(a=>a.type==='asset').reduce((s,a)=>s+bs[a.code],0),liab=(state.accounts||[]).filter(a=>a.type==='liability').reduce((s,a)=>s+bs[a.code],0),cumulativeNet=(state.accounts||[]).filter(a=>a.type==='income').reduce((s,a)=>s+bs[a.code],0)-(state.accounts||[]).filter(a=>a.type==='cogs'||a.type==='expense').reduce((s,a)=>s+bs[a.code],0),equity=(state.accounts||[]).filter(a=>a.type==='equity').reduce((s,a)=>s+bs[a.code],0)+cumulativeNet;const cashFlow=accCashFlowForPeriod(reportStart,reportEnd);document.getElementById('reportMetrics').innerHTML=[['Revenue',money(income),''],['Net profit',money(net),net>=0?'good':'bad'],['Assets',money(assets),''],['Liabilities',money(liab),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');document.getElementById('accPL').innerHTML=integrityNotice+`<div class="row"><span>Revenue</span><b>${money(income)}</b></div><div class="row"><span>COGS</span><b>${money(cogs)}</b></div><div class="row"><span>Gross profit</span><b>${money(income-cogs)}</b></div><div class="row"><span>Operating expenses</span><b>${money(exp)}</b></div><div class="row"><span>Output tax payable</span><b>${money(Math.max(0,b['2100']||0))}</b></div><div class="row"><span>Input tax receivable</span><b>${money(Math.max(0,b['2110']||0))}</b></div><div class="row"><span>Net profit</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Overdue receivables: ${money((state.invoices||[]).filter(x=>x.due_date<accToday()&&accInvoiceStatus(x)!=='paid').reduce((s,x)=>s+x.total-accInvoicePaid(x),0))} • Overdue payables: ${money((state.bills||[]).filter(x=>x.due_date<accToday()&&accBillStatus(x)!=='paid').reduce((s,x)=>s+x.total-accBillPaid(x),0))}</div>`;document.getElementById('accBS').innerHTML=integrityNotice+`<div class="row"><span>Total assets</span><b>${money(assets)}</b></div><div class="row"><span>Total liabilities</span><b>${money(liab)}</b></div><div class="row"><span>Equity incl. current profit</span><b>${money(equity)}</b></div><div class="sub" style="margin-top:8px">${integrity.invalidCount?'⚠ Balance sheet is NOT verified because journal entries are incomplete.':Math.abs(assets-(liab+equity))<0.01?'✓ Balance sheet balances.':'⚠ Balance sheet is not yet balanced — check opening balances and historical entries.'}</div>`;document.getElementById('accCF').innerHTML=integrityNotice+`<div class="row"><span>Cash inflows in period</span><b>${money(cashFlow.inflows)}</b></div><div class="row"><span>Cash outflows in period</span><b>${money(cashFlow.outflows)}</b></div><div class="row"><span>Net cash flow in period</span><b>${money(cashFlow.net)}</b></div>`;const tb=(state.accounts||[]).filter(a=>Math.abs(bs[a.code])>0.005).map(a=>`<tr><td>${esc(a.code)}</td><td>${esc(a.name)}</td><td>${money(a.normal_balance==='debit'?Math.max(0,bs[a.code]):0)}</td><td>${money(a.normal_balance==='credit'?Math.max(0,bs[a.code]):0)}</td></tr>`).join('');document.getElementById('accTB').innerHTML=`<table class="table"><tr><th>Code</th><th>Account</th><th>Debit</th><th>Credit</th></tr>${tb}</table>`;const gl=(state.journalEntries||[]).filter(e=>sheriDateInReportRange(e.entry_date||e.created_at)).slice().sort((a,b)=>String(b.created_at||b.entry_date).localeCompare(String(a.created_at||a.entry_date))).slice(0,30);document.getElementById('accGL').innerHTML=gl.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr>${gl.map(e=>{const ls=accLinesForEntry(e.id);return ls.map(l=>`<tr><td>${esc(e.entry_date)}</td><td>${esc(e.description)} — ${esc(accAccount(l.account_id)?.name||'')}</td><td>${l.debit?money(l.debit):''}</td><td>${l.credit?money(l.credit):''}</td></tr>`).join('')}).join('')}</table>`:'<div class="empty">No journal entries yet.</div>';document.getElementById('accAudit').innerHTML=state.auditLog.length?`<table class="table"><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Reason</th><th>Details</th></tr>${state.auditLog.filter(x=>sheriDateInReportRange(x.created_at)).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,20).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audit events yet.</div>';}
 // Ensure operational records create accounting entries exactly once when rebuilt or newly entered.
 const _v14_1_recordSale=recordSale;recordSale=async function(){const before=state.sales.length;await _v14_1_recordSale();const created=state.sales.slice(before);if(created.length){try{await accEnsureBase();for(const s of created){const cash=accAccountCode('1000'),sales=accAccountCode('4000'),inv=accAccountCode('1200'),cogs=accAccountCode('5000'),total=s.qty*s.price,c=s.qty*(s.cost||0);await accPostEntry({date:String(s.created_at).slice(0,10),description:'Sale '+(s.product_name_snapshot||''),sourceType:'sale',sourceId:s.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});if(c>0)await accPostEntry({date:String(s.created_at).slice(0,10),description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:c},{accountId:inv.id,credit:c}]});await accAudit('create','sale',s.id,{total,cogs:c,invoice_number:s.invoice_number||null,transaction_id:s.transaction_id||null})}}catch(e){console.warn('[Sheri accounting] sale ledger failed',e);sheriToast('Sale recorded, but accounting posting needs attention: '+(e.message||e),'warning')}}render()};
 const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const before=state.purchases.length;await _v14_1_addOSPurchase();const p=state.purchases[before];if(p&&p.status!=='ordered'){try{await accEnsureBase();const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||p.qty*p.unit_cost);await accPostEntry({date:String(p.purchased_at||p.created_at).slice(0,10),description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});await accAudit('create','purchase',p.id,{total})}catch(e){console.warn('[Sheri accounting] purchase ledger failed',e)}}render()};
