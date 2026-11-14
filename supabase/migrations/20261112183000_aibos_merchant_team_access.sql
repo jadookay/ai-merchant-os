@@ -151,7 +151,7 @@ where coalesce(p.stock,0)>0
   );
 
 create or replace function public.shericeri_adjust_product_stock(
-  p_merchant_id uuid,p_product_id uuid,p_quantity_delta integer,p_reason text,
+  p_merchant_id uuid,p_product_id uuid,p_expected_stock integer,p_quantity_delta integer,p_reason text,
   p_movement_type text default 'adjustment',p_source_id uuid default gen_random_uuid()
 )
 returns jsonb
@@ -165,7 +165,7 @@ begin
      or not private.user_can_access_merchant(p_merchant_id,'manage_inventory') then
     raise exception 'Not authorized to adjust inventory';
   end if;
-  if p_product_id is null or p_quantity_delta=0 or coalesce(length(trim(p_reason)),0)<3 then
+  if p_product_id is null or p_expected_stock is null or p_quantity_delta=0 or coalesce(length(trim(p_reason)),0)<3 then
     raise exception 'A product, non-zero quantity and clear reason are required';
   end if;
   if p_movement_type not in ('adjustment','customer_return','supplier_return','writeoff') then
@@ -176,6 +176,9 @@ begin
   select * into v_product from public.products
     where id=p_product_id and merchant_id=p_merchant_id for update;
   if not found then raise exception 'Product not found'; end if;
+  if coalesce(v_product.stock,0)<>p_expected_stock then
+    return jsonb_build_object('ok',false,'stock_conflict',true,'server_stock',v_product.stock,'expected_stock',p_expected_stock);
+  end if;
   v_next:=coalesce(v_product.stock,0)+p_quantity_delta;
   if v_next<0 then raise exception 'Stock cannot become negative'; end if;
   perform set_config('aibos.stock_movement_type',p_movement_type,true);
@@ -186,7 +189,7 @@ begin
   return jsonb_build_object('ok',true,'stock',v_next,'movement_type',p_movement_type);
 end;
 $;
-revoke all on function public.shericeri_adjust_product_stock(uuid,uuid,integer,text,text,uuid) from public,anon;
+revoke all on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) from public,anon;
 grant execute on function public.shericeri_adjust_product_stock(uuid,uuid,integer,text,text,uuid) to authenticated;
 
 create or replace function public.shericeri_get_inventory_movement_report(
@@ -214,13 +217,13 @@ begin
         'product_id',p.id,'product_name',p.name,
         'opening_quantity',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
           where im.merchant_id=p_merchant_id and im.product_id=p.id
-            and (p_start_date is null or im.created_at<p_start_date::timestamptz)),0),
+            and p_start_date is not null and im.created_at<p_start_date::timestamptz),0),
         'stock_in',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
-          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.quantity_delta>0
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.quantity_delta>0 and im.movement_type<>'opening_balance'
             and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
             and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
         'stock_out',coalesce((select sum(-im.quantity_delta) from public.inventory_movements im
-          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.quantity_delta<0
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.quantity_delta<0 and im.movement_type<>'opening_balance'
             and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
             and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
         'closing_quantity',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
