@@ -12,6 +12,13 @@ const previewHtml = await readFile(new URL("../preview/index.html", import.meta.
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
 
+test("global language selector stays fixed at the top-right and synchronizes app and voice language", () => {
+  assert.match(html, /#aibosLanguageSwitcher\{position:fixed;right:12px;top:10px/);
+  assert.ok(html.includes("sheriSyncLangSelectors(source)"));
+  assert.ok(html.includes("window.AIBOS_I18N?.setLanguage?.(appLang)"));
+  assert.ok(html.includes("const voiceValue=current==='rw'?'rw-RW':current==='fr'?'fr-FR':'en-US'"));
+});
+
 test("production inline JavaScript parses without syntax errors", () => {
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
     .filter(match => !/type\s*=\s*["']module["']/i.test(match[1]) && match[2].trim());
@@ -86,6 +93,8 @@ test("AI Advisor, extraction and Shericeri use the deployed quick-service functi
   }
   assert.match(html, /functions\/v1\/quick-service/);
   assert.match(quickService, /mode === "shericeri"/);
+  assert.match(quickService, /LANGUAGE REQUIREMENT: Reply entirely in natural everyday Kinyarwanda/);
+  assert.match(quickService, /LANGUAGE REQUIREMENT: Reply entirely in clear, natural French/);
   assert.doesNotMatch(html, /sb\.functions\.invoke\('advisor',\{body:\{mode:'(?:extract|barcode|extract_batch|organize_import)/);
 });
 
@@ -329,6 +338,8 @@ test("cashier accounting setup and journal posting are permission-scoped", () =>
 
 test("multi-product sales support add, remove, confirmation, transaction IDs and printable receipts", () => {
   assert.ok(html.includes("function addSaleToCart()"));
+  assert.ok(html.includes("function focusSaleProduct()"));
+  assert.ok(html.includes("＋ Add more products"));
   assert.ok(html.includes("function removeSaleCartItem(i)"));
   assert.ok(html.includes("function clearSaleCart()"));
   assert.ok(html.includes("function printLastReceipt()"));
@@ -353,6 +364,7 @@ test("voice entry requires an explicit stop, review, use or discard action", () 
 
 test("Shericeri receives operational, accounting, team, calendar, image and formula context", () => {
   assert.ok(html.includes("function sheriAiSystemSnapshot(calendar)"));
+  assert.ok(html.includes("accountId:state.merchant.shericeri_id||state.merchant.id"));
   assert.ok(html.includes("teamMembers:a.team?(state.teamMembers||[]):[]"));
   assert.ok(html.includes("calendar:(calendar||[]).filter"));
   assert.ok(html.includes("currentDateTime,currentTimeZone,businessCalendar"));
