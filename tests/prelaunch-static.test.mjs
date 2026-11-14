@@ -568,6 +568,27 @@ test("operational journal posting follows each source permission and validates i
   assert.match(releaseMigration, /case when private\.user_can_access_merchant\(p_merchant_id,'view_audit_log'\)/);
 });
 
+test("opening inventory valuation remains immutable after stock changes and can be rebuilt", () => {
+  assert.match(releaseMigration, /add column if not exists opening_stock_qty integer/);
+  assert.match(releaseMigration, /add column if not exists opening_stock_cost integer/);
+  assert.match(releaseMigration, /p\.opening_stock_value/);
+  assert.match(html, /opening_stock_qty:stock\|\|0/);
+  assert.match(html, /Rebuild opening inventory from immutable creation-time values/);
+  assert.match(html, /sourceType:'product_opening_stock',sourceId:p\.id/);
+});
+
+test("offline sale-void operations wait for their cart dependency to synchronize", () => {
+  assert.match(html, /op\.type==='sale_void'&&op\.transaction_id/);
+  assert.match(html, /saleDependency=queued\.find\(x=>x\.op\?\.type==='sale_cart_upsert'&&x\.op\.transaction_id===op\.transaction_id\)/);
+  assert.match(html, /if\(saleDependency\)continue/);
+});
+
+test("read-only staff do not seed accounts or auto-post journals without an assigned write permission", () => {
+  assert.match(html, /const canSeed=\['create_sale','manage_expenses','manage_inventory','manage_finance'\]\.some\(sheriCan\)/);
+  assert.match(html, /if\(sheriCan\('create_sale'\)\)for\(const s of \(state\.sales\|\|\[\]\)\)/);
+  assert.match(html, /if\(sheriCan\('manage_expenses'\)\)for\(const e of \(state\.expenses\|\|\[\]\)\)/);
+});
+
 test("recurring journal source IDs are deterministic UUIDs accepted by Postgres", () => {
   assert.match(html, /async function sheriStableUuid\(value\)/);
   assert.match(html, /const sourceId=await sheriStableUuid\(r\.id\+'\|'\+r\.next_run\)/);
