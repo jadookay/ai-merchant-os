@@ -6940,6 +6940,18 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
   const supported=['en','rw','fr'];
   let current='en';
   Object.assign(dictionaries.rw,{
+    'stock movement report':'Raporo y’ihinduka ry’ububiko','period':'Igihe','today (daily)':'Uyu munsi','this month':'Uku kwezi','custom date range':'Igihe wahisemo','from date':'Itariki yo gutangiriraho','to date':'Itariki yo kurangiriraho','all products':'Ibicuruzwa byose','movement direction':'Icyerekezo cy’ihinduka','all movements':'Ihinduka ryose','stock in only':'Ibyinjiye mu bubiko gusa','stock out only':'Ibyasohotse mu bubiko gusa','load movement report':'Erekana raporo y’ububiko','opening':'Ububiko bw’ibanze','stock in':'Ibyinjiye','stock out':'Ibyasohotse','closing':'Ububiko busigaye','movement details':'Ibisobanuro by’ihinduka','no movements match the selected direction in this period.':'Nta gihinduka gihuye n’icyerekezo wahisemo muri iki gihe.','the end date cannot be earlier than the start date.':'Itariki isoza ntishobora kubanziriza itariki itangiriraho.',
+    'attach image':'Ongeraho ifoto','attach file':'Ongeraho dosiye','send':'Ohereza','remove file':'Kuraho dosiye','please analyze the attached file.':'Sobanura dosiye nometseho.','could not read that file.':'Ntibyashobotse gusoma iyo dosiye.','no readable text was found in this file.':'Nta nyandiko isomeka yabonetse muri iyi dosiye.','supported files: pdf, word docx, excel xls/xlsx, csv, txt, markdown and json.':'Dosiye zemerewe: PDF, Word DOCX, Excel XLS/XLSX, CSV, TXT, Markdown na JSON.',
+    'inventory':'Ububiko','sales':'Ibyagurishijwe','expenses':'Amafaranga yakoreshejwe','customers':'Abakiriya','suppliers':'Abagemura','reports':'Raporo','income statement':'Raporo y’inyungu n’igihombo','balance sheet':'Imbonerahamwe y’umutungo n’imyenda','cash flow':'Imigendekere y’amafaranga'
+  });
+  Object.assign(dictionaries.fr,{
+    'stock movement report':'Rapport des mouvements de stock','period':'Période','today (daily)':'Aujourd’hui (journalier)','this month':'Ce mois-ci','custom date range':'Période personnalisée','from date':'Date de début','to date':'Date de fin','all products':'Tous les produits','movement direction':'Sens du mouvement','all movements':'Tous les mouvements','stock in only':'Entrées de stock uniquement','stock out only':'Sorties de stock uniquement','load movement report':'Afficher le rapport de stock','opening':'Stock initial','stock in':'Entrées','stock out':'Sorties','closing':'Stock final','movement details':'Détails des mouvements','no movements match the selected direction in this period.':'Aucun mouvement ne correspond au sens sélectionné pour cette période.','the end date cannot be earlier than the start date.':'La date de fin ne peut pas être antérieure à la date de début.',
+    'attach image':'Joindre une image','attach file':'Joindre un fichier','send':'Envoyer','remove file':'Supprimer le fichier','please analyze the attached file.':'Veuillez analyser le fichier joint.','could not read that file.':'Impossible de lire ce fichier.','no readable text was found in this file.':'Aucun texte lisible n’a été trouvé dans ce fichier.','supported files: pdf, word docx, excel xls/xlsx, csv, txt, markdown and json.':'Fichiers acceptés : PDF, Word DOCX, Excel XLS/XLSX, CSV, TXT, Markdown et JSON.',
+    'inventory':'Stock','sales':'Ventes','expenses':'Dépenses','customers':'Clients','suppliers':'Fournisseurs','reports':'Rapports','income statement':'Compte de résultat','balance sheet':'Bilan','cash flow':'Flux de trésorerie'
+  });
+  const supported=['en','rw','fr'];
+  let current='en';
+  Object.assign(dictionaries.rw,{
     'pending activities on this device':'Ibikorwa bitegereje koherezwa kuri iki gikoresho',
     'waiting to sync':'Birategereje koherezwa','waiting for retry':'Birategereje kongera kugeragezwa',
     'needs attention':'Bisaba ko ubyitaho','inventory adjustment':'Guhindura ububiko',
@@ -7010,9 +7022,11 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
   }
   function translateNode(node){
     if(!node||node.nodeType!==Node.TEXT_NODE)return;
-    if(!originals.has(node))originals.set(node,node.nodeValue);
-    const source=originals.get(node);
-    const translated=translateString(source,current);
+    let record=originals.get(node);
+    if(!record){record={source:node.nodeValue,lastTranslated:null};originals.set(node,record);}
+    else if(node.nodeValue!==record.lastTranslated){record.source=node.nodeValue;}
+    const translated=translateString(record.source,current);
+    record.lastTranslated=translated;
     if(node.nodeValue!==translated)node.nodeValue=translated;
   }
   const attrs=['placeholder','title','aria-label'];
@@ -7020,15 +7034,21 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     if(!el||el.nodeType!==Node.ELEMENT_NODE)return;
     attrs.forEach(attr=>{
       if(!el.hasAttribute(attr))return;
-      const key='data-aibos-original-'+attr;
-      if(!el.hasAttribute(key))el.setAttribute(key,el.getAttribute(attr));
-      const source=el.getAttribute(key);
-      const translated=translateString(source,current);
-      if(el.getAttribute(attr)!==translated)el.setAttribute(attr,translated);
+      const key='data-aibos-original-'+attr,lastKey='data-aibos-last-'+attr;
+      const currentValue=el.getAttribute(attr);
+      if(!el.hasAttribute(key))el.setAttribute(key,currentValue);
+      else if(currentValue!==el.getAttribute(lastKey))el.setAttribute(key,currentValue);
+      const translated=translateString(el.getAttribute(key),current);
+      el.setAttribute(lastKey,translated);
+      if(currentValue!==translated)el.setAttribute(attr,translated);
     });
     if(el.tagName==='INPUT'&&el.type==='submit'){
-      if(!el.hasAttribute('data-aibos-original-value'))el.setAttribute('data-aibos-original-value',el.value);
-      el.value=translateString(el.getAttribute('data-aibos-original-value'),current);
+      const currentValue=el.value;
+      if(!el.hasAttribute('data-aibos-original-value'))el.setAttribute('data-aibos-original-value',currentValue);
+      else if(currentValue!==el.getAttribute('data-aibos-last-value'))el.setAttribute('data-aibos-original-value',currentValue);
+      const translated=translateString(el.getAttribute('data-aibos-original-value'),current);
+      el.setAttribute('data-aibos-last-value',translated);
+      if(currentValue!==translated)el.value=translated;
     }
   }
   function walk(root){
