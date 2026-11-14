@@ -2619,7 +2619,7 @@ async function deleteExpense(id){
 function renderExpenses(){
   const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount or date',activeExpenses().flatMap(e=>[e.description,e.cat]));
   const rows=activeExpenses().filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('expenseTable').innerHTML=rows.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${rows.map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td>${sheriCan('manage_team')&&sheriCan('manage_expenses')?`<button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button>`:''}</td></tr>`).join('')}</table>`:'<div class="empty">No expenses in the selected date range.</div>';
+  document.getElementById('expenseTable').innerHTML=rows.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${rows.map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td>${sheriCan('manage_team')&&sheriCan('manage_expenses')?`<button class="btn small danger" onclick="deleteExpense('${e.id}')">Void</button>`:''}</td></tr>`).join('')}</table>`:'<div class="empty">No expenses in the selected date range.</div>';
 }
 
 // ── Customers ────────────────────────────────────────────────────────────
@@ -5116,7 +5116,8 @@ function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('sal
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accReportTotals(startDate=null,endDate=null){const by={};for(const a of state.accounts)by[a.code]=0;const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));for(const line of state.journalLines||[]){const entry=entries.get(line.journal_entry_id);if(!entry||entry.voided)continue;const date=String(entry.entry_date||entry.created_at||'').slice(0,10);if(endDate&&date>endDate)continue;if(startDate&&date<startDate)continue;const account=state.accounts.find(a=>a.id===line.account_id);if(!account)continue;const raw=Number(line.debit||0)-Number(line.credit||0);by[account.code]+=['liability','equity','income'].includes(account.type)?-raw:raw;}return by}
 
-const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);if(state.expenses.some(x=>x.id===id))return;try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
+// Expense voiding is now performed by shericeri_void_expense; no client-side reversal wrapper.
+const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){return _v14_1_deleteExpense(id)}
 // Sale void accounting is handled atomically by sh ericeri_void_sale; no second reversal wrapper.
 
 const _v14_1_addOSCashEntry=addOSCashEntry;addOSCashEntry=async function(){const before=state.cashEntries.length;await _v14_1_addOSCashEntry();if(state.cashEntries.length>before){const x=state.cashEntries[state.cashEntries.length-1];try{await accEnsureBase();const cash=accAccountCode('1000'),amount=Number(x.amount||0);if(amount>0&&x.kind==='income')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash income',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:cash.id,debit:amount},{accountId:accAccountCode('4100').id,credit:amount}]});else if(amount>0&&x.kind==='expense')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash expense',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:accAccountCode('6000').id,debit:amount},{accountId:cash.id,credit:amount}]});if(x.kind!=='transfer')await accAudit('create','cash_entry',x.id,{amount,kind:x.kind})}catch(err){console.warn('[Sheri accounting] cash entry failed',err);alert('Cash movement saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
@@ -5218,7 +5219,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){if(accPeriodLocke
       'view audit trail':'Kureba amateka y’ibikorwa','manage team access':'Gucunga uburenganzira bw’abakozi',
       'enable':'Fungura konti','disable':'Hagarika konti','enabled':'Konti irakora','disabled':'Konti yahagaritswe',
       'active':'Arakora','suspended':'Yahagaritswe','save':'Bika','cancel':'Reka',
-      'delete':'Siba','edit':'Hindura','update':'Vugurura','add':'Ongeraho','remove':'Kuraho',
+      'delete':'Siba','void':'Hagarika','edit':'Hindura','update':'Vugurura','add':'Ongeraho','remove':'Kuraho',
       'search':'Shakisha','filter':'Shungura','clear':'Siba ibyo wahisemo','close':'Funga',
       'back':'Subira inyuma','refresh':'Ongera urebe','submit':'Ohereza','confirm':'Emeza',
       'continue':'Komeza','sign out':'Sohoka','sign in':'Injira','login':'Kwinjira',
@@ -5329,7 +5330,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){if(accPeriodLocke
       'view audit trail':'Consulter le journal d’audit','manage team access':'Gérer les accès de l’équipe',
       'enable':'Activer','disable':'Désactiver','enabled':'Activé','disabled':'Désactivé',
       'active':'Actif','suspended':'Suspendu','save':'Enregistrer','cancel':'Annuler',
-      'delete':'Supprimer','edit':'Modifier','update':'Mettre à jour','add':'Ajouter',
+      'delete':'Supprimer','void':'Annuler','edit':'Modifier','update':'Mettre à jour','add':'Ajouter',
       'remove':'Retirer','search':'Rechercher','filter':'Filtrer','clear':'Effacer',
       'close':'Fermer','back':'Retour','refresh':'Actualiser','submit':'Soumettre',
       'confirm':'Confirmer','continue':'Continuer','sign out':'Se déconnecter',
