@@ -2529,19 +2529,48 @@ function renderCategory(){const rows=categoryBreakdown();document.getElementById
 // ── Export ───────────────────────────────────────────────────────────────
 const EXPORT_HEADERS=['Name','Category','Cost','Sell Price','Stock','Reorder Level','Barcode','Expiry Date'];
 function exportRows(){return activeProducts().map(p=>[p.name,p.cat,p.cost,p.sell,p.stock,p.reorder,p.barcode||'',p.expiry_date||''])}
-function downloadBlob(blob,filename){const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.click();URL.revokeObjectURL(url)}
+const sheriExportScriptPromises=new Map();
+function sheriLoadExportScript(url,ready){
+  if(ready())return Promise.resolve();
+  if(sheriExportScriptPromises.has(url))return sheriExportScriptPromises.get(url);
+  const task=new Promise((resolve,reject)=>{
+    const script=document.createElement('script');script.src=url;script.async=true;
+    script.onload=()=>ready()?resolve():reject(new Error('Export library loaded but its API is unavailable.'));
+    script.onerror=()=>reject(new Error('Could not load an export library. Check your connection and try again.'));
+    document.head.appendChild(script);
+  });
+  sheriExportScriptPromises.set(url,task);
+  task.catch(()=>sheriExportScriptPromises.delete(url));
+  return task;
+}
+async function sheriEnsureXlsx(){
+  await sheriLoadExportScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',()=>!!window.XLSX?.utils);
+}
+async function sheriEnsurePdf(){
+  await sheriLoadExportScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF);
+  await sheriLoadExportScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',()=>typeof window.jspdf?.jsPDF?.API?.autoTable==='function');
+}
+function downloadBlob(blob,filename){
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download=filename;a.style.display='none';
+  document.body.appendChild(a);a.click();a.remove();
+  // Revoke only after the browser has had time to start the download.
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
 function exportCSV(){
   const rows=[EXPORT_HEADERS,...exportRows()];
   const csv=rows.map(r=>r.map(v=>{const s=String(v??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}).join(',')).join('\n');
   downloadBlob(new Blob([csv],{type:'text/csv'}),`inventory-${new Date().toISOString().slice(0,10)}.csv`);
 }
-function exportExcel(){
-  if(!window.XLSX){alert('Excel export library did not load. Check your connection and try again.');return}
-  const rows=[EXPORT_HEADERS,...exportRows()];
-  const ws=XLSX.utils.aoa_to_sheet(rows);
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Inventory');
-  XLSX.writeFile(wb,`inventory-${new Date().toISOString().slice(0,10)}.xlsx`);
+async function exportExcel(){
+  try{
+    await sheriEnsureXlsx();
+    const rows=[EXPORT_HEADERS,...exportRows()];
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'Inventory');
+    XLSX.writeFile(wb,`inventory-${new Date().toISOString().slice(0,10)}.xlsx`);
+  }catch(error){console.error('[AIBOS export] Excel failed',error);alert(error?.message||'Excel export failed. Please try again.')}
 }
 function exportWord(){
   const rows=exportRows();
@@ -2553,13 +2582,15 @@ function exportWord(){
   </table></body></html>`;
   downloadBlob(new Blob(['\ufeff',html],{type:'application/msword'}),`inventory-${new Date().toISOString().slice(0,10)}.doc`);
 }
-function exportPDF(){
-  if(!window.jspdf){alert('PDF export library did not load. Check your connection and try again.');return}
-  const doc=new window.jspdf.jsPDF();
-  doc.setFontSize(14);
-  doc.text(`${state.merchant.name} — Inventory`,14,15);
-  doc.autoTable({startY:22,head:[EXPORT_HEADERS],body:exportRows(),styles:{fontSize:8}});
-  doc.save(`inventory-${new Date().toISOString().slice(0,10)}.pdf`);
+async function exportPDF(){
+  try{
+    await sheriEnsurePdf();
+    const doc=new window.jspdf.jsPDF();
+    doc.setFontSize(14);
+    doc.text(`${state.merchant.name} — Inventory`,14,15);
+    doc.autoTable({startY:22,head:[EXPORT_HEADERS],body:exportRows(),styles:{fontSize:8}});
+    doc.save(`inventory-${new Date().toISOString().slice(0,10)}.pdf`);
+  }catch(error){console.error('[AIBOS export] PDF failed',error);alert(error?.message||'PDF export failed. Please try again.')}
 }
 
 // ── Import ───────────────────────────────────────────────────────────────
