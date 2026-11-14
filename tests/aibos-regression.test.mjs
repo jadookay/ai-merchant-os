@@ -145,5 +145,5 @@ test("live-update migration enables merchant tables in Realtime and tracks owner
   assert.ok(liveSyncMigration.includes("alter publication supabase_realtime add table public.%I"));
   assert.ok(liveSyncMigration.includes("merchant_device_sessions"));
   assert.ok(liveSyncMigration.includes("return jsonb_build_object('ok',true,'owner',v_is_owner"));
-  assert.ok(liveSyncMigration.includes("where ds.revoked_at is null"));
+  assert.ok(liveSyncMigration.includes("where public.merchant_device_sessions.revoked_at is null"));
 });
