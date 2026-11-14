@@ -115,6 +115,7 @@ test("financial reports flag incomplete or unbalanced journal entries", () => {
   assert.ok(html.includes("function accLedgerIntegrity(endDate=null)"));
   assert.ok(html.includes("Financial statements are NOT reconciled"));
   assert.ok(html.includes("Balance sheet is NOT verified because journal entries are incomplete."));
+  assert.ok(html.includes("integrity.invalidCount?'<div style=\"grid-column:1/-1\">'+integrityNotice"));
 });
 
 test("operational fallback financial statements exclude voided sales", () => {
