@@ -158,7 +158,7 @@ Deno.serve(async (req: Request) => {
       // manager could create a custom account with finance/admin rights and escalate.
       const grantablePermissions = new Set([
         "view_sales", "create_sale", "manage_sales", "view_inventory", "manage_inventory",
-        "view_expenses", "manage_expenses", "view_financial_reports", "manage_finance",
+        "view_expenses", "manage_expenses", "view_financial_reports", "view_inventory_costs", "manage_finance",
         "view_customers", "manage_customers", "view_suppliers", "manage_suppliers",
         "view_audit_log", "manage_team"
       ]);
