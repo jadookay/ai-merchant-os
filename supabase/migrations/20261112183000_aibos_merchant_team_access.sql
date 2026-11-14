@@ -177,9 +177,9 @@ begin
     if t.table_name not in ('audit_log','sales','journal_entries','journal_lines') then
       execute format('drop policy if exists %I on public.%I',t.table_name||'_team_update',t.table_name);
       execute format('drop policy if exists %I on public.%I',t.table_name||'_team_delete',t.table_name);
-      -- Operational updates are authorized by the table-specific permission alone.
-      -- Team administration remains separate and is still required for deletes below.
-      execute format('create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_update',t.table_name,write_perm,write_perm);
+      -- Editing existing operational records remains manager/admin/owner-only.
+      -- Staff perform assigned work through scoped insert/RPC operations instead.
+      execute format('create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_update',t.table_name,write_perm,write_perm);
       if t.table_name<>'purchases' then
         execute format('create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))',t.table_name||'_team_delete',t.table_name,write_perm);
       end if;
