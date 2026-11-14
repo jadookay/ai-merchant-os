@@ -2050,6 +2050,22 @@ async function voidSale(id){
   const transactionId=selected.transaction_id||null;
   const rows=transactionId?state.sales.filter(x=>x.transaction_id===transactionId):[selected];
   const invoice=selected.invoice_number||'';
+  if(invoice&&navigator.onLine){
+    try{
+      const {data:linkedInvoice,error:invoiceError}=await sb.from('invoices').select('id,status').eq('merchant_id',state.merchant.id).eq('invoice_number',invoice).maybeSingle();
+      if(invoiceError)throw invoiceError;
+      if(linkedInvoice){
+        const {count,error:paymentError}=await sb.from('payments').select('id',{count:'exact',head:true}).eq('merchant_id',state.merchant.id).eq('source_type','invoice').eq('source_id',linkedInvoice.id);
+        if(paymentError)throw paymentError;
+        if(linkedInvoice.status!=='void'||Number(count||0)>0){
+          return sheriToast('This sale is linked to an accounting invoice. Void or credit the invoice and process any payment refund first.','error');
+        }
+      }
+    }catch(error){
+      console.warn('[AIBOS] Could not verify linked invoice before void:',error);
+      return sheriToast('Could not verify the linked invoice and payments. No changes were made.','error');
+    }
+  }
   const total=rows.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0);
   const reason=prompt('Enter the reason for voiding this sale (required):');
   if(!reason||reason.trim().length<3)return sheriToast('A clear void reason is required.','error');
