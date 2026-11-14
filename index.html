@@ -923,6 +923,7 @@ async function sheriReconcileMerchantId(){
         const op=item.op||{};
         if(op.type==='merchant_upsert'&&op.record?.id===oldId)op.record.id=newId;
         if(op.record?.merchant_id===oldId)op.record.merchant_id=newId;
+        if(Array.isArray(op.records))for(const record of op.records){if(record?.merchant_id===oldId)record.merchant_id=newId;}
         await sheriPut('outbox',item.key,{...item,op});
       }
       // The profile was already applied to the real server merchant. Remove
