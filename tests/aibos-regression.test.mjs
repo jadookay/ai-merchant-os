@@ -88,7 +88,7 @@ test("Shericeri memory remains queued for retry and persisted locally", () => {
 
 test("server snapshots replace stale confirmed IndexedDB rows but preserve queued local changes", () => {
   assert.ok(html.includes("const pendingOutbox=await sheriGetAll('outbox')"));
-  assert.ok(html.includes("if(pendingIdsFor(store).has(x.id))sm.set(x.id,{...x,_serverConfirmed:false})"));
+  assert.ok(html.includes("if(pendingIdsFor(store).has(x.id)&&!sm.has(x.id))sm.set(x.id,{...x,_serverConfirmed:false})"));
   assert.ok(!html.includes("if(sr.length===0&&lr.length>0)return lr.map"));
   assert.ok(!html.includes("const keep=!x._serverConfirmed||sheriSyncQueued>0"));
 });
@@ -104,7 +104,7 @@ test("authorized multi-device refresh subscribes only to merchant-filtered inser
 });
 
 test("pending sync panel is scrollable and shows business amounts and descriptions", () => {
-  assert.ok(html.includes("panel.style.maxHeight='440px'"));
+  assert.ok(html.includes("panel.style.maxHeight='320px'"));
   assert.ok(html.includes("panel.style.overflowY='auto'"));
   assert.ok(html.includes("function sheriPendingActivityDetails(op)"));
   for(const value of ["Total ","Cost value ","fmt(r.amount)","Waiting to sync"])
@@ -114,8 +114,9 @@ test("pending sync panel is scrollable and shows business amounts and descriptio
 test("financial reports flag incomplete or unbalanced journal entries", () => {
   assert.ok(html.includes("function accLedgerIntegrity(endDate=null)"));
   assert.ok(html.includes("Financial statements are NOT reconciled"));
-  assert.ok(html.includes("Balance sheet is NOT verified because journal entries are incomplete."));
-  assert.ok(html.includes("integrity.invalidCount?'<div style=\"grid-column:1/-1\">'+integrityNotice"));
+  assert.ok(html.includes("Balance Sheet does not balance."));
+  assert.ok(html.includes("const statementsVerified=integrity.invalidCount===0"));
+  assert.ok(html.includes("statementNotice?'<div style=\"grid-column:1/-1\">'+statementNotice"));
 });
 
 test("operational fallback financial statements exclude voided sales", () => {
@@ -145,7 +146,8 @@ test("financial statement calculations respect each account's normal balance", (
 });
 
 test("team access reuses existing employee Auth identities and returns actionable conflicts", () => {
-  assert.ok(teamAccess.includes("admin.auth.admin.listUsers({ page: 1, perPage: 1000 })"));
+  assert.ok(teamAccess.includes("admin.auth.admin.listUsers({ page, perPage })"));
+  assert.ok(teamAccess.includes("page <= 50 && !authUser"));
   assert.ok(teamAccess.includes("reused_existing_auth_user"));
   assert.ok(teamAccess.includes("member_exists"));
   assert.ok(teamAccess.includes("email_exists"));
