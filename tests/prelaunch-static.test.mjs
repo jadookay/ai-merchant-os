@@ -405,17 +405,19 @@ test("team migration preserves owner RLS, prevents forged staff audit inserts an
   assert.ok(teamMigration.includes("when t.table_name='sales' then 'manage_sales'"));
   assert.ok(teamMigration.includes("when t.table_name='products' then 'manage_inventory'"));
   assert.ok(teamMigration.includes("when t.table_name='expenses' then 'manage_expenses'"));
-  assert.ok(teamMigration.includes("create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,%L))"));
+  assert.ok(teamMigration.includes("create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))"));
   assert.ok(teamMigration.includes("create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))"));
 });
 
-test("operational updates do not require team administration, while deletes remain manager-gated", () => {
-  const policyStart=teamMigration.indexOf("-- Operational updates are authorized by the table-specific permission alone.");
+test("direct edits and deletes remain manager/admin/owner-gated while operational work uses scoped permissions", () => {
+  const policyStart=teamMigration.indexOf("-- Editing existing operational records remains manager/admin/owner-only.");
   const policyEnd=teamMigration.indexOf("end loop;",policyStart);
   const policies=teamMigration.slice(policyStart,policyEnd);
   assert.ok(policyStart>=0 && policyEnd>policyStart);
-  assert.match(policies,/for update to authenticated using \(private\.user_can_access_merchant\(merchant_id,%L\)\) with check \(private\.user_can_access_merchant\(merchant_id,%L\)\)/);
-  assert.match(policies,/for delete to authenticated using \(private\.user_can_access_merchant\(merchant_id,''manage_team''\) and private\.user_can_access_merchant\(merchant_id,%L\)\)/);
+  assert.ok(policies.includes("private.user_can_access_merchant(merchant_id,''manage_team'')"));
+  assert.ok(policies.includes("private.user_can_access_merchant(merchant_id,%L)"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'create_sale')"));
+  assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'manage_inventory')"));
 });
 
 test("sale voiding retains source rows, reverses posted journals and is idempotent", () => {
