@@ -6,7 +6,7 @@ const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
-const sixDigitIdMigration = readFileSync(new URL("../supabase/migrations/20261114180000_enforce_six_digit_shericeri_business_ids.sql", import.meta.url), "utf8");
+const sixDigitIdMigration = readFileSync(new URL("../supabase/migrations/20261114162636_enforce_six_digit_shericeri_business_ids.sql", import.meta.url), "utf8");
 const voidBlock = html.slice(html.indexOf("async function voidSale(id){"), html.indexOf("const sheriSearchValues"));
 
 test("Kinyarwanda covers core finance and stock terms", () => {
