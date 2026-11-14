@@ -560,6 +560,8 @@ test("operational journal posting follows each source permission and validates i
   assert.match(fn, /else 'manage_finance'/);
   assert.match(fn, /private\.user_can_access_merchant\(p_merchant_id,v_permission\)/);
   assert.match(fn, /Operational journal lines do not match the source transaction/);
+  assert.match(fn, /Journal date does not match the source transaction date/);
+  assert.match(fn, /v_expected_date date/);
   assert.match(fn, /This source already has a journal entry/);
   assert.match(releaseMigration, /journal_entries_merchant_source_unique_idx/);
   assert.match(releaseMigration, /view_financial_reports/);
