@@ -233,7 +233,7 @@ test("sales and expenses confirm before saving and post balanced journal entries
   const sale = html.slice(saleStart, saleEnd);
   assert.ok(sale.includes("confirm('Confirm sale?"), "sale must be confirmed before it is recorded");
   assert.ok(sale.includes("sheriToast(sheriLocalized('Sale captured."), "sale acknowledgement must appear before durable persistence");
-  assert.ok(sale.indexOf("sheriToast(sheriLocalized('Sale captured.") < sale.indexOf("await sheriSaveSnapshot()"), "sale acknowledgement must not wait for full snapshot persistence");), "sale confirmation must be immediate");
+  assert.ok(sale.indexOf("sheriToast(sheriLocalized('Sale captured.") < sale.indexOf("await sheriSaveSnapshot()"), "sale acknowledgement must not wait for full snapshot persistence");
   assert.ok(sale.includes("Promise.resolve().then(()=>sheriSyncOutbox())"), "background sync must not delay the sale confirmation");
 
   const saleAccountingStart = html.indexOf("const _v14_1_recordSale=recordSale");
