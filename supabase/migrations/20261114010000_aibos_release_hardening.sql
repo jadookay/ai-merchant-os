@@ -374,6 +374,7 @@ as $$
 declare
   v_permission text;
   v_expected numeric;
+  v_expected_date date;
   v_debit_code text;
   v_credit_code text;
   v_lock date;
@@ -419,33 +420,36 @@ begin
     v_operational := true;
     case p_source_type
       when 'sale' then
-        select (s.qty::numeric*s.price::numeric) into v_expected
+        select (s.qty::numeric*s.price::numeric),s.created_at::date into v_expected,v_expected_date
         from public.sales s
         where s.id=p_source_id and s.merchant_id=p_merchant_id and coalesce(s.voided,false)=false;
         v_debit_code := '1000'; v_credit_code := '4000';
       when 'sale_cogs' then
-        select (s.qty::numeric*s.cost::numeric) into v_expected
+        select (s.qty::numeric*s.cost::numeric),s.created_at::date into v_expected,v_expected_date
         from public.sales s
         where s.id=p_source_id and s.merchant_id=p_merchant_id and coalesce(s.voided,false)=false;
         v_debit_code := '5000'; v_credit_code := '1200';
       when 'purchase' then
-        select coalesce(p.total,p.qty*p.unit_cost) into v_expected
+        select coalesce(p.total,p.qty*p.unit_cost),coalesce(p.purchased_at,p.created_at)::date into v_expected,v_expected_date
         from public.purchases p
         where p.id=p_source_id and p.merchant_id=p_merchant_id and p.status<>'ordered';
         v_debit_code := '1200'; v_credit_code := '2000';
       when 'expense' then
-        select e.amount::numeric into v_expected
+        select e.amount::numeric,e.created_at::date into v_expected,v_expected_date
         from public.expenses e
         where e.id=p_source_id and e.merchant_id=p_merchant_id;
         v_debit_code := '6000'; v_credit_code := '1000';
       when 'product_opening_stock' then
-        select (p.stock::numeric*p.cost::numeric) into v_expected
+        select (p.stock::numeric*p.cost::numeric),p.created_at::date into v_expected,v_expected_date
         from public.products p
         where p.id=p_source_id and p.merchant_id=p_merchant_id;
         v_debit_code := '1200'; v_credit_code := '3000';
     end case;
     if not found or coalesce(v_expected,0)<=0 then
       raise exception 'The accounting source record is missing or has no positive value';
+    end if;
+    if p_entry_date is distinct from v_expected_date then
+      raise exception 'Journal date does not match the source transaction date';
     end if;
     if jsonb_array_length(p_lines)<>2 then
       raise exception 'Operational journal entries must contain exactly two lines';
