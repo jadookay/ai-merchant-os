@@ -2181,77 +2181,7 @@ function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script>
-<style id="aibos-layout-ifrs-v1">
-/* Fixed desktop navigation; the mobile navigation remains in normal document flow. */
-#appRoot .side{position:fixed!important;inset:0 auto 0 0!important;height:100vh!important;height:100dvh!important;overflow-y:auto!important;overscroll-behavior:contain;z-index:60;display:flex;flex-direction:column;padding:16px 12px!important}
-#appRoot .side .brand{margin:4px 8px 14px!important}
-#appRoot .side .nav{display:flex;flex-direction:column;gap:2px;flex:0 0 auto}
-#appRoot .side .nav button{padding:9px 10px!important;margin:1px 0!important}
-#appRoot .main{margin:0 0 0 230px!important;width:calc(100% - 230px)!important;max-width:none!important;padding:12px 16px!important}
-#aibosLanguageSwitcher{position:static!important;inset:auto!important;z-index:auto!important;width:100%;max-width:100%;margin:16px 0 8px!important;padding:8px!important;box-shadow:none!important;display:flex!important;flex-direction:column;align-items:stretch!important;gap:5px!important}
-#aibosLanguageSwitcher select{width:100%!important;min-width:0!important}
-#sheriOfflineBar{position:relative!important;top:auto!important;margin:0 0 5px!important;z-index:15!important;flex-wrap:wrap}
-#sheriOfflineBar>div:last-child{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
-#dashboard>.top{margin:0 0 4px!important;align-items:center}
-#dashboard>.top>div:last-child{flex-direction:row!important;align-items:center!important;gap:8px!important}
-#dashboard .sheri-launcher{margin-left:4px;align-self:center}
-#dashboard .hero{margin:0 0 5px!important;padding:15px 17px!important}
-#dashboard .section{margin-top:5px!important}
-#dashboard .section h2{margin-bottom:6px!important}
-.advisor-composer{display:grid!important;grid-template-columns:42px minmax(0,1fr) 78px;grid-template-rows:minmax(42px,auto) 34px;gap:6px!important;align-items:stretch!important}
-.advisor-composer textarea{grid-column:2!important;grid-row:1 / span 2!important;width:100%;min-width:0;min-height:112px!important;height:112px;max-height:220px!important;resize:vertical!important;padding:12px!important;font:inherit!important;line-height:1.45!important}
-.advisor-composer-actions{display:contents!important}
-#advisorUploadWrap{grid-column:1!important;grid-row:1!important;align-self:start}
-#advisorUploadWrap>.btn{width:40px;height:40px;padding:0!important;font-size:21px}
-.advisor-composer-actions>button:nth-of-type(1){grid-column:1!important;grid-row:2!important;min-width:40px;padding:5px!important}
-.advisor-composer-actions>button:nth-of-type(2){grid-column:3!important;grid-row:2!important;min-width:40px;padding:5px!important}
-.advisor-composer-actions>button:nth-of-type(3){grid-column:3!important;grid-row:1!important;min-width:72px;padding:8px!important}
-#advisorUploadWrap .export-menu{left:0;right:auto;bottom:44px;top:auto}
-input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #fee2e2!important}
-.statement-period{font-size:12px;color:var(--muted);padding:4px 0 8px}
-.statement-section-row{font-weight:800;background:#f8fafc;border-top:1px solid var(--line)}
-.statement-total-row{font-weight:800;border-top:1px solid var(--line)}
-@media(max-width:900px) and (min-width:651px){#appRoot .side{width:190px!important}#appRoot .main{margin-left:190px!important;width:calc(100% - 190px)!important}}
-@media(max-width:650px){
- #appRoot .side{position:sticky!important;top:0!important;inset:auto!important;width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:9px 10px!important}
- #appRoot .side .nav{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px}
- #appRoot .side .nav button{flex:1 1 calc(33.333% - 4px);width:auto;min-width:0;padding:8px 5px!important}
- #appRoot .main{margin:0!important;width:100%!important;max-width:100%!important;padding:8px 12px 12px!important}
- #aibosLanguageSwitcher{margin:10px 0 2px!important;max-width:180px!important}
- #sheriOfflineBar{margin-bottom:4px!important;gap:5px!important}
- #sheriOfflineBar>div:last-child{justify-content:flex-start;width:100%}
- #dashboard>.top{gap:6px!important;margin-bottom:3px!important}
- #dashboard>.top>div:last-child{gap:5px!important}
- #dashboard .hero{padding:12px!important;margin-bottom:4px!important}
- .advisor-composer{grid-template-columns:38px minmax(0,1fr) 68px!important;grid-template-rows:minmax(40px,auto) 32px!important;gap:5px!important}
- .advisor-composer textarea{min-height:108px!important;height:108px!important;padding:9px!important}
- #advisorUploadWrap>.btn{width:36px;height:38px}
- .advisor-composer-actions>button:nth-of-type(1){min-width:36px!important}
- .advisor-composer-actions>button:nth-of-type(2){min-width:36px!important}
- .advisor-composer-actions>button:nth-of-type(3){min-width:64px!important}
-}
-</style>
-<script>
-(function(){
-  const picker=document.getElementById('aibosLanguageSwitcher');
-  const side=document.querySelector('#appRoot .side');
-  const nav=side?.querySelector('.nav');
-  if(picker&&nav&&picker.parentElement!==side)nav.after(picker);
-  const teamEmail=document.getElementById('teamEmail');
-  if(teamEmail)teamEmail.addEventListener('input',()=>teamEmail.removeAttribute('aria-invalid'));
-  const originalCreate=window.createTeamMember;
-  if(typeof originalCreate==='function'&&!originalCreate.__emailFlagWrapped){
-    const wrapped=async function(){
-      const field=document.getElementById('teamEmail');
-      if(field)field.removeAttribute('aria-invalid');
-      await originalCreate.apply(this,arguments);
-      const status=document.getElementById('teamStatus');
-      if(field&&/email.*already|already.*email|email.*registered/i.test(status?.textContent||''))field.setAttribute('aria-invalid','true');
-    };
-    wrapped.__emailFlagWrapped=true;window.createTeamMember=wrapped;
-  }
-})();
-</script>
+
 <script id="aibos-ifrs-statements-v1">
 (function(){
   if(typeof window.renderReports!=='function'||window.renderReports.__ifrsPresentationWrapped)return;
@@ -7436,6 +7366,77 @@ function sheriWrapSyncBatch(name){
   'accEnsureBase','accEnsureOperationalLedger','accCreateInvoice','accCreateBill','accCreatePayment',
   'accCreateBankAccount','accCreateTaxRate','accCreateRecurring','accPostOpeningBalance','accCreateAdjustment'
 ].forEach(sheriWrapSyncBatch);
+</script>
+<style id="aibos-layout-ifrs-v1">
+/* Fixed desktop navigation; the mobile navigation remains in normal document flow. */
+#appRoot .side{position:fixed!important;inset:0 auto 0 0!important;height:100vh!important;height:100dvh!important;overflow-y:auto!important;overscroll-behavior:contain;z-index:60;display:flex;flex-direction:column;padding:16px 12px!important}
+#appRoot .side .brand{margin:4px 8px 14px!important}
+#appRoot .side .nav{display:flex;flex-direction:column;gap:2px;flex:0 0 auto}
+#appRoot .side .nav button{padding:9px 10px!important;margin:1px 0!important}
+#appRoot .main{margin:0 0 0 230px!important;width:calc(100% - 230px)!important;max-width:none!important;padding:12px 16px!important}
+#aibosLanguageSwitcher{position:static!important;inset:auto!important;z-index:auto!important;width:100%;max-width:100%;margin:16px 0 8px!important;padding:8px!important;box-shadow:none!important;display:flex!important;flex-direction:column;align-items:stretch!important;gap:5px!important}
+#aibosLanguageSwitcher select{width:100%!important;min-width:0!important}
+#sheriOfflineBar{position:relative!important;top:auto!important;margin:0 0 5px!important;z-index:15!important;flex-wrap:wrap}
+#sheriOfflineBar>div:last-child{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+#dashboard>.top{margin:0 0 4px!important;align-items:center}
+#dashboard>.top>div:last-child{flex-direction:row!important;align-items:center!important;gap:8px!important}
+#dashboard .sheri-launcher{margin-left:4px;align-self:center}
+#dashboard .hero{margin:0 0 5px!important;padding:15px 17px!important}
+#dashboard .section{margin-top:5px!important}
+#dashboard .section h2{margin-bottom:6px!important}
+.advisor-composer{display:grid!important;grid-template-columns:42px minmax(0,1fr) 78px;grid-template-rows:minmax(42px,auto) 34px;gap:6px!important;align-items:stretch!important}
+.advisor-composer textarea{grid-column:2!important;grid-row:1 / span 2!important;width:100%;min-width:0;min-height:112px!important;height:112px;max-height:220px!important;resize:vertical!important;padding:12px!important;font:inherit!important;line-height:1.45!important}
+.advisor-composer-actions{display:contents!important}
+#advisorUploadWrap{grid-column:1!important;grid-row:1!important;align-self:start}
+#advisorUploadWrap>.btn{width:40px;height:40px;padding:0!important;font-size:21px}
+.advisor-composer-actions>button:nth-of-type(1){grid-column:1!important;grid-row:2!important;min-width:40px;padding:5px!important}
+.advisor-composer-actions>button:nth-of-type(2){grid-column:3!important;grid-row:2!important;min-width:40px;padding:5px!important}
+.advisor-composer-actions>button:nth-of-type(3){grid-column:3!important;grid-row:1!important;min-width:72px;padding:8px!important}
+#advisorUploadWrap .export-menu{left:0;right:auto;bottom:44px;top:auto}
+input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #fee2e2!important}
+.statement-period{font-size:12px;color:var(--muted);padding:4px 0 8px}
+.statement-section-row{font-weight:800;background:#f8fafc;border-top:1px solid var(--line)}
+.statement-total-row{font-weight:800;border-top:1px solid var(--line)}
+@media(max-width:900px) and (min-width:651px){#appRoot .side{width:190px!important}#appRoot .main{margin-left:190px!important;width:calc(100% - 190px)!important}}
+@media(max-width:650px){
+ #appRoot .side{position:sticky!important;top:0!important;inset:auto!important;width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:9px 10px!important}
+ #appRoot .side .nav{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px}
+ #appRoot .side .nav button{flex:1 1 calc(33.333% - 4px);width:auto;min-width:0;padding:8px 5px!important}
+ #appRoot .main{margin:0!important;width:100%!important;max-width:100%!important;padding:8px 12px 12px!important}
+ #aibosLanguageSwitcher{margin:10px 0 2px!important;max-width:180px!important}
+ #sheriOfflineBar{margin-bottom:4px!important;gap:5px!important}
+ #sheriOfflineBar>div:last-child{justify-content:flex-start;width:100%}
+ #dashboard>.top{gap:6px!important;margin-bottom:3px!important}
+ #dashboard>.top>div:last-child{gap:5px!important}
+ #dashboard .hero{padding:12px!important;margin-bottom:4px!important}
+ .advisor-composer{grid-template-columns:38px minmax(0,1fr) 68px!important;grid-template-rows:minmax(40px,auto) 32px!important;gap:5px!important}
+ .advisor-composer textarea{min-height:108px!important;height:108px!important;padding:9px!important}
+ #advisorUploadWrap>.btn{width:36px;height:38px}
+ .advisor-composer-actions>button:nth-of-type(1){min-width:36px!important}
+ .advisor-composer-actions>button:nth-of-type(2){min-width:36px!important}
+ .advisor-composer-actions>button:nth-of-type(3){min-width:64px!important}
+}
+</style>
+<script>
+(function(){
+  const picker=document.getElementById('aibosLanguageSwitcher');
+  const side=document.querySelector('#appRoot .side');
+  const nav=side?.querySelector('.nav');
+  if(picker&&nav&&picker.parentElement!==side)nav.after(picker);
+  const teamEmail=document.getElementById('teamEmail');
+  if(teamEmail)teamEmail.addEventListener('input',()=>teamEmail.removeAttribute('aria-invalid'));
+  const originalCreate=window.createTeamMember;
+  if(typeof originalCreate==='function'&&!originalCreate.__emailFlagWrapped){
+    const wrapped=async function(){
+      const field=document.getElementById('teamEmail');
+      if(field)field.removeAttribute('aria-invalid');
+      await originalCreate.apply(this,arguments);
+      const status=document.getElementById('teamStatus');
+      if(field&&/email.*already|already.*email|email.*registered/i.test(status?.textContent||''))field.setAttribute('aria-invalid','true');
+    };
+    wrapped.__emailFlagWrapped=true;window.createTeamMember=wrapped;
+  }
+})();
 </script>
 </body>
 </html>
