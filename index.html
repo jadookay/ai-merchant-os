@@ -2902,8 +2902,23 @@ function renderTeamMembers(){
 function renderTeamAuditTrail(){
  const host=document.getElementById('teamAuditTrail');if(!host)return;
  if(!sheriCan('view_audit_log')){host.innerHTML='';return;}
+ const amountKeys=/^(amount|total|price|quantity|qty|balance|cost|paid|received|debit|credit|value|count|stock|before_amount|after_amount)$/i;
+ const numericAmounts=details=>{
+  const found=[];
+  const visit=obj=>{
+   if(!obj||typeof obj!=='object')return;
+   Object.entries(obj).forEach(([k,v])=>{
+    if(amountKeys.test(k)){
+     if(typeof v==='number'&&Number.isFinite(v))found.push(v);
+     else if(typeof v==='string'&&v.trim()!==''&&/^-?\d+(?:[,.]\d+)?$/.test(v.trim()))found.push(Number(v.replace(/,/g,'')));
+    }else if(v&&typeof v==='object')visit(v);
+   });
+  };
+  visit(details||{});
+  return [...new Set(found)].map(v=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(v)).join(' · ')||'—';
+ };
  const rows=(state.auditLog||[]).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).slice(0,30);
- host.innerHTML='<h3>Recent audit trail</h3>'+ (rows.length?`<table class="table" style="min-width:920px"><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Reason</th><th>What changed / amount</th></tr>${rows.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)} · ${esc(x.entity_id||'—')}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audited changes have been recorded yet.</div>');
+ host.innerHTML='<h3>Recent audit trail</h3>'+ (rows.length?'<table class="table" style="min-width:820px"><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Reason</th><th>Amount</th></tr>'+rows.map(x=>'<tr><td>'+esc(x.created_at?new Date(x.created_at).toLocaleString():'—')+'</td><td>'+esc(x.details?.actor_name||x.actor_user_id||'Owner')+'</td><td>'+esc(x.action)+'</td><td>'+esc(x.entity_type)+' · '+esc(x.entity_id||'—')+'</td><td>'+esc(x.reason||x.details?.reason||'—')+'</td><td>'+esc(numericAmounts(x.details))+'</td></tr>').join('')+'</table>':'<div class="empty">No audited changes have been recorded yet.</div>');
 }
 async function loadTeamDevices(){
  const host=document.getElementById('teamDevicesTable');if(!host)return;
@@ -7333,10 +7348,10 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
 .statement-total-row{font-weight:800;border-top:1px solid var(--line)}
 @media(max-width:900px) and (min-width:651px){#appRoot .side{width:190px!important}#appRoot .main{margin-left:190px!important;width:calc(100% - 190px)!important}}
 @media(max-width:650px){
- #appRoot .side{position:sticky!important;top:0!important;inset:auto!important;width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:9px 10px!important}
+ #appRoot .side{position:fixed!important;top:0!important;left:0!important;right:0!important;inset:0 0 auto 0!important;width:100%!important;height:auto!important;max-height:220px!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;z-index:1200!important;padding:9px 10px!important;box-shadow:0 3px 12px #0002!important}
  #appRoot .side .nav{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px}
  #appRoot .side .nav button{flex:1 1 calc(33.333% - 4px);width:auto;min-width:0;padding:8px 5px!important}
- #appRoot .main{margin:0!important;width:100%!important;max-width:100%!important;padding:8px 12px 12px!important}
+ #appRoot .main{margin:0!important;width:100%!important;max-width:100%!important;padding:230px 12px 12px!important}
  #aibosLanguageSwitcher{margin:10px 0 2px!important;max-width:180px!important}
  #sheriOfflineBar{margin-bottom:4px!important;gap:5px!important}
  #sheriOfflineBar>div:last-child{justify-content:flex-start;width:100%}
