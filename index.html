@@ -1693,15 +1693,20 @@ function sheriSubscribeMerchantRealtime(merchantId){
     'accounting_settings','audit_log','customers','suppliers','budgets','shericeri_memory','cash_entries',
     'merchant_members','merchant_device_sessions'];
   let channel=sb.channel('aibos-live-'+merchantId);
+  const refreshFromServer=()=>{
+    if(sheriRealtimeRefreshTimer)clearTimeout(sheriRealtimeRefreshTimer);
+    sheriRealtimeRefreshTimer=setTimeout(()=>{
+      sheriRealtimeRefreshTimer=null;
+      if(state.merchant?.id!==merchantId||!session?.access_token)return;
+      loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
+    },220);
+  };
   for(const table of tables){
-    channel=channel.on('postgres_changes',{event:'*',schema:'public',table,filter:'merchant_id=eq.'+merchantId},()=>{
-      if(sheriRealtimeRefreshTimer)clearTimeout(sheriRealtimeRefreshTimer);
-      sheriRealtimeRefreshTimer=setTimeout(()=>{
-        sheriRealtimeRefreshTimer=null;
-        if(state.merchant?.id!==merchantId||!session?.access_token)return;
-        loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
-      },220);
-    });
+    // Subscribe only to INSERT/UPDATE. DELETE payloads cannot be reliably
+    // filtered by merchant_id and must not leak cross-business event metadata.
+    channel=channel
+      .on('postgres_changes',{event:'INSERT',schema:'public',table,filter:'merchant_id=eq.'+merchantId},refreshFromServer)
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table,filter:'merchant_id=eq.'+merchantId},refreshFromServer);
   }
   sheriRealtimeMerchantId=merchantId;
   sheriRealtimeChannel=channel.subscribe((status,error)=>{
