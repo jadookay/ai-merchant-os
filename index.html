@@ -1864,7 +1864,8 @@ function topCustomers(n=5){return customerStats().filter(c=>c.revenue>0).slice(0
 function repeatCustomerCount(){return customerStats().filter(c=>c.visits>1).length}
 function revenue(){return state.sales.reduce((s,x)=>s+x.qty*x.price,0)}
 function cogs(){return state.sales.reduce((s,x)=>s+x.qty*(x.cost??0),0)}
-function totalExpenses(){return state.expenses.reduce((s,x)=>s+x.amount,0)}
+function activeExpenses(){return (state.expenses||[]).filter(x=>!x.voided)}
+function totalExpenses(){return activeExpenses().reduce((s,x)=>s+Number(x.amount||0),0)}
 function profit(){return revenue()-cogs()-totalExpenses()}
 function categoryBreakdown(){
   let map={};
@@ -1953,7 +1954,7 @@ function dailyProfitTrend(windowDays=7){
   const profitInWindow=(from,to)=>{
     const salesRev=state.sales.filter(s=>s.created_at>=from&&(!to||s.created_at<to))
       .reduce((sum,s)=>sum+s.qty*(s.price-(s.cost??0)),0);
-    const exp=state.expenses.filter(e=>e.created_at>=from&&(!to||e.created_at<to))
+    const exp=activeExpenses().filter(e=>e.created_at>=from&&(!to||e.created_at<to))
       .reduce((sum,e)=>sum+e.amount,0);
     return salesRev-exp;
   };
@@ -2611,8 +2612,8 @@ async function deleteExpense(id){
   render();sheriToast('Expense voided; accounting reversal is queued or posted.');
 }
 function renderExpenses(){
-  const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount or date',state.expenses.flatMap(e=>[e.description,e.cat]));
-  const rows=state.expenses.filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount or date',activeExpenses().flatMap(e=>[e.description,e.cat]));
+  const rows=activeExpenses().filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
   document.getElementById('expenseTable').innerHTML=rows.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr>${rows.map(e=>`<tr><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td>${sheriCan('manage_team')&&sheriCan('manage_expenses')?`<button class="btn small danger" onclick="deleteExpense('${e.id}')">Delete</button>`:''}</td></tr>`).join('')}</table>`:'<div class="empty">No expenses in the selected date range.</div>';
 }
 
@@ -4836,7 +4837,7 @@ function osSupplierSpend(id){return (state.purchases||[]).filter(x=>x.supplier_i
 function osAvgDaily(days=30, field='revenue'){
   const cutoff=Date.now()-days*86400000;
   if(field==='revenue'){const rows=state.sales.filter(x=>new Date(x.created_at).getTime()>=cutoff);return rows.reduce((s,x)=>s+x.qty*x.price,0)/days}
-  const rows=state.expenses.filter(x=>new Date(x.created_at).getTime()>=cutoff);return rows.reduce((s,x)=>s+Number(x.amount||0),0)/days
+  const rows=activeExpenses().filter(x=>new Date(x.created_at).getTime()>=cutoff);return rows.reduce((s,x)=>s+Number(x.amount||0),0)/days
 }
 function osForecast30(){
   const salesDays=Math.min(30,Math.max(1,(state.sales.length?30:1)));
@@ -4981,7 +4982,7 @@ async function accEnsureOperationalLedger(){
     if(total>0&&cash&&sales)await accPostEntry({date,description:'Sale '+(s.product_name_snapshot||''),sourceType:'sale',sourceId:s.id,lines:[{accountId:cash.id,debit:total},{accountId:sales.id,credit:total}]});
     if(cost>0&&inv&&cogs)await accPostEntry({date,description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:cost},{accountId:inv.id,credit:cost}]});
   }
-  if(sheriCan('manage_expenses'))for(const e of (state.expenses||[])){
+  if(sheriCan('manage_expenses'))for(const e of activeExpenses()){
     const ex=accAccountCode('6000'),cash=accAccountCode('1000'),amount=Number(e.amount||0),date=String(e.created_at||e.date||sheriNow()).slice(0,10);
     if(amount>0&&ex&&cash)await accPostEntry({date,description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});
   }
