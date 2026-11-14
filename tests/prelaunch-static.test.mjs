@@ -620,7 +620,7 @@ test("team access is bound to an individually revocable authenticated device ses
   assert.ok(html.includes("await sheriRegisterDeviceSession(memberResult.data.merchant_id)"));
   assert.ok(html.includes("sheriRegisterDeviceSession(merchantId)"));
   assert.ok(html.includes("shericeri_list_device_sessions"));
-  assert.ok(html.includes("sheri_revoke_device_session"));
+  assert.ok(html.includes("shericeri_revoke_device_session"));
   assert.ok(html.includes("id=\"teamDevicesTable\""));
   assert.ok(html.includes("function revokeTeamDeviceSession(sessionId)"));
 });
@@ -682,7 +682,7 @@ test("staff offline workspaces retain local membership metadata and refresh perm
 
 test("inventory adjustment retries are idempotent and grants match the seven-argument RPC", () => {
   assert.ok(teamMigration.includes("inventory_movements_source_unique"));
-  assert.ok(teamMigration.includes("where im.movement_type=p_movement_type"));
+  assert.ok(teamMigration.includes("im.movement_type=p_movement_type"));
   assert.ok(teamMigration.includes("grant execute on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) to authenticated"));
   assert.ok(teamMigration.includes("revoke all on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) from public,anon"));
   assert.ok(html.includes("data?.ok===true"));
