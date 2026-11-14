@@ -417,7 +417,6 @@ test("operational updates do not require team administration, while deletes rema
   assert.match(policies,/for update to authenticated using \(private\.user_can_access_merchant\(merchant_id,%L\)\) with check \(private\.user_can_access_merchant\(merchant_id,%L\)\)/);
   assert.match(policies,/for delete to authenticated using \(private\.user_can_access_merchant\(merchant_id,''manage_team''\) and private\.user_can_access_merchant\(merchant_id,%L\)\)/);
 });
-});
 
 test("sale voiding retains source rows, reverses posted journals and is idempotent", () => {
   assert.ok(teamMigration.includes("add column if not exists voided boolean not null default false"));
