@@ -141,7 +141,7 @@ insert into public.inventory_movements(
 select p.merchant_id,p.id,'opening_balance',p.stock,0,p.stock,
   coalesce(p.cost,0),'migration_opening',p.id,
   'Opening balance captured when inventory movement tracking was enabled',
-  coalesce(p.created_at,now())
+  now()
 from public.products p
 where coalesce(p.stock,0)>0
   and not exists(
