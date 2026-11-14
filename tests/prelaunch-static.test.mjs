@@ -8,10 +8,21 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const releaseMigration = await readFile(new URL("../supabase/migrations/20261114010000_aibos_release_hardening.sql", import.meta.url), "utf8");
+const supabaseConfig = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
 
+
+test("all inline production JavaScript parses without syntax errors", () => {
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
+  assert.ok(scripts.length > 0, "expected inline application scripts");
+  for (let i = 0; i < scripts.length; i++) {
+    const source = scripts[i][1].trim();
+    if (source) new vm.Script(source, { filename: "index.html inline script " + (i + 1) });
+  }
+});
 
 test("team managers cannot create administrator accounts or grant permissions they do not hold", () => {
   assert.match(teamAccess, /if \(role === "admin" && !isPrivilegedGrantor\)/);
@@ -427,6 +438,214 @@ test("stock conflicts do not create partial sale or purchase records", () => {
   const purchase=teamMigration.slice(purchaseStart);
   assert.ok(purchase.indexOf("if v_current_stock<>p_expected_server_stock") < purchase.indexOf("insert into public.purchases"));
   assert.ok(purchase.includes("return jsonb_build_object('ok',false,'stock_conflict',true"));
+});
+
+test("sale void RPC cannot be reached through manage_finance alone", () => {
+  const start = teamMigration.indexOf("create or replace function public.shericeri_void_sale");
+  const end = teamMigration.indexOf("revoke all on function public.shericeri_void_sale", start);
+  assert.ok(start >= 0 && end > start);
+  const fn = teamMigration.slice(start, end);
+  assert.match(fn, /if not private\.user_can_access_merchant\(v_merchant_id,'manage_sales'\) then/);
+  assert.doesNotMatch(fn, /or private\.user_can_access_merchant\(v_merchant_id,'manage_finance'\)/);
+});
+
+test("operational insert permissions remain independent of team administration while edits and deletes stay manager-restricted", () => {
+  assert.match(teamMigration, /for insert to authenticated with check \(private\.user_can_access_merchant\(merchant_id,%L\)\)/);
+  assert.match(teamMigration, /private\.user_can_access_merchant\(merchant_id,''manage_team''\) and private\.user_can_access_merchant\(merchant_id,%L\)/);
+  assert.match(teamMigration, /if insert_perm is not null and t\.table_name not in/);
+});
+
+test("multi-line carts queue and synchronize as one atomic server operation", () => {
+  assert.match(html, /type:'sale_cart_upsert',merchant_id:state\.merchant\.id,transaction_id:transactionId/);
+  assert.match(html, /async function sheriSyncSaleCartOperation\(op,item\)[\s\S]*?sb\.rpc\('shericeri_sync_sale_cart'/);
+  const syncStart = html.indexOf("async function sheriSyncOutbox(){");
+  const syncEnd = html.indexOf("\nfunction sheriOnlineEvents(){", syncStart);
+  assert.ok(syncStart >= 0 && syncEnd > syncStart);
+  const sync = html.slice(syncStart, syncEnd);
+  assert.equal((sync.match(/op\.type==='sale_cart_upsert'/g)||[]).length, 2,
+    "normal and 401 retry paths must both handle the cart RPC");
+  const start = releaseMigration.indexOf("create or replace function public.shericeri_sync_sale_cart");
+  const end = releaseMigration.indexOf("revoke all on function public.shericeri_sync_sale_cart", start);
+  assert.ok(start >= 0 && end > start);
+  const rpc = releaseMigration.slice(start, end);
+  assert.match(rpc, /order by \(value->>'product_id'\)::uuid[\s\S]*?for update/);
+  assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("update public.products"));
+  assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("insert into public.sales"));
+  assert.match(rpc, /partial sale cart with this transaction ID already exists/i);
+  assert.match(rpc, /pg_advisory_xact_lock/);
+  assert.match(html, /const allOutboxItems=await sheriGetAll\('outbox'\)/);
+  assert.match(html, /const groupReady=group\.every\(x=>!x\.blocked/);
+  assert.match(html, /conflict\.status=422/);
+  assert.match(html, /server stock is insufficient/);
+});
+
+test("PIN throttling locks independent identity and IP buckets and rejects concurrent bypasses", () => {
+  assert.match(releaseMigration, /v_identity_key := 'identity:'/);
+  assert.match(releaseMigration, /v_ip_key := 'ip:'/);
+  assert.match(releaseMigration, /digest\(p_ip_hash,'sha256'\)/);
+  assert.match(releaseMigration, /coalesce\(p_pin,''\) !~ '\^\[0-9\]\+'/);
+  assert.match(releaseMigration, /length\(coalesce\(p_pin,''\)\) not between 6 and 8 then/);
+  assert.match(releaseMigration, /perform 1[\s\S]*?order by attempt_key[\s\S]*?for update/);
+  assert.match(releaseMigration, /then 20 else 5 end/);
+  assert.match(releaseMigration, /where attempt_key = v_identity_key/);
+  assert.match(releaseMigration, /blocked_until=case[\s\S]*?interval '15 minutes'/);
+  assert.match(releaseMigration, /revoke all on function public\.verify_merchant_member_pin/);
+  assert.match(releaseMigration, /grant execute on function public\.verify_merchant_member_pin.*to service_role/);
+  assert.match(teamAccess, /const ip = req\.headers\.get\("cf-connecting-ip"\)/);
+  assert.match(teamAccess, /: "";/);
+});
+
+test("Kinyarwanda TTS JWT enforcement matches the authenticated browser caller", () => {
+  assert.match(supabaseConfig, /\[functions\.kinya-tts\]\s+verify_jwt = true/);
+  assert.match(html, /functions\/v1\/kinya-tts/);
+  assert.match(html, /'Authorization':'Bearer '\+currentSession\.access_token/);
+  assert.match(html, /if\(res\.status===401\)[\s\S]*?sb\.auth\.refreshSession\(\)/);
+});
+
+test("inventory movement labels are localized in Kinyarwanda and French", () => {
+  assert.match(html, /'stock movement history':'Amateka y’impinduka z’ububiko'/);
+  assert.match(html, /'stock movement history':'Historique des mouvements de stock'/);
+  assert.match(html, /'stock adjustment':'Ihinduka ry’ububiko'/);
+  assert.match(html, /'stock adjustment':'Ajustement de stock'/);
+});
+
+test("inventory movement report includes sales, received purchases, stock corrections and void reversals", () => {
+  assert.match(html, /Stock movement history/);
+  assert.match(html, /function renderInventoryMovements\(\)/);
+  assert.match(html, /type:'Sale out'[\s\S]*?quantity:-Math\.abs/);
+  assert.match(html, /type:'Purchase in'[\s\S]*?status==='ordered'/);
+  assert.match(html, /type:'Stock adjustment'/);
+  assert.match(html, /type:'Sale void reversal'/);
+  assert.match(html, /inventoryMovementFrom/);
+  assert.match(html, /inventoryMovementTo/);
+  assert.match(html, /accAudit\('create','adjustment'/);
+  assert.match(html, /accAudit\('edit','adjustment'/);
+  assert.match(teamMigration, /'lines',v_lines/);
+  assert.match(teamMigration, /'product_name',product_name_snapshot,'qty',qty/);
+});
+
+test("database hardening covers all ten unindexed foreign keys and hoists auth.uid from row policies", () => {
+  const fkIndexes = [
+    "bank_accounts_account_merchant_fk_idx","bills_supplier_fk_idx","invoices_customer_fk_idx",
+    "journal_lines_account_merchant_fk_idx","journal_lines_entry_merchant_fk_idx",
+    "payments_account_merchant_fk_idx","recurring_transactions_merchant_fk_idx",
+    "sales_customer_fk_idx","sales_product_fk_idx","tax_rates_merchant_fk_idx"
+  ];
+  for (const name of fkIndexes) assert.ok(releaseMigration.includes("create index if not exists "+name));
+  assert.match(releaseMigration, /for p in[\s\S]*?from pg_policies[\s\S]*?replace\(p\.qual,'auth\.uid\(\)','\(select auth\.uid\(\)\)'\)/);
+  assert.match(releaseMigration, /alter policy %I on %I\.%I/);
+  assert.match(releaseMigration, /not like '%\( select auth\.uid\(\)%'/);
+});
+
+test("switching merchants clears all previously loaded business data before loading the next tenant", () => {
+  assert.match(html, /let sheriLoadedMerchantId=null/);
+  assert.match(html, /function sheriResetMerchantData\(\)/);
+  assert.match(html, /if\(sheriLoadedMerchantId!==mId\)\{sheriResetMerchantData\(\);sheriLoadedMerchantId=mId;\}/);
+  assert.match(html, /state\.accountingSettings=null;state\.currentMembership=null/);
+});
+
+test("suspending a staff member revokes refresh sessions and the client revalidates active membership", () => {
+  assert.match(releaseMigration, /create or replace function public\.revoke_merchant_member_sessions\(p_user_id uuid\)/);
+  assert.match(releaseMigration, /delete from auth\.sessions where user_id=p_user_id/);
+  assert.match(releaseMigration, /grant execute on function public\.revoke_merchant_member_sessions\(uuid\) to service_role/);
+  assert.match(teamAccess, /admin\.rpc\("revoke_merchant_member_sessions"/);
+  assert.match(teamAccess, /status === "suspended" && target\.status !== "suspended"/);
+  assert.match(html, /async function sheriValidateCurrentMembership\(\)/);
+  assert.match(html, /if\(!data\|\|data\.status!=='active'\)/);
+  assert.match(html, /Staff access verified/);
+  assert.match(html, /if\(navigator\.onLine&&\!\(await sheriValidateCurrentMembership\(\)\)\)return/);
+});
+
+test("expense deletion is a soft void with a server-side balanced journal reversal", () => {
+  assert.match(releaseMigration, /add column if not exists voided boolean not null default false/);
+  assert.match(releaseMigration, /create or replace function public\.shericeri_void_expense/);
+  assert.match(releaseMigration, /Only a Manager, Admin or Owner with expense access can void expenses/);
+  assert.match(releaseMigration, /source_type='expense_void'/);
+  assert.match(releaseMigration, /set voided=true,void_reason=trim\(p_reason\)/);
+  assert.match(releaseMigration, /Legacy expense deletion journal entries are blocked/);
+  assert.match(html, /async function sheriSyncVoidExpense\(op\)/);
+  assert.match(html, /type:'expense_void'/);
+  assert.match(html, /expenseDependency=queued\.find/);
+  assert.match(html, /function activeExpenses\(\)/);
+  assert.match(html, /Object\.assign\(expense,\{voided:true,void_reason:reason\.trim\(\)/);
+  assert.match(html, /expenses:activeExpenses\(\)/);
+  assert.match(html, /Legacy expense deletion requires manual reconciliation/);
+  assert.match(releaseMigration, /coalesce\(e\.voided,false\)=false/);
+  assert.match(html, /activeExpenses\(\)\.reduce/);
+  assert.match(html, /expense_void:'Expense voided'/);
+  assert.doesNotMatch(html, /sb\.from\('expenses'\)\.delete\(\)/);
+});
+
+test("period locks are enforced by server-side triggers and operational RPCs", () => {
+  assert.match(releaseMigration, /create or replace function public\.prevent_locked_operational_write/);
+  for (const table of ["products","sales","purchases","expenses"]) {
+    assert.match(releaseMigration, new RegExp("aibos_period_lock_"+table+" on public\\."+table));
+  }
+  assert.match(releaseMigration, /set_config\('app\.aibos_period_lock_bypass','true',true\)/);
+  assert.match(releaseMigration, /Accounting period is locked through/);
+  assert.match(teamMigration, /v_sale_date:=coalesce\(nullif\(p_sale->>'created_at'/);
+  assert.match(teamMigration, /v_purchase_date:=coalesce\(nullif\(p_purchase->>'purchased_at'/);
+  assert.match(teamMigration, /The sale or current accounting period is locked/);
+  assert.match(html, /Sales cannot be recorded until it is reopened/);
+  assert.match(html, /Received purchases cannot be recorded until it is reopened/);
+  assert.match(html, /Expenses cannot be recorded until it is reopened/);
+  assert.match(html, /Stock cannot be adjusted until it is reopened/);
+});
+
+test("operational journal posting follows each source permission and validates its source amounts", () => {
+  const start=releaseMigration.indexOf("create or replace function public.shericeri_sync_journal_batch");
+  const end=releaseMigration.indexOf("revoke all on function public.shericeri_sync_journal_batch",start);
+  assert.ok(start>=0&&end>start);
+  const fn=releaseMigration.slice(start,end);
+  assert.match(fn, /when 'sale' then 'create_sale'/);
+  assert.match(fn, /when 'sale_cogs' then 'create_sale'/);
+  assert.match(fn, /when 'purchase' then 'manage_inventory'/);
+  assert.match(fn, /when 'expense' then 'manage_expenses'/);
+  assert.match(fn, /else 'manage_finance'/);
+  assert.match(fn, /private\.user_can_access_merchant\(p_merchant_id,v_permission\)/);
+  assert.match(fn, /Operational journal lines do not match the source transaction/);
+  assert.match(fn, /Journal date does not match the source transaction date/);
+  assert.match(fn, /v_expected_date date/);
+  assert.match(fn, /This source already has a journal entry/);
+  assert.match(releaseMigration, /journal_entries_merchant_source_unique_idx/);
+  assert.match(releaseMigration, /view_financial_reports/);
+  assert.match(releaseMigration, /case when private\.user_can_access_merchant\(p_merchant_id,'view_audit_log'\)/);
+});
+
+test("opening inventory valuation remains immutable after stock changes and can be rebuilt", () => {
+  assert.match(releaseMigration, /add column if not exists opening_stock_qty integer/);
+  assert.match(releaseMigration, /add column if not exists opening_stock_cost integer/);
+  assert.match(releaseMigration, /p\.opening_stock_value/);
+  assert.match(html, /opening_stock_qty:stock\|\|0/);
+  assert.match(html, /Rebuild opening inventory from immutable creation-time values/);
+  assert.match(html, /sourceType:'product_opening_stock',sourceId:p\.id/);
+});
+
+test("offline sale-void operations wait for their cart dependency to synchronize", () => {
+  assert.match(html, /op\.type==='sale_void'&&op\.transaction_id/);
+  assert.match(html, /saleDependency=queued\.find\(x=>x\.op\?\.type==='sale_cart_upsert'&&x\.op\.transaction_id===op\.transaction_id\)/);
+  assert.match(html, /if\(saleDependency\)continue/);
+});
+
+test("read-only staff do not seed accounts or auto-post journals without an assigned write permission", () => {
+  assert.match(html, /const canSeed=\['create_sale','manage_expenses','manage_inventory','manage_finance'\]\.some\(sheriCan\)/);
+  assert.match(html, /if\(sheriCan\('create_sale'\)\)for\(const s of \(state\.sales\|\|\[\]\)\)/);
+  assert.match(html, /if\(sheriCan\('manage_expenses'\)\)for\(const e of \(state\.expenses\|\|\[\]\)\)/);
+  assert.match(html, /const canSeed=\['create_sale','manage_expenses','manage_inventory','manage_finance'\]\.some\(sheriCan\)/);
+});
+
+test("recurring journal source IDs are deterministic UUIDs accepted by Postgres", () => {
+  assert.match(html, /async function sheriStableUuid\(value\)/);
+  assert.match(html, /const sourceId=await sheriStableUuid\(r\.id\+'\|'\+r\.next_run\)/);
+  assert.doesNotMatch(html, /sourceId:r\.id\+'-'\+r\.next_run/);
+});
+
+test("privileged accounting RPCs are not executable by anon or PUBLIC", () => {
+  assert.match(releaseMigration, /revoke all on function public\.shericeri_get_accounting_snapshot\(uuid\) from public,anon/);
+  assert.match(releaseMigration, /revoke all on function public\.shericeri_sync_journal_batch\(uuid,uuid,date,text,text,uuid,jsonb\) from public,anon/);
+  for (const fn of ["set_merchants_updated_at","set_accounting_settings_updated_at","prevent_locked_journal_entry","prevent_locked_journal_line"]) {
+    assert.ok(releaseMigration.includes("alter function public."+fn+"() set search_path = ''"));
+  }
 });
 
 test("voided server sales are excluded from the active sales workspace", () => {
