@@ -2798,7 +2798,7 @@ async function loadTeamDevices(){
  if(!sheriCan('manage_team')){host.innerHTML='';teamDeviceSessions=[];return;}
  const {data,error}=await sb.rpc('shericeri_list_device_sessions',{p_merchant_id:state.merchant.id});
  if(error)throw error;
- if(data?.ok===falsethrow new Error(data.error||'The server did not authorize device-session access.');
+ if(data?.ok===false)throw new Error(data.error||'The server did not authorize device-session access.');
  teamDeviceSessions=Array.isArray(data)?data:[];
  renderTeamDevices();
 }
@@ -6765,7 +6765,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'repairing ledger…':'Birimo gukosora ibitabo by’ibaruramari…',
     'only an authorized finance manager or owner can repair the ledger.':'Gusa nyiri ubucuruzi cyangwa umuyobozi w’imari ubifitiye uburenganzira ni we ushobora gukosora ibitabo by’ibaruramari.',
     'refresh the server data before repairing the ledger.':'Banza uvugurure amakuru yo kuri seriveri mbere yo gukosora ibitabo by’ibaruramari.',
-    'the ledger is already balanced.':'Ibitabo by’ibaruramari biraringanije.';
+    'the ledger is already balanced.':'Ibitabo by’ibaruramari biraringanije.'
 
   });
   Object.assign(dictionaries.fr,{
@@ -6788,7 +6788,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'repairing ledger…':'Correction du grand livre en cours…',
     'only an authorized finance manager or owner can repair the ledger.':'Seul le propriétaire ou un responsable financier autorisé peut corriger le grand livre.',
     'refresh the server data before repairing the ledger.':'Actualisez les données du serveur avant de corriger le grand livre.',
-    'the ledger is already balanced.':'Le grand livre est déjà équilibré.';
+    'the ledger is already balanced.':'Le grand livre est déjà équilibré.'
 
   });
   phraseFragments.rw.push(
