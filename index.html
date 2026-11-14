@@ -374,7 +374,14 @@ window.ensurePdfJs=async function(){
   <div class="card section">
     <h2>Stock movement report</h2>
     <p class="sub">Opening and closing quantities, receipts, sales, returns, void reversals, adjustments and write-offs.</p>
-    <div class="formgrid"><div><label>From date</label><input type="date" id="inventoryMovementStart"></div><div><label>To date</label><input type="date" id="inventoryMovementEnd"></div><div style="align-self:end"><button class="btn" onclick="loadInventoryMovementReport()">Load movement report</button></div></div>
+    <div class="formgrid">
+      <div><label>Period</label><select id="inventoryMovementPeriod" onchange="sheriSetInventoryMovementPeriod()"><option value="daily">Today (daily)</option><option value="monthly" selected>This month</option><option value="custom">Custom date range</option></select></div>
+      <div><label>From date</label><input type="date" id="inventoryMovementStart"></div>
+      <div><label>To date</label><input type="date" id="inventoryMovementEnd"></div>
+      <div><label>Product</label><select id="inventoryMovementFilterProduct" onchange="sheriApplyInventoryMovementFilters()"><option value="">All products</option></select></div>
+      <div><label>Movement direction</label><select id="inventoryMovementFilterDirection" onchange="sheriApplyInventoryMovementFilters()"><option value="all">All movements</option><option value="in">Stock in only</option><option value="out">Stock out only</option></select></div>
+      <div style="align-self:end"><button class="btn" onclick="loadInventoryMovementReport()">Load movement report</button></div>
+    </div>
     <div id="inventoryMovementEntry" class="card" style="margin-top:12px;display:none">
       <h3>Record return, write-off or adjustment</h3>
       <div class="formgrid">
@@ -2487,6 +2494,23 @@ async function recordInventoryMovement(){
   render();if(navigator.onLine)await sheriSyncOutbox();
   await loadInventoryMovementReport();
 }
+let inventoryMovementReportCache=null;
+function sheriLocalDateInput(date){
+  const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');
+  return y+'-'+m+'-'+d;
+}
+async function sheriSetInventoryMovementPeriod(){
+  const period=document.getElementById('inventoryMovementPeriod')?.value||'custom';
+  const start=document.getElementById('inventoryMovementStart'),end=document.getElementById('inventoryMovementEnd');
+  if(!start||!end)return;
+  const now=new Date(),today=sheriLocalDateInput(now);
+  if(period==='daily'){start.value=today;end.value=today;}
+  else if(period==='monthly'){start.value=sheriLocalDateInput(new Date(now.getFullYear(),now.getMonth(),1));end.value=today;}
+  if(period!=='custom')await loadInventoryMovementReport();
+}
+function sheriApplyInventoryMovementFilters(){
+  if(inventoryMovementReportCache)renderInventoryMovementReport(inventoryMovementReportCache);
+}
 async function loadInventoryMovementReport(){
   const status=document.getElementById('inventoryMovementStatus');
   if(!sheriCan('view_inventory')){if(status)status.textContent='You do not have permission to view inventory movements.';return;}
@@ -2494,11 +2518,20 @@ async function loadInventoryMovementReport(){
   try{
     const start=document.getElementById('inventoryMovementStart').value||null;
     const end=document.getElementById('inventoryMovementEnd').value||null;
+    if(start&&end&&end<start)throw new Error('The end date cannot be earlier than the start date.');
     const {data,error}=await sb.rpc('shericeri_get_inventory_movement_report',{
       p_merchant_id:state.merchant.id,p_start_date:start,p_end_date:end
     });
     if(error)throw error;
-    renderInventoryMovementReport(data||{});
+    inventoryMovementReportCache=data||{};
+    const productFilter=document.getElementById('inventoryMovementFilterProduct');
+    if(productFilter){
+      const selected=productFilter.value;
+      const items=Array.isArray(inventoryMovementReportCache.items)?inventoryMovementReportCache.items:[];
+      productFilter.innerHTML='<option value="">All products</option>'+items.map(p=>'<option value="'+esc(p.product_id)+'">'+esc(p.product_name||'Product')+'</option>').join('');
+      if(items.some(p=>p.product_id===selected))productFilter.value=selected;
+    }
+    renderInventoryMovementReport(inventoryMovementReportCache);
     if(status)status.textContent=(data?.items||[]).length+' products · '+(data?.can_view_costs?'Valuation and COGS included':'Quantities only; valuation access is restricted');
   }catch(e){if(status)status.textContent=e?.message||'Could not load the stock movement report.';}
 }
@@ -2506,17 +2539,22 @@ function renderInventoryMovementReport(report){
   const summary=document.getElementById('inventoryMovementSummary');
   const details=document.getElementById('inventoryMovementDetails');
   if(!summary||!details)return;
-  const items=Array.isArray(report.items)?report.items:[];
+  const allItems=Array.isArray(report.items)?report.items:[];
+  const selectedProduct=document.getElementById('inventoryMovementFilterProduct')?.value||'';
+  const direction=document.getElementById('inventoryMovementFilterDirection')?.value||'all';
+  const items=selectedProduct?allItems.filter(p=>p.product_id===selectedProduct):allItems;
   const costs=report.can_view_costs===true;
-  if(!items.length){summary.innerHTML='<div class="empty">No inventory movement data for this period.</div>';details.innerHTML='';return;}
+  if(!items.length){summary.innerHTML='<div class="empty">No inventory movement data for this product and period.</div>';details.innerHTML='';return;}
   const headers=['Product','Opening','Stock in','Stock out','Closing','Receipts','Sales','Returns','Void reversals','Adjustments','Write-offs'];
   if(costs)headers.push('Unit cost','Stock value','COGS');
   summary.innerHTML='<table class="table" style="min-width:1050px"><tr>'+headers.map(x=>'<th>'+x+'</th>').join('')+'</tr>'+
     items.map(p=>'<tr><td>'+esc(p.product_name||'Product')+'</td><td>'+Number(p.opening_quantity||0)+'</td><td>'+Number(p.stock_in||0)+'</td><td>'+Number(p.stock_out||0)+'</td><td><b>'+Number(p.closing_quantity||0)+'</b></td><td>'+Number(p.receipts||0)+'</td><td>'+Number(p.sales||0)+'</td><td>'+Number(p.returns||0)+'</td><td>'+Number(p.void_reversals||0)+'</td><td>'+Number(p.adjustments||0)+'</td><td>'+Number(p.writeoffs||0)+'</td>'+
     (costs?'<td>'+money(p.unit_cost||0)+'</td><td>'+money(p.stock_value||0)+'</td><td>'+money(p.cogs||0)+'</td>':'')+'</tr>').join('')+'</table>';
-  const moves=items.flatMap(p=>(p.movements||[]).map(m=>({...m,product_name:p.product_name}))).sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
+  const moves=items.flatMap(p=>(p.movements||[]).map(m=>({...m,product_name:p.product_name})))
+    .filter(m=>direction==='in'?Number(m.quantity_delta)>0:direction==='out'?Number(m.quantity_delta)<0:true)
+    .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
   details.innerHTML='<h3>Movement details</h3>'+(moves.length?'<table class="table" style="min-width:1100px"><tr><th>Date</th><th>Product</th><th>Movement</th><th>Change</th><th>Before</th><th>After</th><th>Source</th><th>Reason</th><th>Actor ID</th>'+(costs?'<th>Unit cost</th>':'')+'</tr>'+
-    moves.map(m=>'<tr><td>'+esc(m.created_at?new Date(m.created_at).toLocaleString():'—')+'</td><td>'+esc(m.product_name||'')+'</td><td>'+esc(m.movement_type||'')+'</td><td>'+Number(m.quantity_delta||0)+'</td><td>'+Number(m.quantity_before||0)+'</td><td>'+Number(m.quantity_after||0)+'</td><td>'+esc(m.source_type||'')+'</td><td>'+esc(m.reason||'')+'</td><td>'+esc(m.actor_user_id||'System')+'</td>'+(costs?'<td>'+money(m.unit_cost||0)+'</td>':'')+'</tr>').join('')+'</table>':'<div class="empty">No individual movements were recorded in this period.</div>');
+    moves.map(m=>'<tr><td>'+esc(m.created_at?new Date(m.created_at).toLocaleString():'—')+'</td><td>'+esc(m.product_name||'')+'</td><td>'+esc(m.movement_type||'')+'</td><td>'+Number(m.quantity_delta||0)+'</td><td>'+Number(m.quantity_before||0)+'</td><td>'+Number(m.quantity_after||0)+'</td><td>'+esc(m.source_type||'')+'</td><td>'+esc(m.reason||'')+'</td><td>'+esc(m.actor_user_id||'System')+'</td>'+(costs?'<td>'+money(m.unit_cost||0)+'</td>':'')+'</tr>').join('')+'</table>':'<div class="empty">No movements match the selected direction in this period.</div>');
 }
 function renderInventory(){
   const list=activeProducts();renderInventoryMovementEntry();const search=document.getElementById('inventorySearchHost');if(search)search.innerHTML=sheriSearchControl('inventory','inventoryTable','Search products by name, category or barcode',list.flatMap(p=>[p.name,p.cat,p.barcode]));
