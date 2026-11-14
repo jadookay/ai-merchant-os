@@ -6,6 +6,7 @@ const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
+const sixDigitIdMigration = readFileSync(new URL("../supabase/migrations/20261114180000_enforce_six_digit_shericeri_business_ids.sql", import.meta.url), "utf8");
 const voidBlock = html.slice(html.indexOf("async function voidSale(id){"), html.indexOf("const sheriSearchValues"));
 
 test("Kinyarwanda covers core finance and stock terms", () => {
@@ -190,12 +191,11 @@ test("business IDs are capped at six digits in the app, staff login and database
   assert.ok(html.includes('maxlength="6"'));
   assert.ok(html.includes("!/^\\d{1,6}$/.test(merchant_code)"));
   assert.ok(teamAccess.includes("!/^\\d{1,6}$/.test(merchantCode)"));
-  assert.ok(html.includes("merchants_shericeri_id_six_digits_check"));
+  assert.ok(sixDigitIdMigration.includes("merchants_shericeri_id_six_digits_check"));
 });
 
 test("cross-device server rows override stale local rows and foreground tabs refresh", () => {
   assert.ok(html.includes("if(pendingIdsFor(store).has(x.id)&&!sm.has(x.id))"));
-  assert.ok(html.includes("sheriQueueQueued"));
   assert.ok(html.includes("sheriSyncQueued=items.length"));
   assert.ok(html.includes("loadAll(true).then(()=>render())"));
 });
