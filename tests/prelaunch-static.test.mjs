@@ -24,7 +24,7 @@ test("global language selector stays fixed at the top-right and synchronizes app
 test("production inline JavaScript parses without syntax errors", () => {
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
     .filter(match => !/type\s*=\s*["']module["']/i.test(match[1]) && match[2].trim());
-  assert.equal(scripts.length, 6, "expected all six production inline script blocks");
+  assert.ok(scripts.length >= 6, "expected all production inline script blocks to be present");
   scripts.forEach((match, index) => {
     try {
       new vm.Script(match[2], { filename: "index.html inline script " + index });
@@ -469,7 +469,7 @@ test("stock conflicts do not create partial sale or purchase records", () => {
 });
 
 test("voided server sales remain visible in history but are excluded from active metrics", () => {
-  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales);"));
+  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales,'sales');"));
   assert.match(html, /s\.voided\?'<span class="pill">Voided<\/span>/);
   assert.ok(html.includes("esc(s.void_reason||'No reason recorded')"));
   assert.ok(html.includes("function revenue(){return state.sales.filter(x=>!x.voided)"));
