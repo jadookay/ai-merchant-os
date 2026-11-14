@@ -567,6 +567,10 @@ test("expense deletion is a soft void with a server-side balanced journal revers
   assert.match(html, /type:'expense_void'/);
   assert.match(html, /expenseDependency=queued\.find/);
   assert.match(html, /function activeExpenses\(\)/);
+  assert.match(html, /Object\.assign\(expense,\{voided:true,void_reason:reason\.trim\(\)/);
+  assert.match(html, /expenses:activeExpenses\(\)/);
+  assert.match(html, /Legacy expense deletion requires manual reconciliation/);
+  assert.match(releaseMigration, /coalesce\(e\.voided,false\)=false/);
   assert.match(html, /activeExpenses\(\)\.reduce/);
   assert.match(html, /expense_void:'Expense voided'/);
   assert.doesNotMatch(html, /sb\.from\('expenses'\)\.delete\(\)/);
