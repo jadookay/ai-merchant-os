@@ -542,3 +542,36 @@ grant execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,tex
 create unique index if not exists journal_entries_merchant_source_unique_idx
   on public.journal_entries(merchant_id,source_type,source_id)
   where source_type is not null and source_id is not null;
+
+
+-- Expose accounting snapshots only to members explicitly assigned financial
+-- report access; audit history remains a separate permission.
+create or replace function public.shericeri_get_accounting_snapshot(p_merchant_id uuid)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+begin
+  if not private.user_can_access_merchant(p_merchant_id,'view_financial_reports') then
+    raise exception 'Not authorized to view financial reports';
+  end if;
+  return jsonb_build_object(
+    'accounts',coalesce((select jsonb_agg(x order by x.code) from (select * from public.chart_of_accounts where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'journalEntries',coalesce((select jsonb_agg(x order by x.entry_date desc) from (select * from public.journal_entries where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'journalLines',coalesce((select jsonb_agg(x) from (select * from public.journal_lines where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'invoices',coalesce((select jsonb_agg(x order by x.issue_date desc) from (select * from public.invoices where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'bills',coalesce((select jsonb_agg(x order by x.issue_date desc) from (select * from public.bills where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'payments',coalesce((select jsonb_agg(x order by x.payment_date desc) from (select * from public.payments where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'bankAccounts',coalesce((select jsonb_agg(x order by x.name) from (select * from public.bank_accounts where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'taxRates',coalesce((select jsonb_agg(x order by x.name) from (select * from public.tax_rates where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'recurringTransactions',coalesce((select jsonb_agg(x order by x.next_run) from (select * from public.recurring_transactions where merchant_id=p_merchant_id) x),'[]'::jsonb),
+    'accountingSettings',(select to_jsonb(x) from (select * from public.accounting_settings where merchant_id=p_merchant_id limit 1) x),
+    'auditLog',case when private.user_can_access_merchant(p_merchant_id,'view_audit_log')
+      then coalesce((select jsonb_agg(x order by x.created_at desc) from (select * from public.audit_log where merchant_id=p_merchant_id order by created_at desc limit 100) x),'[]'::jsonb)
+      else '[]'::jsonb end
+  );
+end;
+$$;
+revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon;
+grant execute on function public.shericeri_get_accounting_snapshot(uuid) to authenticated;
