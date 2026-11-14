@@ -744,9 +744,11 @@ declare
   v_current_stock integer;
   v_conflicts jsonb:='[]'::jsonb;
 begin
-  if jsonb_typeof(p_sales)<>'array' or jsonb_array_length(p_sales)<1
+  if p_sales is null or p_stock_checks is null
+     or jsonb_typeof(p_sales) is distinct from 'array'
+     or jsonb_array_length(p_sales)<1
      or jsonb_array_length(p_sales)>100
-     or jsonb_typeof(p_stock_checks)<>'array'
+     or jsonb_typeof(p_stock_checks) is distinct from 'array'
      or jsonb_array_length(p_stock_checks)<1 then
     raise exception 'A sale invoice must contain valid sale lines and stock checks';
   end if;
