@@ -1177,7 +1177,7 @@ async function sheriSyncOutbox(){
         else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
         else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='expense_delete'){const {error}=await sb.from('expenses').delete().eq('id',op.id);if(error)throw error}
-        else if(op.type==='sale_delete'){const {error}=await sb.from('sales').delete().eq('id',op.id);if(error)throw error}
+        else if(op.type==='sale_delete')throw new Error('Direct sale deletion is disabled; use the audited sale-void workflow.')
         else if(op.type==='supplier_upsert'){const {error}=await sb.from('suppliers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='supplier_delete'){const {error}=await sb.from('suppliers').update({deleted:true}).eq('id',op.id);if(error)throw error}
         else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
