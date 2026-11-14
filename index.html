@@ -1942,7 +1942,8 @@ document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset
 
 function sheriRecentActivitiesHtml(){
   const rows=[];
-  for(const s of state.sales||[])if(!s.voided)rows.push({when:s.created_at,type:'Sale',title:s.product_name_snapshot||product(s.product_id)?.name||'Sale',amount:Number(s.qty||0)*Number(s.price||0)});\n  for(const s of state.sales||[])if(s.voided)rows.push({when:s.voided_at||s.created_at,type:'Voided sale',title:(s.product_name_snapshot||product(s.product_id)?.name||'Sale')+' — '+(s.void_reason||'No reason recorded'),amount:0});
+  for(const s of state.sales||[])if(!s.voided)rows.push({when:s.created_at,type:'Sale',title:s.product_name_snapshot||product(s.product_id)?.name||'Sale',amount:Number(s.qty||0)*Number(s.price||0)});
+  for(const s of state.sales||[])if(s.voided)rows.push({when:s.voided_at||s.created_at,type:'Voided sale',title:(s.product_name_snapshot||product(s.product_id)?.name||'Sale')+' — '+(s.void_reason||'No reason recorded'),amount:0});
   for(const e of state.expenses||[])rows.push({when:e.created_at,type:'Expense',title:e.description||'Expense',amount:-Number(e.amount||0)});
   for(const p of state.purchases||[])if(p.status!=='ordered')rows.push({when:p.purchased_at||p.created_at,type:'Purchase',title:p.product_name_snapshot||product(p.product_id)?.name||'Purchase',amount:-Number(p.total||Number(p.qty||0)*Number(p.unit_cost||0))});
   for(const c of state.cashEntries||[])rows.push({when:c.occurred_at||c.created_at,type:c.kind==='income'?'Cash income':c.kind==='expense'?'Cash expense':'Cash transfer',title:c.description||'Cash movement',amount:c.kind==='income'?Number(c.amount||0):c.kind==='expense'?-Number(c.amount||0):0});
