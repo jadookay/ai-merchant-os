@@ -16,7 +16,7 @@ new vm.Script(previewScript, { filename: "preview/index.html" });
 
 
 test("all inline production JavaScript parses without syntax errors", () => {
-  const scripts = [...html.matchAll(/<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+  const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)];
   assert.ok(scripts.length > 0, "expected inline application scripts");
   for (let i = 0; i < scripts.length; i++) {
     const source = scripts[i][1].trim();
