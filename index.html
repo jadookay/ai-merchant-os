@@ -1643,7 +1643,7 @@ async function onAuthed(sess){
     else{const n=document.getElementById('shericeriNotice');if(n)n.textContent='Offline mode — saved business data is still available.'}
   }else showOnboarding()
 }
-async function signOut(){await sb.auth.signOut();session=null;location.reload()}
+async function signOut(){await sb.auth.signOut({scope:'local'});session=null;location.reload()}
 
 // ── Data loading ─────────────────────────────────────────────────────────
 async function loadAll(silent=false){
@@ -2544,7 +2544,7 @@ function renderTeamDevices(){
  const host=document.getElementById('teamDevicesTable');if(!host)return;
  const rows=teamDeviceSessions||[];
  host.innerHTML=rows.length?'<table class="table" style="min-width:760px"><tr><th>Staff member</th><th>Device</th><th>Platform</th><th>Last seen</th><th>Status</th><th>Action</th></tr>'+
- rows.map(d=>'<tr><td>'+esc(d.member_name||d.role||'Staff')+' · '+esc(d.role||'')+'</td><td>'+esc(d.device_name||'Unknown device')+'</td><td>'+esc(d.platform||'—')+'</td><td>'+esc(d.last_seen_at?new Date(d.last_seen_at).toLocaleString():'—')+'</td><td>'+(d.revoked_at?'Revoked':d.current?'Current session':'Active')+'</td><td>'+(d.revoked_at||d.current?'—':'<button class="btn small danger" onclick="revokeTeamDeviceSession(\''+esc(d.session_id)+'\')">Revoke session</button>')+'</td></tr>').join('')+'</table>':'<div class="empty">No staff device sessions have been registered yet.</div>';
+ rows.map(d=>'<tr><td>'+esc(d.member_name||d.role||'Staff')+' · '+esc(d.role||'')+'</td><td>'+esc(d.device_name||'Unknown device')+'</td><td>'+esc(d.platform||'—')+'</td><td>'+esc(d.last_seen_at?new Date(d.last_seen_at).toLocaleString():'—')+'</td><td>'+(d.revoked_at?'Revoked':!d.auth_session_active?'Signed out / expired':d.current?'Current session':'Active')+'</td><td>'+(d.revoked_at||!d.auth_session_active||d.current?'—':'<button class="btn small danger" onclick="revokeTeamDeviceSession(\''+esc(d.session_id)+'\')">Revoke session</button>')+'</td></tr>').join('')+'</table>':'<div class="empty">No staff device sessions have been registered yet.</div>';
 }
 async function revokeTeamDeviceSession(sessionId){
  if(!sessionId||!confirm('Revoke this device session? It will lose access on its next server request.'))return;
