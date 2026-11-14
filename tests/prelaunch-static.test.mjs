@@ -60,10 +60,14 @@ test("cancelled sale void leaves records and accounting untouched", () => {
   assert.doesNotMatch(html, /const _v14_1_voidSale=voidSale/);
 });
 
-test("locally deleted expenses and voided invoice sale rows are removed from IndexedDB", () => {
+test("locally deleted expenses are removed but voided sales remain preserved in IndexedDB", () => {
   assert.match(html, /state\.expenses=state\.expenses\.filter\(x=>x\.id!==id\);await sheriDelete\('expenses',id\)/);
-  assert.match(html, /for\(const row of rows\)[\s\S]*?await sheriDelete\('sales',row\.id\)/);
-  assert.match(html, /state\.sales=state\.sales\.filter\(x=>!saleIds\.includes\(x\.id\)\)/);
+  const voidStart=html.indexOf("async function voidSale(id){");
+  const voidEnd=html.indexOf("const sheriSearchValues",voidStart);
+  const voidCode=html.slice(voidStart,voidEnd);
+  assert.ok(voidCode.includes("await sheriPut('sales',row.id"));
+  assert.doesNotMatch(voidCode, /sheriDelete\('sales'/);
+  assert.ok(voidCode.includes("Voids are status changes, never deletions"));
 });
 
 test("journal entries synchronize as one atomic RPC batch on normal and auth-retry paths", () => {
@@ -450,8 +454,11 @@ test("stock conflicts do not create partial sale or purchase records", () => {
   assert.ok(purchase.includes("return jsonb_build_object('ok',false,'stock_conflict',true"));
 });
 
-test("voided server sales are excluded from the active sales workspace", () => {
-  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales).filter(x=>!x.voided)"));
+test("voided server sales remain visible in history but are excluded from active metrics", () => {
+  assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales);"));
+  assert.ok(html.includes("s.voided?'<span class="pill">Voided</span>"));
+  assert.ok(html.includes("esc(s.void_reason||'No reason recorded')"));
+  assert.ok(html.includes("function revenue(){return state.sales.filter(x=>!x.voided)"));
 });
 
 
