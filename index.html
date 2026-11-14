@@ -364,6 +364,18 @@ window.ensurePdfJs=async function(){
     </div>
   </div>
   <div class="card section"><div id="inventorySearchHost"></div><div id="inventoryTable"></div></div>
+  <div class="card section">
+    <h2>Stock movement history</h2>
+    <div class="sub">Track recorded stock coming in and going out. Sales, received purchases, manager stock corrections and sale reversals are included when their audit records are available.</div>
+    <div class="formgrid" style="margin-top:10px">
+      <div><label>From</label><input id="inventoryMovementFrom" type="date"></div>
+      <div><label>To</label><input id="inventoryMovementTo" type="date"></div>
+      <div style="align-self:end"><button class="btn small" onclick="renderInventoryMovements()">Apply dates</button></div>
+    </div>
+    <div id="inventoryMovementSummary" style="margin-top:12px"></div>
+    <div id="inventoryMovementTable" style="overflow-x:auto;margin-top:10px"></div>
+    <div class="sub" style="margin-top:8px">This report reflects recorded transactions. It cannot reconstruct stock corrections made before movement logging was enabled.</div>
+  </div>
   <div class="card section"><h2>Revenue by category</h2><div id="categoryTable"></div></div>
   <div class="card section">
     <h2>Import / Export</h2>
@@ -2289,6 +2301,59 @@ function renderInventory(){
   const list=activeProducts();const search=document.getElementById('inventorySearchHost');if(search)search.innerHTML=sheriSearchControl('inventory','inventoryTable','Search products by name, category or barcode',list.flatMap(p=>[p.name,p.cat,p.barcode]));
   document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions">${sheriCan('manage_team')&&sheriCan('manage_inventory')?'<button class="btn small secondary" onclick="toggleProductFavorite(\''+p.id+'\')">'+(p.favorite?'★ Favorite':'☆ Favorite')+'</button><button class="btn small secondary" onclick="editProduct(\''+p.id+'\')">Edit</button><button class="btn small danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>':''}</div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
   renderCategory();
+  renderInventoryMovements();
+}
+function renderInventoryMovements(){
+  const from=document.getElementById('inventoryMovementFrom')?.value||'';
+  const to=document.getElementById('inventoryMovementTo')?.value||'';
+  const rows=[];
+  for(const sale of state.sales||[]){
+    rows.push({
+      when:sale.created_at||sale.sold_at,type:'Sale out',direction:'OUT',
+      product:sale.product_name_snapshot||product(sale.product_id)?.name||'Product',
+      quantity:-Math.abs(Number(sale.qty||0)),reference:sale.invoice_number||sale.transaction_id||'Sale',
+      reason:'Recorded sale'
+    });
+  }
+  for(const purchase of state.purchases||[]){
+    if(purchase.status==='ordered')continue;
+    rows.push({
+      when:purchase.purchased_at||purchase.created_at,type:'Purchase in',direction:'IN',
+      product:purchase.product_name_snapshot||product(purchase.product_id)?.name||'Product',
+      quantity:Math.abs(Number(purchase.qty||0)),reference:purchase.id||'Purchase',
+      reason:'Received purchase'
+    });
+  }
+  for(const event of state.auditLog||[]){
+    const details=event.details||{};
+    if(event.entity_type==='adjustment'&&Number.isFinite(Number(details.stock_delta))&&Number(details.stock_delta)!==0){
+      rows.push({
+        when:event.created_at,type:'Stock adjustment',direction:Number(details.stock_delta)>0?'IN':'OUT',
+        product:details.product_name||product(event.entity_id)?.name||'Product',
+        quantity:Number(details.stock_delta),reference:event.id,reason:event.reason||details.reason||'Manager adjustment'
+      });
+    }
+    if(event.action==='void'&&event.entity_type==='sale'&&Array.isArray(details.lines)){
+      for(const line of details.lines){
+        rows.push({
+          when:event.created_at,type:'Sale void reversal',direction:'IN',
+          product:line.product_name||product(line.product_id)?.name||'Product',
+          quantity:Math.abs(Number(line.qty||0)),reference:details.invoice_number||event.entity_id||'Voided sale',
+          reason:event.reason||details.reason||'Sale voided'
+        });
+      }
+    }
+  }
+  const inRange=rows.filter(x=>{
+    const day=String(x.when||'').slice(0,10);
+    return (!from||day>=from)&&(!to||day<=to);
+  }).sort((a,b)=>String(b.when||'').localeCompare(String(a.when||'')));
+  const incoming=inRange.filter(x=>x.quantity>0).reduce((n,x)=>n+x.quantity,0);
+  const outgoing=inRange.filter(x=>x.quantity<0).reduce((n,x)=>n+Math.abs(x.quantity),0);
+  const summary=document.getElementById('inventoryMovementSummary');
+  if(summary)summary.innerHTML='<div class="row"><span>Stock received / added</span><b>'+incoming+'</b></div><div class="row"><span>Stock sold / removed</span><b>'+outgoing+'</b></div><div class="row"><span>Net movement</span><b>'+(incoming-outgoing)+'</b></div>';
+  const host=document.getElementById('inventoryMovementTable');
+  if(host)host.innerHTML=inRange.length?'<table class="table" style="min-width:760px"><tr><th>Date</th><th>Product</th><th>Movement</th><th>Quantity</th><th>Reference</th><th>Reason</th></tr>'+inRange.map(x=>'<tr><td>'+esc(x.when?new Date(x.when).toLocaleString():'—')+'</td><td>'+esc(x.product)+'</td><td>'+esc(x.type)+'</td><td>'+((x.quantity>0?'+':'')+x.quantity)+'</td><td>'+esc(x.reference)+'</td><td>'+esc(x.reason)+'</td></tr>').join('')+'</table>':'<div class="empty">No recorded stock movements in this date range.</div>';
 }
 async function toggleProductFavorite(id){if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can change sales favorites.','error');const p=product(id);if(!p)return;p.favorite=!p.favorite;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}});render();sheriToast(p.favorite?'Added to sales favorites.':'Removed from sales favorites.')}
 function renderCategory(){const rows=categoryBreakdown();document.getElementById('categoryTable').innerHTML=rows.length?`<table class="table"><tr><th>Category</th><th>Revenue</th><th>Est. profit</th></tr>${rows.map(r=>`<tr><td>${esc(r.cat)}</td><td>${money(r.revenue)}</td><td>${money(r.profit)}</td></tr>`).join('')}</table>`:'<div class="empty">No sales yet.</div>'}
