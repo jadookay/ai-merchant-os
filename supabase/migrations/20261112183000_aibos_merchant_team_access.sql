@@ -135,6 +135,7 @@ drop trigger if exists products_inventory_movement_capture on public.products;
 create trigger products_inventory_movement_capture
 after insert or update of stock on public.products
 for each row execute function public.capture_inventory_movement();
+revoke all on function public.capture_inventory_movement() from public,anon,authenticated;
 
 -- Establish an auditable opening balance for products that existed before this ledger.
 insert into public.inventory_movements(
