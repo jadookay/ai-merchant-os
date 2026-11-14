@@ -12,6 +12,13 @@ const previewHtml = await readFile(new URL("../preview/index.html", import.meta.
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
 
+test("production inline JavaScript parses without syntax errors", () => {
+  const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)]
+    .filter(match => !/type\\s*=\\s*["']module["']/i.test(match[1]) && match[2].trim());
+  assert.equal(scripts.length, 6, "expected all six production inline script blocks");
+  scripts.forEach((match, index) => new vm.Script(match[2], { filename: "index.html inline script " + index }));
+});
+
 
 test("team managers cannot create administrator accounts or grant permissions they do not hold", () => {
   assert.match(teamAccess, /if \(role === "admin" && !isPrivilegedGrantor\)/);
