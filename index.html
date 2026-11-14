@@ -1098,7 +1098,9 @@ async function sheriSyncInventoryAdjustmentOperation(op){
   if(data?.stock_conflict){
     const p=product(op.product_id);if(p&&Number.isFinite(Number(data.server_stock))){p.stock=Number(data.server_stock);await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});render();}
     await sheriRecordConflict({type:'inventory_adjustment_conflict',product_id:op.product_id,expected_stock:op.expected_stock,server_stock:data.server_stock,operation:op});
-  }else if(data?.ok!==true)throw new Error('Inventory adjustment was not recorded.');
+  }else if(data?.ok===true){
+    const p=product(op.product_id);if(p&&Number.isFinite(Number(data.stock))){p.stock=Number(data.stock);await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});}
+  }else throw new Error('Inventory adjustment was not recorded.');
 }
 async function sheriSyncVoidSale(op){
   const {error}=await sb.rpc('shericeri_void_sale',{
@@ -1201,6 +1203,10 @@ async function sheriSyncOutbox(){
         await sheriDelete('outbox',item.key);
         successCount++;
       }catch(err){
+        if(op.type==='inventory_adjustment'){
+          const p=product(op.product_id);
+          if(p){p.stock=Number(op.expected_stock);await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});}
+        }
         // A 401 is an authentication-expiry condition, not a bad business row.
         // Refresh once and retry this same operation before recording a failure.
         if(Number(err?.status||err?.code||0)===401){
