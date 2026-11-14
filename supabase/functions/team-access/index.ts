@@ -178,20 +178,57 @@ Deno.serve(async (req: Request) => {
         return json({ error: "Only the business owner or an administrator can create another administrator." }, 403);
       }
 
-      const authEmail = email || ("staff-" + crypto.randomUUID() + "@example.com");
-      const { data: created, error: createError } = await admin.auth.admin.createUser({
-        email: authEmail,
-        phone: phone || undefined,
-        password: randomPassword(),
-        email_confirm: true,
-        phone_confirm: !!phone,
-        user_metadata: { full_name: fullName },
-      });
-      if (createError || !created?.user) throw createError || new Error("Could not create the login identity.");
+      // Reuse an existing verified Auth identity when the owner is adding an
+      // employee who already has an account. Never create a duplicate identity.
+      let authUser: any = null;
+      let createdAuthUser = false;
+      if (email || (!email && phone)) {
+        const { data: userPage, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        if (listError) throw listError;
+        authUser = (userPage?.users || []).find((u: any) =>
+          email ? String(u.email || "").toLowerCase() === email :
+          String(u.phone || "").replace(/[^0-9+]/g, "") === phone
+        ) || null;
+      }
+      if (authUser?.id === merchant.user_id) {
+        return json({ ok: false, code: "owner_identity", error: "The business owner's login cannot also be added as an employee." }, 409);
+      }
+      if (authUser && !authUser.email) {
+        return json({ ok: false, code: "existing_phone_account", error: "This phone is already attached to an account without an email login. Add a verified email to that account first, or use a different phone number." }, 409);
+      }
+      if (authUser) {
+        const { data: existingMember, error: existingMemberError } = await admin.from("merchant_members")
+          .select("id").eq("merchant_id", merchantId).eq("user_id", authUser.id).maybeSingle();
+        if (existingMemberError) throw existingMemberError;
+        if (existingMember) {
+          return json({ ok: false, code: "member_exists", error: "This person is already on this business team. Use Edit access to change permissions or reset their PIN." }, 409);
+        }
+      } else {
+        const authEmail = email || ("staff-" + crypto.randomUUID() + "@example.com");
+        const { data: created, error: createError } = await admin.auth.admin.createUser({
+          email: authEmail,
+          phone: phone || undefined,
+          password: randomPassword(),
+          email_confirm: true,
+          phone_confirm: !!phone,
+          user_metadata: { full_name: fullName },
+        });
+        if (createError || !created?.user) {
+          const code = (createError as any)?.code;
+          if (code === "email_exists" || code === "phone_exists") {
+            return json({ ok: false, code, error: code === "email_exists"
+              ? "This email already belongs to an account. If it is the employee's account, sign in using that account or contact support to link it; otherwise use another email."
+              : "This phone number is already linked to an account. Use the employee's existing account or another phone number." }, 409);
+          }
+          throw createError || new Error("Could not create the login identity.");
+        }
+        authUser = created.user;
+        createdAuthUser = true;
+      }
 
       const { data: member, error: insertError } = await admin.from("merchant_members").insert({
         merchant_id: merchantId,
-        user_id: created.user.id,
+        user_id: authUser.id,
         full_name: fullName,
         username,
         email,
@@ -203,7 +240,7 @@ Deno.serve(async (req: Request) => {
       }).select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,status,created_at").single();
 
       if (insertError) {
-        await admin.auth.admin.deleteUser(created.user.id);
+        if (createdAuthUser) await admin.auth.admin.deleteUser(authUser.id);
         throw insertError;
       }
 
@@ -213,11 +250,11 @@ Deno.serve(async (req: Request) => {
       });
       if (pinError) {
         await admin.from("merchant_members").delete().eq("id", member.id);
-        await admin.auth.admin.deleteUser(created.user.id);
+        if (createdAuthUser) await admin.auth.admin.deleteUser(authUser.id);
         throw pinError;
       }
 
-      return json({ ok: true, member });
+      return json({ ok: true, member, reused_existing_auth_user: !createdAuthUser });
     }
 
     if (action === "update_member") {
@@ -330,6 +367,12 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Unsupported action." }, 400);
   } catch (error) {
     console.error("[team-access]", error);
-    return json({ error: "The team access request could not be completed. Check the supplied details and try again." }, 500);
+    const code = (error as any)?.code;
+    if (code === "email_exists" || code === "phone_exists") {
+      return json({ ok: false, code, error: code === "email_exists"
+        ? "This email is already registered. Use the employee's existing account or another email address."
+        : "This phone number is already registered. Use the employee's existing account or another phone number." }, 409);
+    }
+    return json({ ok: false, error: (error as any)?.message || "The team access request could not be completed. Check the supplied details and try again." }, 500);
   }
 });
