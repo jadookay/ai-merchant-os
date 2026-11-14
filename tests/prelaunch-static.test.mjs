@@ -426,6 +426,12 @@ test("sale voiding retains source rows, reverses posted journals and is idempote
   assert.ok(teamMigration.includes("jl.credit,jl.debit"));
   assert.ok(!teamMigration.includes("delete from public.sales"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
+  const voidStart=teamMigration.indexOf("create or replace function public.shericeri_void_sale");
+  const voidEnd=teamMigration.indexOf("revoke all on function public.shericeri_void_sale",voidStart);
+  const voidRpc=teamMigration.slice(voidStart,voidEnd);
+  assert.ok(voidRpc.includes("private.user_can_access_merchant(v_merchant_id,'manage_team')"));
+  assert.ok(voidRpc.includes("private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
+  assert.ok(!voidRpc.includes("private.user_can_access_merchant(v_merchant_id,'manage_finance')"));
 });
 
 test("stock conflicts do not create partial sale or purchase records", () => {
