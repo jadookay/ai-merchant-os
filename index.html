@@ -797,9 +797,9 @@ async function sheriRegisterDeviceSession(merchantId){
 async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id){
   if(!merchantId||!session?.user?.id)return true;
   if(state.merchant?.user_id===session.user.id)return true;
-  const {data,error}=await sb.from('merchant_members').select('status').eq('merchant_id',merchantId).eq('user_id',session.user.id).maybeSingle();
+  const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,role,permissions,responsibility,status').eq('merchant_id',merchantId).eq('user_id',session.user.id).maybeSingle();
   if(error)throw error;
-  if(data?.status==='active'&&await sheriRegisterDeviceSession(merchantId))return true;
+  if(data?.status==='active'&&await sheriRegisterDeviceSession(merchantId)){state.currentMembership=data;return true;}
   await sheriClearMerchantLocalData(merchantId);
   try{await sb.auth.signOut({scope:'local'})}catch(_){}
   return false;
