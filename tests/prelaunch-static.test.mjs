@@ -472,6 +472,7 @@ test("multi-line carts queue and synchronize as one atomic server operation", ()
   assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("update public.products"));
   assert.ok(rpc.indexOf("if jsonb_array_length(v_conflicts)>0") < rpc.indexOf("insert into public.sales"));
   assert.match(rpc, /partial sale cart with this transaction ID already exists/i);
+  assert.match(rpc, /pg_advisory_xact_lock/);
   assert.match(html, /const allOutboxItems=await sheriGetAll\('outbox'\)/);
   assert.match(html, /const groupReady=group\.every\(x=>!x\.blocked/);
   assert.match(html, /conflict\.status=422/);
@@ -587,6 +588,7 @@ test("read-only staff do not seed accounts or auto-post journals without an assi
   assert.match(html, /const canSeed=\['create_sale','manage_expenses','manage_inventory','manage_finance'\]\.some\(sheriCan\)/);
   assert.match(html, /if\(sheriCan\('create_sale'\)\)for\(const s of \(state\.sales\|\|\[\]\)\)/);
   assert.match(html, /if\(sheriCan\('manage_expenses'\)\)for\(const e of \(state\.expenses\|\|\[\]\)\)/);
+  assert.match(html, /const canSeed=\['create_sale','manage_expenses','manage_inventory','manage_finance'\]\.some\(sheriCan\)/);
 });
 
 test("recurring journal source IDs are deterministic UUIDs accepted by Postgres", () => {
