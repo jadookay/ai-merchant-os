@@ -172,6 +172,11 @@ begin
     group by x.value->>'product_id' having count(*)>1
   ) then raise exception 'Duplicate product stock change'; end if;
 
+  -- Serialize duplicate submissions of the same invoice even when their
+  -- line items do not share a product row.
+  perform pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended(p_merchant_id::text||':'||p_transaction_id::text,0)
+  );
   v_sale_count := jsonb_array_length(p_sales);
   select count(*) into v_existing_count
   from public.sales
