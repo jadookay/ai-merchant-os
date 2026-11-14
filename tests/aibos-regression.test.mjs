@@ -55,7 +55,7 @@ test("voiding preserves sale rows instead of deleting them", () => {
 });
 
 test("sales history renders void status and the reason", () => {
-  assert.ok(html.includes("s.voided?'<span class=\\"pill\\">Voided</span>"));
+  assert.match(html, /s\.voided\?'<span class="pill">Voided<\/span>/);
   assert.ok(html.includes("esc(s.void_reason||'No reason recorded')"));
   assert.ok(html.includes("mergeKeepLocal(sales,state.sales);"));
 });
