@@ -103,7 +103,7 @@ test("authorized multi-device refresh subscribes only to merchant-filtered inser
 });
 
 test("pending sync panel is scrollable and shows business amounts and descriptions", () => {
-  assert.ok(html.includes("panel.style.maxHeight='360px'"));
+  assert.ok(html.includes("panel.style.maxHeight='440px'"));
   assert.ok(html.includes("panel.style.overflowY='auto'"));
   assert.ok(html.includes("function sheriPendingActivityDetails(op)"));
   for(const value of ["Total ","Cost value ","fmt(r.amount)","Waiting to sync"])
