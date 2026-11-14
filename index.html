@@ -6408,6 +6408,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'gross profit':'Inyungu mbumbe','operating expenses':'Amafaranga yakoreshejwe mu bikorwa','income tax expense':'Umusoro ku nyungu',
     'total cost of sales':'Igiteranyo cy’ikiguzi cy’ibicuruzwa byagurishijwe','total operating expenses':'Igiteranyo cy’amafaranga yakoreshejwe mu bikorwa','total income tax expense':'Igiteranyo cy’umusoro ku nyungu','total other / non-current assets':'Igiteranyo cy’undi mutungo w’igihe kirekire','total current liabilities':'Igiteranyo cy’imyenda y’igihe gito','total other / non-current liabilities':'Igiteranyo cy’indi myenda y’igihe kirekire','for the period ended':'Mu gihe cyarangiye ku','as at':'Ku itariki ya','total revenue':'Igiteranyo cy’amafaranga yinjiye','total current assets':'Igiteranyo cy’umutungo w’igihe gito','total equity':'Igiteranyo cy’igishoro n’inyungu zasigaye','total liabilities and equity':'Igiteranyo cy’imyenda n’igishoro',
     'profit before tax':'Inyungu mbere y’umusoro','profit for the period':'Inyungu y’igihe cyatoranyijwe',
+    'statement of financial position':'Imbonerahamwe y’imiterere y’umutungo n’imyenda','statement of profit or loss':'Imbonerahamwe y’inyungu cyangwa igihombo','IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.':'Iyi raporo iteguye mu buryo busa n’ubwa IFRS ikoresheje amakuru yanditswe mu ibaruramari. Kugira ngo yubahirize IFRS yose, hakenewe amakuru yuzuye n’amabwiriza akwiye ku mafaranga agomba kwishyurwa, igabanuka ry’agaciro k’umutungo, igihombo gishoboka, imisoro no gutandukanya iby’igihe gito n’igihe kirekire.',
     'cash on hand':'Amafaranga mu ntoki','bank accounts':'Amafaranga kuri banki','mobile money':'Amafaranga kuri Mobile Money',
     'accounts receivable':'Amafaranga abakiriya bakurimo','accounts payable':'Amafaranga ugomba kwishyura','input tax receivable':'Umusoro wishyuwe utegereje kugaruzwa',
     'other liabilities':'Indi myenda','sales revenue':'Amafaranga yavuye mu igurisha','cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe',
@@ -6429,6 +6430,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'total cost of sales':'Total du coût des ventes','total operating expenses':'Total des charges opérationnelles','total income tax expense':'Total de la charge d’impôt sur le résultat','total other / non-current assets':'Total des autres actifs / actifs non courants','total current liabilities':'Total des passifs courants','total other / non-current liabilities':'Total des autres passifs / passifs non courants','for the period ended':'Pour la période close le','as at':'Au','total current assets':'Total des actifs courants','total equity':'Total des capitaux propres','total liabilities and equity':'Total des passifs et des capitaux propres',
     'operating expenses':'Charges opérationnelles','income tax expense':'Charge d’impôt sur le résultat',
     'profit before tax':'Résultat avant impôt','profit for the period':'Résultat de la période',
+    'statement of financial position':'État de la situation financière','statement of profit or loss':'État du résultat net','IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.':'Présentation de type IFRS fondée sur les soldes comptabilisés. La conformité complète aux IFRS exige également des pièces exhaustives et des méthodes adaptées pour les charges à payer, amortissements, dépréciations, provisions, impôts et classement courant/non courant.',
     'cash on hand':'Espèces en caisse','bank accounts':'Comptes bancaires','mobile money':'Mobile Money',
     'accounts receivable':'Créances clients','accounts payable':'Dettes fournisseurs','input tax receivable':'TVA déductible à récupérer',
     'other liabilities':'Autres passifs','cost of goods sold':'Coût des marchandises vendues','tax expense':'Charge fiscale'
@@ -7402,7 +7404,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
         const rowsCash=accountRows(cashAccounts,bs,'debit'),rowsAR=accountRows(receivables,bs,'debit'),rowsInv=accountRows(inventory,bs,'debit'),rowsTax=accountRows(taxAssets,bs,'debit'),rowsOtherCurrent=accountRows(otherCurrent,bs,'debit');
         const rowsOtherAssets=accountRows(otherAssets,bs,'debit'),rowsCurrentLiab=accountRows(currentLiabs,bs,'credit'),rowsOtherLiab=accountRows(otherLiabs,bs,'credit'),rowsEquity=accountRows(equityList,bs,'credit');
         const notices=prefix(bsEl);
-        bsEl.innerHTML=notices+asAt+
+        bsEl.innerHTML=notices+'<div class="row statement-section-row"><span>Statement of financial position</span><b></b></div>'+asAt+
           section('Current assets',section('Cash and cash equivalents',rowsCash,'Cash and cash equivalents',totalRows(cashAccounts,bs,'debit'))+
             section('Trade receivables',rowsAR,'Trade receivables',totalRows(receivables,bs,'debit'))+
             section('Inventory',rowsInv,'Inventory',totalRows(inventory,bs,'debit'))+
@@ -7415,20 +7417,20 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
           moneyRow('Total liabilities',liabilities,'statement-total-row')+
           section('Equity',rowsEquity+moneyRow('Retained earnings / current period profit',cumulative),'Total equity',equity)+
           moneyRow('Total liabilities and equity',liabilities+equity,'statement-total-row')+
-          '<div class="sub" style="margin-top:8px">Assets = liabilities + equity. '+(Math.abs(assets-liabilities-equity)<=0.005?'The statement balances.':'Difference: '+money(assets-liabilities-equity)+'. The statement is not reconciled.')+'</div>';
+          '<div class="sub" style="margin-top:8px">Assets = liabilities + equity. '+(Math.abs(assets-liabilities-equity)<=0.005?'The statement balances.':'Difference: '+money(assets-liabilities-equity)+'. The statement is not reconciled.')+'</div><div class="sub" style="margin-top:8px">IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.</div>';
       }
       if(plEl){
         const incomeAccounts=accounts.filter(a=>a.type==='income'),cogsAccounts=accounts.filter(a=>a.type==='cogs');
         const incomeRows=accountRows(incomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
         const opRows=accountRows(operatingAccounts,period,'debit'),taxRows=accountRows(taxAccounts,period,'debit');
-        plEl.innerHTML=prefix(plEl)+periodText+
+        plEl.innerHTML=prefix(plEl)+'<div class="row statement-section-row"><span>Statement of profit or loss</span><b></b></div>'+periodText+
           section('Revenue',incomeRows,'Total revenue',periodIncome)+
           section('Cost of sales',cogsRows,'Total cost of sales',periodCogs)+
           moneyRow('Gross profit',periodIncome-periodCogs,'statement-total-row')+
           section('Operating expenses',opRows,'Total operating expenses',operatingExpenses)+
           moneyRow('Profit before tax',pretax,'statement-total-row')+
           section('Income tax expense',taxRows,'Total income tax expense',taxExpense)+
-          moneyRow('Profit for the period',net,'statement-total-row');
+          moneyRow('Profit for the period',net,'statement-total-row')+'<div class="sub" style="margin-top:8px">IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.</div>';
       }
     }catch(e){console.warn('[AIBOS IFRS statement presentation]',e)}
   };
