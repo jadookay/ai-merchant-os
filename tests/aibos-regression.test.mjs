@@ -167,7 +167,7 @@ test("record confirmation immediately queues sync and schedules the next pending
   const queueEnd=html.indexOf("async function sheriQueueMemory",queueStart);
   const queue=html.slice(queueStart,queueEnd);
   assert.ok(queue.includes("await sheriPut('outbox',key"));
-  assert.ok(queue.includes("if(navigator.onLine)sherriSyncKick()"));
+  assert.ok(queue.includes("if(navigator.onLine&&sheriSyncBatchDepth===0)sherriSyncKick()"));
   assert.ok(html.includes("const delay=Math.max(0,Math.min(2147483000,dueAt-Date.now()))"));
 });
 
@@ -184,4 +184,23 @@ test("Realtime access to device and inventory movement rows remains permission-s
   assert.ok(realtimeRlsMigration.includes("private.user_can_access_merchant(merchant_id,'manage_team')"));
   assert.ok(realtimeRlsMigration.includes("inventory_movements_cost_view_select"));
   assert.ok(realtimeRlsMigration.includes("private.user_can_access_merchant(merchant_id,'view_inventory_costs')"));
+});
+
+test("business IDs are capped at six digits in the app, staff login and database", () => {
+  assert.ok(html.includes('maxlength="6"'));
+  assert.ok(html.includes("!/^\\d{1,6}$/.test(merchant_code)"));
+  assert.ok(teamAccess.includes("!/^\\d{1,6}$/.test(merchantCode)"));
+  assert.ok(html.includes("merchants_shericeri_id_six_digits_check"));
+});
+
+test("cross-device server rows override stale local rows and foreground tabs refresh", () => {
+  assert.ok(html.includes("if(pendingIdsFor(store).has(x.id)&&!sm.has(x.id))"));
+  assert.ok(html.includes("sheriQueueQueued"));
+  assert.ok(html.includes("sheriSyncQueued=items.length"));
+  assert.ok(html.includes("loadAll(true).then(()=>render())"));
+});
+
+test("trial balance places abnormal account balances on the opposite side", () => {
+  assert.ok(html.includes("debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance)"));
+  assert.ok(html.includes("credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance)"));
 });
