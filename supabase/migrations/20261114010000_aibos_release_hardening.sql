@@ -1,4 +1,10 @@
 -- AIBOS release hardening: atomic cart sync, resilient PIN throttling and least-privilege accounting RPCs.
+-- Preserve immutable opening-stock values so later sales or adjustments do not
+-- change the value used by the original inventory opening journal.
+alter table public.products add column if not exists opening_stock_qty integer;
+alter table public.products add column if not exists opening_stock_cost integer;
+alter table public.products add column if not exists opening_stock_value numeric;
+
 
 create or replace function public.verify_merchant_member_pin(
   p_merchant_id uuid,
@@ -440,9 +446,10 @@ begin
         where e.id=p_source_id and e.merchant_id=p_merchant_id;
         v_debit_code := '6000'; v_credit_code := '1000';
       when 'product_opening_stock' then
-        select (p.stock::numeric*p.cost::numeric),p.created_at::date into v_expected,v_expected_date
+        select coalesce(p.opening_stock_value,p.opening_stock_qty::numeric*p.opening_stock_cost::numeric),p.created_at::date into v_expected,v_expected_date
         from public.products p
-        where p.id=p_source_id and p.merchant_id=p_merchant_id;
+        where p.id=p_source_id and p.merchant_id=p_merchant_id
+          and p.opening_stock_qty is not null and p.opening_stock_cost is not null;
         v_debit_code := '1200'; v_credit_code := '3000';
     end case;
     if not found or coalesce(v_expected,0)<=0 then
