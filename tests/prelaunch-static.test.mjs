@@ -643,3 +643,21 @@ test("device sign-out is local and revoked Supabase auth sessions cannot re-regi
   assert.ok(teamAccess.includes('admin.rpc("shericeri_is_auth_session_active"'));
   assert.ok(html.includes("!d.auth_session_active?'Signed out / expired'"));
 });
+
+
+test("inventory movement ledger records stock changes and gates valuation separately", () => {
+  assert.ok(teamMigration.includes("create table if not exists public.inventory_movements"));
+  assert.ok(teamMigration.includes("create or replace function public.capture_inventory_movement"));
+  assert.ok(teamMigration.includes("Stock changes must use a recorded movement with a reason"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_adjust_product_stock"));
+  assert.ok(teamMigration.includes("p_expected_stock"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_get_inventory_movement_report"));
+  assert.ok(teamMigration.includes("v_cost_access:=private.user_can_access_merchant(p_merchant_id,'view_inventory_costs')"));
+  assert.ok(teamMigration.includes("'cogs',case when v_cost_access"));
+  assert.ok(teamAccess.includes('"view_inventory_costs"'));
+  assert.ok(html.includes("id=\"teamInventoryCosts\""));
+  assert.ok(html.includes("view_inventory_costs:document.getElementById('teamInventoryCosts').checked"));
+  assert.ok(html.includes("async function loadInventoryMovementReport()"));
+  assert.ok(html.includes("sheri_get_inventory_movement_report"));
+  assert.ok(html.includes("type:'inventory_adjustment'"));
+});
