@@ -537,6 +537,13 @@ test("database hardening covers all ten unindexed foreign keys and hoists auth.u
   assert.match(releaseMigration, /not like '%\( select auth\.uid\(\)%'/);
 });
 
+test("switching merchants clears all previously loaded business data before loading the next tenant", () => {
+  assert.match(html, /let sheriLoadedMerchantId=null/);
+  assert.match(html, /function sheriResetMerchantData\(\)/);
+  assert.match(html, /if\(sheriLoadedMerchantId!==mId\)\{sheriResetMerchantData\(\);sheriLoadedMerchantId=mId;\}/);
+  assert.match(html, /state\.accountingSettings=null;state\.currentMembership=null/);
+});
+
 test("suspending a staff member revokes refresh sessions and the client revalidates active membership", () => {
   assert.match(releaseMigration, /create or replace function public\.revoke_merchant_member_sessions\(p_user_id uuid\)/);
   assert.match(releaseMigration, /delete from auth\.sessions where user_id=p_user_id/);
