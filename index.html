@@ -1303,7 +1303,10 @@ async function sheriValidateCurrentMembership(){
     state.merchant=null;
     return false;
   }
+  const previous=JSON.stringify(state.currentMembership?.permissions||{});
+  const previousRole=state.currentMembership?.role||'';
   state.currentMembership=data;
+  if(previous!==JSON.stringify(data.permissions||{})||previousRole!==data.role)render();
   return true;
 }
 async function sheriServerHeartbeat(){
