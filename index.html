@@ -673,7 +673,7 @@ async function sheriTogglePendingSync(){
   try{
     const pending=(await sheriGetAll('outbox')).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
     const blocked=pending.filter(x=>x.blocked).length;
-    const labels={sale_cart_upsert:'Sale invoice recorded',sale_upsert:'Sale recorded',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
+    const labels={inventory_adjustment:'Inventory adjustment',sale_cart_upsert:'Sale invoice recorded',sale_upsert:'Sale recorded',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
     let out='<b>'+pending.length+' pending activities</b> · '+blocked+' need attention';if(!pending.length)out='<b>Everything is synchronized.</b>';
     for(const item of pending){
       const op=item.op||{},status=item.blocked?'Needs attention':item.next_retry_at&&new Date(item.next_retry_at)>new Date()?'Waiting for retry':'Waiting to sync';
@@ -1069,6 +1069,19 @@ async function sheriSyncSaleCartOperation(op){
   }
   if(data?.ok!==true)throw new Error('The complete sale cart was not synchronized.');
 }
+async function sheriSyncInventoryAdjustmentOperation(op){
+  const {data,error}=await sb.rpc('shericeri_adjust_product_stock',{
+    p_merchant_id:op.merchant_id,p_product_id:op.product_id,p_expected_stock:op.expected_stock,
+    p_quantity_delta:op.quantity_delta,p_reason:op.reason,p_movement_type:op.movement_type||'adjustment',
+    p_source_id:op.source_id
+  });
+  if(error)throw error;
+  if(data?.stock_conflict)await sheriRecordConflict({
+    type:'inventory_adjustment_conflict',product_id:op.product_id,
+    expected_stock:op.expected_stock,server_stock:data.server_stock,operation:op
+  });
+  else if(data?.ok!==true)throw new Error('Inventory adjustment was not recorded.');
+}
 async function sheriSyncVoidSale(op){
   const {error}=await sb.rpc('shericeri_void_sale',{
     p_merchant_id:op.merchant_id,p_sale_id:op.id,p_transaction_id:op.transaction_id||null,p_reason:op.reason,p_audit_id:op.audit_id
@@ -1131,6 +1144,7 @@ async function sheriSyncOutbox(){
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
         else if(op.type==='product_delete'){const {error}=await sb.from('products').update({deleted:true}).eq('id',op.id);if(error)throw error}
+        else if(op.type==='inventory_adjustment'){await sheriSyncInventoryAdjustmentOperation(op)}
         else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
         else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
@@ -1170,7 +1184,8 @@ async function sheriSyncOutbox(){
               // Re-run this operation exactly once with the fresh token.
               if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
-              else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
+              else if(op.type==='inventory_adjustment'){await sheriSyncInventoryAdjustmentOperation(op)}
+        else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
               else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
               else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
@@ -2197,9 +2212,14 @@ async function saveProduct(){
   let openingStockProduct=null;
   if(editingProductId){
     const p=product(editingProductId); if(!p)return;
-    Object.assign(p,{name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,updated_at:now});
+    const previousStock=Number(p.stock||0),stockDelta=(stock||0)-previousStock;
+    Object.assign(p,{name,cat,cost,sell,stock:previousStock,reorder:reorder||0,barcode,expiry_date,updated_at:now});
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
+    if(stockDelta!==0){
+      await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:previousStock,quantity_delta:stockDelta,reason:editReason.trim(),movement_type:'adjustment',source_id:sheriUuid()});
+      p.stock=stock||0;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
+    }
   }else{
     const p={id:sheriUuid(),merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,created_at:now,updated_at:now};
     state.products.push(p);openingStockProduct=p;
