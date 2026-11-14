@@ -592,3 +592,15 @@ test("sale void RPC cannot be authorized by finance permission alone", () => {
   assert.ok(fn.includes("private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
   assert.doesNotMatch(fn, /or private\\.user_can_access_merchant\\(v_merchant_id,'manage_finance'\\)/);
 });
+
+
+test("disabled team members lose cached merchant data and cannot replay offline work after reconnect", () => {
+  assert.ok(html.includes("async function sheriClearMerchantLocalData(merchantId)"));
+  assert.ok(html.includes("async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id)"));
+  assert.ok(html.includes("if(data?.status==='active')return true"));
+  assert.ok(html.includes("await sheriClearMerchantLocalData(merchantId)"));
+  assert.ok(html.includes("sb.auth.signOut({scope:'local'})"));
+  assert.ok(html.includes("if(navigator.onLine&&!(await sheriVerifyActiveStaffMembership(mId)))return"));
+  assert.ok(html.includes("if(!(await sheriVerifyActiveStaffMembership(state.merchant.id)))return"));
+  assert.ok(html.includes("memberResult.data.status!=='active'"));
+});
