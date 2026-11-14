@@ -353,3 +353,192 @@ begin
   end loop;
 end;
 $$;
+
+
+-- Permit only the operational journal sources that the caller is authorized to
+-- create. Manual journals remain restricted to finance permission.
+create or replace function public.shericeri_sync_journal_batch(
+  p_merchant_id uuid,
+  p_entry_id uuid,
+  p_entry_date date,
+  p_description text,
+  p_source_type text,
+  p_source_id uuid,
+  p_lines jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_permission text;
+  v_expected numeric;
+  v_debit_code text;
+  v_credit_code text;
+  v_lock date;
+  v_existing_merchant uuid;
+  v_existing_source_type text;
+  v_existing_source_id uuid;
+  v_entry_exists boolean := false;
+  v_line jsonb;
+  v_line_id uuid;
+  v_account uuid;
+  v_account_code text;
+  v_d numeric;
+  v_c numeric;
+  v_debit numeric := 0;
+  v_credit numeric := 0;
+  v_debit_match integer := 0;
+  v_credit_match integer := 0;
+  v_operational boolean := false;
+begin
+  if p_merchant_id is null or p_entry_id is null or p_entry_date is null
+     or coalesce(trim(p_description),'')='' then
+    raise exception 'Journal entry identity is incomplete';
+  end if;
+  if coalesce(jsonb_typeof(p_lines),'')<>'array' or jsonb_array_length(p_lines)<2 then
+    raise exception 'Journal batch requires at least two lines';
+  end if;
+
+  v_permission := case p_source_type
+    when 'sale' then 'create_sale'
+    when 'sale_cogs' then 'create_sale'
+    when 'purchase' then 'manage_inventory'
+    when 'product_opening_stock' then 'manage_inventory'
+    when 'expense' then 'manage_expenses'
+    else 'manage_finance'
+  end;
+  if not private.user_can_access_merchant(p_merchant_id,v_permission) then
+    raise exception 'Not authorized to post this accounting source';
+  end if;
+
+  -- Operational journal types must match their real source record and exact
+  -- debit/credit accounts and amounts; they cannot be used to inject journals.
+  if p_source_type in ('sale','sale_cogs','purchase','expense','product_opening_stock') then
+    v_operational := true;
+    case p_source_type
+      when 'sale' then
+        select (s.qty::numeric*s.price::numeric) into v_expected
+        from public.sales s
+        where s.id=p_source_id and s.merchant_id=p_merchant_id and coalesce(s.voided,false)=false;
+        v_debit_code := '1000'; v_credit_code := '4000';
+      when 'sale_cogs' then
+        select (s.qty::numeric*s.cost::numeric) into v_expected
+        from public.sales s
+        where s.id=p_source_id and s.merchant_id=p_merchant_id and coalesce(s.voided,false)=false;
+        v_debit_code := '5000'; v_credit_code := '1200';
+      when 'purchase' then
+        select coalesce(p.total,p.qty*p.unit_cost) into v_expected
+        from public.purchases p
+        where p.id=p_source_id and p.merchant_id=p_merchant_id and p.status<>'ordered';
+        v_debit_code := '1200'; v_credit_code := '2000';
+      when 'expense' then
+        select e.amount::numeric into v_expected
+        from public.expenses e
+        where e.id=p_source_id and e.merchant_id=p_merchant_id;
+        v_debit_code := '6000'; v_credit_code := '1000';
+      when 'product_opening_stock' then
+        select (p.stock::numeric*p.cost::numeric) into v_expected
+        from public.products p
+        where p.id=p_source_id and p.merchant_id=p_merchant_id;
+        v_debit_code := '1200'; v_credit_code := '3000';
+    end case;
+    if not found or coalesce(v_expected,0)<=0 then
+      raise exception 'The accounting source record is missing or has no positive value';
+    end if;
+    if jsonb_array_length(p_lines)<>2 then
+      raise exception 'Operational journal entries must contain exactly two lines';
+    end if;
+  end if;
+
+  select s.locked_through into v_lock
+  from public.accounting_settings s where s.merchant_id=p_merchant_id;
+  if v_lock is not null and p_entry_date<=v_lock then
+    raise exception 'Accounting period is locked through %',v_lock;
+  end if;
+
+  select je.merchant_id,je.source_type,je.source_id
+    into v_existing_merchant,v_existing_source_type,v_existing_source_id
+  from public.journal_entries je where je.id=p_entry_id for update;
+  v_entry_exists := found;
+  if v_entry_exists and (
+    v_existing_merchant is distinct from p_merchant_id
+    or v_existing_source_type is distinct from p_source_type
+    or v_existing_source_id is distinct from p_source_id
+  ) then raise exception 'Journal entry ID belongs to another record'; end if;
+
+  if p_source_type is not null and p_source_id is not null and exists (
+    select 1 from public.journal_entries je
+    where je.merchant_id=p_merchant_id and je.source_type=p_source_type
+      and je.source_id=p_source_id and je.id<>p_entry_id
+  ) then raise exception 'This source already has a journal entry'; end if;
+
+  for v_line in select value from jsonb_array_elements(p_lines) loop
+    v_line_id := nullif(v_line->>'id','')::uuid;
+    v_account := nullif(v_line->>'account_id','')::uuid;
+    v_d := coalesce((v_line->>'debit')::numeric,0);
+    v_c := coalesce((v_line->>'credit')::numeric,0);
+    if v_line_id is null or v_account is null then
+      raise exception 'Journal line identity is incomplete';
+    end if;
+    if v_d<0 or v_c<0 or ((v_d=0)=(v_c=0)) then
+      raise exception 'Invalid journal line';
+    end if;
+    select a.code into v_account_code
+    from public.chart_of_accounts a
+    where a.id=v_account and a.merchant_id=p_merchant_id and a.active;
+    if not found then raise exception 'Invalid ledger account'; end if;
+
+    if v_operational then
+      if v_d>0 and v_account_code=v_debit_code and v_d=v_expected and v_c=0 then
+        v_debit_match:=v_debit_match+1;
+      elsif v_c>0 and v_account_code=v_credit_code and v_c=v_expected and v_d=0 then
+        v_credit_match:=v_credit_match+1;
+      else
+        raise exception 'Operational journal lines do not match the source transaction';
+      end if;
+    end if;
+    v_debit:=v_debit+v_d;
+    v_credit:=v_credit+v_c;
+  end loop;
+
+  if v_debit<=0 or abs(v_debit-v_credit)>0.005 then
+    raise exception 'Journal entry is not balanced';
+  end if;
+  if v_operational and (v_debit_match<>1 or v_credit_match<>1) then
+    raise exception 'Operational journal entry must match the approved debit and credit accounts';
+  end if;
+
+  if not v_entry_exists then
+    insert into public.journal_entries(id,merchant_id,entry_date,description,source_type,source_id)
+    values(p_entry_id,p_merchant_id,p_entry_date,p_description,p_source_type,p_source_id);
+  end if;
+
+  for v_line in select value from jsonb_array_elements(p_lines) loop
+    v_line_id := (v_line->>'id')::uuid;
+    v_account := (v_line->>'account_id')::uuid;
+    v_d := coalesce((v_line->>'debit')::numeric,0);
+    v_c := coalesce((v_line->>'credit')::numeric,0);
+    if not exists(select 1 from public.journal_lines jl where jl.id=v_line_id) then
+      insert into public.journal_lines(id,merchant_id,journal_entry_id,account_id,debit,credit,memo)
+      values(v_line_id,p_merchant_id,p_entry_id,v_account,v_d,v_c,v_line->>'memo');
+    elsif not exists(
+      select 1 from public.journal_lines jl
+      where jl.id=v_line_id and jl.merchant_id=p_merchant_id
+        and jl.journal_entry_id=p_entry_id and jl.account_id=v_account
+        and jl.debit=v_d and jl.credit=v_c
+    ) then
+      raise exception 'Journal line UUID belongs to another or different record';
+    end if;
+  end loop;
+  return p_entry_id;
+end;
+$$;
+revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon;
+grant execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) to authenticated;
+
+-- One source record can create only one journal entry of each source type.
+create unique index if not exists journal_entries_merchant_source_unique_idx
+  on public.journal_entries(merchant_id,source_type,source_id)
+  where source_type is not null and source_id is not null;
