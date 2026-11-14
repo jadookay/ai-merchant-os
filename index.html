@@ -7285,6 +7285,7 @@ function sheriWrapSyncBatch(name){
 #appRoot .main{margin:0 0 0 230px!important;width:calc(100% - 230px)!important;max-width:none!important;padding:12px 16px!important}
 #aibosLanguageSwitcher{position:static!important;inset:auto!important;z-index:auto!important;width:100%;max-width:100%;margin:16px 0 8px!important;padding:8px!important;box-shadow:none!important;display:flex!important;flex-direction:column;align-items:stretch!important;gap:5px!important}
 #aibosLanguageSwitcher select{width:100%!important;min-width:0!important}
+#authScreen #aibosLanguageSwitcher{margin:14px 0 0!important;max-width:100%!important;background:#f8fafc}
 #sheriOfflineBar{position:relative!important;top:auto!important;margin:0 0 5px!important;z-index:15!important;flex-wrap:wrap}
 #sheriOfflineBar>div:last-child{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
 #dashboard>.top{margin:0 0 4px!important;align-items:center}
@@ -7329,9 +7330,23 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
 <script>
 (function(){
   const picker=document.getElementById('aibosLanguageSwitcher');
-  const side=document.querySelector('#appRoot .side');
+  const appRoot=document.getElementById('appRoot');
+  const auth=document.getElementById('authScreen');
+  const authCard=auth?.querySelector('.auth-card');
+  const side=appRoot?.querySelector('.side');
   const nav=side?.querySelector('.nav');
-  if(picker&&nav&&picker.parentElement!==side)nav.after(picker);
+  const placeLanguagePicker=()=>{
+    if(!picker)return;
+    const signedIn=!!appRoot&&appRoot.style.display!=='none';
+    if(signedIn&&nav&&picker.parentElement!==side)nav.after(picker);
+    else if(!signedIn&&authCard&&picker.parentElement!==authCard)authCard.append(picker);
+  };
+  placeLanguagePicker();
+  if(typeof MutationObserver!=='undefined'){
+    const observer=new MutationObserver(placeLanguagePicker);
+    if(appRoot)observer.observe(appRoot,{attributes:true,attributeFilter:['style']});
+    if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
+  }
   const teamEmail=document.getElementById('teamEmail');
   if(teamEmail)teamEmail.addEventListener('input',()=>teamEmail.removeAttribute('aria-invalid'));
   const originalCreate=window.createTeamMember;
