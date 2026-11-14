@@ -669,3 +669,12 @@ test("legacy direct sale deletion is blocked so stock and accounting reversals c
   assert.ok(html.includes("const {stock,...metadata}=record"));
   assert.ok(html.includes("sheri_adjust_product_stock"));
 });
+
+
+test("staff offline workspaces retain local membership metadata and refresh permissions online", () => {
+  assert.ok(html.includes("local_user_id:session?.user?.id||null"));
+  assert.ok(html.includes("membership:state.currentMembership||null"));
+  assert.ok(html.includes("mine.local_user_id===session.user.id"));
+  assert.ok(html.includes("select('id,merchant_id,user_id,full_name,role,permissions,responsibility,status')"));
+  assert.ok(html.includes("state.currentMembership=data"));
+});
