@@ -7172,6 +7172,30 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     ['Cost value ','Valeur du stock : '],['Quantity ','Quantité : '],['Debit ','Débit : '],
     ['Next retry: ','Nouvel essai : '],['attempts: ','Tentatives : '],['line(s)','ligne(s)']
   );
+  phraseFragments.rw.push(
+    ['Assets = liabilities + equity.','Umutungo ungana n’imyenda hiyongereyeho igishoro.'],
+    ['The statement balances.','Iyi raporo iraringaniye.'],['Difference:','Itandukaniro:'],['The statement is not reconciled.','Iyi raporo ntiraringanizwa.'],
+    ['Financial statements are NOT reconciled: ','Raporo z’imari ntiziraringanijwe: '],
+    [' journal entries are missing lines or out of balance. Review the General Ledger before relying on these totals.',' byanditswe mu gitabo cy’ibaruramari bibura imirongo cyangwa ntibiringaniye. Banza urebe igitabo rusange mbere yo gukoresha iyi mibare.'],
+    [' journal entry is missing lines or out of balance. Review the General Ledger before relying on these totals.',' cyanditswe mu gitabo cy’ibaruramari kibura imirongo cyangwa ntikiringaniye. Banza urebe igitabo rusange mbere yo gukoresha iyi mibare.'],
+    ['The latest server ledger refresh was incomplete. These figures may be cached and are NOT verified. ','Kuvugurura amakuru y’ibaruramari kuri seriveri ntibyuzuye. Iyi mibare ishobora kuba ishaje kandi ntiyemejwe. '],
+    ['The latest ledger snapshot has not yet been confirmed from the server. These statements are NOT verified.','Amakuru aheruka y’ibaruramari ntaremezwa na seriveri. Izi raporo ntiziremezwa.'],
+    ['Some transactions are still waiting to synchronize. These figures include only data currently available on this device and are NOT yet server-verified.','Hari ibikorwa bitaroherezwa. Iyi mibare ikubiyemo gusa amakuru ari kuri iki gikoresho kandi ntiragenzurwa na seriveri.'],
+    ['Balance Sheet does not balance. Assets minus liabilities and equity = ','Imbonerahamwe y’umutungo n’imyenda ntiringaniye. Umutungo ukuyemo imyenda n’igishoro = '],
+    ['. Do not rely on this statement until the journal is corrected.','. Ntukishingikirize kuri iyi raporo mbere y’uko igitabo cy’ibaruramari gikosorwa.']
+  );
+  phraseFragments.fr.push(
+    ['Assets = liabilities + equity.','Les actifs sont égaux aux passifs plus les capitaux propres.'],
+    ['The statement balances.','L’état est équilibré.'],['Difference:','Écart :'],['The statement is not reconciled.','L’état n’est pas rapproché.'],
+    ['Financial statements are NOT reconciled: ','Les états financiers ne sont PAS rapprochés : '],
+    [' journal entries are missing lines or out of balance. Review the General Ledger before relying on these totals.',' écritures comptables ont des lignes manquantes ou sont déséquilibrées. Vérifiez le grand livre avant de vous fier à ces totaux.'],
+    [' journal entry is missing lines or out of balance. Review the General Ledger before relying on these totals.',' écriture comptable comporte des lignes manquantes ou est déséquilibrée. Vérifiez le grand livre avant de vous fier à ces totaux.'],
+    ['The latest server ledger refresh was incomplete. These figures may be cached and are NOT verified. ','La dernière actualisation du grand livre sur le serveur est incomplète. Ces chiffres peuvent être en cache et ne sont PAS vérifiés. '],
+    ['The latest ledger snapshot has not yet been confirmed from the server. These statements are NOT verified.','Le dernier instantané du grand livre n’a pas encore été confirmé par le serveur. Ces états ne sont PAS vérifiés.'],
+    ['Some transactions are still waiting to synchronize. These figures include only data currently available on this device and are NOT yet server-verified.','Certaines opérations attendent encore la synchronisation. Ces chiffres comprennent uniquement les données disponibles sur cet appareil et ne sont PAS encore vérifiés par le serveur.'],
+    ['Balance Sheet does not balance. Assets minus liabilities and equity = ','Le bilan n’est pas équilibré. Les actifs moins les passifs et les capitaux propres = '],
+    ['. Do not rely on this statement until the journal is corrected.','. Ne vous fiez pas à cet état avant la correction du journal.']
+  );
   const normalize=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
   function translateString(original,lang){
     if(lang==='en')return original;
