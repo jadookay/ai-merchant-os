@@ -15,6 +15,15 @@ const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, pre
 new vm.Script(previewScript, { filename: "preview/index.html" });
 
 
+test("all inline production JavaScript parses without syntax errors", () => {
+  const scripts = [...html.matchAll(/<script(?![^>]*\\bsrc=)[^>]*>([\\s\\S]*?)<\\/script>/gi)];
+  assert.ok(scripts.length > 0, "expected inline application scripts");
+  for (let i = 0; i < scripts.length; i++) {
+    const source = scripts[i][1].trim();
+    if (source) new vm.Script(source, { filename: "index.html inline script " + (i + 1) });
+  }
+});
+
 test("team managers cannot create administrator accounts or grant permissions they do not hold", () => {
   assert.match(teamAccess, /if \(role === "admin" && !isPrivilegedGrantor\)/);
   assert.match(teamAccess, /Only the business owner or an administrator can create another administrator/);
