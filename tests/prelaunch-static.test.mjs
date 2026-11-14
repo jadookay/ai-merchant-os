@@ -405,7 +405,8 @@ test("team migration preserves owner RLS, prevents forged staff audit inserts an
   assert.ok(teamMigration.includes("when t.table_name='sales' then 'manage_sales'"));
   assert.ok(teamMigration.includes("when t.table_name='products' then 'manage_inventory'"));
   assert.ok(teamMigration.includes("when t.table_name='expenses' then 'manage_expenses'"));
-  assert.ok(teamMigration.includes("private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L)"));
+  assert.ok(teamMigration.includes("create policy %I on public.%I for update to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L)) with check (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))"));
+  assert.ok(teamMigration.includes("create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))"));
 });
 
 test("sale voiding retains source rows, reverses posted journals and is idempotent", () => {
@@ -415,6 +416,12 @@ test("sale voiding retains source rows, reverses posted journals and is idempote
   assert.ok(teamMigration.includes("jl.credit,jl.debit"));
   assert.ok(!teamMigration.includes("delete from public.sales"));
   assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
+  const voidStart=teamMigration.indexOf("create or replace function public.shericeri_void_sale");
+  const voidEnd=teamMigration.indexOf("revoke all on function public.shericeri_void_sale",voidStart);
+  const voidRpc=teamMigration.slice(voidStart,voidEnd);
+  assert.ok(voidRpc.includes("private.user_can_access_merchant(v_merchant_id,'manage_team')"));
+  assert.ok(voidRpc.includes("private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
+  assert.ok(!voidRpc.includes("private.user_can_access_merchant(v_merchant_id,'manage_finance')"));
 });
 
 test("stock conflicts do not create partial sale or purchase records", () => {
@@ -548,4 +555,23 @@ test("AIBOS language switch supports English, everyday Kinyarwanda and French wi
   assert.ok(localeScript.includes("'cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe'"));
   assert.doesNotMatch(localeScript, /fetch\s*\(|https?:\/\//i);
   assert.ok(localeScript.includes("does not change business records"));
+});
+
+
+test("accounting SECURITY DEFINER RPCs revoke anonymous/public execution and enforce merchant permissions", () => {
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon;"));
+  assert.ok(teamMigration.includes("grant execute on function public.shericeri_get_accounting_snapshot(uuid) to authenticated;"));
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) from public,anon;"));
+  assert.ok(teamMigration.includes("grant execute on function public.shericeri_sync_journal_batch(uuid,uuid,date,text,text,uuid,jsonb) to authenticated;"));
+  const snapshotStart=teamMigration.indexOf("create or replace function public.shericeri_get_accounting_snapshot");
+  const snapshotEnd=teamMigration.indexOf("revoke all on function public.shericeri_get_accounting_snapshot",snapshotStart);
+  const snapshot=teamMigration.slice(snapshotStart,snapshotEnd);
+  assert.ok(snapshot.includes("v_can_view_reports"));
+  assert.ok(snapshot.includes("Not authorized for merchant accounting data"));
+  assert.ok(snapshot.includes("set search_path=''"));
+  const journalStart=teamMigration.indexOf("create or replace function public.shericeri_sync_journal_batch");
+  const journalEnd=teamMigration.indexOf("revoke all on function public.shericeri_sync_journal_batch",journalStart);
+  const journal=teamMigration.slice(journalStart,journalEnd);
+  assert.ok(journal.includes("private.user_can_access_merchant(p_merchant_id"));
+  assert.ok(journal.includes("Journal entry is not balanced"));
 });
