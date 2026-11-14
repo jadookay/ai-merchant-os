@@ -499,8 +499,9 @@ begin
   if p_sale_id is null or coalesce(length(trim(p_reason)),0)<3 then raise exception 'A clear void reason is required'; end if;
   v_merchant_id:=coalesce(p_merchant_id,(select merchant_id from public.sales where id=p_sale_id));
   if v_merchant_id is null then return jsonb_build_object('ok',true,'already_voided',true); end if;
-  if not (private.user_can_access_merchant(v_merchant_id,'manage_sales')
-      or private.user_can_access_merchant(v_merchant_id,'manage_finance')) then
+  -- Voiding is a manager-level sales control. Finance-report permission alone
+  -- must never let an accountant bypass the Owner/Admin/Manager restriction.
+  if not private.user_can_access_merchant(v_merchant_id,'manage_sales') then
     raise exception 'Not authorized to void sales';
   end if;
   perform 1 from public.sales
