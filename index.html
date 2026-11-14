@@ -1109,7 +1109,16 @@ async function sheriSyncVoidSale(op){
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
   if(sheriCan('manage_team')){
-    const {error}=await sb.from('products').upsert(record,{onConflict:'id'});if(error)throw error;return;
+    const {data:existing,error:findError}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
+    if(findError)throw findError;
+    if(existing){
+      // Stock is changed only through the audited inventory-adjustment RPC.
+      const {stock,...metadata}=record;
+      const {error}=await sb.from('products').update(metadata).eq('id',record.id);if(error)throw error;
+    }else{
+      const {error}=await sb.from('products').insert(record);if(error)throw error;
+    }
+    return;
   }
   const {data,error}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
   if(error)throw error;
