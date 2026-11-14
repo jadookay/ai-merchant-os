@@ -7491,5 +7491,46 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   wrapped.__ifrsPresentationWrapped=true;window.renderReports=wrapped;
 })();
 </script>
+
+<style id="aibos-mobile-visual-polish-v2">
+/* Stable, fully visible app navigation and balanced page framing */
+#appRoot .side{transform:none!important;transition:none!important;will-change:auto!important}
+#appRoot .main{background:#fff;border-radius:22px 22px 0 0;box-shadow:0 -5px 24px rgba(15,23,42,.07);min-height:calc(100vh - 16px);position:relative}
+#aibosLanguageSwitcher{display:flex!important;align-items:center!important;justify-content:center!important;align-self:center!important;width:max-content!important;max-width:calc(100% - 20px)!important;margin:10px auto 12px!important;padding:5px 9px!important;border-radius:999px!important;box-shadow:0 2px 8px rgba(15,23,42,.12)!important;background:#fff!important}
+#aibosLanguageSwitcher select{width:auto!important;min-width:150px!important;max-width:100%!important;text-align:center!important}
+#sheriOfflineBar{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;margin:0 0 16px!important;padding:9px 12px!important;border-radius:12px!important;flex-wrap:wrap!important}
+#sheriOfflineBar>div:last-child{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-end!important;gap:6px!important;flex-wrap:nowrap!important;overflow-x:auto!important;max-width:100%!important;padding-bottom:2px!important}
+#sheriOfflineBar>div:last-child .btn{flex:0 0 auto!important;white-space:nowrap!important}
+@media(max-width:650px){
+ #appRoot .side{position:fixed!important;top:0!important;left:0!important;right:0!important;bottom:auto!important;inset:0 0 auto 0!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;overscroll-behavior:auto!important;z-index:1300!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;padding:9px 10px 10px!important;background:linear-gradient(145deg,#101827 0%,#18243a 100%)!important;box-shadow:0 8px 22px rgba(15,23,42,.20)!important;border-radius:0 0 18px 18px!important;transform:none!important;transition:none!important}
+ #appRoot .side .brand{width:100%!important;text-align:center!important;margin:0 0 2px!important;font-size:17px!important;line-height:1.25!important}
+ #appRoot .side .nav{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;grid-auto-rows:minmax(39px,auto)!important;gap:5px!important;width:100%!important;min-width:0!important;overflow:visible!important;flex:0 0 auto!important}
+ #appRoot .side .nav button{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;min-width:0!important;width:100%!important;min-height:39px!important;padding:6px 3px!important;margin:0!important;border:1px solid rgba(255,255,255,.08)!important;border-radius:9px!important;background:rgba(255,255,255,.045)!important;color:#e5e7eb!important;font-size:10.5px!important;line-height:1.15!important}
+ #appRoot .side .nav button.active{background:#2563eb!important;border-color:#60a5fa!important;color:#fff!important;box-shadow:0 2px 8px rgba(37,99,235,.25)!important}
+ #appRoot .side #aibosLanguageSwitcher{order:3!important;margin:8px auto 1px!important;min-height:32px!important}
+ #appRoot .side #aibosLanguageSwitcher select{min-width:156px!important}
+ #appRoot .main{margin:0!important;margin-top:194px!important;width:100%!important;max-width:100%!important;padding:16px 12px 18px!important;border-radius:22px 22px 0 0!important;overflow-x:hidden!important;min-height:calc(100vh - 194px)!important}
+ #sheriOfflineBar{flex-direction:column!important;align-items:stretch!important;gap:7px!important;margin:0 0 16px!important;padding:9px 10px!important;border-radius:12px!important}
+ #sheriOfflineBar>div:first-child{width:100%!important;display:flex!important;align-items:center!important;gap:7px!important;flex-wrap:wrap!important}
+ #sheriOfflineBar>div:last-child{width:100%!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;justify-content:flex-start!important;gap:6px!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin!important}
+ #sheriOfflineBar>div:last-child .btn{font-size:11px!important;padding:7px 9px!important;min-height:34px!important}
+ #dashboard>.top{margin-bottom:14px!important}
+}
+@media(max-width:360px){
+ #appRoot .side{padding-left:7px!important;padding-right:7px!important}
+ #appRoot .side .nav{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:4px!important}
+ #appRoot .side .nav button{font-size:9.5px!important;padding:5px 2px!important}
+ #appRoot .main{margin-top:190px!important;min-height:calc(100vh - 190px)!important}
+}
+@media(min-width:651px){
+ #appRoot .side #aibosLanguageSwitcher{margin:12px auto 0!important}
+ #appRoot .main{margin-top:12px!important;border-radius:22px 0 0 0!important}
+ #sheriOfflineBar>div:last-child{overflow:visible!important}
+}
+#authScreen{position:relative!important;align-items:center!important;padding:64px 16px 22px!important}
+#authScreen #aibosLanguageSwitcher{position:absolute!important;top:12px!important;right:12px!important;left:auto!important;bottom:auto!important;inset:12px 12px auto auto!important;z-index:5!important;width:max-content!important;max-width:calc(100% - 24px)!important;margin:0!important;padding:5px 8px!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;border-radius:999px!important;background:#fff!important;box-shadow:0 2px 10px rgba(15,23,42,.12)!important}
+#authScreen #aibosLanguageSwitcher select{width:auto!important;min-width:150px!important;max-width:100%!important}
+@media(max-width:420px){#authScreen{padding-top:62px!important}#authScreen #aibosLanguageSwitcher{top:10px!important;right:10px!important}}
+</style>
 </body>
 </html>
