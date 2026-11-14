@@ -77,6 +77,9 @@ create table if not exists public.inventory_movements (
 );
 create index if not exists inventory_movements_product_date_idx
   on public.inventory_movements(merchant_id,product_id,created_at desc);
+create unique index if not exists inventory_movements_source_unique
+  on public.inventory_movements(merchant_id,product_id,movement_type,source_id)
+  where source_id is not null;
 alter table public.inventory_movements enable row level security;
 revoke all on public.inventory_movements from public,anon,authenticated;
 grant all on public.inventory_movements to service_role;
@@ -176,6 +179,12 @@ begin
   select * into v_product from public.products
     where id=p_product_id and merchant_id=p_merchant_id for update;
   if not found then raise exception 'Product not found'; end if;
+  if p_source_id is null then raise exception 'A stable movement reference is required'; end if;
+  if exists(select 1 from public.inventory_movements im
+    where im.merchant_id=p_merchant_id and im.product_id=p_product_id
+      and im.movement_type=p_movement_type and im.source_id=p_source_id) then
+    return jsonb_build_object('ok',true,'already_recorded',true,'stock',v_product.stock,'movement_type',p_movement_type);
+  end if;
   if coalesce(v_product.stock,0)<>p_expected_stock then
     return jsonb_build_object('ok',false,'stock_conflict',true,'server_stock',v_product.stock,'expected_stock',p_expected_stock);
   end if;
