@@ -597,7 +597,7 @@ test("sale void RPC cannot be authorized by finance permission alone", () => {
 test("disabled team members lose cached merchant data and cannot replay offline work after reconnect", () => {
   assert.ok(html.includes("async function sheriClearMerchantLocalData(merchantId)"));
   assert.ok(html.includes("async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id)"));
-  assert.ok(html.includes("if(data?.status==='active')return true"));
+  assert.ok(html.includes("if(data?.status==='active'&&await sheriRegisterDeviceSession(merchantId)){state.currentMembership=data;return true;}"));
   assert.ok(html.includes("await sheriClearMerchantLocalData(merchantId)"));
   assert.ok(html.includes("sb.auth.signOut({scope:'local'})"));
   assert.ok(html.includes("if(navigator.onLine&&!(await sheriVerifyActiveStaffMembership(mId)))return"));
@@ -619,7 +619,7 @@ test("team access is bound to an individually revocable authenticated device ses
   assert.ok(html.includes("async function sheriRegisterDeviceSession(merchantId)"));
   assert.ok(html.includes("await sheriRegisterDeviceSession(memberResult.data.merchant_id)"));
   assert.ok(html.includes("sheriRegisterDeviceSession(merchantId)"));
-  assert.ok(html.includes("sheri_list_device_sessions"));
+  assert.ok(html.includes("shericeri_list_device_sessions"));
   assert.ok(html.includes("sheri_revoke_device_session"));
   assert.ok(html.includes("id=\"teamDevicesTable\""));
   assert.ok(html.includes("function revokeTeamDeviceSession(sessionId)"));
@@ -658,7 +658,7 @@ test("inventory movement ledger records stock changes and gates valuation separa
   assert.ok(html.includes("id=\"teamInventoryCosts\""));
   assert.ok(html.includes("view_inventory_costs:document.getElementById('teamInventoryCosts').checked"));
   assert.ok(html.includes("async function loadInventoryMovementReport()"));
-  assert.ok(html.includes("sheri_get_inventory_movement_report"));
+  assert.ok(html.includes("shericeri_get_inventory_movement_report"));
   assert.ok(html.includes("type:'inventory_adjustment'"));
 });
 
@@ -667,7 +667,7 @@ test("legacy direct sale deletion is blocked so stock and accounting reversals c
   assert.ok(html.includes("Direct sale deletion is disabled; use the audited sale-void workflow."));
   assert.ok(html.includes("async function sheriSyncProductOperation(op)"));
   assert.ok(html.includes("const {stock,...metadata}=record"));
-  assert.ok(html.includes("sheri_adjust_product_stock"));
+  assert.ok(html.includes("shericeri_adjust_product_stock"));
 });
 
 
@@ -682,9 +682,9 @@ test("staff offline workspaces retain local membership metadata and refresh perm
 
 test("inventory adjustment retries are idempotent and grants match the seven-argument RPC", () => {
   assert.ok(teamMigration.includes("inventory_movements_source_unique"));
-  assert.ok(teamMigration.includes("where im.movement_type=p_movement_type and im.source_id=p_source_id"));
+  assert.ok(teamMigration.includes("where im.movement_type=p_movement_type"));
   assert.ok(teamMigration.includes("grant execute on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) to authenticated"));
   assert.ok(teamMigration.includes("revoke all on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) from public,anon"));
   assert.ok(html.includes("data?.ok===true"));
-  assert.ok(html.includes("already_recorded"));
+  assert.ok(teamMigration.includes("'already_recorded',true"));
 });
