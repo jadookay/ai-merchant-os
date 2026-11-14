@@ -2936,25 +2936,61 @@ async function sheriTeamFunctionError(error,data,fallback='The team request coul
  }
  return new Error(message||error?.message||fallback);
 }
+function closeTeamMemberEdit(){document.getElementById('teamMemberEditModal')?.remove();}
 async function editTeamMember(id){
  const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
- const full_name=prompt('Staff member name:',m.full_name);if(full_name===null)return;
- const email=prompt('Email address (leave blank to remove email login):',m.email||'');if(email===null)return;
- const phone=prompt('Phone number in international format (leave blank to remove phone login):',m.phone||'');if(phone===null)return;
- const username=prompt('Username (optional; leave blank to remove):',m.username||'');if(username===null)return;
- const role=prompt('Role: cashier, inventory, accountant, manager, admin or custom',m.role);if(role===null)return;
- const responsibility=prompt('Responsibilities:',m.responsibility||'');if(responsibility===null)return;
- const keys=Object.keys(m.permissions||{}).filter(k=>m.permissions[k]===true);
- const permissionText=prompt('Comma-separated permission keys. Available: view_sales, create_sale, manage_sales, view_inventory, manage_inventory, view_expenses, manage_expenses, view_financial_reports, manage_finance, view_customers, manage_customers, view_suppliers, manage_suppliers, view_audit_log, manage_team',keys.join(','));
- if(permissionText===null)return;
- const permissions={};permissionText.split(',').map(x=>x.trim()).filter(Boolean).forEach(k=>permissions[k]=true);if(role.trim().toLowerCase()==='manager'){permissions.manage_team=true;permissions.manage_sales=true;permissions.view_audit_log=true;}
- const status=document.getElementById('teamStatus');if(status)status.textContent='Updating staff access…';
+ if(!sheriCan('manage_team'))return sheriToast('You do not have permission to manage team access.','error');
+ const permissionOptions=[
+  ['view_sales','View sales'],['create_sale','Record sales'],['manage_sales','Edit / void sales'],
+  ['view_inventory','View inventory'],['manage_inventory','Manage inventory'],['view_inventory_costs','View inventory costs'],
+  ['view_expenses','View expenses'],['manage_expenses','Manage expenses'],
+  ['view_financial_reports','View financial reports'],['manage_finance','Manage accounting and finance'],
+  ['view_customers','View customers'],['manage_customers','Manage customers'],
+  ['view_suppliers','View suppliers'],['manage_suppliers','Manage suppliers'],
+  ['view_audit_log','View audit trail'],['manage_team','Manage team access']
+ ];
+ const selected=m.permissions||{};
+ const modal=document.createElement('div');modal.id='teamMemberEditModal';
+ modal.style.cssText='position:fixed;inset:0;z-index:1600;background:#11182799;display:flex;align-items:center;justify-content:center;padding:14px;overflow:auto';
+ modal.innerHTML=`<div class="card" style="width:min(680px,100%);max-height:92vh;overflow:auto;background:white">
+  <div class="top"><div><h2>Edit team access</h2><div class="sub">${esc(m.full_name)} · Changes apply on the next server request</div></div><button class="btn secondary" type="button" onclick="closeTeamMemberEdit()">Close</button></div>
+  <div class="formgrid" style="grid-template-columns:1fr 1fr">
+   <div><label>Full name</label><input id="teamEditName" value="${esc(m.full_name)}"></div>
+   <div><label>Role</label><select id="teamEditRole"><option value="cashier">Cashier</option><option value="inventory">Inventory</option><option value="accountant">Accountant</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="custom">Custom</option></select></div>
+   <div><label>Email</label><input id="teamEditEmail" type="email" value="${esc(m.email||'')}" placeholder="Optional"></div>
+   <div><label>Phone (international format)</label><input id="teamEditPhone" value="${esc(m.phone||'')}" placeholder="+250…"></div>
+   <div><label>Username</label><input id="teamEditUsername" value="${esc(m.username||'')}" placeholder="Optional"></div>
+   <div><label>Responsibilities</label><input id="teamEditResponsibility" value="${esc(m.responsibility||'')}" placeholder="e.g. Cashier, stock counts"></div>
+  </div>
+  <details style="margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:12px" open>
+   <summary style="font-weight:700;cursor:pointer">Permissions — select or clear responsibilities</summary>
+   <div class="formgrid" style="grid-template-columns:1fr 1fr;margin-top:10px">
+    ${permissionOptions.map(([key,label])=>'<label style="display:flex;align-items:center;gap:8px;margin:0"><input type="checkbox" class="team-edit-permission" value="'+key+'" '+(selected[key]===true?'checked':'')+' style="width:auto">'+esc(label)+'</label>').join('')}
+   </div>
+  </details>
+  <div class="actions" style="justify-content:flex-end;margin-top:16px"><button class="btn secondary" type="button" onclick="closeTeamMemberEdit()">Cancel</button><button class="btn" type="button" onclick="saveTeamMemberEdit('${esc(m.id)}')">Save access</button></div>
+  <div id="teamEditStatus" class="sub" style="margin-top:8px"></div>
+ </div>`;
+ document.body.appendChild(modal);
+ const role=document.getElementById('teamEditRole');if(role)role.value=m.role||'cashier';
+}
+async function saveTeamMemberEdit(id){
+ const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
+ const get=id=>document.getElementById(id)?.value?.trim()||'';
+ const full_name=get('teamEditName'),email=get('teamEditEmail'),phone=get('teamEditPhone'),username=get('teamEditUsername'),role=get('teamEditRole'),responsibility=get('teamEditResponsibility');
+ const permissions={};
+ document.querySelectorAll('.team-edit-permission:checked').forEach(el=>permissions[el.value]=true);
+ if(!full_name||full_name.length<2)return sheriToast('Enter the staff member’s full name.','error');
+ if(!email&&!phone)return sheriToast('Keep at least one login method: email or phone.','error');
+ if(role==='manager'){permissions.manage_team=true;permissions.manage_sales=true;permissions.view_audit_log=true;}
+ const status=document.getElementById('teamEditStatus');if(status)status.textContent='Updating staff access…';
  try{
-  const {data,error}=await sb.functions.invoke('team-access',{body:{action:'update_member',merchant_id:state.merchant.id,member_id:id,full_name:full_name.trim(),email:email.trim(),phone:phone.trim(),username:username.trim(),role:role.trim().toLowerCase(),responsibility,permissions,status:m.status}});
+  const {data,error}=await sb.functions.invoke('team-access',{body:{action:'update_member',merchant_id:state.merchant.id,member_id:id,full_name,email,phone,username,role,responsibility,permissions,status:m.status}});
   if(error||!data?.ok)throw await sheriTeamFunctionError(error,data,'Could not update team access.');
-  if(status)status.textContent='Staff access updated. Permission changes take effect on the next data request.';
+  closeTeamMemberEdit();
+  const teamStatus=document.getElementById('teamStatus');if(teamStatus)teamStatus.textContent='Staff access updated. Permission changes take effect on the next data request.';
   await loadTeamMembers(true);
- }catch(e){if(status)status.textContent=e?.message||'Could not update staff access.';}
+ }catch(e){if(status)status.textContent=e?.message||'Could not update team access.';}
 }
 async function resetTeamMemberPin(id){
  const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
