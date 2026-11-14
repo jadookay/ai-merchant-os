@@ -583,3 +583,12 @@ test("offline merchant-ID reconciliation updates every queued sale-cart line", (
   assert.ok(teamMigration.includes("p_sales is null or p_stock_checks is null"));
   assert.ok(teamMigration.includes("jsonb_typeof(p_sales) is distinct from 'array'"));
 });
+
+
+test("sale void RPC cannot be authorized by finance permission alone", () => {
+  const start=teamMigration.indexOf("create or replace function public.shericeri_void_sale");
+  const end=teamMigration.indexOf("revoke all on function public.shericeri_void_sale",start);
+  const fn=teamMigration.slice(start,end);
+  assert.ok(fn.includes("private.user_can_access_merchant(v_merchant_id,'manage_sales')"));
+  assert.doesNotMatch(fn, /or private\\.user_can_access_merchant\\(v_merchant_id,'manage_finance'\\)/);
+});
