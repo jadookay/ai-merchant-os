@@ -312,7 +312,7 @@ window.ensurePdfJs=async function(){
       <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="salePrice" type="number" min="0"></div>
       <div><label>Customer (optional)</label><select id="saleCustomer"><option value="">— Anonymous —</option></select></div>
     </div>
-    <div class="actions" style="margin-top:14px"><button class="btn secondary" onclick="addSaleToCart()">＋ Add to cart</button><button class="btn" onclick="recordSale()">Confirm sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
+    <div class="actions" style="margin-top:14px"><button class="btn secondary" onclick="addSaleToCart()">＋ Add to cart</button><button class="btn secondary" onclick="focusSaleProduct()">＋ Add more products</button><button class="btn" onclick="recordSale()">Confirm sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
     <div id="voiceStatus" class="sub" style="margin-top:8px"></div>
     <div class="section"><h2>Sale cart</h2><div id="saleCartHost"><div class="empty">Add products to begin.</div></div><div class="actions" style="margin-top:10px"><button class="btn secondary small" onclick="clearSaleCart()">Clear cart</button><button class="btn small" onclick="printLastReceipt()" id="printReceiptBtn" disabled>Print last receipt</button></div></div>
   </div>
@@ -680,6 +680,7 @@ function sheriNow(){return new Date().toISOString()}
 function sheriUuid(){try{return crypto.randomUUID()}catch(_){return 'local-'+Date.now()+'-'+Math.random().toString(16).slice(2)}}
 function sheriIsOffline(){return !navigator.onLine||sheriConnectivity==='offline'}
 function sheriToast(message,kind='success'){
+  try{message=window.AIBOS_I18N?.translate?.(String(message||''))||message}catch(_){}
   let el=document.getElementById('sheriToast');
   if(!el){el=document.createElement('div');el.id='sheriToast';el.className='sheri-toast';el.setAttribute('role','status');el.setAttribute('aria-live','polite');document.body.appendChild(el);}
   el.textContent=String(message||'');el.style.background=kind==='error'?'#7f1d1d':kind==='warning'?'#78350f':'#172554';
@@ -1993,6 +1994,7 @@ function addSaleToCart(){
   const already=saleCart.filter(x=>x.productId===id).reduce((n,x)=>n+x.qty,0);if(already+qty>p.stock){sheriToast('Cart quantity exceeds available stock for '+p.name+'.','error');return}
   const existing=saleCart.find(x=>x.productId===id&&Number(x.price)===price);if(existing)existing.qty+=qty;else saleCart.push({productId:id,qty,price});renderSaleCart();sheriToast(p.name+' added to cart.');
 }
+function focusSaleProduct(){const select=document.getElementById('saleProduct');if(select){select.focus();select.scrollIntoView({behavior:'smooth',block:'center'});}sheriToast(sheriLocalized('Choose another product, then tap Add to cart.','Choisissez un autre produit, puis appuyez sur Ajouter au panier.','Hitamo ikindi gicuruzwa, hanyuma ukande Shyira mu byo ngiye kugurisha.'));}
 function removeSaleCartItem(i){saleCart.splice(i,1);renderSaleCart()}
 function clearSaleCart(){saleCart=[];renderSaleCart()}
 function renderSaleCart(){
@@ -2012,14 +2014,14 @@ async function recordSale(){
   const total=checked.reduce((n,x)=>n+x.qty*x.price,0),transactionId=sheriUuid(),createdAt=sheriNow(),invoice='INV-'+String(state.merchant.shericeri_id||'AIBOS')+'-'+Date.now();
   if(!confirm('Confirm sale?\\n'+checked.map(x=>x.qty+' × '+x.product.name+' — '+money(x.qty*x.price)).join('\\n')+'\\nTotal: '+money(total)))return;
   const rows=checked.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,product_id:x.product.id,product_name_snapshot:x.product.name,customer_id:custId,qty:x.qty,price:x.price,cost:x.product.cost,created_at:createdAt}));
-  checked.forEach(x=>{x.product.stock-=x.qty});state.sales.push(...rows);await sheriSaveSnapshot();window.__lastReceipt={business:state.merchant.name,invoice,createdAt,total,items:checked.map(x=>({name:x.product.name,qty:x.qty,price:x.price}))};
-  const pb=document.getElementById('printReceiptBtn');if(pb)pb.disabled=false;saleCart=[];renderSaleCart();render();sheriToast('Sale confirmed. Receipt '+invoice+' is ready to print.');
+  checked.forEach(x=>{x.product.stock-=x.qty});state.sales.push(...rows);window.__lastReceipt={business:state.merchant.name,invoice,createdAt,total,items:checked.map(x=>({name:x.product.name,qty:x.qty,price:x.price}))};
+  const pb=document.getElementById('printReceiptBtn');if(pb)pb.disabled=false;saleCart=[];renderSaleCart();render();sheriToast(sheriLocalized('Sale captured. Saving securely…','Vente enregistrée. Enregistrement sécurisé…','Igurisha ryafashwe. Turibika neza…'),'warning');
   const stockChecks=[...new Map(checked.map(x=>[x.product.id,x.product])).values()].map(p=>{
     const qty=checked.filter(x=>x.product.id===p.id).reduce((n,x)=>n+x.qty,0);
     return {product_id:p.id,expected_server_stock:Number(p.stock||0)+qty,local_stock:Number(p.stock||0),qty};
   });
-  await sheriQueue({type:'sale_cart_upsert',records:rows,stockChecks})
-  if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] background sync',e));
+  try{await sheriSaveSnapshot();await sheriQueue({type:'sale_cart_upsert',records:rows,stockChecks});sheriToast(sheriLocalized('Sale saved. Syncing to your account…','Vente enregistrée. Synchronisation avec votre compte…','Igurisha ribitswe. Turimo kurihuza na konti yawe…'));if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] background sync',e));}
+  catch(err){console.error('[AIBOS] sale persistence failed',err);sheriToast(sheriLocalized('Sale is visible on this device, but saving or sync needs attention. Check Pending Sync.','La vente est visible sur cet appareil, mais son enregistrement ou sa synchronisation nécessite une vérification.','Igurisha riragaragara kuri iki gikoresho, ariko kubika cyangwa kohereza amakuru biracyasaba kugenzurwa.'),'error');}
 }
 async function voidSale(id){
   if(!sheriCan('manage_sales'))return sheriToast('Only an Owner, Admin or authorized Manager can void sales.','error');
@@ -3428,7 +3430,8 @@ function sheriSyncLangSelectors(source){
   const value=source?.value||currentShericeriLang();
   if(page&&page.value!==value)page.value=value;
   if(hero&&hero.value!==value)hero.value=value;
-  if(typeof sheriDiagSet==='function')sheriDiagSet('Selected language',value);
+  try{const appLang=value.slice(0,2).toLowerCase();if(window.AIBOS_I18N?.getLanguage?.()!==appLang)window.AIBOS_I18N?.setLanguage?.(appLang);}catch(_){}
+  if(typeof sheriDiagSet==='function'sheriDiagSet('Selected language',value);
   try{ ensureVoicesLoaded().then(()=>{
     const v=pickVoice(value);
     if(typeof sheriDiagSet==='function')sheriDiagSet('Selected TTS voice',v?`${v.name} (${v.lang})`:(sheriIsKinyarwanda()?'No rw-RW voice exposed; bridge/device fallback required':'platform default'));
@@ -5747,6 +5750,8 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     const label=document.getElementById('aibosLanguageLabel');
     const picker=document.getElementById('aibosLanguageSelect');
     if(picker&&picker.value!==current)picker.value=current;
+    const voiceValue=current==='rw'?'rw-RW':current==='fr'?'fr-FR':'en-US';
+    ['shericeriLang','sheriHeroLang'].forEach(id=>{const voice=document.getElementById(id);if(voice)voice.value=voiceValue;});
     window.dispatchEvent(new CustomEvent('aibos:languagechange',{detail:{language:current}}));
   }
   function init(){
