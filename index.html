@@ -1941,6 +1941,17 @@ function sheriRecentActivitiesHtml(){
 }
 function sheriCan(permission){if(!session?.user||!state.merchant)return false;if(state.merchant.user_id===session.user.id)return true;if(state.currentMembership?.role==='admin')return true;if(['manage_team','manage_sales'].includes(permission)&&state.currentMembership?.role!=='manager')return false;return state.currentMembership?.permissions?.[permission]===true}
 function sheriPermissionButton(permission,html){return sheriCan(permission)?html:''}
+function sheriAiAccessScope(){
+  const owner=state.merchant?.user_id===session?.user?.id||state.currentMembership?.role==='admin';
+  return {owner,finance:owner||sheriCan('view_financial_reports')||sheriCan('manage_finance'),sales:owner||sheriCan('view_sales'),inventory:owner||sheriCan('view_inventory'),inventoryCosts:owner||sheriCan('view_inventory_costs')||sheriCan('view_financial_reports'),expenses:owner||sheriCan('view_expenses'),customers:owner||sheriCan('view_customers'),suppliers:owner||sheriCan('view_suppliers'),audit:owner||sheriCan('view_audit_log'),team:owner||sheriCan('manage_team')};
+}
+function sheriAiSystemSnapshot(calendar){
+  const a=sheriAiAccessScope();
+  const products=a.inventory?(state.products||[]).map(p=>{if(a.inventoryCosts)return p;const {cost,...safe}=p;return safe;}):[];
+  const sales=a.sales?(state.sales||[]).map(s=>{if(a.finance)return s;const {cost,...safe}=s;return safe;}):[];
+  return {merchant:state.merchant?{name:state.merchant.name,category:state.merchant.category,country:state.merchant.country,currency:state.merchant.currency,fiscal_year:a.finance?state.merchant.fiscal_year:null,tin:a.finance?state.merchant.tin:null}:null,products,sales,expenses:a.expenses?state.expenses:[],customers:a.customers?state.customers:[],suppliers:a.suppliers?state.suppliers:[],purchases:a.suppliers?state.purchases:[],cashEntries:a.finance?state.cashEntries:[],budgets:a.finance?state.budgets:[],chartOfAccounts:a.finance?state.accounts:[],journalEntries:a.finance?state.journalEntries:[],journalLines:a.finance?state.journalLines:[],invoices:a.finance?state.invoices:[],bills:a.finance?state.bills:[],payments:a.finance?state.payments:[],bankAccounts:a.finance?state.bankAccounts:[],taxRates:a.finance?state.taxRates:[],recurringTransactions:a.finance?state.recurringTransactions:[],accountingSettings:a.finance?state.accountingSettings:null,auditLog:a.audit?state.auditLog:[],teamMembers:a.team?(state.teamMembers||[]):[],calendar:(calendar||[]).filter(x=>x.type==='product_expiry'?a.inventory:a.finance),productImages:a.inventory?(state.products||[]).filter(p=>p.image_url).map(p=>({product_id:p.id,name:p.name,image_url:p.image_url})):[],settings:{merchant:a.finance?state.merchant:{name:state.merchant?.name,currency:state.merchant?.currency},accounting:a.finance?state.accountingSettings:null},appNavigation:['Dashboard','Record Sale','Records','AIBOS Command Center','AI Advisor','Shericeri','Settings','Inventory','Expenses','Customers','Suppliers','Purchases','Financial Reports'],formulas:a.finance?{revenue:'sum(quantity × selling price)',cogs:'sum(quantity × unit cost)',grossProfit:'revenue − cost of goods sold',netProfit:'gross profit − operating expenses'}:null};
+}
+
 function render(){
   if(!state.merchant)return;
   if(typeof loadTeamMembers==='function')loadTeamMembers();
@@ -2839,18 +2850,18 @@ async function askAI(webSearch){
   ].sort((a,b)=>String(a.date).localeCompare(String(b.date)));
   const context={
     currentDateTime,currentTimeZone,businessCalendar,
-    revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
-    salesCount:state.sales.length,
-    merchantName:state.merchant.name,merchantCategory:state.merchant.category,merchantTin:state.merchant.tin||null,fiscalYear:state.merchant.fiscal_year||null,country:state.merchant.country||'RW',currency:state.merchant.currency||'RWF',
-    lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
-    topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),
-    customerCount:activeCustomers().length,
-    repeatCustomers:repeatCustomerCount(),
-    topCustomers:topCustomers(5).map(c=>({name:c.name,revenue:c.revenue,visits:c.visits})),
-    revenueTrend:revenueTrend(),
-    profitTrend:dailyProfitTrend(),
-    restockForecast:restockForecast().map(f=>({name:f.name,stock:f.stock,daysUntilStockout:Math.round(f.daysUntilStockout)})),
-    systemSnapshot:{merchant:state.merchant,products:state.products,sales:state.sales,expenses:state.expenses,customers:state.customers,suppliers:state.suppliers,purchases:state.purchases,cashEntries:state.cashEntries,budgets:state.budgets,chartOfAccounts:state.accounts,journalEntries:state.journalEntries,journalLines:state.journalLines,invoices:state.invoices,bills:state.bills,payments:state.payments,bankAccounts:state.bankAccounts,taxRates:state.taxRates,recurringTransactions:state.recurringTransactions,accountingSettings:state.accountingSettings,auditLog:state.auditLog,teamMembers:state.teamMembers||[],calendar:businessCalendar,productImages:state.products.filter(p=>p.image_url).map(p=>({product_id:p.id,name:p.name,image_url:p.image_url})),settings:{merchant:state.merchant,accounting:state.accountingSettings},appNavigation:['Dashboard','Record Sale','Records','AIBOS Command Center','AI Advisor','Shericeri','Settings','Inventory','Expenses','Customers','Suppliers','Purchases','Financial Reports'],formulas:{revenue:'sum(quantity × selling price)',cogs:'sum(quantity × unit cost)',grossProfit:'revenue − cost of goods sold',netProfit:'gross profit − operating expenses'}}
+    revenue:sheriAiAccessScope().finance?revenue():null,cogs:sheriAiAccessScope().finance?cogs():null,expenses:sheriAiAccessScope().expenses?totalExpenses():null,profit:sheriAiAccessScope().finance?profit():null,
+    salesCount:sheriAiAccessScope().sales?state.sales.length:null,
+    merchantName:state.merchant.name,merchantCategory:state.merchant.category,merchantTin:sheriAiAccessScope().finance?state.merchant.tin||null:null,fiscalYear:sheriAiAccessScope().finance?state.merchant.fiscal_year||null:null,country:state.merchant.country||'RW',currency:state.merchant.currency||'RWF',
+    lowStock:sheriAiAccessScope().inventory?activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})):[],
+    topProducts:sheriAiAccessScope().sales?bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:sheriAiAccessScope().finance?p.profit:null})):[],
+    customerCount:sheriAiAccessScope().customers?activeCustomers().length:null,
+    repeatCustomers:sheriAiAccessScope().customers?repeatCustomerCount():null,
+    topCustomers:sheriAiAccessScope().customers?topCustomers(5).map(c=>({name:c.name,revenue:sheriAiAccessScope().finance?c.revenue:null,visits:c.visits})):[],
+    revenueTrend:sheriAiAccessScope().finance?revenueTrend():[],
+    profitTrend:sheriAiAccessScope().finance?dailyProfitTrend():[],
+    restockForecast:sheriAiAccessScope().inventory?restockForecast().map(f=>({name:f.name,stock:f.stock,daysUntilStockout:Math.round(f.daysUntilStockout)})):[],
+    systemSnapshot:sheriAiSystemSnapshot(businessCalendar)
   };
   let answered=false;
   if(advisorAvailable!==false){
@@ -4606,18 +4617,18 @@ async function shericeriRespond(transcript){
   setSheriStatus(effectiveWebSearch?'Shericeri is checking live information…':'Shericeri is thinking…');
   if(typeof sheriDiagSet==='function')sheriDiagSet('Response source','CLOUD ADVISOR');
   const context={
-    revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),
-    salesCount:state.sales.length,
-    merchantName:state.merchant.name,merchantCategory:state.merchant.category,merchantTin:state.merchant.tin||null,fiscalYear:state.merchant.fiscal_year||null,country:state.merchant.country||'RW',currency:state.merchant.currency||'RWF',
-    lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),
-    topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),
-    customerCount:activeCustomers().length,
-    repeatCustomers:repeatCustomerCount(),
-    topCustomers:topCustomers(5).map(c=>({name:c.name,revenue:c.revenue,visits:c.visits})),
-    revenueTrend:revenueTrend(),
-    profitTrend:dailyProfitTrend(),
-    restockForecast:restockForecast().map(f=>({name:f.name,stock:f.stock,daysUntilStockout:Math.round(f.daysUntilStockout)})),
-    systemSnapshot:{merchant:state.merchant,products:state.products,sales:state.sales,expenses:state.expenses,customers:state.customers,suppliers:state.suppliers,purchases:state.purchases,cashEntries:state.cashEntries,budgets:state.budgets,chartOfAccounts:state.accounts,journalEntries:state.journalEntries,journalLines:state.journalLines,invoices:state.invoices,bills:state.bills,payments:state.payments,bankAccounts:state.bankAccounts,taxRates:state.taxRates,recurringTransactions:state.recurringTransactions,accountingSettings:state.accountingSettings,auditLog:state.auditLog,teamMembers:state.teamMembers||[],calendar:state.calendar||[],appNavigation:['Dashboard','Record Sale','Records','AIBOS Command Center','AI Advisor','Shericeri','Settings','Inventory','Expenses','Customers','Suppliers','Purchases','Financial Reports'],formulas:{revenue:'sum(quantity × selling price)',cogs:'sum(quantity × unit cost)',grossProfit:'revenue − cost of goods sold',netProfit:'gross profit − operating expenses'}}
+    revenue:sheriAiAccessScope().finance?revenue():null,cogs:sheriAiAccessScope().finance?cogs():null,expenses:sheriAiAccessScope().expenses?totalExpenses():null,profit:sheriAiAccessScope().finance?profit():null,
+    salesCount:sheriAiAccessScope().sales?state.sales.length:null,
+    merchantName:state.merchant.name,merchantCategory:state.merchant.category,merchantTin:sheriAiAccessScope().finance?state.merchant.tin||null:null,fiscalYear:sheriAiAccessScope().finance?state.merchant.fiscal_year||null:null,country:state.merchant.country||'RW',currency:state.merchant.currency||'RWF',
+    lowStock:sheriAiAccessScope().inventory?activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})):[],
+    topProducts:sheriAiAccessScope().sales?bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:sheriAiAccessScope().finance?p.profit:null})):[],
+    customerCount:sheriAiAccessScope().customers?activeCustomers().length:null,
+    repeatCustomers:sheriAiAccessScope().customers?repeatCustomerCount():null,
+    topCustomers:sheriAiAccessScope().customers?topCustomers(5).map(c=>({name:c.name,revenue:sheriAiAccessScope().finance?c.revenue:null,visits:c.visits})):[],
+    revenueTrend:sheriAiAccessScope().finance?revenueTrend():[],
+    profitTrend:sheriAiAccessScope().finance?dailyProfitTrend():[],
+    restockForecast:sheriAiAccessScope().inventory?restockForecast().map(f=>({name:f.name,stock:f.stock,daysUntilStockout:Math.round(f.daysUntilStockout)})):[],
+    systemSnapshot:sheriAiSystemSnapshot(state.calendar||[])
   };
   const sheriMemoryPayload=sheriRecentMemoryForPrompt();
 
@@ -4880,7 +4891,7 @@ function renderBusinessOS(){
 async function generateOSInsight(){
   const box=document.getElementById('osAIInsight');if(!box)return;box.textContent='Analyzing…';const local=osLocalInsights();
   if(!navigator.onLine||advisorAvailable===false){box.innerHTML='<b>Offline intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>');const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=local.slice(0,2).map(x=>`• ${esc(x)}`).join('<br>');return}
-  try{const today=new Date();const expiryAttention=activeProducts().filter(p=>p.expiry_date).map(p=>({name:p.name,expiryDate:p.expiry_date,barcode:p.barcode||null,daysRemaining:Math.ceil((new Date(p.expiry_date+'T00:00:00')-new Date(today.toISOString().slice(0,10)+'T00:00:00'))/86400000)})).filter(p=>p.daysRemaining<=30).sort((a,b)=>a.daysRemaining-b.daysRemaining);const context={merchantName:state.merchant.name,merchantCategory:state.merchant.category,country:merchantCountry(),currency:merchantCurrency(),revenue:revenue(),cogs:cogs(),expenses:totalExpenses(),profit:profit(),inventoryValue:osInventoryValue(),supplierSpend:osPurchasesTotal(),cashNet:osCashNet(),salesCount:state.sales.length,customerCount:activeCustomers().length,repeatCustomers:repeatCustomerCount(),lowStock:activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})),expiryAttention,topProducts:bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:p.profit})),suppliers:osActiveSuppliers().map(s=>({name:s.name,spend:osSupplierSpend(s.id)})),purchases:state.purchases.slice(0,20).map(x=>({supplierId:x.supplier_id,total:x.total||x.qty*x.unit_cost,status:x.status})),forecast30:osForecast30()};const {data,error}=await sb.functions.invoke('quick-service',{body:{question:'Give me the three most useful business decisions I should consider now, based strictly on my recorded business data. Mention risks and opportunities. Keep it practical.',context,language:window.AIBOS_I18N?.getLanguage?.()||'en'}});if(error||!data?.answer)throw error||new Error('No AI answer');box.innerHTML='<b>AI intelligence</b><br>'+esc(data.answer).replace(/\n/g,'<br>');const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=esc(data.answer).replace(/\n/g,'<br>');await sheriQueueMemory('insight',data.answer.slice(0,1800))}catch(e){box.innerHTML='<b>Local intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>')+'<div class="sub" style="margin-top:8px">Cloud AI was unavailable, so the app used its offline analysis.</div>';const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=local.slice(0,2).map(x=>`• ${esc(x)}`).join('<br>')}
+  try{const today=new Date();const expiryAttention=activeProducts().filter(p=>p.expiry_date).map(p=>({name:p.name,expiryDate:p.expiry_date,barcode:p.barcode||null,daysRemaining:Math.ceil((new Date(p.expiry_date+'T00:00:00')-new Date(today.toISOString().slice(0,10)+'T00:00:00'))/86400000)})).filter(p=>p.daysRemaining<=30).sort((a,b)=>a.daysRemaining-b.daysRemaining);const context={merchantName:state.merchant.name,merchantCategory:state.merchant.category,country:merchantCountry(),currency:merchantCurrency(),revenue:sheriAiAccessScope().finance?revenue():null,cogs:sheriAiAccessScope().finance?cogs():null,expenses:sheriAiAccessScope().expenses?totalExpenses():null,profit:sheriAiAccessScope().finance?profit():null,inventoryValue:osInventoryValue(),supplierSpend:osPurchasesTotal(),cashNet:osCashNet(),salesCount:sheriAiAccessScope().sales?state.sales.length:null,customerCount:sheriAiAccessScope().customers?activeCustomers().length:null,repeatCustomers:sheriAiAccessScope().customers?repeatCustomerCount():null,lowStock:sheriAiAccessScope().inventory?activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})):[],expiryAttention,topProducts:sheriAiAccessScope().sales?bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:sheriAiAccessScope().finance?p.profit:null})):[],suppliers:osActiveSuppliers().map(s=>({name:s.name,spend:osSupplierSpend(s.id)})),purchases:state.purchases.slice(0,20).map(x=>({supplierId:x.supplier_id,total:x.total||x.qty*x.unit_cost,status:x.status})),forecast30:osForecast30()};const {data,error}=await sb.functions.invoke('quick-service',{body:{question:'Give me the three most useful business decisions I should consider now, based strictly on my recorded business data. Mention risks and opportunities. Keep it practical.',context,language:window.AIBOS_I18N?.getLanguage?.()||'en'}});if(error||!data?.answer)throw error||new Error('No AI answer');box.innerHTML='<b>AI intelligence</b><br>'+esc(data.answer).replace(/\n/g,'<br>');const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=esc(data.answer).replace(/\n/g,'<br>');await sheriQueueMemory('insight',data.answer.slice(0,1800))}catch(e){box.innerHTML='<b>Local intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>')+'<div class="sub" style="margin-top:8px">Cloud AI was unavailable, so the app used its offline analysis.</div>';const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=local.slice(0,2).map(x=>`• ${esc(x)}`).join('<br>')}
 }
 
 
