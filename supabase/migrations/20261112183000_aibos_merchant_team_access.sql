@@ -59,6 +59,226 @@ alter table public.merchant_device_sessions enable row level security;
 revoke all on public.merchant_device_sessions from public,anon,authenticated;
 grant all on public.merchant_device_sessions to service_role;
 
+
+create table if not exists public.inventory_movements (
+  id uuid primary key default gen_random_uuid(),
+  merchant_id uuid not null references public.merchants(id) on delete cascade,
+  product_id uuid not null references public.products(id) on delete cascade,
+  movement_type text not null check (movement_type in ('opening_balance','sale','purchase_receipt','sale_void','customer_return','supplier_return','adjustment','writeoff')),
+  quantity_delta integer not null check (quantity_delta<>0),
+  quantity_before integer not null,
+  quantity_after integer not null check (quantity_after>=0),
+  unit_cost numeric(18,4) not null default 0 check (unit_cost>=0),
+  source_type text,
+  source_id uuid,
+  reason text not null,
+  actor_user_id uuid references auth.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists inventory_movements_product_date_idx
+  on public.inventory_movements(merchant_id,product_id,created_at desc);
+alter table public.inventory_movements enable row level security;
+revoke all on public.inventory_movements from public,anon,authenticated;
+grant all on public.inventory_movements to service_role;
+
+create or replace function public.capture_inventory_movement()
+returns trigger
+language plpgsql
+security definer
+set search_path=''
+as $
+declare
+  v_type text;
+  v_reason text;
+  v_source_id uuid;
+  v_unit_cost numeric;
+begin
+  if tg_op='INSERT' then
+    if coalesce(new.stock,0)>0 then
+      insert into public.inventory_movements(
+        merchant_id,product_id,movement_type,quantity_delta,quantity_before,quantity_after,
+        unit_cost,source_type,source_id,reason,actor_user_id,created_at
+      ) values(
+        new.merchant_id,new.id,'opening_balance',new.stock,0,new.stock,
+        coalesce(new.cost,0),'product_create',new.id,'Opening stock on product creation',auth.uid(),coalesce(new.created_at,now())
+      );
+    end if;
+    return new;
+  end if;
+
+  if new.stock is distinct from old.stock then
+    v_type:=nullif(current_setting('aibos.stock_movement_type',true),'');
+    v_reason:=nullif(trim(current_setting('aibos.stock_movement_reason',true)),'');
+    v_source_id:=nullif(current_setting('aibos.stock_movement_source_id',true),'')::uuid;
+    v_unit_cost:=coalesce(nullif(current_setting('aibos.stock_movement_unit_cost',true),'')::numeric,new.cost,0);
+    if v_type is null or v_reason is null then
+      raise exception 'Stock changes must use a recorded movement with a reason';
+    end if;
+    if v_type not in ('sale','purchase_receipt','sale_void','customer_return','supplier_return','adjustment','writeoff') then
+      raise exception 'Invalid inventory movement type';
+    end if;
+    insert into public.inventory_movements(
+      merchant_id,product_id,movement_type,quantity_delta,quantity_before,quantity_after,
+      unit_cost,source_type,source_id,reason,actor_user_id
+    ) values(
+      new.merchant_id,new.id,v_type,new.stock-old.stock,old.stock,new.stock,
+      greatest(v_unit_cost,0),v_type,v_source_id,v_reason,auth.uid()
+    );
+  end if;
+  return new;
+end;
+$;
+drop trigger if exists products_inventory_movement_capture on public.products;
+create trigger products_inventory_movement_capture
+after insert or update of stock on public.products
+for each row execute function public.capture_inventory_movement();
+
+-- Establish an auditable opening balance for products that existed before this ledger.
+insert into public.inventory_movements(
+  merchant_id,product_id,movement_type,quantity_delta,quantity_before,quantity_after,
+  unit_cost,source_type,source_id,reason,created_at
+)
+select p.merchant_id,p.id,'opening_balance',p.stock,0,p.stock,
+  coalesce(p.cost,0),'migration_opening',p.id,
+  'Opening balance captured when inventory movement tracking was enabled',
+  coalesce(p.created_at,now())
+from public.products p
+where coalesce(p.stock,0)>0
+  and not exists(
+    select 1 from public.inventory_movements im
+    where im.merchant_id=p.merchant_id and im.product_id=p.id
+      and im.movement_type='opening_balance' and im.source_id=p.id
+  );
+
+create or replace function public.shericeri_adjust_product_stock(
+  p_merchant_id uuid,p_product_id uuid,p_quantity_delta integer,p_reason text,
+  p_movement_type text default 'adjustment',p_source_id uuid default gen_random_uuid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $
+declare v_product public.products%rowtype; v_next integer;
+begin
+  if not private.user_can_access_merchant(p_merchant_id,'manage_team')
+     or not private.user_can_access_merchant(p_merchant_id,'manage_inventory') then
+    raise exception 'Not authorized to adjust inventory';
+  end if;
+  if p_product_id is null or p_quantity_delta=0 or coalesce(length(trim(p_reason)),0)<3 then
+    raise exception 'A product, non-zero quantity and clear reason are required';
+  end if;
+  if p_movement_type not in ('adjustment','customer_return','supplier_return','writeoff') then
+    raise exception 'Invalid manual movement type';
+  end if;
+  if p_movement_type in ('customer_return') and p_quantity_delta<0 then raise exception 'Customer returns must increase stock'; end if;
+  if p_movement_type in ('supplier_return','writeoff') and p_quantity_delta>0 then raise exception 'Supplier returns and write-offs must reduce stock'; end if;
+  select * into v_product from public.products
+    where id=p_product_id and merchant_id=p_merchant_id for update;
+  if not found then raise exception 'Product not found'; end if;
+  v_next:=coalesce(v_product.stock,0)+p_quantity_delta;
+  if v_next<0 then raise exception 'Stock cannot become negative'; end if;
+  perform set_config('aibos.stock_movement_type',p_movement_type,true);
+  perform set_config('aibos.stock_movement_source_id',coalesce(p_source_id,p_product_id)::text,true);
+  perform set_config('aibos.stock_movement_reason',trim(p_reason),true);
+  perform set_config('aibos.stock_movement_unit_cost',coalesce(v_product.cost,0)::text,true);
+  update public.products set stock=v_next where id=p_product_id and merchant_id=p_merchant_id;
+  return jsonb_build_object('ok',true,'stock',v_next,'movement_type',p_movement_type);
+end;
+$;
+revoke all on function public.shericeri_adjust_product_stock(uuid,uuid,integer,text,text,uuid) from public,anon;
+grant execute on function public.shericeri_adjust_product_stock(uuid,uuid,integer,text,text,uuid) to authenticated;
+
+create or replace function public.shericeri_get_inventory_movement_report(
+  p_merchant_id uuid,p_start_date date default null,p_end_date date default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $
+declare v_cost_access boolean;
+begin
+  if not private.user_can_access_merchant(p_merchant_id,'view_inventory') then
+    raise exception 'Not authorized to view inventory movements';
+  end if;
+  if p_start_date is not null and p_end_date is not null and p_end_date<p_start_date then
+    raise exception 'Report end date cannot be earlier than start date';
+  end if;
+  v_cost_access:=private.user_can_access_merchant(p_merchant_id,'view_inventory_costs');
+  return jsonb_build_object(
+    'can_view_costs',v_cost_access,
+    'start_date',p_start_date,'end_date',p_end_date,
+    'items',coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'product_id',p.id,'product_name',p.name,
+        'opening_quantity',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id
+            and (p_start_date is null or im.created_at<p_start_date::timestamptz)),0),
+        'stock_in',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.quantity_delta>0
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'stock_out',coalesce((select sum(-im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.quantity_delta<0
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'closing_quantity',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'receipts',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.movement_type='purchase_receipt'
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'sales',coalesce((select sum(-im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.movement_type='sale'
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'returns',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.movement_type='customer_return'
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'void_reversals',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.movement_type='sale_void'
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'adjustments',coalesce((select sum(im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.movement_type='adjustment'
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'writeoffs',coalesce((select sum(-im.quantity_delta) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id and im.movement_type='writeoff'
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0),
+        'unit_cost',case when v_cost_access then p.cost else null end,
+        'stock_value',case when v_cost_access then
+          coalesce((select sum(im.quantity_delta) from public.inventory_movements im
+            where im.merchant_id=p_merchant_id and im.product_id=p.id
+              and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0)*p.cost else null end,
+        'cogs',case when v_cost_access then coalesce((select sum(abs(im.quantity_delta)*im.unit_cost)
+          from public.inventory_movements im where im.merchant_id=p_merchant_id and im.product_id=p.id
+            and im.movement_type='sale'
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),0) else null end,
+        'movements',coalesce((select jsonb_agg(jsonb_build_object(
+          'movement_type',im.movement_type,'quantity_delta',im.quantity_delta,
+          'quantity_before',im.quantity_before,'quantity_after',im.quantity_after,
+          'unit_cost',case when v_cost_access then im.unit_cost else null end,
+          'source_type',im.source_type,'source_id',im.source_id,'reason',im.reason,
+          'actor_user_id',im.actor_user_id,'created_at',im.created_at
+        ) order by im.created_at desc) from public.inventory_movements im
+          where im.merchant_id=p_merchant_id and im.product_id=p.id
+            and (p_start_date is null or im.created_at>=p_start_date::timestamptz)
+            and (p_end_date is null or im.created_at<(p_end_date+1)::timestamptz)),'[]'::jsonb)
+      ) order by p.name)
+      from public.products p where p.merchant_id=p_merchant_id and coalesce(p.deleted,false)=false
+    ),'[]'::jsonb)
+  );
+end;
+$;
+revoke all on function public.shericeri_get_inventory_movement_report(uuid,date,date) from public,anon;
+grant execute on function public.shericeri_get_inventory_movement_report(uuid,date,date) to authenticated;
+
 create or replace function private.user_can_access_merchant(p_merchant_id uuid,p_permission text default 'view_dashboard')
 returns boolean language sql stable security definer set search_path=''
 as $$
@@ -622,6 +842,10 @@ begin
   end if;
   insert into public.sales
   select (jsonb_populate_record(null::public.sales,p_sale || jsonb_build_object('stock_applied',true,'voided',false))).*;
+  perform set_config('aibos.stock_movement_type','sale',true);
+  perform set_config('aibos.stock_movement_source_id',v_sale_id::text,true);
+  perform set_config('aibos.stock_movement_reason','Sale invoice posted',true);
+  perform set_config('aibos.stock_movement_unit_cost',v_cost::text,true);
   update public.products set stock=p_local_stock where id=p_product_id and merchant_id=v_merchant_id;
   return jsonb_build_object('ok',true,'stock_conflict',false,'server_stock',p_local_stock);
 end;
@@ -692,6 +916,9 @@ begin
     and coalesce(voided,false)=false;
 
   -- Restore only stock movements that were actually applied, then mark them unapplied.
+  perform set_config('aibos.stock_movement_type','sale_void',true);
+  perform set_config('aibos.stock_movement_source_id',p_sale_id::text,true);
+  perform set_config('aibos.stock_movement_reason',trim(p_reason),true);
   update public.products p set stock=p.stock+x.qty
   from (
     select product_id,sum(qty)::integer as qty
@@ -870,6 +1097,10 @@ begin
   if v_status='ordered' then
     return jsonb_build_object('ok',true,'stock_conflict',false,'ordered',true);
   end if;
+  perform set_config('aibos.stock_movement_type','purchase_receipt',true);
+  perform set_config('aibos.stock_movement_source_id',v_purchase_id::text,true);
+  perform set_config('aibos.stock_movement_reason','Purchase received',true);
+  perform set_config('aibos.stock_movement_unit_cost',v_unit_cost::text,true);
   update public.products set stock=p_local_stock,cost=p_local_cost where id=p_product_id and merchant_id=v_merchant_id;
   return jsonb_build_object('ok',true,'stock_conflict',false,'server_stock',p_local_stock,'server_cost',p_local_cost);
 end;
@@ -1038,6 +1269,10 @@ begin
 
   for v_check in select value from jsonb_array_elements(p_stock_checks) as c(value)
   loop
+    perform set_config('aibos.stock_movement_type','sale',true);
+    perform set_config('aibos.stock_movement_source_id',v_transaction_id::text,true);
+    perform set_config('aibos.stock_movement_reason','Sale invoice posted',true);
+    perform set_config('aibos.stock_movement_unit_cost',coalesce((select max((x.value->>'cost')::numeric) from jsonb_array_elements(p_sales) as x(value) where (x.value->>'product_id')::uuid=(v_check->>'product_id')::uuid),0)::text,true);
     update public.products
     set stock=(v_check->>'local_stock')::integer
     where id=(v_check->>'product_id')::uuid and merchant_id=v_merchant_id;
