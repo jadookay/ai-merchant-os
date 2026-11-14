@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
+const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const voidBlock = html.slice(html.indexOf("async function voidSale(id){"), html.indexOf("const sheriSearchValues"));
 
 test("Kinyarwanda covers core finance and stock terms", () => {
@@ -128,4 +130,20 @@ test("staff PIN reset is available to authorized team managers", () => {
 test("owner device sessions are registered and non-success RPC payloads are rejected", () => {
   assert.ok(html.includes("if(data?.ok!==true)"));
   assert.ok(html.includes("try{await sheriRegisterDeviceSession(merchantId)}catch(e)"));
+});
+
+
+test("team access reuses existing employee Auth identities and returns actionable conflicts", () => {
+  assert.ok(teamAccess.includes("admin.auth.admin.listUsers({ page: 1, perPage: 1000 })"));
+  assert.ok(teamAccess.includes("reused_existing_auth_user"));
+  assert.ok(teamAccess.includes("member_exists"));
+  assert.ok(teamAccess.includes("email_exists"));
+  assert.ok(teamAccess.includes("Use Edit access to change permissions or reset their PIN."));
+});
+
+test("live-update migration enables merchant tables in Realtime and tracks owner devices", () => {
+  assert.ok(liveSyncMigration.includes("alter publication supabase_realtime add table public.%I"));
+  assert.ok(liveSyncMigration.includes("merchant_device_sessions"));
+  assert.ok(liveSyncMigration.includes("return jsonb_build_object('ok',true,'owner',v_is_owner"));
+  assert.ok(liveSyncMigration.includes("where ds.revoked_at is null"));
 });
