@@ -604,3 +604,23 @@ test("disabled team members lose cached merchant data and cannot replay offline 
   assert.ok(html.includes("if(!(await sheriVerifyActiveStaffMembership(state.merchant.id)))return"));
   assert.ok(html.includes("memberResult.data.status!=='active'"));
 });
+
+
+test("team access is bound to an individually revocable authenticated device session", () => {
+  assert.ok(teamMigration.includes("create table if not exists public.merchant_device_sessions"));
+  assert.ok(teamMigration.includes("ds.session_id=nullif(auth.jwt()->>'session_id','')::uuid"));
+  assert.ok(teamMigration.includes("ds.revoked_at is null"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_register_device_session"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_list_device_sessions"));
+  assert.ok(teamMigration.includes("create or replace function public.shericeri_revoke_device_session"));
+  assert.ok(teamMigration.includes("revoke all on function public.shericeri_revoke_device_session(uuid,uuid) from public,anon"));
+  assert.ok(teamAccess.includes('admin.from("merchant_device_sessions")'));
+  assert.ok(teamAccess.includes('if (status === "suspended")'));
+  assert.ok(html.includes("async function sheriRegisterDeviceSession(merchantId)"));
+  assert.ok(html.includes("await sheriRegisterDeviceSession(memberResult.data.merchant_id)"));
+  assert.ok(html.includes("sheriRegisterDeviceSession(merchantId)"));
+  assert.ok(html.includes("sheri_list_device_sessions"));
+  assert.ok(html.includes("sheri_revoke_device_session"));
+  assert.ok(html.includes("id=\"teamDevicesTable\""));
+  assert.ok(html.includes("function revokeTeamDeviceSession(sessionId)"));
+});
