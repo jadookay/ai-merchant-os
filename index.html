@@ -2182,96 +2182,7 @@ function printLastReceipt(){
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script>
 
-<script id="aibos-ifrs-statements-v1">
-(function(){
-  if(typeof window.renderReports!=='function'||window.renderReports.__ifrsPresentationWrapped)return;
-  const original=window.renderReports;
-  const moneyRow=(label,value,cls='')=>'<div class="row '+cls+'"><span>'+label+'</span><b>'+money(value)+'</b></div>';
-  const section=(label,rows,totalLabel,total)=>'<div class="row statement-section-row"><span>'+label+'</span><b></b></div>'+rows+moneyRow(totalLabel,total,'statement-total-row');
-  function accountRows(accounts,balances,naturalSide){
-    return accounts.filter(a=>Math.abs(Number(balances?.[a.code]||0))>0.005).map(a=>{
-      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
-      const side=String(a.normal_balance||defaultSide).toLowerCase();
-      const value=Number(balances[a.code]||0)*(side===naturalSide?1:-1);
-      return moneyRow(esc(a.name)+' <small>('+esc(a.code)+')</small>',value);
-    }).join('');
-  }
-  function totalRows(accounts,balances,naturalSide){
-    return accounts.reduce((sum,a)=>{
-      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
-      const side=String(a.normal_balance||defaultSide).toLowerCase();
-      const value=Number(balances?.[a.code]||0);
-      return sum+(side===naturalSide?value:-value);
-    },0);
-  }
-  const wrapped=function(){
-    original.apply(this,arguments);
-    try{
-      if(!Array.isArray(state.accounts)||!state.accounts.length||!Array.isArray(state.journalEntries))return;
-      const end=sheriReportEnd||sheriLocalDateKey(new Date()),start=sheriReportStart||'';
-      const bs=accReportTotals(null,end),period=accReportTotals(start,end),accounts=state.accounts;
-      const assetsList=accounts.filter(a=>a.type==='asset'),liabList=accounts.filter(a=>a.type==='liability'),equityList=accounts.filter(a=>a.type==='equity');
-      const currentAssetCodes=new Set(['1000','1010','1020','1100','1200','2110']);
-      const currentAssets=assetsList.filter(a=>currentAssetCodes.has(String(a.code)));
-      const otherAssets=assetsList.filter(a=>!currentAssetCodes.has(String(a.code)));
-      const currentLiabCodes=new Set(['2000','2100']);
-      const currentLiabs=liabList.filter(a=>currentLiabCodes.has(String(a.code)));
-      const otherLiabs=liabList.filter(a=>!currentLiabCodes.has(String(a.code)));
-      const currentAssetsTotal=totalRows(currentAssets,bs,'debit'),otherAssetsTotal=totalRows(otherAssets,bs,'debit');
-      const currentLiabsTotal=totalRows(currentLiabs,bs,'credit'),otherLiabsTotal=totalRows(otherLiabs,bs,'credit');
-      const assets=accStatementTotal('asset',bs,'debit'),liabilities=accStatementTotal('liability',bs,'credit');
-      const cumulative=accStatementTotal('income',bs,'credit')-accStatementTotal('cogs',bs,'debit')-accStatementTotal('expense',bs,'debit');
-      const equity=accStatementTotal('equity',bs,'credit')+cumulative;
-      const periodIncome=accStatementTotal('income',period,'credit'),periodCogs=accStatementTotal('cogs',period,'debit');
-      const expenseAccounts=accounts.filter(a=>a.type==='expense'),operatingAccounts=expenseAccounts.filter(a=>String(a.code)!=='6100'),taxAccounts=expenseAccounts.filter(a=>String(a.code)==='6100');
-      const operatingExpenses=totalRows(operatingAccounts,period,'debit'),taxExpense=totalRows(taxAccounts,period,'debit');
-      const net=periodIncome-periodCogs-operatingExpenses-taxExpense,pretax=net+taxExpense;
-      const plEl=document.getElementById('accPL'),bsEl=document.getElementById('accBS');
-      const prefix=el=>(el?.innerHTML||'').match(/^(.*?)(?=<div class="row")/s)?.[1]||'';
-      const periodText='<div class="statement-period"><span>For the period ended</span> '+esc(end)+(start?' (from '+esc(start)+')':'')+' · '+esc(state.merchant?.currency||'')+'</div>';
-      const asAt='<div class="statement-period"><span>As at</span> '+esc(end)+' · '+esc(state.merchant?.currency||'')+'</div>';
-      if(bsEl){
-        const cashAccounts=currentAssets.filter(a=>['1000','1010','1020'].includes(String(a.code)));
-        const receivables=currentAssets.filter(a=>String(a.code)==='1100');
-        const inventory=currentAssets.filter(a=>String(a.code)==='1200');
-        const taxAssets=currentAssets.filter(a=>String(a.code)==='2110');
-        const otherCurrent=currentAssets.filter(a=>!['1000','1010','1020','1100','1200','2110'].includes(String(a.code)));
-        const rowsCash=accountRows(cashAccounts,bs,'debit'),rowsAR=accountRows(receivables,bs,'debit'),rowsInv=accountRows(inventory,bs,'debit'),rowsTax=accountRows(taxAssets,bs,'debit'),rowsOtherCurrent=accountRows(otherCurrent,bs,'debit');
-        const rowsOtherAssets=accountRows(otherAssets,bs,'debit'),rowsCurrentLiab=accountRows(currentLiabs,bs,'credit'),rowsOtherLiab=accountRows(otherLiabs,bs,'credit'),rowsEquity=accountRows(equityList,bs,'credit');
-        const notices=prefix(bsEl);
-        bsEl.innerHTML=notices+asAt+
-          section('Current assets',section('Cash and cash equivalents',rowsCash,'Cash and cash equivalents',totalRows(cashAccounts,bs,'debit'))+
-            section('Trade receivables',rowsAR,'Trade receivables',totalRows(receivables,bs,'debit'))+
-            section('Inventory',rowsInv,'Inventory',totalRows(inventory,bs,'debit'))+
-            section('Tax recoverable',rowsTax,'Tax recoverable',totalRows(taxAssets,bs,'debit'))+
-            section('Other current assets',rowsOtherCurrent,'Other current assets',totalRows(otherCurrent,bs,'debit')),'Total current assets',currentAssetsTotal)+
-          section('Other / non-current assets',rowsOtherAssets,'Total other / non-current assets',otherAssetsTotal)+
-          moneyRow('Total assets',assets,'statement-total-row')+
-          section('Current liabilities',rowsCurrentLiab,'Total current liabilities',currentLiabsTotal)+
-          section('Other / non-current liabilities',rowsOtherLiab,'Total other / non-current liabilities',otherLiabsTotal)+
-          moneyRow('Total liabilities',liabilities,'statement-total-row')+
-          section('Equity',rowsEquity+moneyRow('Retained earnings / current period profit',cumulative),'Total equity',equity)+
-          moneyRow('Total liabilities and equity',liabilities+equity,'statement-total-row')+
-          '<div class="sub" style="margin-top:8px">Assets = liabilities + equity. '+(Math.abs(assets-liabilities-equity)<=0.005?'The statement balances.':'Difference: '+money(assets-liabilities-equity)+'. The statement is not reconciled.')+'</div>';
-      }
-      if(plEl){
-        const incomeAccounts=accounts.filter(a=>a.type==='income'),cogsAccounts=accounts.filter(a=>a.type==='cogs');
-        const incomeRows=accountRows(incomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
-        const opRows=accountRows(operatingAccounts,period,'debit'),taxRows=accountRows(taxAccounts,period,'debit');
-        plEl.innerHTML=prefix(plEl)+periodText+
-          section('Revenue',incomeRows,'Total revenue',periodIncome)+
-          section('Cost of sales',cogsRows,'Total cost of sales',periodCogs)+
-          moneyRow('Gross profit',periodIncome-periodCogs,'statement-total-row')+
-          section('Operating expenses',opRows,'Total operating expenses',operatingExpenses)+
-          moneyRow('Profit before tax',pretax,'statement-total-row')+
-          section('Income tax expense',taxRows,'Total income tax expense',taxExpense)+
-          moneyRow('Profit for the period',net,'statement-total-row');
-      }
-    }catch(e){console.warn('[AIBOS IFRS statement presentation]',e)}
-  };
-  wrapped.__ifrsPresentationWrapped=true;window.renderReports=wrapped;
-})();
-</script>
+
 
 </body></html>');w.document.close();
 }
@@ -7436,6 +7347,96 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
     };
     wrapped.__emailFlagWrapped=true;window.createTeamMember=wrapped;
   }
+})();
+</script>
+<script id="aibos-ifrs-statements-v1">
+(function(){
+  if(typeof window.renderReports!=='function'||window.renderReports.__ifrsPresentationWrapped)return;
+  const original=window.renderReports;
+  const moneyRow=(label,value,cls='')=>'<div class="row '+cls+'"><span>'+label+'</span><b>'+money(value)+'</b></div>';
+  const section=(label,rows,totalLabel,total)=>'<div class="row statement-section-row"><span>'+label+'</span><b></b></div>'+rows+moneyRow(totalLabel,total,'statement-total-row');
+  function accountRows(accounts,balances,naturalSide){
+    return accounts.filter(a=>Math.abs(Number(balances?.[a.code]||0))>0.005).map(a=>{
+      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
+      const side=String(a.normal_balance||defaultSide).toLowerCase();
+      const value=Number(balances[a.code]||0)*(side===naturalSide?1:-1);
+      return moneyRow(esc(a.name)+' <small>('+esc(a.code)+')</small>',value);
+    }).join('');
+  }
+  function totalRows(accounts,balances,naturalSide){
+    return accounts.reduce((sum,a)=>{
+      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
+      const side=String(a.normal_balance||defaultSide).toLowerCase();
+      const value=Number(balances?.[a.code]||0);
+      return sum+(side===naturalSide?value:-value);
+    },0);
+  }
+  const wrapped=function(){
+    original.apply(this,arguments);
+    try{
+      if(!Array.isArray(state.accounts)||!state.accounts.length||!Array.isArray(state.journalEntries))return;
+      const end=sheriReportEnd||sheriLocalDateKey(new Date()),start=sheriReportStart||'';
+      const bs=accReportTotals(null,end),period=accReportTotals(start,end),accounts=state.accounts;
+      const assetsList=accounts.filter(a=>a.type==='asset'),liabList=accounts.filter(a=>a.type==='liability'),equityList=accounts.filter(a=>a.type==='equity');
+      const currentAssetCodes=new Set(['1000','1010','1020','1100','1200','2110']);
+      const currentAssets=assetsList.filter(a=>currentAssetCodes.has(String(a.code)));
+      const otherAssets=assetsList.filter(a=>!currentAssetCodes.has(String(a.code)));
+      const currentLiabCodes=new Set(['2000','2100']);
+      const currentLiabs=liabList.filter(a=>currentLiabCodes.has(String(a.code)));
+      const otherLiabs=liabList.filter(a=>!currentLiabCodes.has(String(a.code)));
+      const currentAssetsTotal=totalRows(currentAssets,bs,'debit'),otherAssetsTotal=totalRows(otherAssets,bs,'debit');
+      const currentLiabsTotal=totalRows(currentLiabs,bs,'credit'),otherLiabsTotal=totalRows(otherLiabs,bs,'credit');
+      const assets=accStatementTotal('asset',bs,'debit'),liabilities=accStatementTotal('liability',bs,'credit');
+      const cumulative=accStatementTotal('income',bs,'credit')-accStatementTotal('cogs',bs,'debit')-accStatementTotal('expense',bs,'debit');
+      const equity=accStatementTotal('equity',bs,'credit')+cumulative;
+      const periodIncome=accStatementTotal('income',period,'credit'),periodCogs=accStatementTotal('cogs',period,'debit');
+      const expenseAccounts=accounts.filter(a=>a.type==='expense'),operatingAccounts=expenseAccounts.filter(a=>String(a.code)!=='6100'),taxAccounts=expenseAccounts.filter(a=>String(a.code)==='6100');
+      const operatingExpenses=totalRows(operatingAccounts,period,'debit'),taxExpense=totalRows(taxAccounts,period,'debit');
+      const net=periodIncome-periodCogs-operatingExpenses-taxExpense,pretax=net+taxExpense;
+      const plEl=document.getElementById('accPL'),bsEl=document.getElementById('accBS');
+      const prefix=el=>(el?.innerHTML||'').match(/^(.*?)(?=<div class="row")/s)?.[1]||'';
+      const periodText='<div class="statement-period"><span>For the period ended</span> '+esc(end)+(start?' (from '+esc(start)+')':'')+' · '+esc(state.merchant?.currency||'')+'</div>';
+      const asAt='<div class="statement-period"><span>As at</span> '+esc(end)+' · '+esc(state.merchant?.currency||'')+'</div>';
+      if(bsEl){
+        const cashAccounts=currentAssets.filter(a=>['1000','1010','1020'].includes(String(a.code)));
+        const receivables=currentAssets.filter(a=>String(a.code)==='1100');
+        const inventory=currentAssets.filter(a=>String(a.code)==='1200');
+        const taxAssets=currentAssets.filter(a=>String(a.code)==='2110');
+        const otherCurrent=currentAssets.filter(a=>!['1000','1010','1020','1100','1200','2110'].includes(String(a.code)));
+        const rowsCash=accountRows(cashAccounts,bs,'debit'),rowsAR=accountRows(receivables,bs,'debit'),rowsInv=accountRows(inventory,bs,'debit'),rowsTax=accountRows(taxAssets,bs,'debit'),rowsOtherCurrent=accountRows(otherCurrent,bs,'debit');
+        const rowsOtherAssets=accountRows(otherAssets,bs,'debit'),rowsCurrentLiab=accountRows(currentLiabs,bs,'credit'),rowsOtherLiab=accountRows(otherLiabs,bs,'credit'),rowsEquity=accountRows(equityList,bs,'credit');
+        const notices=prefix(bsEl);
+        bsEl.innerHTML=notices+asAt+
+          section('Current assets',section('Cash and cash equivalents',rowsCash,'Cash and cash equivalents',totalRows(cashAccounts,bs,'debit'))+
+            section('Trade receivables',rowsAR,'Trade receivables',totalRows(receivables,bs,'debit'))+
+            section('Inventory',rowsInv,'Inventory',totalRows(inventory,bs,'debit'))+
+            section('Tax recoverable',rowsTax,'Tax recoverable',totalRows(taxAssets,bs,'debit'))+
+            section('Other current assets',rowsOtherCurrent,'Other current assets',totalRows(otherCurrent,bs,'debit')),'Total current assets',currentAssetsTotal)+
+          section('Other / non-current assets',rowsOtherAssets,'Total other / non-current assets',otherAssetsTotal)+
+          moneyRow('Total assets',assets,'statement-total-row')+
+          section('Current liabilities',rowsCurrentLiab,'Total current liabilities',currentLiabsTotal)+
+          section('Other / non-current liabilities',rowsOtherLiab,'Total other / non-current liabilities',otherLiabsTotal)+
+          moneyRow('Total liabilities',liabilities,'statement-total-row')+
+          section('Equity',rowsEquity+moneyRow('Retained earnings / current period profit',cumulative),'Total equity',equity)+
+          moneyRow('Total liabilities and equity',liabilities+equity,'statement-total-row')+
+          '<div class="sub" style="margin-top:8px">Assets = liabilities + equity. '+(Math.abs(assets-liabilities-equity)<=0.005?'The statement balances.':'Difference: '+money(assets-liabilities-equity)+'. The statement is not reconciled.')+'</div>';
+      }
+      if(plEl){
+        const incomeAccounts=accounts.filter(a=>a.type==='income'),cogsAccounts=accounts.filter(a=>a.type==='cogs');
+        const incomeRows=accountRows(incomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
+        const opRows=accountRows(operatingAccounts,period,'debit'),taxRows=accountRows(taxAccounts,period,'debit');
+        plEl.innerHTML=prefix(plEl)+periodText+
+          section('Revenue',incomeRows,'Total revenue',periodIncome)+
+          section('Cost of sales',cogsRows,'Total cost of sales',periodCogs)+
+          moneyRow('Gross profit',periodIncome-periodCogs,'statement-total-row')+
+          section('Operating expenses',opRows,'Total operating expenses',operatingExpenses)+
+          moneyRow('Profit before tax',pretax,'statement-total-row')+
+          section('Income tax expense',taxRows,'Total income tax expense',taxExpense)+
+          moneyRow('Profit for the period',net,'statement-total-row');
+      }
+    }catch(e){console.warn('[AIBOS IFRS statement presentation]',e)}
+  };
+  wrapped.__ifrsPresentationWrapped=true;window.renderReports=wrapped;
 })();
 </script>
 </body>
