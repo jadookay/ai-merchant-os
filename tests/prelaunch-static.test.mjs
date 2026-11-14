@@ -456,7 +456,7 @@ test("stock conflicts do not create partial sale or purchase records", () => {
 
 test("voided server sales remain visible in history but are excluded from active metrics", () => {
   assert.ok(html.includes("state.sales=mergeKeepLocal(sales,state.sales);"));
-  assert.ok(html.includes("s.voided?'<span class="pill">Voided</span>"));
+  assert.match(html, /s\.voided\?'<span class="pill">Voided<\/span>/);
   assert.ok(html.includes("esc(s.void_reason||'No reason recorded')"));
   assert.ok(html.includes("function revenue(){return state.sales.filter(x=>!x.voided)"));
 });
