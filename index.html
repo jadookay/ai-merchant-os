@@ -653,6 +653,11 @@ function money(n){try{return new Intl.NumberFormat(merchantLocale(),{style:'curr
 
 let session=null;
 let state={merchant:null,products:[],sales:[],expenses:[],memory:[],customers:[],suppliers:[],purchases:[],cashEntries:[],budgets:[],accounts:[],journalEntries:[],journalLines:[],invoices:[],bills:[],payments:[],bankAccounts:[],taxRates:[],recurringTransactions:[],accountingSettings:null,auditLog:[],teamMembers:[],currentMembership:null};
+let sheriLoadedMerchantId=null;
+function sheriResetMerchantData(){
+  for(const key of ['products','sales','expenses','memory','customers','suppliers','purchases','cashEntries','budgets','accounts','journalEntries','journalLines','invoices','bills','payments','bankAccounts','taxRates','recurringTransactions','auditLog','teamMembers'])state[key]=[];
+  state.accountingSettings=null;state.currentMembership=null;
+}
 let editingProductId=null;
 
 let advisorAvailable=null; // null=unknown, true/false once tested
@@ -1718,6 +1723,7 @@ async function signOut(){await sb.auth.signOut();session=null;location.reload()}
 // ── Data loading ─────────────────────────────────────────────────────────
 async function loadAll(silent=false){
   const mId=state.merchant?.id; if(!mId)return;
+  if(sheriLoadedMerchantId!==mId){sheriResetMerchantData();sheriLoadedMerchantId=mId;}
   if(navigator.onLine&&!(await sheriValidateCurrentMembership()))return;
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
