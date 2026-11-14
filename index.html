@@ -5604,7 +5604,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))docum
 async function exportStatement(id,title,kind){
   const el=document.getElementById(id);if(!el)return;
   const filename=(title||'report').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+new Date().toISOString().slice(0,10);
-  const rows=[['Shericeri — '+title],...Array.from(el.querySelectorAll('.row')).map(r=>Array.from(r.children).map(c=>c.textContent.trim()))];
+  const rows=[['Business',state.merchant?.name||'Business'],['Statement',title],['Reporting period',(sheriReportStart||'Beginning')+' – '+(sheriReportEnd||sheriLocalDateKey(new Date()))],['Currency',state.merchant?.currency||''],...Array.from(el.querySelectorAll('.row')).map(r=>Array.from(r.children).map(c=>c.textContent.trim()))];
   try{
     if(kind==='xlsx'){
       await sheriEnsureXlsx();
@@ -6391,6 +6391,50 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'balance sheet':'Bilan','income statement':'Compte de résultat','trial balance':'Balance générale',
     'gross margin':'Marge brute','inventory value':'Valeur du stock','stock movement':'Mouvements de stock','low stock':'Stock faible'
   });
+  Object.assign(dictionaries.rw,{
+    'statement of financial position':'Imbonerahamwe y’imiterere y’umutungo n’imyenda','current assets':'Umutungo ukoreshwa mu gihe gito',
+    'cash and cash equivalents':'Amafaranga mu ntoki, kuri banki na Mobile Money','trade receivables':'Amafaranga abakiriya batarishyura',
+    'inventory':'Ibicuruzwa biri mu bubiko','tax recoverable':'Umusoro ugomba kugaruzwa','other current assets':'Undi mutungo w’igihe gito',
+    'total current assets':'Igiteranyo cy’umutungo w’igihe gito','other / non-current assets':'Undi mutungo w’igihe kirekire',
+    'total assets':'Igiteranyo cy’umutungo','current liabilities':'Imyenda igomba kwishyurwa mu gihe gito',
+    'trade and other payables':'Amafaranga ugomba kwishyura abatanga ibicuruzwa na serivisi','tax payable':'Umusoro ugomba kwishyurwa',
+    'other / non-current liabilities':'Indi myenda y’igihe kirekire','total liabilities':'Igiteranyo cy’imyenda',
+    'equity':'Igishoro n’umutungo bwite','owner equity':'Igishoro cya nyir’ubucuruzi',
+    'owner drawings':'Amafaranga nyir’ubucuruzi yikuye mu bucuruzi','retained earnings / current period profit':'Inyungu zasigaye n’iy’iki gihe',
+    'total equity':'Igiteranyo cy’igishoro n’inyungu zasigaye','total liabilities and equity':'Igiteranyo cy’imyenda n’igishoro',
+    'as at':'Ku itariki ya','statement of profit or loss':'Imbonerahamwe y’inyungu cyangwa igihombo','for the period ended':'Mu gihe cyarangiye ku',
+    'sales revenue':'Amafaranga yavuye mu igurisha','sales returns & discounts':'Ibyagaruwe n’ibiciro byagabanyijwe',
+    'other income':'Andi mafaranga yinjiye','total revenue':'Igiteranyo cy’amafaranga yinjiye','cost of sales':'Ikiguzi cy’ibicuruzwa byagurishijwe',
+    'gross profit':'Inyungu mbumbe','operating expenses':'Amafaranga yakoreshejwe mu bikorwa','income tax expense':'Umusoro ku nyungu',
+    'total cost of sales':'Igiteranyo cy’ikiguzi cy’ibicuruzwa byagurishijwe','total operating expenses':'Igiteranyo cy’amafaranga yakoreshejwe mu bikorwa','total income tax expense':'Igiteranyo cy’umusoro ku nyungu','total other / non-current assets':'Igiteranyo cy’undi mutungo w’igihe kirekire','total current liabilities':'Igiteranyo cy’imyenda y’igihe gito','total other / non-current liabilities':'Igiteranyo cy’indi myenda y’igihe kirekire','for the period ended':'Mu gihe cyarangiye ku','as at':'Ku itariki ya','total revenue':'Igiteranyo cy’amafaranga yinjiye','total current assets':'Igiteranyo cy’umutungo w’igihe gito','total equity':'Igiteranyo cy’igishoro n’inyungu zasigaye','total liabilities and equity':'Igiteranyo cy’imyenda n’igishoro',
+    'profit before tax':'Inyungu mbere y’umusoro','profit for the period':'Inyungu y’igihe cyatoranyijwe',
+    'statement of financial position':'Imbonerahamwe y’imiterere y’umutungo n’imyenda','statement of profit or loss':'Imbonerahamwe y’inyungu cyangwa igihombo','IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.':'Iyi raporo iteguye mu buryo busa n’ubwa IFRS ikoresheje amakuru yanditswe mu ibaruramari. Kugira ngo yubahirize IFRS yose, hakenewe amakuru yuzuye n’amabwiriza akwiye ku mafaranga agomba kwishyurwa, igabanuka ry’agaciro k’umutungo, igihombo gishoboka, imisoro no gutandukanya iby’igihe gito n’igihe kirekire.',
+    'cash on hand':'Amafaranga mu ntoki','bank accounts':'Amafaranga kuri banki','mobile money':'Amafaranga kuri Mobile Money',
+    'accounts receivable':'Amafaranga abakiriya bakurimo','accounts payable':'Amafaranga ugomba kwishyura','input tax receivable':'Umusoro wishyuwe utegereje kugaruzwa',
+    'other liabilities':'Indi myenda','sales revenue':'Amafaranga yavuye mu igurisha','cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe',
+    'operating expenses':'Amafaranga yakoreshejwe mu bikorwa','tax expense':'Umusoro ku nyungu'
+  });
+  Object.assign(dictionaries.fr,{
+    'statement of financial position':'État de la situation financière','current assets':'Actifs courants',
+    'cash and cash equivalents':'Trésorerie et équivalents de trésorerie','trade receivables':'Créances clients',
+    'inventory':'Stocks','tax recoverable':'Taxes à récupérer','other current assets':'Autres actifs courants',
+    'total current assets':'Total des actifs courants','other / non-current assets':'Autres actifs / actifs non courants',
+    'total assets':'Total des actifs','current liabilities':'Passifs courants','trade and other payables':'Dettes fournisseurs et autres créditeurs',
+    'tax payable':'Impôts et taxes à payer','other / non-current liabilities':'Autres passifs / passifs non courants',
+    'total liabilities':'Total des passifs','equity':'Capitaux propres','owner equity':'Capital du propriétaire',
+    'owner drawings':'Prélèvements du propriétaire','retained earnings / current period profit':'Résultats accumulés / bénéfice de la période',
+    'total equity':'Total des capitaux propres','total liabilities and equity':'Total des passifs et des capitaux propres',
+    'as at':'Au','statement of profit or loss':'État du résultat net','for the period ended':'Pour la période close le',
+    'sales revenue':'Chiffre d’affaires','sales returns & discounts':'Retours sur ventes et rabais','other income':'Autres produits',
+    'total revenue':'Total des produits','cost of sales':'Coût des ventes','gross profit':'Marge brute',
+    'total cost of sales':'Total du coût des ventes','total operating expenses':'Total des charges opérationnelles','total income tax expense':'Total de la charge d’impôt sur le résultat','total other / non-current assets':'Total des autres actifs / actifs non courants','total current liabilities':'Total des passifs courants','total other / non-current liabilities':'Total des autres passifs / passifs non courants','for the period ended':'Pour la période close le','as at':'Au','total current assets':'Total des actifs courants','total equity':'Total des capitaux propres','total liabilities and equity':'Total des passifs et des capitaux propres',
+    'operating expenses':'Charges opérationnelles','income tax expense':'Charge d’impôt sur le résultat',
+    'profit before tax':'Résultat avant impôt','profit for the period':'Résultat de la période',
+    'statement of financial position':'État de la situation financière','statement of profit or loss':'État du résultat net','IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.':'Présentation de type IFRS fondée sur les soldes comptabilisés. La conformité complète aux IFRS exige également des pièces exhaustives et des méthodes adaptées pour les charges à payer, amortissements, dépréciations, provisions, impôts et classement courant/non courant.',
+    'cash on hand':'Espèces en caisse','bank accounts':'Comptes bancaires','mobile money':'Mobile Money',
+    'accounts receivable':'Créances clients','accounts payable':'Dettes fournisseurs','input tax receivable':'TVA déductible à récupérer',
+    'other liabilities':'Autres passifs','cost of goods sold':'Coût des marchandises vendues','tax expense':'Charge fiscale'
+  });
   const pendingFragments={
     rw:[
       ['pending activities','ibikorwa bitaroherezwa'],['need attention','bikeneye kwitabwaho'],
@@ -7128,6 +7172,30 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     ['Cost value ','Valeur du stock : '],['Quantity ','Quantité : '],['Debit ','Débit : '],
     ['Next retry: ','Nouvel essai : '],['attempts: ','Tentatives : '],['line(s)','ligne(s)']
   );
+  phraseFragments.rw.push(
+    ['Assets = liabilities + equity.','Umutungo ungana n’imyenda hiyongereyeho igishoro.'],
+    ['The statement balances.','Iyi raporo iraringaniye.'],['Difference:','Itandukaniro:'],['The statement is not reconciled.','Iyi raporo ntiraringanizwa.'],
+    ['Financial statements are NOT reconciled: ','Raporo z’imari ntiziraringanijwe: '],
+    [' journal entries are missing lines or out of balance. Review the General Ledger before relying on these totals.',' byanditswe mu gitabo cy’ibaruramari bibura imirongo cyangwa ntibiringaniye. Banza urebe igitabo rusange mbere yo gukoresha iyi mibare.'],
+    [' journal entry is missing lines or out of balance. Review the General Ledger before relying on these totals.',' cyanditswe mu gitabo cy’ibaruramari kibura imirongo cyangwa ntikiringaniye. Banza urebe igitabo rusange mbere yo gukoresha iyi mibare.'],
+    ['The latest server ledger refresh was incomplete. These figures may be cached and are NOT verified. ','Kuvugurura amakuru y’ibaruramari kuri seriveri ntibyuzuye. Iyi mibare ishobora kuba ishaje kandi ntiyemejwe. '],
+    ['The latest ledger snapshot has not yet been confirmed from the server. These statements are NOT verified.','Amakuru aheruka y’ibaruramari ntaremezwa na seriveri. Izi raporo ntiziremezwa.'],
+    ['Some transactions are still waiting to synchronize. These figures include only data currently available on this device and are NOT yet server-verified.','Hari ibikorwa bitaroherezwa. Iyi mibare ikubiyemo gusa amakuru ari kuri iki gikoresho kandi ntiragenzurwa na seriveri.'],
+    ['Balance Sheet does not balance. Assets minus liabilities and equity = ','Imbonerahamwe y’umutungo n’imyenda ntiringaniye. Umutungo ukuyemo imyenda n’igishoro = '],
+    ['. Do not rely on this statement until the journal is corrected.','. Ntukishingikirize kuri iyi raporo mbere y’uko igitabo cy’ibaruramari gikosorwa.']
+  );
+  phraseFragments.fr.push(
+    ['Assets = liabilities + equity.','Les actifs sont égaux aux passifs plus les capitaux propres.'],
+    ['The statement balances.','L’état est équilibré.'],['Difference:','Écart :'],['The statement is not reconciled.','L’état n’est pas rapproché.'],
+    ['Financial statements are NOT reconciled: ','Les états financiers ne sont PAS rapprochés : '],
+    [' journal entries are missing lines or out of balance. Review the General Ledger before relying on these totals.',' écritures comptables ont des lignes manquantes ou sont déséquilibrées. Vérifiez le grand livre avant de vous fier à ces totaux.'],
+    [' journal entry is missing lines or out of balance. Review the General Ledger before relying on these totals.',' écriture comptable comporte des lignes manquantes ou est déséquilibrée. Vérifiez le grand livre avant de vous fier à ces totaux.'],
+    ['The latest server ledger refresh was incomplete. These figures may be cached and are NOT verified. ','La dernière actualisation du grand livre sur le serveur est incomplète. Ces chiffres peuvent être en cache et ne sont PAS vérifiés. '],
+    ['The latest ledger snapshot has not yet been confirmed from the server. These statements are NOT verified.','Le dernier instantané du grand livre n’a pas encore été confirmé par le serveur. Ces états ne sont PAS vérifiés.'],
+    ['Some transactions are still waiting to synchronize. These figures include only data currently available on this device and are NOT yet server-verified.','Certaines opérations attendent encore la synchronisation. Ces chiffres comprennent uniquement les données disponibles sur cet appareil et ne sont PAS encore vérifiés par le serveur.'],
+    ['Balance Sheet does not balance. Assets minus liabilities and equity = ','Le bilan n’est pas équilibré. Les actifs moins les passifs et les capitaux propres = '],
+    ['. Do not rely on this statement until the journal is corrected.','. Ne vous fiez pas à cet état avant la correction du journal.']
+  );
   const normalize=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
   function translateString(original,lang){
     if(lang==='en')return original;
@@ -7231,6 +7299,182 @@ function sheriWrapSyncBatch(name){
   'accEnsureBase','accEnsureOperationalLedger','accCreateInvoice','accCreateBill','accCreatePayment',
   'accCreateBankAccount','accCreateTaxRate','accCreateRecurring','accPostOpeningBalance','accCreateAdjustment'
 ].forEach(sheriWrapSyncBatch);
+</script>
+<style id="aibos-layout-ifrs-v1">
+/* Fixed desktop navigation; the mobile navigation remains in normal document flow. */
+#appRoot .side{position:fixed!important;inset:0 auto 0 0!important;height:100vh!important;height:100dvh!important;overflow-y:auto!important;overscroll-behavior:contain;z-index:60;display:flex;flex-direction:column;padding:16px 12px!important}
+#appRoot .side .brand{margin:4px 8px 14px!important}
+#appRoot .side .nav{display:flex;flex-direction:column;gap:2px;flex:0 0 auto}
+#appRoot .side .nav button{padding:9px 10px!important;margin:1px 0!important}
+#appRoot .main{margin:0 0 0 230px!important;width:calc(100% - 230px)!important;max-width:none!important;padding:12px 16px!important}
+#aibosLanguageSwitcher{position:static!important;inset:auto!important;z-index:auto!important;width:100%;max-width:100%;margin:16px 0 8px!important;padding:8px!important;box-shadow:none!important;display:flex!important;flex-direction:column;align-items:stretch!important;gap:5px!important}
+#aibosLanguageSwitcher select{width:100%!important;min-width:0!important}
+#authScreen #aibosLanguageSwitcher{margin:14px 0 0!important;max-width:100%!important;background:#f8fafc}
+#sheriOfflineBar{position:relative!important;top:auto!important;margin:0 0 5px!important;z-index:15!important;flex-wrap:wrap}
+#sheriOfflineBar>div:last-child{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}
+#dashboard>.top{margin:0 0 4px!important;align-items:center}
+#dashboard>.top>div:last-child{flex-direction:row!important;align-items:center!important;gap:8px!important}
+#dashboard .sheri-launcher{margin-left:4px;align-self:center}
+#dashboard .hero{margin:0 0 5px!important;padding:15px 17px!important}
+#dashboard .section{margin-top:5px!important}
+#dashboard .section h2{margin-bottom:6px!important}
+.advisor-composer{display:grid!important;grid-template-columns:42px minmax(0,1fr) 78px;grid-template-rows:minmax(42px,auto) 34px;gap:6px!important;align-items:stretch!important}
+.advisor-composer textarea{grid-column:2!important;grid-row:1 / span 2!important;width:100%;min-width:0;min-height:112px!important;height:112px;max-height:220px!important;resize:vertical!important;padding:12px!important;font:inherit!important;line-height:1.45!important}
+.advisor-composer-actions{display:contents!important}
+#advisorUploadWrap{grid-column:1!important;grid-row:1!important;align-self:start}
+#advisorUploadWrap>.btn{width:40px;height:40px;padding:0!important;font-size:21px}
+.advisor-composer-actions>button:nth-of-type(1){grid-column:1!important;grid-row:2!important;min-width:40px;padding:5px!important}
+.advisor-composer-actions>button:nth-of-type(2){grid-column:3!important;grid-row:2!important;min-width:40px;padding:5px!important}
+.advisor-composer-actions>button:nth-of-type(3){grid-column:3!important;grid-row:1!important;min-width:72px;padding:8px!important}
+#advisorUploadWrap .export-menu{left:0;right:auto;bottom:44px;top:auto}
+input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #fee2e2!important}
+.statement-period{font-size:12px;color:var(--muted);padding:4px 0 8px}
+.statement-section-row{font-weight:800;background:#f8fafc;border-top:1px solid var(--line)}
+.statement-total-row{font-weight:800;border-top:1px solid var(--line)}
+@media(max-width:900px) and (min-width:651px){#appRoot .side{width:190px!important}#appRoot .main{margin-left:190px!important;width:calc(100% - 190px)!important}}
+@media(max-width:650px){
+ #appRoot .side{position:sticky!important;top:0!important;inset:auto!important;width:100%!important;height:auto!important;max-height:none!important;overflow:visible!important;padding:9px 10px!important}
+ #appRoot .side .nav{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px}
+ #appRoot .side .nav button{flex:1 1 calc(33.333% - 4px);width:auto;min-width:0;padding:8px 5px!important}
+ #appRoot .main{margin:0!important;width:100%!important;max-width:100%!important;padding:8px 12px 12px!important}
+ #aibosLanguageSwitcher{margin:10px 0 2px!important;max-width:180px!important}
+ #sheriOfflineBar{margin-bottom:4px!important;gap:5px!important}
+ #sheriOfflineBar>div:last-child{justify-content:flex-start;width:100%}
+ #dashboard>.top{gap:6px!important;margin-bottom:3px!important}
+ #dashboard>.top>div:last-child{gap:5px!important}
+ #dashboard .hero{padding:12px!important;margin-bottom:4px!important}
+ .advisor-composer{grid-template-columns:38px minmax(0,1fr) 68px!important;grid-template-rows:minmax(40px,auto) 32px!important;gap:5px!important}
+ .advisor-composer textarea{min-height:108px!important;height:108px!important;padding:9px!important}
+ #advisorUploadWrap>.btn{width:36px;height:38px}
+ .advisor-composer-actions>button:nth-of-type(1){min-width:36px!important}
+ .advisor-composer-actions>button:nth-of-type(2){min-width:36px!important}
+ .advisor-composer-actions>button:nth-of-type(3){min-width:64px!important}
+}
+</style>
+<script>
+(function(){
+  const picker=document.getElementById('aibosLanguageSwitcher');
+  const appRoot=document.getElementById('appRoot');
+  const auth=document.getElementById('authScreen');
+  const authCard=auth?.querySelector('.auth-card');
+  const side=appRoot?.querySelector('.side');
+  const nav=side?.querySelector('.nav');
+  const placeLanguagePicker=()=>{
+    if(!picker)return;
+    const signedIn=!!appRoot&&appRoot.style.display!=='none';
+    if(signedIn&&nav&&picker.parentElement!==side)nav.after(picker);
+    else if(!signedIn&&authCard&&picker.parentElement!==authCard)authCard.append(picker);
+  };
+  placeLanguagePicker();
+  if(typeof MutationObserver!=='undefined'){
+    const observer=new MutationObserver(placeLanguagePicker);
+    if(appRoot)observer.observe(appRoot,{attributes:true,attributeFilter:['style']});
+    if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
+  }
+  const teamEmail=document.getElementById('teamEmail');
+  if(teamEmail)teamEmail.addEventListener('input',()=>teamEmail.removeAttribute('aria-invalid'));
+  const originalCreate=window.createTeamMember;
+  if(typeof originalCreate==='function'&&!originalCreate.__emailFlagWrapped){
+    const wrapped=async function(){
+      const field=document.getElementById('teamEmail');
+      if(field)field.removeAttribute('aria-invalid');
+      await originalCreate.apply(this,arguments);
+      const status=document.getElementById('teamStatus');
+      if(field&&/email.*already|already.*email|email.*registered/i.test(status?.textContent||''))field.setAttribute('aria-invalid','true');
+    };
+    wrapped.__emailFlagWrapped=true;window.createTeamMember=wrapped;
+  }
+})();
+</script>
+<script id="aibos-ifrs-statements-v1">
+(function(){
+  if(typeof window.renderReports!=='function'||window.renderReports.__ifrsPresentationWrapped)return;
+  const original=window.renderReports;
+  const moneyRow=(label,value,cls='')=>'<div class="row '+cls+'"><span>'+label+'</span><b>'+money(value)+'</b></div>';
+  const section=(label,rows,totalLabel,total)=>'<div class="row statement-section-row"><span>'+label+'</span><b></b></div>'+rows+moneyRow(totalLabel,total,'statement-total-row');
+  function accountRows(accounts,balances,naturalSide){
+    return accounts.filter(a=>Math.abs(Number(balances?.[a.code]||0))>0.005).map(a=>{
+      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
+      const side=String(a.normal_balance||defaultSide).toLowerCase();
+      const value=Number(balances[a.code]||0)*(side===naturalSide?1:-1);
+      return moneyRow(esc(a.name)+' <small>('+esc(a.code)+')</small>',value);
+    }).join('');
+  }
+  function totalRows(accounts,balances,naturalSide){
+    return accounts.reduce((sum,a)=>{
+      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
+      const side=String(a.normal_balance||defaultSide).toLowerCase();
+      const value=Number(balances?.[a.code]||0);
+      return sum+(side===naturalSide?value:-value);
+    },0);
+  }
+  const wrapped=function(){
+    original.apply(this,arguments);
+    try{
+      if(!Array.isArray(state.accounts)||!state.accounts.length||!Array.isArray(state.journalEntries))return;
+      const end=sheriReportEnd||sheriLocalDateKey(new Date()),start=sheriReportStart||'';
+      const bs=accReportTotals(null,end),period=accReportTotals(start,end),accounts=state.accounts;
+      const assetsList=accounts.filter(a=>a.type==='asset'),liabList=accounts.filter(a=>a.type==='liability'),equityList=accounts.filter(a=>a.type==='equity');
+      const currentAssetCodes=new Set(['1000','1010','1020','1100','1200','2110']);
+      const currentAssets=assetsList.filter(a=>currentAssetCodes.has(String(a.code)));
+      const otherAssets=assetsList.filter(a=>!currentAssetCodes.has(String(a.code)));
+      const currentLiabCodes=new Set(['2000','2100']);
+      const currentLiabs=liabList.filter(a=>currentLiabCodes.has(String(a.code)));
+      const otherLiabs=liabList.filter(a=>!currentLiabCodes.has(String(a.code)));
+      const currentAssetsTotal=totalRows(currentAssets,bs,'debit'),otherAssetsTotal=totalRows(otherAssets,bs,'debit');
+      const currentLiabsTotal=totalRows(currentLiabs,bs,'credit'),otherLiabsTotal=totalRows(otherLiabs,bs,'credit');
+      const assets=accStatementTotal('asset',bs,'debit'),liabilities=accStatementTotal('liability',bs,'credit');
+      const cumulative=accStatementTotal('income',bs,'credit')-accStatementTotal('cogs',bs,'debit')-accStatementTotal('expense',bs,'debit');
+      const equity=accStatementTotal('equity',bs,'credit')+cumulative;
+      const periodIncome=accStatementTotal('income',period,'credit'),periodCogs=accStatementTotal('cogs',period,'debit');
+      const expenseAccounts=accounts.filter(a=>a.type==='expense'),operatingAccounts=expenseAccounts.filter(a=>String(a.code)!=='6100'),taxAccounts=expenseAccounts.filter(a=>String(a.code)==='6100');
+      const operatingExpenses=totalRows(operatingAccounts,period,'debit'),taxExpense=totalRows(taxAccounts,period,'debit');
+      const net=periodIncome-periodCogs-operatingExpenses-taxExpense,pretax=net+taxExpense;
+      const plEl=document.getElementById('accPL'),bsEl=document.getElementById('accBS');
+      const prefix=el=>(el?.innerHTML||'').match(/^(.*?)(?=<div class="row")/s)?.[1]||'';
+      const periodText='<div class="statement-period"><span>For the period ended</span> '+esc(end)+(start?' (from '+esc(start)+')':'')+' · '+esc(state.merchant?.currency||'')+'</div>';
+      const asAt='<div class="statement-period"><span>As at</span> '+esc(end)+' · '+esc(state.merchant?.currency||'')+'</div>';
+      if(bsEl){
+        const cashAccounts=currentAssets.filter(a=>['1000','1010','1020'].includes(String(a.code)));
+        const receivables=currentAssets.filter(a=>String(a.code)==='1100');
+        const inventory=currentAssets.filter(a=>String(a.code)==='1200');
+        const taxAssets=currentAssets.filter(a=>String(a.code)==='2110');
+        const otherCurrent=currentAssets.filter(a=>!['1000','1010','1020','1100','1200','2110'].includes(String(a.code)));
+        const rowsCash=accountRows(cashAccounts,bs,'debit'),rowsAR=accountRows(receivables,bs,'debit'),rowsInv=accountRows(inventory,bs,'debit'),rowsTax=accountRows(taxAssets,bs,'debit'),rowsOtherCurrent=accountRows(otherCurrent,bs,'debit');
+        const rowsOtherAssets=accountRows(otherAssets,bs,'debit'),rowsCurrentLiab=accountRows(currentLiabs,bs,'credit'),rowsOtherLiab=accountRows(otherLiabs,bs,'credit'),rowsEquity=accountRows(equityList,bs,'credit');
+        const notices=prefix(bsEl);
+        bsEl.innerHTML=notices+'<div class="row statement-section-row"><span>Statement of financial position</span><b></b></div>'+asAt+
+          section('Current assets',section('Cash and cash equivalents',rowsCash,'Cash and cash equivalents',totalRows(cashAccounts,bs,'debit'))+
+            section('Trade receivables',rowsAR,'Trade receivables',totalRows(receivables,bs,'debit'))+
+            section('Inventory',rowsInv,'Inventory',totalRows(inventory,bs,'debit'))+
+            section('Tax recoverable',rowsTax,'Tax recoverable',totalRows(taxAssets,bs,'debit'))+
+            section('Other current assets',rowsOtherCurrent,'Other current assets',totalRows(otherCurrent,bs,'debit')),'Total current assets',currentAssetsTotal)+
+          section('Other / non-current assets',rowsOtherAssets,'Total other / non-current assets',otherAssetsTotal)+
+          moneyRow('Total assets',assets,'statement-total-row')+
+          section('Current liabilities',rowsCurrentLiab,'Total current liabilities',currentLiabsTotal)+
+          section('Other / non-current liabilities',rowsOtherLiab,'Total other / non-current liabilities',otherLiabsTotal)+
+          moneyRow('Total liabilities',liabilities,'statement-total-row')+
+          section('Equity',rowsEquity+moneyRow('Retained earnings / current period profit',cumulative),'Total equity',equity)+
+          moneyRow('Total liabilities and equity',liabilities+equity,'statement-total-row')+
+          '<div class="sub" style="margin-top:8px">Assets = liabilities + equity. '+(Math.abs(assets-liabilities-equity)<=0.005?'The statement balances.':'Difference: '+money(assets-liabilities-equity)+'. The statement is not reconciled.')+'</div><div class="sub" style="margin-top:8px">IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.</div>';
+      }
+      if(plEl){
+        const incomeAccounts=accounts.filter(a=>a.type==='income'),cogsAccounts=accounts.filter(a=>a.type==='cogs');
+        const incomeRows=accountRows(incomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
+        const opRows=accountRows(operatingAccounts,period,'debit'),taxRows=accountRows(taxAccounts,period,'debit');
+        plEl.innerHTML=prefix(plEl)+'<div class="row statement-section-row"><span>Statement of profit or loss</span><b></b></div>'+periodText+
+          section('Revenue',incomeRows,'Total revenue',periodIncome)+
+          section('Cost of sales',cogsRows,'Total cost of sales',periodCogs)+
+          moneyRow('Gross profit',periodIncome-periodCogs,'statement-total-row')+
+          section('Operating expenses',opRows,'Total operating expenses',operatingExpenses)+
+          moneyRow('Profit before tax',pretax,'statement-total-row')+
+          section('Income tax expense',taxRows,'Total income tax expense',taxExpense)+
+          moneyRow('Profit for the period',net,'statement-total-row')+'<div class="sub" style="margin-top:8px">IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.</div>';
+      }
+    }catch(e){console.warn('[AIBOS IFRS statement presentation]',e)}
+  };
+  wrapped.__ifrsPresentationWrapped=true;window.renderReports=wrapped;
+})();
 </script>
 </body>
 </html>
