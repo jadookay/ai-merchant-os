@@ -2750,6 +2750,7 @@ function renderTeamMembers(){
  <td>${m.status==='active'?'Enabled':m.status==='suspended'?'Disabled':esc(m.status)}</td>
  <td><div class="actions">
  <button class="btn small secondary" onclick="editTeamMember('${esc(m.id)}')">Edit access</button>
+ <button class="btn small secondary" onclick="resetTeamMemberPin('${esc(m.id)}')">Reset PIN</button>
  <button class="btn small ${m.status==='active'?'danger':'secondary'}" onclick="toggleTeamMemberStatus('${esc(m.id)}')">${m.status==='active'?'Disable':'Enable'}</button>
  </div></td>
  </tr>`).join('')}
@@ -2785,6 +2786,13 @@ async function revokeTeamDeviceSession(sessionId){
   const status=document.getElementById('teamStatus');if(status)status.textContent='Device session revoked. Its next server request will be denied.';
  }catch(e){const status=document.getElementById('teamStatus');if(status)status.textContent=e?.message||'Could not revoke device session.';}
 }
+async function sheriTeamFunctionError(error,data,fallback='The team request could not be completed.'){
+ let message=data?.error||'';
+ if(error?.context){
+  try{const response=typeof error.context.clone==='function'?error.context.clone():error.context;const body=await response.json();message=body?.error||message;}catch(_){}
+ }
+ return new Error(message||error?.message||fallback);
+}
 async function editTeamMember(id){
  const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
  const full_name=prompt('Staff member name:',m.full_name);if(full_name===null)return;
@@ -2800,10 +2808,28 @@ async function editTeamMember(id){
  const status=document.getElementById('teamStatus');if(status)status.textContent='Updating staff access…';
  try{
   const {data,error}=await sb.functions.invoke('team-access',{body:{action:'update_member',merchant_id:state.merchant.id,member_id:id,full_name:full_name.trim(),email:email.trim(),phone:phone.trim(),username:username.trim(),role:role.trim().toLowerCase(),responsibility,permissions,status:m.status}});
-  if(error||!data?.ok)throw error||new Error(data?.error||'Could not update team access.');
+  if(error||!data?.ok)throw await sheriTeamFunctionError(error,data,'Could not update team access.');
   if(status)status.textContent='Staff access updated. Permission changes take effect on the next data request.';
   await loadTeamMembers(true);
  }catch(e){if(status)status.textContent=e?.message||'Could not update staff access.';}
+}
+async function resetTeamMemberPin(id){
+ const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
+ if(!sheriCan('manage_team'))return sheriToast('Only an authorized Manager, Admin or Owner can reset a staff PIN.','error');
+ const pin=prompt('Set a new 6–8 digit PIN for '+m.full_name+':');
+ if(pin===null)return;
+ if(!/^\d{6,8}$/.test(pin.trim()))return sheriToast('The new PIN must contain 6 to 8 digits.','error');
+ const status=document.getElementById('teamStatus');if(status)status.textContent='Resetting staff PIN securely…';
+ try{
+  const {data,error}=await sb.functions.invoke('team-access',{body:{
+   action:'update_member',merchant_id:state.merchant.id,member_id:id,full_name:m.full_name,
+   email:m.email||null,phone:m.phone||null,username:m.username||null,role:m.role,
+   responsibility:m.responsibility||'',permissions:m.permissions||{},status:m.status,pin:pin.trim()
+  }});
+  if(error||!data?.ok)throw await sheriTeamFunctionError(error,data,'Could not reset the staff PIN.');
+  if(status)status.textContent='PIN reset successfully. Give the new PIN to the employee privately.';
+  sheriToast('Staff PIN reset successfully.');
+ }catch(e){if(status)status.textContent=e?.message||'Could not reset the staff PIN.';}
 }
 async function toggleTeamMemberStatus(id){
  const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
@@ -2811,12 +2837,12 @@ async function toggleTeamMemberStatus(id){
  if(!confirm((status==='suspended'?'Disable':'Enable')+' '+m.full_name+'? '+(status==='suspended'?'They will no longer be able to access this business.':'Their existing permissions will be restored.')))return;
  try{
   const {data,error}=await sb.functions.invoke('team-access',{body:{action:'update_member',merchant_id:state.merchant.id,member_id:id,full_name:m.full_name,role:m.role,responsibility:m.responsibility||'',permissions:m.permissions||{},status}});
-  if(error||!data?.ok)throw error||new Error(data?.error||'Could not update staff status.');
+  if(error||!data?.ok)throw await sheriTeamFunctionError(error,data,'Could not update staff status.');
   await loadTeamMembers(true);
   const statusEl=document.getElementById('teamStatus');if(statusEl)statusEl.textContent=m.full_name+' is now '+status+'.';
  }catch(e){const statusEl=document.getElementById('teamStatus');if(statusEl)statusEl.textContent=e?.message||'Could not update staff status.';}
 }
-async function createTeamMember(){const status=document.getElementById('teamStatus');try{const full_name=document.getElementById('teamFullName').value.trim(),username=document.getElementById('teamUsername').value.trim(),email=document.getElementById('teamEmail').value.trim(),phone=document.getElementById('teamPhone').value.trim(),pin=document.getElementById('teamPin').value.trim(),role=document.getElementById('teamRole').value,responsibility=document.getElementById('teamResponsibility').value.trim();if(!full_name||(!email&&!phone)||!/^\d{6,8}$/.test(pin))throw new Error('Enter a name, email or phone, and a 6–8 digit PIN.');const sales=document.getElementById('teamSales').checked,inventory=document.getElementById('teamInventory').checked,expenses=document.getElementById('teamExpenses').checked,reports=document.getElementById('teamReports').checked,finance=document.getElementById('teamFinance').checked,customers=document.getElementById('teamCustomers').checked,suppliers=document.getElementById('teamSuppliers').checked,audit=document.getElementById('teamAudit').checked;const permissions={view_sales:sales,create_sale:sales,manage_sales:role==='manager'||document.getElementById('teamSalesManage').checked,view_inventory:sales||inventory,manage_inventory:inventory,view_inventory_costs:document.getElementById('teamInventoryCosts').checked,view_expenses:expenses,manage_expenses:expenses,view_financial_reports:reports,manage_finance:finance,view_customers:customers,manage_customers:customers,view_suppliers:suppliers,manage_suppliers:suppliers,view_audit_log:role==='manager'||audit,manage_team:role==='manager'||document.getElementById('teamManage').checked};status.textContent='Creating secure team login…';const {data,error}=await sb.functions.invoke('team-access',{body:{action:'create_member',merchant_id:state.merchant.id,full_name,username,email,phone,pin,role,permissions,responsibility}});if(error||!data?.ok)throw error||new Error(data?.error||'Could not create member.');status.textContent='Team member created. They can sign in using their name, phone or email and PIN.';['teamFullName','teamUsername','teamEmail','teamPhone','teamPin','teamResponsibility'].forEach(id=>document.getElementById(id).value='');await loadTeamMembers(true)}catch(e){status.textContent=e?.message||'Could not create team member.'}}
+async function createTeamMember(){const status=document.getElementById('teamStatus');try{const full_name=document.getElementById('teamFullName').value.trim(),username=document.getElementById('teamUsername').value.trim(),email=document.getElementById('teamEmail').value.trim(),phone=document.getElementById('teamPhone').value.trim(),pin=document.getElementById('teamPin').value.trim(),role=document.getElementById('teamRole').value,responsibility=document.getElementById('teamResponsibility').value.trim();if(!full_name||(!email&&!phone)||!/^\d{6,8}$/.test(pin))throw new Error('Enter a name, email or phone, and a 6–8 digit PIN.');const sales=document.getElementById('teamSales').checked,inventory=document.getElementById('teamInventory').checked,expenses=document.getElementById('teamExpenses').checked,reports=document.getElementById('teamReports').checked,finance=document.getElementById('teamFinance').checked,customers=document.getElementById('teamCustomers').checked,suppliers=document.getElementById('teamSuppliers').checked,audit=document.getElementById('teamAudit').checked;const permissions={view_sales:sales,create_sale:sales,manage_sales:role==='manager'||document.getElementById('teamSalesManage').checked,view_inventory:sales||inventory,manage_inventory:inventory,view_inventory_costs:document.getElementById('teamInventoryCosts').checked,view_expenses:expenses,manage_expenses:expenses,view_financial_reports:reports,manage_finance:finance,view_customers:customers,manage_customers:customers,view_suppliers:suppliers,manage_suppliers:suppliers,view_audit_log:role==='manager'||audit,manage_team:role==='manager'||document.getElementById('teamManage').checked};status.textContent='Creating secure team login…';const {data,error}=await sb.functions.invoke('team-access',{body:{action:'create_member',merchant_id:state.merchant.id,full_name,username,email,phone,pin,role,permissions,responsibility}});if(error||!data?.ok)throw await sheriTeamFunctionError(error,data,'Could not create member.');status.textContent=data.reused_existing_auth_user?'Existing account linked to this business. The employee can use their existing email and the new staff PIN.':'Team member created. They can sign in using their name, phone or email and PIN.';['teamFullName','teamUsername','teamEmail','teamPhone','teamPin','teamResponsibility'].forEach(id=>document.getElementById(id).value='');await loadTeamMembers(true)}catch(e){status.textContent=e?.message||'Could not create team member.'}}
 async function signInWithTeamPin(){try{if(!sb)await sheriInitSupabase();const merchant_code=document.getElementById('staffMerchantCode').value.trim(),identifier=document.getElementById('staffIdentifier').value.trim(),pin=document.getElementById('staffPin').value.trim();if(!merchant_code||!identifier||pin.length<6||pin.length>8||!/^[0-9]+$/.test(pin))return setAuthStatus('Enter your business ID, name, phone or email, and a 6–8 digit PIN.',true);setAuthStatus('Verifying team access…');const {data,error}=await sb.functions.invoke('team-access',{body:{action:'login_with_pin',merchant_code,identifier,pin}});if(error||!data?.token_hash)throw error||new Error(data?.error||'Sign-in failed');const credentials={token_hash:data.token_hash,type:data.type||'magiclink'};if(data.email)credentials.email=data.email;else if(data.phone)credentials.phone=data.phone;const {data:authData,error:authError}=await sb.auth.verifyOtp(credentials);if(authError)throw authError;if(!authData?.session)throw new Error('Secure session could not be established.');window.__teamLoginMerchantId=data.merchant_id;setAuthStatus('Signed in. Loading your workspace…');await onAuthed(authData.session)}catch(e){setAuthStatus(e?.message||'Team sign-in failed.',true)}}
 async function saveSettings(){const name=document.getElementById('setName').value.trim()||'Merchant',category=document.getElementById('setCat').value,tin=document.getElementById('setTin').value.trim()||null,fiscalYear=document.getElementById('setFiscalYear').value||null,country=document.getElementById('setCountry').value,currency=document.getElementById('setCurrency').value;if(!country||!currency)return alert('Country and currency are required.');const oldCurrency=state.merchant.currency||'RWF';Object.assign(state.merchant,{name,category,tin,fiscal_year:fiscalYear?Number(fiscalYear):null,country,currency,updated_at:sheriNow()});await sheriSaveSnapshot();await sheriQueue({type:'merchant_upsert',record:{...state.merchant}});if(navigator.onLine)await sheriSyncOutbox();render();alert(oldCurrency!==currency?'Settings saved. Existing numeric amounts were not converted; the new currency is now used for display and new transactions.':(navigator.onLine?'Settings saved.':'Settings saved offline — they will sync automatically.'));}
 async function seedDemoData(){
