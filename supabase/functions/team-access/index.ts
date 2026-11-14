@@ -373,6 +373,9 @@ Deno.serve(async (req: Request) => {
         ? "This email is already registered. Use the employee's existing account or another email address."
         : "This phone number is already registered. Use the employee's existing account or another phone number." }, 409);
     }
-    return json({ ok: false, error: (error as any)?.message || "The team access request could not be completed. Check the supplied details and try again." }, 500);
+    if (code === "23505") {
+      return json({ ok: false, code: "duplicate_member_identifier", error: "This email, phone or username is already assigned to a team member in this business. Open that member's access settings instead." }, 409);
+    }
+    return json({ ok: false, error: "The team access request failed on the server. Check the details and try again." }, 500);
   }
 });
