@@ -62,7 +62,7 @@ Deno.serve(async (req: Request) => {
       const identifier = String(body?.identifier || "").trim();
       const merchantCode = String(body?.merchant_code || "").trim();
       const pin = String(body?.pin || "");
-      if (!identifier || !/^\\d{1,6}$/.test(merchantCode) || pin.length < 6 || pin.length > 8 || !/^[0-9]+$/.test(pin)) return json({ error: "Enter your 1–6 digit business ID, name, phone or email, and a 6–8 digit PIN." }, 400);
+      if (!identifier || !/^\d{1,6}$/.test(merchantCode) || pin.length < 6 || pin.length > 8 || !/^[0-9]+$/.test(pin)) return json({ error: "Enter your 1–6 digit business ID, name, phone or email, and a 6–8 digit PIN." }, 400);
 
       const ip = req.headers.get("cf-connecting-ip") || "unknown";
       const ipHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))), b => b.toString(16).padStart(2, "0")).join("");
