@@ -89,7 +89,7 @@ window.ensurePdfJs=async function(){
 <style>
 :root{--bg:#f5f7fb;--card:#fff;--ink:#172033;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--good:#059669;--warn:#d97706;--bad:#dc2626}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
-.app{display:flex;min-height:100vh}.side{width:230px;background:#111827;color:white;padding:22px 14px;position:sticky;top:0;height:100vh}.brand{font-weight:800;font-size:20px;margin:4px 10px 24px}.brand span{color:#60a5fa}.nav button{width:100%;border:0;background:transparent;color:#d1d5db;text-align:left;padding:12px 12px;border-radius:10px;margin:2px 0;cursor:pointer;font-size:14px}.nav button.active,.nav button:hover{background:#1f2937;color:#fff}.main{flex:1;padding:24px;max-width:1300px;margin:auto;width:100%}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:20px}.top h1{font-size:26px;margin:0}.sub{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px;box-shadow:0 1px 2px #00000008}.metric-card{display:block;width:100%;min-width:0;text-align:left;font:inherit;color:inherit;cursor:pointer}.metric-card:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}.metric-card:hover{border-color:var(--accent)}.metric{font-size:25px;font-weight:800;margin-top:7px}.label{font-size:12px;color:var(--muted)}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.section{margin-top:18px}.section h2{font-size:16px;margin:0 0 10px}.two{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.list{display:flex;flex-direction:column;gap:10px}.row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}.pill{font-size:11px;padding:4px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}.btn{border:0;background:var(--accent);color:#fff;padding:10px 14px;border-radius:9px;font-weight:700;cursor:pointer}.btn.secondary{background:#eef2ff;color:#1d4ed8}.btn.danger{background:#fee2e2;color:#b91c1c}.btn.small{padding:7px 10px;font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.view{display:none}.view.active{display:block}.table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{text-align:left;padding:11px;border-bottom:1px solid var(--line)}input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:white;color:var(--ink)}label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.chat{height:430px;display:flex;flex-direction:column}.messages{flex:1;overflow:auto;padding:6px}.msg{max-width:85%;padding:11px 13px;border-radius:12px;margin:8px 0;line-height:1.45;font-size:13px}.ai{background:#eef2ff}.me{background:#e5e7eb;margin-left:auto}.chatbar{display:flex;gap:8px;margin-top:10px}.chatbar input{flex:1}.empty{padding:25px;text-align:center;color:var(--muted)}.notice{padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:#1e40af}.hero{background:linear-gradient(135deg,#111827,#1d4ed8);color:white;border-radius:16px;padding:22px;margin-bottom:16px}.hero h2{margin:0 0 6px;font-size:20px}.hero p{margin:0;color:#dbeafe;font-size:13px}.footer{font-size:11px;color:var(--muted);margin-top:20px;text-align:center}
+.app{display:flex;min-height:100vh}.side{width:230px;background:#111827;color:white;padding:22px 14px;position:sticky;top:0;height:100vh}.brand{font-weight:800;font-size:20px;margin:4px 10px 24px}.brand span{color:#60a5fa}.nav button{width:100%;border:0;background:transparent;color:#d1d5db;text-align:left;padding:12px 12px;border-radius:10px;margin:2px 0;cursor:pointer;font-size:14px}.nav button.active,.nav button:hover{background:#1f2937;color:#fff}.main{flex:1;padding:24px;max-width:1300px;margin:auto;width:100%}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:20px}.top h1{font-size:26px;margin:0}.sub{color:var(--muted);font-size:13px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:17px;box-shadow:0 1px 2px #00000008}.metric-card{display:block;width:100%;min-width:0;text-align:left;font:inherit;color:inherit;cursor:pointer}.metric-card:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}.metric-card:hover{border-color:var(--accent)}.metric{font-size:25px;font-weight:800;margin-top:7px}.label{font-size:12px;color:var(--muted)}.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}.section{margin-top:18px}.section h2{font-size:16px;margin:0 0 10px}.two{display:grid;grid-template-columns:1.2fr .8fr;gap:14px}.list{display:flex;flex-direction:column;gap:10px}.row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.row:last-child{border-bottom:0}.pill{font-size:11px;padding:4px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}.btn{border:0;background:var(--accent);color:#fff;padding:10px 14px;border-radius:9px;font-weight:700;cursor:pointer}.btn.secondary{background:#eef2ff;color:#1d4ed8}.btn.danger{background:#fee2e2;color:#b91c1c}.btn.small{padding:7px 10px;font-size:12px}.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.view{display:none}.view.active{display:block}.table{width:100%;border-collapse:collapse;font-size:13px}.table th,.table td{text-align:left;padding:11px;border-bottom:1px solid var(--line)}input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:white;color:var(--ink)}label{font-size:12px;color:var(--muted);display:block;margin-bottom:5px}.formgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.chat{height:430px;display:flex;flex-direction:column}.messages{flex:1;overflow:auto;padding:6px}.msg{max-width:85%;padding:11px 13px;border-radius:12px;margin:8px 0;line-height:1.45;font-size:13px}.ai{background:#eef2ff}.me{background:#e5e7eb;margin-left:auto}.chatbar{display:flex;gap:8px;margin-top:10px}.chatbar input{flex:1}.advisor-composer{align-items:flex-end}.advisor-composer textarea{flex:1;min-width:0;min-height:48px;max-height:180px;resize:vertical;margin:0}.advisor-composer-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.advisor-composer-actions .btn{min-height:42px}.advisor-composer .export-menu{bottom:44px;top:auto;left:0;right:auto}.advisor-file-name{font-weight:700}.empty{padding:25px;text-align:center;color:var(--muted)}.notice{padding:12px 14px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;font-size:13px;color:#1e40af}.hero{background:linear-gradient(135deg,#111827,#1d4ed8);color:white;border-radius:16px;padding:22px;margin-bottom:16px}.hero h2{margin:0 0 6px;font-size:20px}.hero p{margin:0;color:#dbeafe;font-size:13px}.footer{font-size:11px;color:var(--muted);margin-top:20px;text-align:center}
 .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}.auth-card{width:100%;max-width:360px;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px;box-shadow:0 4px 20px #0000000f}.auth-card label{margin-top:10px}
 @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.two{grid-template-columns:1fr}.side{width:190px}.formgrid{grid-template-columns:1fr 1fr}}
 @media(max-width:650px){.app{display:block;min-width:0;width:100%}.side{position:static;width:100%;height:auto;padding:10px;min-width:0}.brand{margin:5px 8px 10px}.nav{display:flex;flex-wrap:wrap;gap:4px;overflow:visible;width:100%;min-width:0}.nav button{white-space:normal;flex:1 1 calc(33.333% - 4px);width:auto;min-width:0;text-align:center;padding:8px 5px;font-size:12px;margin:0}.main{padding:12px;min-width:0;max-width:100%;overflow-x:hidden}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{min-width:0;padding:12px}.metric{font-size:clamp(17px,5vw,23px);overflow-wrap:anywhere}.label{overflow-wrap:anywhere}.formgrid{grid-template-columns:1fr}.top{align-items:flex-start;flex-wrap:wrap}.top h1{font-size:21px}.two{min-width:0}.table{table-layout:fixed;width:100%}.table th,.table td{padding:7px 5px;overflow-wrap:anywhere}}
@@ -457,8 +457,23 @@ window.ensurePdfJs=async function(){
     <div id="messages" class="messages">
       <div class="msg ai">Hello! I'm your business advisor. Ask me: <b>How am I doing?</b>, <b>What should I restock?</b>, <b>Which products make the most profit?</b>, or <b>How much did I sell?</b></div>
     </div>
-    <div class="chatbar"><input id="question" placeholder="Ask your business..." onkeydown="if(event.key==='Enter')askAI()"><label class="btn secondary" style="cursor:pointer;display:inline-flex;align-items:center" title="Attach a photo">📷<input type="file" accept="image/*" style="display:none" onchange="handleAdvisorImage(this)"></label><button class="btn secondary" onclick="startAdvisorVoice()" title="Ask by voice">🎙</button><button class="btn secondary" onclick="askAI(true)" title="Search the web for a current-info answer">🔍</button><button class="btn" onclick="askAI()">Ask</button></div>
+    <div class="chatbar advisor-composer">
+      <textarea id="question" rows="2" placeholder="Ask your business..." aria-label="Ask your business" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();askAI()}"></textarea>
+      <div class="advisor-composer-actions">
+        <div class="export-wrap" id="advisorUploadWrap">
+          <button class="btn secondary" type="button" onclick="toggleAdvisorUploadMenu()" title="Attach an image or file">＋</button>
+          <div class="export-menu" id="advisorUploadMenu">
+            <label class="menu-file">Attach image<input type="file" accept="image/*" onchange="handleAdvisorImage(this)"></label>
+            <label class="menu-file">Attach file<input type="file" accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.json" onchange="handleAdvisorFile(this)"></label>
+          </div>
+        </div>
+        <button class="btn secondary" onclick="startAdvisorVoice()" title="Ask by voice">🎙</button>
+        <button class="btn secondary" onclick="askAI(true)" title="Search the web for a current-info answer">🔍</button>
+        <button class="btn" onclick="askAI()">Send</button>
+      </div>
+    </div>
     <div id="advisorImagePreview" style="display:none;margin-top:8px"><img id="advisorImageThumb" style="max-height:80px;border-radius:8px;border:1px solid var(--line)"><button class="btn small danger" style="margin-left:8px" onclick="clearAdvisorImage()">Remove photo</button></div>
+    <div id="advisorFilePreview" class="sub" style="display:none;margin-top:8px"></div>
     <div id="advisorVoiceStatus" class="sub" style="margin-top:6px"></div>
   </div>
 </section>
@@ -3048,6 +3063,11 @@ async function importData(input){
 }
 
 let attachedImage=null; // {dataUrl, mimeType}
+let attachedAdvisorFile=null; // {name,text}
+function toggleAdvisorUploadMenu(){
+  const wrap=document.getElementById('advisorUploadWrap');
+  if(wrap)wrap.classList.toggle('open');
+}
 function handleAdvisorImage(input){
   const file=input.files[0];if(!file)return;
   if(!file.type.startsWith('image/')){alert('Please choose an image file.');input.value='';return}
@@ -3058,8 +3078,72 @@ function handleAdvisorImage(input){
     document.getElementById('advisorImageThumb').src=e.target.result;
     document.getElementById('advisorImagePreview').style.display='block';
   };
+  reader.onerror=()=>alert('Could not read that image. Please try another file.');
   reader.readAsDataURL(file);
   input.value='';
+  document.getElementById('advisorUploadWrap')?.classList.remove('open');
+}
+async function sheriLoadAdvisorLibrary(url,ready){
+  if(ready())return;
+  if(!window._advisorLibraryLoads)window._advisorLibraryLoads={};
+  if(!window._advisorLibraryLoads[url]){
+    window._advisorLibraryLoads[url]=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');script.src=url;script.async=true;
+      script.onload=()=>ready()?resolve():reject(new Error('The document reader did not initialize.'));
+      script.onerror=()=>reject(new Error('Could not load the document reader. Check your connection.'));
+      document.head.appendChild(script);
+    }).catch(error=>{delete window._advisorLibraryLoads[url];throw error});
+  }
+  await window._advisorLibraryLoads[url];
+}
+async function handleAdvisorFile(input){
+  const file=input.files[0];if(!file)return;
+  const status=document.getElementById('advisorFilePreview');
+  const name=file.name||'Attached file';
+  if(file.size>8*1024*1024){alert('Please choose a file smaller than 8 MB.');input.value='';return}
+  if(status){status.style.display='block';status.textContent='Reading '+name+'…'}
+  try{
+    const ext=name.split('.').pop().toLowerCase();
+    let textContent='';
+    if(['txt','csv','md','json'].includes(ext)){
+      textContent=await file.text();
+    }else if(ext==='pdf'){
+      const pdfjs=await window.ensurePdfJs();
+      const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;
+      const pages=[];
+      for(let n=1;n<=Math.min(pdf.numPages,12);n++){
+        const page=await pdf.getPage(n),content=await page.getTextContent();
+        pages.push(content.items.map(x=>x.str||'').join(' '));
+      }
+      textContent=pages.join('\n');
+      if(pdf.numPages>12)textContent+='\n[Only the first 12 pages were extracted.]';
+    }else if(ext==='xlsx'||ext==='xls'){
+      await sheriEnsureXlsx();
+      const workbook=XLSX.read(await file.arrayBuffer(),{type:'array'});
+      textContent=workbook.SheetNames.slice(0,5).map(sheet=>'Sheet: '+sheet+'\n'+XLSX.utils.sheet_to_csv(workbook.Sheets[sheet])).join('\n\n');
+    }else if(ext==='docx'){
+      await sheriLoadAdvisorLibrary('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js',()=>!!window.mammoth);
+      const result=await window.mammoth.extractRawText({arrayBuffer:await file.arrayBuffer()});
+      textContent=result.value||'';
+    }else{
+      throw new Error('Supported files: PDF, Word DOCX, Excel XLS/XLSX, CSV, TXT, Markdown and JSON.');
+    }
+    textContent=String(textContent||'').replace(/\u0000/g,'').trim();
+    if(!textContent)throw new Error('No readable text was found in this file.');
+    if(textContent.length>24000)textContent=textContent.slice(0,24000)+'\n[Content truncated to 24,000 characters.]';
+    attachedAdvisorFile={name,text:textContent};
+    if(status){status.style.display='block';status.innerHTML='<span class="advisor-file-name">'+esc(name)+'</span> attached · '+textContent.length.toLocaleString()+' characters <button class="btn small danger" onclick="clearAdvisorFile()">Remove file</button>'}
+  }catch(error){
+    if(status){status.style.display='block';status.textContent=error?.message||'Could not read this file.'}
+  }finally{
+    input.value='';
+    document.getElementById('advisorUploadWrap')?.classList.remove('open');
+  }
+}
+function clearAdvisorFile(){
+  attachedAdvisorFile=null;
+  const status=document.getElementById('advisorFilePreview');
+  if(status){status.style.display='none';status.textContent=''}
 }
 function clearAdvisorImage(){
   attachedImage=null;
@@ -3083,14 +3167,17 @@ async function checkAdvisor(){
     :'Shericeri isn\'t reachable yet — same fix as the AI Advisor: deploy the "advisor" function and set GROQ_API_KEY.';
 }
 async function askAI(webSearch){
-  const q=document.getElementById('question').value.trim();
+  const typedQuestion=document.getElementById('question').value.trim();
   const img=webSearch?null:attachedImage;
-  if(!q&&!img)return;
-  if(webSearch&&!q){alert('Type a question first, then tap 🔍 to search the web for it.');return}
+  const doc=webSearch?null:attachedAdvisorFile;
+  if(!typedQuestion&&!img&&!doc)return;
+  if(webSearch&&!typedQuestion){alert('Type a question first, then tap 🔍 to search the web for it.');return}
+  const q=typedQuestion+(doc?'\n\nAttached file: '+doc.name+'\n'+doc.text:'');
+  const displayQuestion=typedQuestion||'Please analyze the attached file.';
   const box=document.getElementById('messages');
-  box.innerHTML+=`<div class="msg me">${q?esc(q):'<i>(photo attached)</i>'}${img?`<div style="margin-top:6px"><img src="${img.dataUrl}" style="max-height:120px;border-radius:8px"></div>`:''}${webSearch?' <span class="sub">(web search)</span>':''}</div>`;
+  box.innerHTML+=`<div class="msg me">${esc(displayQuestion)}${img?`<div style="margin-top:6px"><img src="${img.dataUrl}" style="max-height:120px;border-radius:8px"></div>`:''}${doc?`<div class="sub">📎 ${esc(doc.name)}</div>`:''}${webSearch?' <span class="sub">(web search)</span>':''}</div>`;
   document.getElementById('question').value='';
-  clearAdvisorImage();
+  clearAdvisorImage();clearAdvisorFile();
   const thinkingId='think-'+Date.now();
   box.innerHTML+=`<div class="msg ai" id="${thinkingId}">${webSearch?'Searching the web…':'Thinking…'}</div>`;
   box.scrollTop=box.scrollHeight;
