@@ -1097,8 +1097,13 @@ async function sheriSyncJournalBatch(op){
   lines=lines.map(line=>{
     if(serverById.has(line.account_id))return line;
     const previous=previousById.get(line.account_id);
-    const replacement=previous&&serverByCode.get(previous.code);
-    if(!replacement||!replacement.active)throw new Error('Queued journal account '+String(previous?.code||line.account_id)+' cannot be matched to an active server ledger account. No entry was posted.');
+    // Opening stock has a fixed, explicit double-entry mapping: Inventory
+    // (1200) on the debit side and Owner equity (3000) on the credit side.
+    // This safely recovers old queued opening-stock batches even when their
+    // stale account IDs are no longer present in the local account cache.
+    const knownCode=previous?.code||(entry.source_type==='product_opening_stock'?(Number(line.debit||0)>0?'1200':'3000'):null);
+    const replacement=knownCode&&serverByCode.get(knownCode);
+    if(!replacement||!replacement.active)throw new Error('Queued journal account '+String(knownCode||line.account_id)+' cannot be matched to an active server ledger account. No entry was posted.');
     return {...line,account_id:replacement.id};
   });
   state.accounts=serverAccounts;
