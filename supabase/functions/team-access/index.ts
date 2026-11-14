@@ -183,12 +183,19 @@ Deno.serve(async (req: Request) => {
       let authUser: any = null;
       let createdAuthUser = false;
       if (email || (!email && phone)) {
-        const { data: userPage, error: listError } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        if (listError) throw listError;
-        authUser = (userPage?.users || []).find((u: any) =>
-          email ? String(u.email || "").toLowerCase() === email :
-          String(u.phone || "").replace(/[^0-9+]/g, "") === phone
-        ) || null;
+        // Auth listUsers is paginated. Searching only page 1 can miss an existing
+        // identity and make createUser fail with a misleading HTTP 500.
+        const perPage = 1000;
+        for (let page = 1; page <= 50 && !authUser; page++) {
+          const { data: userPage, error: listError } = await admin.auth.admin.listUsers({ page, perPage });
+          if (listError) throw listError;
+          const users = userPage?.users || [];
+          authUser = users.find((u: any) =>
+            email ? String(u.email || "").toLowerCase() === email :
+            String(u.phone || "").replace(/[^0-9+]/g, "") === phone
+          ) || null;
+          if (users.length < perPage) break;
+        }
       }
       if (authUser?.id === merchant.user_id) {
         return json({ ok: false, code: "owner_identity", error: "The business owner's login cannot also be added as an employee." }, 409);
@@ -214,7 +221,11 @@ Deno.serve(async (req: Request) => {
           user_metadata: { full_name: fullName },
         });
         if (createError || !created?.user) {
-          const code = (createError as any)?.code;
+          const createFailure = createError as any;
+          const createMessage = String(createFailure?.message || "").toLowerCase();
+          const code = createFailure?.code ||
+            (createFailure?.status === 422 && createMessage.includes("email") ? "email_exists" :
+             createFailure?.status === 422 && createMessage.includes("phone") ? "phone_exists" : undefined);
           if (code === "email_exists" || code === "phone_exists") {
             return json({ ok: false, code, error: code === "email_exists"
               ? "This email already belongs to an account. If it is the employee's account, sign in using that account or contact support to link it; otherwise use another email."
@@ -367,7 +378,11 @@ Deno.serve(async (req: Request) => {
     return json({ error: "Unsupported action." }, 400);
   } catch (error) {
     console.error("[team-access]", error);
-    const code = (error as any)?.code;
+    const failure = error as any;
+    const message = String(failure?.message || "").toLowerCase();
+    const code = failure?.code ||
+      (failure?.status === 422 && message.includes("email") ? "email_exists" :
+       failure?.status === 422 && message.includes("phone") ? "phone_exists" : undefined);
     if (code === "email_exists" || code === "phone_exists") {
       return json({ ok: false, code, error: code === "email_exists"
         ? "This email is already registered. Use the employee's existing account or another email address."
