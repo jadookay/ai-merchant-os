@@ -5117,7 +5117,7 @@ async function accEnsureOperationalLedger({approved=false}={}){
   // Historical journal repair is opt-in. It requires an authoritative server
   // snapshot and explicit owner/finance-manager confirmation from the UI.
   if(!approved||!state.merchant||!navigator.onLine||!accServerSnapshotAuthoritative||
-     !sheriCan('manage_team')||!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return {repairedLines:0,blocked:0};
+     !sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return {repairedLines:0,blocked:0};
   await accEnsureBase();
   let repairedLines=0,blocked=0;
   const safePost=async payload=>{
@@ -5144,7 +5144,7 @@ async function accEnsureOperationalLedger({approved=false}={}){
   return {repairedLines,blocked};
 }
 async function accReconcileOperationalLedger(){
-  if(!sheriCan('manage_team')||!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return sheriToast('Only an authorized finance manager or owner can repair the ledger.','error');
+  if(!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return sheriToast('Only an authorized finance manager or owner can repair the ledger.','error');
   if(!accServerSnapshotAuthoritative)return sheriToast('Refresh the server data before repairing the ledger.','warning');
   const integrity=accLedgerIntegrity();
   if(!integrity.invalidCount)return sheriToast('The ledger is already balanced.');
@@ -5377,7 +5377,7 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
   }
   const integrity=accLedgerIntegrity(reportEnd);
   const reconcileButton=document.getElementById('accReconcileButton');
-  if(reconcileButton){reconcileButton.style.display=integrity.invalidCount&&accServerSnapshotAuthoritative&&sheriCan('manage_team')&&sheriCan('manage_finance')&&sheriCan('view_financial_reports')?'inline-flex':'none';reconcileButton.textContent=sheriPendingText('Review and repair ledger');}
+  if(reconcileButton){reconcileButton.style.display=integrity.invalidCount&&accServerSnapshotAuthoritative&&sheriCan('manage_finance')&&sheriCan('view_financial_reports')?'inline-flex':'none';reconcileButton.textContent=sheriPendingText('Review and repair ledger');}
   const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' journal entr'+(integrity.invalidCount===1?'y is':'ies are')+' missing lines or out of balance. Review the General Ledger before relying on these totals.</div>':'';
   const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd);
   const income=accStatementTotal('income',b,'credit');
