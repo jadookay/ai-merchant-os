@@ -693,6 +693,10 @@ function sheriToast(message,kind='success'){
   el.textContent=String(message||'');el.style.background=kind==='error'?'#7f1d1d':kind==='warning'?'#78350f':'#172554';
   clearTimeout(window._sheriToastTimer);window._sheriToastTimer=setTimeout(()=>el.remove(),4200);
 }
+function sheriPendingText(value){
+  const raw=String(value??'');
+  try{return window.AIBOS_I18N?.translate?.(raw)||raw}catch(_){return raw}
+}
 function sheriPendingActivityDetails(op){
   const r=op.record||{},fmt=v=>money(Number(v||0));
   if(op.type==='sale_cart_upsert'){const rows=op.records||op.sales||[],total=rows.reduce((s,x)=>s+Number(x.qty||0)*Number(x.price||0),0);return rows.length+' line(s) · Total '+fmt(total);}
@@ -710,16 +714,16 @@ async function sheriTogglePendingSync(){
   const panel=document.getElementById('sheriPendingSyncPanel');if(!panel)return;
   panel.style.maxHeight='440px';panel.style.overflowY='auto';panel.style.overscrollBehavior='contain';
   const opening=panel.style.display!=='block';panel.style.display=opening?'block':'none';if(!opening)return;
-  panel.innerHTML='<b>Loading pending activities…</b>';
+  panel.innerHTML='<b>'+esc(sheriPendingText('Loading pending activities…'))+'</b>';
   try{
     const pending=(await sheriGetAll('outbox')).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
     const blocked=pending.filter(x=>x.blocked).length;
     const labels={inventory_adjustment:'Inventory adjustment',sale_cart_upsert:'Sale invoice recorded',sale_upsert:'Sale recorded',sale_delete:'Sale voided',sale_void:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
-    let out='<b>'+pending.length+' pending activities</b> · '+blocked+' need attention';if(!pending.length)out='<b>Everything is synchronized.</b>';
+    let out='<b>'+pending.length+' '+esc(sheriPendingText('pending activities on this device'))+'</b> · '+blocked+' '+esc(sheriPendingText('need attention'));if(!pending.length)out='<b>'+esc(sheriPendingText('Everything is synchronized.'))+'</b>';
     for(const item of pending){
       const op=item.op||{},status=item.blocked?'Needs attention':item.next_retry_at&&new Date(item.next_retry_at)>new Date()?'Waiting for retry':'Waiting to sync';
       const reason=item.last_error||(item.blocked?'The server rejected this activity. Review permissions or the reported data error.':item.next_retry_at?'A previous sync attempt failed; automatic retry is scheduled.':'Saved on this device and waiting for the next sync attempt.');
-      out+='<div class="sheri-pending-item"><b>'+esc(labels[op.type]||String(op.type||'Business update').replace(/_/g,' '))+'</b> <span class="pill">'+status+'</span><div>'+esc(sheriPendingActivityDetails(op))+'</div><div class="sub">'+esc(item.created_at?new Date(item.created_at).toLocaleString():'Time unavailable')+' · attempts: '+(Number(item.attempts)||0)+'</div><div>'+esc(reason)+'</div>'+(item.next_retry_at?'<div class="sub">Next retry: '+esc(new Date(item.next_retry_at).toLocaleString())+'</div>':'')+'</div>';
+      out+='<div class="sheri-pending-item"><b>'+esc(sheriPendingText(labels[op.type]||String(op.type||'Business update').replace(/_/g,' ')))+'</b> <span class="pill">'+esc(sheriPendingText(status))+'</span><div>'+esc(sheriPendingText(sheriPendingActivityDetails(op)))+'</div><div class="sub">'+esc(item.created_at?new Date(item.created_at).toLocaleString():'Time unavailable')+' · '+esc(sheriPendingText('attempts:'))+' '+(Number(item.attempts)||0)+'</div><div>'+esc(sheriPendingText(reason))+'</div>'+(item.next_retry_at?'<div class="sub">'+esc(sheriPendingText('Next retry:'))+' '+esc(new Date(item.next_retry_at).toLocaleString())+'</div>':'')+'</div>';
     }
     out+='<div class="actions" style="margin-top:10px"><button class="btn small secondary" onclick="sheriTogglePendingSync()">Close</button>'+(blocked?'<button class="btn small" onclick="sheriRetryBlockedWithConfirm()">Review and retry blocked items</button>':'')+'</div>';panel.innerHTML=out;
   }catch(e){panel.innerHTML='<b>Could not read pending activities.</b><div class="sub">'+esc(e?.message||String(e))+'</div>';}
@@ -738,7 +742,7 @@ function sheriSetConnectivity(mode,reason=''){
   const bar=document.getElementById('sheriOfflineBar'); if(bar)bar.style.background=mode==='offline'?'#fef2f2':mode==='degraded'?'#fffbeb':'#f8fafc';
   const sync=document.getElementById('sheriSyncLabel'); if(sync)sync.textContent=reason||`${sheriSyncQueued} pending local change(s)`;
   const pendingButton=document.getElementById('sheriPendingSyncButton');
-  if(pendingButton)pendingButton.textContent=`Pending activity (${Number(sheriSyncQueued)||0})`;
+  if(pendingButton)pendingButton.textContent=sheriPendingText('Pending activity')+` (${Number(sheriSyncQueued)||0})`;
 }
 let sheriMemoryOnly=false;
 const sheriMemoryStores=new Map();
@@ -960,7 +964,7 @@ async function sheriQueueCount(){
   const items=await sheriGetAll('outbox');
   sheriSyncQueued=items.filter(x=>!x.blocked).length;
   const pendingButton=document.getElementById('sheriPendingSyncButton');
-  if(pendingButton)pendingButton.textContent=`Pending activity (${sheriSyncQueued})`;
+  if(pendingButton)pendingButton.textContent=sheriPendingText('Pending activity')+` (${sheriSyncQueued})`;
   return sheriSyncQueued;
 }
 
@@ -6664,6 +6668,52 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
   const originals=new WeakMap();
   const supported=['en','rw','fr'];
   let current='en';
+  Object.assign(dictionaries.rw,{
+    'pending activities on this device':'Ibikorwa bitegereje koherezwa kuri iki gikoresho',
+    'waiting to sync':'Birategereje koherezwa','waiting for retry':'Birategereje kongera kugeragezwa',
+    'needs attention':'Bisaba ko ubyitaho','inventory adjustment':'Guhindura ububiko',
+    'sale invoice recorded':'Inyemezabuguzi y’igurisha yanditswe','sale recorded':'Igurisha ryanditswe',
+    'sale voided':'Igurisha ryahagaritswe','product saved':'Igicuruzwa cyabitswe',
+    'product deleted':'Igicuruzwa cyasibwe','expense recorded':'Ikiguzi cyanditswe',
+    'expense deleted':'Ikiguzi cyasibwe','accounting entry':'Ibaruramari ryanditswe',
+    'accounting record':'Iby’ibaruramari','shericeri memory':'Ibyibukwa na Shericeri',
+    'business profile':'Umwirondoro w’ubucuruzi','purchase recorded':'Ibyaguzwe byanditswe',
+    'cash movement':'Igikorwa cy’amafaranga','budget updated':'Ingengo y’imari yavuguruwe',
+    'cost value':'Agaciro k’ibicuruzwa','quantity':'Umubare','adjustment':'Ihinduka',
+    'debit':'Ibyishyuwe','everything is synchronized.':'Ibikorwa byose byahujwe.',
+    'the server rejected this activity. review permissions or the reported data error.':'Seriveri yanze iki gikorwa. Reba uburenganzira cyangwa amakuru y’ikosa.',
+    'a previous sync attempt failed; automatic retry is scheduled.':'Kugerageza guhuza byabanje byanze; kongera kugerageza birateganyijwe.',
+    'saved on this device and waiting for the next sync attempt.':'Byabitswe kuri iki gikoresho kandi bitegereje kongera koherezwa.'
+  });
+  Object.assign(dictionaries.fr,{
+    'pending activities on this device':'Activités en attente sur cet appareil',
+    'waiting to sync':'En attente de synchronisation','waiting for retry':'En attente d’une nouvelle tentative',
+    'needs attention':'À vérifier','inventory adjustment':'Ajustement du stock',
+    'sale invoice recorded':'Facture de vente enregistrée','sale recorded':'Vente enregistrée',
+    'sale voided':'Vente annulée','product saved':'Produit enregistré',
+    'product deleted':'Produit supprimé','expense recorded':'Dépense enregistrée',
+    'expense deleted':'Dépense supprimée','accounting entry':'Écriture comptable',
+    'accounting record':'Donnée comptable','shericeri memory':'Mémoire Shericeri',
+    'business profile':'Profil de l’entreprise','purchase recorded':'Achat enregistré',
+    'cash movement':'Mouvement de trésorerie','budget updated':'Budget mis à jour',
+    'cost value':'Valeur du stock','quantity':'Quantité','adjustment':'Ajustement',
+    'debit':'Débit','everything is synchronized.':'Tout est synchronisé.',
+    'the server rejected this activity. review permissions or the reported data error.':'Le serveur a rejeté cette activité. Vérifiez les autorisations ou les données signalées.',
+    'a previous sync attempt failed; automatic retry is scheduled.':'La tentative précédente a échoué ; une nouvelle tentative est programmée.',
+    'saved on this device and waiting for the next sync attempt.':'Enregistré sur cet appareil et en attente de la prochaine tentative.'
+  });
+  phraseFragments.rw.push(
+    [' pending activities on this device',' ibikorwa bitegereje koherezwa kuri iki gikoresho'],
+    [' need attention',' bisaba ko ubyitaho'],['Total ','Igiteranyo: '],['Stock ','Ububiko: '],
+    ['Cost value ','Agaciro k’ibicuruzwa: '],['Quantity ','Umubare: '],['Debit ','Ibyishyuwe: '],
+    ['Next retry: ','Kongera kugerageza: '],['attempts: ','Ibyageragejwe: '],['line(s)','imirongo']
+  );
+  phraseFragments.fr.push(
+    [' pending activities on this device',' activités en attente sur cet appareil'],
+    [' need attention',' nécessitent votre attention'],['Total ','Total : '],['Stock ','Stock : '],
+    ['Cost value ','Valeur du stock : '],['Quantity ','Quantité : '],['Debit ','Débit : '],
+    ['Next retry: ','Nouvel essai : '],['attempts: ','Tentatives : '],['line(s)','ligne(s)']
+  );
   const normalize=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
   function translateString(original,lang){
     if(lang==='en')return original;
