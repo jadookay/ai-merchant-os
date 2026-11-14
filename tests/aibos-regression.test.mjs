@@ -57,7 +57,7 @@ test("voiding preserves sale rows instead of deleting them", () => {
 test("sales history renders void status and the reason", () => {
   assert.match(html, /s\.voided\?'<span class="pill">Voided<\/span>/);
   assert.ok(html.includes("esc(s.void_reason||'No reason recorded')"));
-  assert.ok(html.includes("mergeKeepLocal(sales,state.sales);"));
+  assert.ok(html.includes("mergeKeepLocal(sales,state.sales,'sales')"));
 });
 
 test("voided sales are excluded from operating metrics and trends", () => {
@@ -80,4 +80,52 @@ test("AI Advisor sends the selected application language", () => {
 test("Shericeri memory remains queued for retry and persisted locally", () => {
   assert.ok(html.includes("async function sheriQueueMemory(category,content)"));
   assert.ok(html.includes("type:'memory_insert',record"));
+});
+
+
+test("server snapshots replace stale confirmed IndexedDB rows but preserve queued local changes", () => {
+  assert.ok(html.includes("const pendingOutbox=await sheriGetAll('outbox')"));
+  assert.ok(html.includes("if(pendingIdsFor(store).has(x.id))sm.set(x.id,{...x,_serverConfirmed:false})"));
+  assert.ok(!html.includes("if(sr.length===0&&lr.length>0)return lr.map"));
+  assert.ok(!html.includes("const keep=!x._serverConfirmed||sheriSyncQueued>0"));
+});
+
+test("authorized multi-device refresh subscribes only to merchant-filtered inserts and updates", () => {
+  const start=html.indexOf("function sheriSubscribeMerchantRealtime");
+  const end=html.indexOf("async function onAuthed",start);
+  const block=html.slice(start,end);
+  assert.ok(block.includes("event:'INSERT'"));
+  assert.ok(block.includes("event:'UPDATE'"));
+  assert.ok(block.includes("filter:'merchant_id=eq.'+merchantId"));
+  assert.ok(!block.includes("event:'*'"));
+});
+
+test("pending sync panel is scrollable and shows business amounts and descriptions", () => {
+  assert.ok(html.includes("panel.style.maxHeight='360px'"));
+  assert.ok(html.includes("panel.style.overflowY='auto'"));
+  assert.ok(html.includes("function sheriPendingActivityDetails(op)"));
+  for(const value of ["Total ","Cost value ","fmt(r.amount)","Waiting to sync"])
+    assert.ok(html.includes(value), "Missing pending activity detail: "+value);
+});
+
+test("financial reports flag incomplete or unbalanced journal entries", () => {
+  assert.ok(html.includes("function accLedgerIntegrity(endDate=null)"));
+  assert.ok(html.includes("Financial statements are NOT reconciled"));
+  assert.ok(html.includes("Balance sheet is NOT verified because journal entries are incomplete."));
+});
+
+test("operational fallback financial statements exclude voided sales", () => {
+  assert.ok(html.includes("const salesInRange=state.sales.filter(x=>!x.voided&&sheriDateInReportRange(x.created_at))"));
+});
+
+test("staff PIN reset is available to authorized team managers", () => {
+  assert.ok(html.includes("onclick=\"resetTeamMemberPin('"));
+  assert.ok(html.includes("async function resetTeamMemberPin(id)"));
+  assert.ok(html.includes("pin:pin.trim()"));
+  assert.ok(html.includes("Set a new 6–8 digit PIN"));
+});
+
+test("owner device sessions are registered and non-success RPC payloads are rejected", () => {
+  assert.ok(html.includes("if(data?.ok!==true)"));
+  assert.ok(html.includes("try{await sheriRegisterDeviceSession(merchantId)}catch(e)"));
 });
