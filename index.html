@@ -5562,7 +5562,31 @@ function sheriHideInternalAccountingUi(){
 }
 function toggleExportMenu(btn){document.querySelectorAll('.export-wrap.open').forEach(x=>x.classList.remove('open'));btn.parentElement.classList.toggle('open')}
 document.addEventListener('click',e=>{if(!e.target.closest('.export-wrap'))document.querySelectorAll('.export-wrap.open').forEach(x=>x.classList.remove('open'))});
-function exportStatement(id,title,kind){const el=document.getElementById(id);if(!el)return;const filename=(title||'report').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+new Date().toISOString().slice(0,10);const rows=[['Shericeri — '+title],...Array.from(el.querySelectorAll('.row')).map(r=>Array.from(r.children).map(c=>c.textContent.trim()))];if(kind==='xlsx'){if(!window.XLSX)return alert('Excel export library did not load.');const ws=XLSX.utils.aoa_to_sheet(rows);const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,title.slice(0,31));XLSX.writeFile(wb,filename+'.xlsx');return}if(kind==='doc'){const html=`<html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body><h2>${esc(state.merchant?.name||'Business')} — ${esc(title)}</h2>${el.innerHTML}</body></html>`;downloadBlob(new Blob(['\\ufeff',html],{type:'application/msword'}),filename+'.doc');return}if(kind==='pdf'){if(!window.jspdf)return alert('PDF export library did not load.');const d=new window.jspdf.jsPDF();d.text(`${state.merchant?.name||'Business'} — ${title}`,14,15);const body=rows.slice(1);d.autoTable({startY:22,head:[['Item','Amount']],body:body.length?body: [['','No data']],styles:{fontSize:9}});d.save(filename+'.pdf')}}
+async function exportStatement(id,title,kind){
+  const el=document.getElementById(id);if(!el)return;
+  const filename=(title||'report').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'-'+new Date().toISOString().slice(0,10);
+  const rows=[['Shericeri — '+title],...Array.from(el.querySelectorAll('.row')).map(r=>Array.from(r.children).map(c=>c.textContent.trim()))];
+  try{
+    if(kind==='xlsx'){
+      await sheriEnsureXlsx();
+      const ws=XLSX.utils.aoa_to_sheet(rows),wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,title.slice(0,31));
+      XLSX.writeFile(wb,filename+'.xlsx');return;
+    }
+    if(kind==='doc'){
+      const html=`<html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body><h2>${esc(state.merchant?.name||'Business')} — ${esc(title)}</h2>${el.innerHTML}</body></html>`;
+      downloadBlob(new Blob(['\\ufeff',html],{type:'application/msword'}),filename+'.doc');return;
+    }
+    if(kind==='pdf'){
+      await sheriEnsurePdf();
+      const d=new window.jspdf.jsPDF();
+      d.text(`${state.merchant?.name||'Business'} — ${title}`,14,15);
+      const body=rows.slice(1);
+      d.autoTable({startY:22,head:[['Item','Amount']],body:body.length?body:[['','No data']],styles:{fontSize:9}});
+      d.save(filename+'.pdf');return;
+    }
+  }catch(error){console.error('[AIBOS export] Statement export failed',error);alert(error?.message||'Could not export this statement. Please try again.');}
+}
 function accCashFlowForPeriod(startDate,endDate){
   const cashIds=new Set((state.accounts||[]).filter(a=>['1000','1010','1020'].includes(String(a.code))||(state.bankAccounts||[]).some(b=>b.account_id===a.id)).map(a=>a.id));
   const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
