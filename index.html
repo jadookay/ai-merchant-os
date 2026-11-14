@@ -5621,7 +5621,11 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
       ["Top restock priority: ","Ibyo ugomba kongera mu bubiko mbere ni: "],
       ["There are no products to add.","Nta bicuruzwa byo kongeraho bihari."],
       ["Are you sure you want to delete ","Urashaka koko gusiba "],
-      ["? This cannot be undone.","? Ibi ntibishobora gusubizwa inyuma."]
+      ["? This cannot be undone.","? Ibi ntibishobora gusubizwa inyuma."],
+      ["Sale captured. Saving securely…","Igurisha ryafashwe. Turibika neza…"],
+      ["Sale saved. Syncing to your account…","Igurisha ribitswe. Turimo kurihuza na konti yawe…"],
+      ["Search sales by product, customer, amount or date","Shakisha igurisha ukoresheje igicuruzwa, umukiriya, amafaranga cyangwa itariki"],
+      ["Search products by name, category or barcode","Shakisha ibicuruzwa ukoresheje izina, icyiciro cyangwa kode"]
     ],
     fr:[
       ["Confirm sale?","Confirmer la vente ?"],["Sale confirmed.","Vente confirmée."],
@@ -5637,7 +5641,11 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
       ["Top restock priority: ","Priorité de réapprovisionnement : "],
       ["There are no products to add.","Aucun produit à ajouter."],
       ["Are you sure you want to delete ","Voulez-vous vraiment supprimer "],
-      ["? This cannot be undone."," ? Cette action est irréversible."]
+      ["? This cannot be undone."," ? Cette action est irréversible."],
+      ["Sale captured. Saving securely…","Vente enregistrée. Enregistrement sécurisé…"],
+      ["Sale saved. Syncing to your account…","Vente enregistrée. Synchronisation avec votre compte…"],
+      ["Search sales by product, customer, amount or date","Rechercher les ventes par produit, client, montant ou date"],
+      ["Search products by name, category or barcode","Rechercher les produits par nom, catégorie ou code-barres"]
     ]
   };
   Object.assign(dictionaries.rw,{
@@ -5716,6 +5724,34 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     '⚡ one business profile across the whole app':'⚡ Un seul profil commercial dans toute l’application',
     'merchant':'Commerçant','good morning,':'Bonjour,','⇩ data':'⇩ Données',', or':', ou',
     "sherry-cherry, at your service — finance, accounting, business intelligence, and the occasional bad pun. tap the mic and let's talk.":'Shericeri vous accompagne dans la gestion, la comptabilité et l’analyse de votre commerce. Appuyez sur le micro pour parler.'
+  });
+  Object.assign(dictionaries.rw,{
+    'search sales by product, customer, amount or date':'Shakisha igurisha ukoresheje igicuruzwa, umukiriya, amafaranga cyangwa itariki',
+    'search products by name, category or barcode':'Shakisha ibicuruzwa ukoresheje izina, icyiciro cyangwa kode',
+    'search expenses by description, category or date':'Shakisha amafaranga yakoreshejwe ukoresheje ibisobanuro, icyiciro cyangwa itariki',
+    'search invoices by number, customer or date':'Shakisha inyemezabuguzi ukoresheje nimero, umukiriya cyangwa itariki',
+    'search bills by number, supplier or date':'Shakisha fagitire ukoresheje nimero, umugemura cyangwa itariki',
+    'search payments by reference, type or date':'Shakisha ubwishyu ukoresheje nimero, ubwoko cyangwa itariki',
+    'thinking…':'Ndimo gutekereza…','searching the web…':'Ndimo gushakisha kuri internet…',
+    'ai intelligence':'Isesengura rya AI','local intelligence':'Isesengura rishingiye ku makuru ari muri telefoni',
+    'cloud ai was unavailable, so the app used its offline analysis.':'AI yo kuri internet ntiyabonetse, porogaramu ikoresheje isesengura ryo kuri telefoni.',
+    'sale captured. saving securely…':'Igurisha ryafashwe. Turibika neza…',
+    'sale saved. syncing to your account…':'Igurisha ribitswe. Turimo kurihuza na konti yawe…',
+    'sale is visible on this device, but saving or sync needs attention. check pending sync.':'Igurisha riragaragara kuri iki gikoresho, ariko kubika cyangwa kohereza amakuru biracyasaba kugenzurwa. Reba ibitegereje koherezwa.'
+  });
+  Object.assign(dictionaries.fr,{
+    'search sales by product, customer, amount or date':'Rechercher les ventes par produit, client, montant ou date',
+    'search products by name, category or barcode':'Rechercher les produits par nom, catégorie ou code-barres',
+    'search expenses by description, category or date':'Rechercher les dépenses par description, catégorie ou date',
+    'search invoices by number, customer or date':'Rechercher les factures par numéro, client ou date',
+    'search bills by number, supplier or date':'Rechercher les notes par numéro, fournisseur ou date',
+    'search payments by reference, type or date':'Rechercher les paiements par référence, type ou date',
+    'thinking…':'Réflexion en cours…','searching the web…':'Recherche sur le Web…',
+    'ai intelligence':'Analyse par IA','local intelligence':'Analyse locale',
+    'cloud ai was unavailable, so the app used its offline analysis.':'L’IA en ligne était indisponible ; l’application a utilisé son analyse locale.',
+    'sale captured. saving securely…':'Vente enregistrée. Enregistrement sécurisé…',
+    'sale saved. syncing to your account…':'Vente enregistrée. Synchronisation avec votre compte…',
+    'sale is visible on this device, but saving or sync needs attention. check pending sync.':'La vente est visible sur cet appareil, mais son enregistrement ou sa synchronisation nécessite une vérification. Consultez les éléments en attente.'
   });
   const originals=new WeakMap();
   const supported=['en','rw','fr'];
