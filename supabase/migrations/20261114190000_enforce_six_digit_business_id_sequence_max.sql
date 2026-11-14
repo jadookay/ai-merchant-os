@@ -1,0 +1,1 @@
+alter sequence public.shericeri_id_seq minvalue 100000 maxvalue 999999 start with 100000;
