@@ -1,0 +1,25 @@
+name: AIBOS pre-launch regression checks
+
+on:
+  push:
+    branches:
+      - fix/prelaunch-priority-one-2026-11-11
+      - feat/aibos-team-controls-cart-expiry-sheri-context
+  pull_request:
+    branches:
+      - main
+      - fix/prelaunch-priority-one-2026-11-11
+  workflow_dispatch:
+
+jobs:
+  static-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run static regression tests
+        run: node --test tests/prelaunch-static.test.mjs
