@@ -1108,6 +1108,13 @@ async function sheriSyncVoidSale(op){
     p_merchant_id:op.merchant_id,p_sale_id:op.id,p_transaction_id:op.transaction_id||null,p_reason:op.reason,p_audit_id:op.audit_id
   });
   if(error)throw error;
+  // The server has accepted the audited void; allow the next authoritative refresh to win.
+  for(const sale of state.sales||[]){
+    if(sale.id===op.id||(op.transaction_id&&sale.transaction_id===op.transaction_id)){
+      sale._serverConfirmed=true;
+      await sheriPut('sales',sale.id,{merchant_id:op.merchant_id,record:{...sale}});
+    }
+  }
 }
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
@@ -1732,7 +1739,10 @@ async function loadAll(silent=false){
       if(sr.length===0&&lr.length>0)return lr.map(x=>({...x,_serverConfirmed:x._serverConfirmed??false}));
       const sm=new Map(sr.map(x=>[x.id,{...x,_serverConfirmed:true}]));
       for(const x of lr){
-        if(!sm.has(x.id)){
+        if(sm.has(x.id)&&x._serverConfirmed===false){
+          // Preserve a local mutation (such as a pending void) until its server operation succeeds.
+          sm.set(x.id,{...x,_serverConfirmed:false});
+        }else if(!sm.has(x.id)){
           const keep=!x._serverConfirmed||sheriSyncQueued>0;
           if(keep)sm.set(x.id,{...x,_serverConfirmed:false});
         }
@@ -2052,7 +2062,7 @@ async function voidSale(id){
   for(const row of rows){
     const p=product(row.product_id);if(p)p.stock=Number(p.stock||0)+Number(row.qty||0);
     // Keep the original sale in history. Voids are status changes, never deletions.
-    const preserved={...row,voided:true,void_reason:reason.trim(),voided_at:sheriNow(),voided_by:session?.user?.id||null,stock_applied:false};
+    const preserved={...row,voided:true,void_reason:reason.trim(),voided_at:sheriNow(),voided_by:session?.user?.id||null,stock_applied:false,_serverConfirmed:false};
     Object.assign(row,preserved);
     await sheriPut('sales',row.id,{merchant_id:state.merchant.id,record:{...preserved}});
   }
