@@ -13,8 +13,8 @@ const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, pre
 new vm.Script(previewScript, { filename: "preview/index.html" });
 
 test("production inline JavaScript parses without syntax errors", () => {
-  const scripts = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)]
-    .filter(match => !/type\\s*=\\s*["']module["']/i.test(match[1]) && match[2].trim());
+  const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter(match => !/type\s*=\s*["']module["']/i.test(match[1]) && match[2].trim());
   assert.equal(scripts.length, 6, "expected all six production inline script blocks");
   scripts.forEach((match, index) => new vm.Script(match[2], { filename: "index.html inline script " + index }));
 });
