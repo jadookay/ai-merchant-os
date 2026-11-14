@@ -2403,12 +2403,16 @@ async function saveProduct(){
       p.stock=stock||0;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     }
   }else{
-    const p={id:sheriUuid(),merchant_id:state.merchant.id,name,cat,cost,sell,stock:stock||0,reorder:reorder||0,barcode,expiry_date,created_at:now,updated_at:now};
+    const initialStock=stock||0;
+    const p={id:sheriUuid(),merchant_id:state.merchant.id,name,cat,cost,sell,stock:initialStock,reorder:reorder||0,barcode,expiry_date,created_at:now,updated_at:now};
     state.products.push(p);openingStockProduct=p;
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
-    await sheriQueue({type:'product_upsert',record:{...p}});
+    // Create the product at zero stock on the server, then apply opening stock
+    // through the audited RPC so inventory_movements records the opening balance.
+    await sheriQueue({type:'product_upsert',record:{...p,stock:0}});
+    if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:0,quantity_delta:initialStock,reason:'Initial stock entry',movement_type:'opening_balance',source_id:sheriUuid()});
   }
-  let openingWarning='';if(openingStockProduct&&openingStockProduct.stock>0&&openingStockProduct.cost>0){try{await accEnsureBase();const inv=accAccountCode('1200'),equity=accAccountCode('3000'),value=openingStockProduct.stock*openingStockProduct.cost;await accPostEntry({date:now.slice(0,10),description:'Opening inventory '+name,sourceType:'product_opening_stock',sourceId:openingStockProduct.id,lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]});}catch(err){openingWarning=' Opening stock was saved but its accounting entry needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] opening inventory posting failed',err);}}
+  let openingWarning='';if(openingStockProduct&&openingStockProduct.stock>0&&openingStockProduct.cost>0){if(sheriCan('manage_finance')){try{await accEnsureBase();const inv=accAccountCode('1200'),equity=accAccountCode('3000'),value=openingStockProduct.stock*openingStockProduct.cost;await accPostEntry({date:now.slice(0,10),description:'Opening inventory '+name,sourceType:'product_opening_stock',sourceId:openingStockProduct.id,lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]});}catch(err){openingWarning=' Opening stock was saved but its accounting entry needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] opening inventory posting failed',err);}}else openingWarning=' Inventory quantity is recorded; a finance manager must post the opening stock value.';}
   if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name});
   if(navigator.onLine)sherriSyncKick();
   document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast((isEditing?'Product updated.':'Product saved.')+openingWarning,openingWarning?'warning':'success');
