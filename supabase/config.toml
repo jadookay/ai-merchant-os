@@ -1,0 +1,11 @@
+[functions.advisor]
+verify_jwt = true
+
+[functions.quick-service]
+verify_jwt = true
+
+[functions.kinya-tts]
+verify_jwt = true
+
+[functions.team-access]
+verify_jwt = false
