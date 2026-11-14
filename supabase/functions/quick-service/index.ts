@@ -393,6 +393,12 @@ Deno.serve(async (req: Request) => {
     const { question, context, image, mode, barcode, rows, webSearch, audio, language, history, memory } = await req.json();
     const apiKey = Deno.env.get("GROQ_API_KEY");
     if (!apiKey) return json({ error: "GROQ_API_KEY is not configured on the server." }, 500);
+    const selectedLanguage = typeof language === "string" ? language.slice(0, 2).toLowerCase() : "en";
+    const languageInstruction = selectedLanguage === "rw"
+      ? "LANGUAGE REQUIREMENT: Reply entirely in natural everyday Kinyarwanda used by Rwandan small-business owners. Use clear, familiar merchant vocabulary. Do not default to English; keep product names, invoice IDs, dates and numbers unchanged."
+      : selectedLanguage === "fr"
+      ? "LANGUAGE REQUIREMENT: Reply entirely in clear, natural French. Do not default to English; keep product names, invoice IDs, dates and numbers unchanged."
+      : "LANGUAGE REQUIREMENT: Reply in clear English. Keep product names, invoice IDs, dates and numbers unchanged.";
 
     // ── Mode: barcode — look up a scanned barcode via free product databases ──
     if (mode === "barcode") {
@@ -678,7 +684,7 @@ find genuinely conflicting information, say so briefly instead of picking one ar
           model: SEARCH_MODEL,
           max_tokens: 500,
           messages: [
-            { role: "system", content: systemPrompt },
+            { role: "system", content: systemPrompt + "\n\n" + languageInstruction },
             { role: "user", content: question },
           ],
         });
@@ -975,7 +981,7 @@ Behavioral rules:
           max_tokens: 90,
           reasoning_effort: "low",
           messages: [
-            { role: "system", content: SHERICERI_PERSONA + "\n\n" + grounding + memoryContext },
+            { role: "system", content: SHERICERI_PERSONA + "\n\n" + languageInstruction + "\n\n" + grounding + memoryContext },
             ...cleanHistory,
             { role: "user", content: question },
           ],
@@ -1030,7 +1036,7 @@ enough information to answer confidently, say so plainly instead of guessing.`;
         temperature: 0.4,
         max_tokens: 400,
         messages: [
-          { role: "system", content: systemPrompt + "\n\nBusiness data:\n" + JSON.stringify(context || {}) },
+          { role: "system", content: systemPrompt + "\n\n" + languageInstruction + "\n\nBusiness data:\n" + JSON.stringify(context || {}) },
           { role: "user", content: userContent },
         ],
       });
