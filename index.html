@@ -3047,7 +3047,7 @@ async function askAI(webSearch){
     const lang=window.AIBOS_I18N?.getLanguage?.()||'en';
     const webOffline=lang==='rw'?'Gushakisha kuri murandasi ntibikora ubu. Ongera ugerageze nyuma.':lang==='fr'?'La recherche sur le Web est momentanément indisponible. Réessayez plus tard.':'Web search isn\'t reachable right now. Please try again later.';
     const photoOffline=lang==='rw'?'Sinshobora gusoma ifoto igihe ntari kuri murandasi — ':lang==='fr'?'Je ne peux pas analyser les photos hors ligne — ':'I can\'t read photos while offline — ';
-    const offlineNote=lang==='rw'?'(Ibarura ryo kuri iki gikoresho — serivisi y’umujyanama wa AI ntiboneka ubu.)':lang==='fr'?'(Calcul hors ligne — le service du conseiller IA est momentanément indisponible.)':'(Offline calculation — the AI advisor service is currently unavailable.)';
+    const offlineNote=lang==='rw'?'(Ibarura rishingiye ku makuru abitswe kuri iki gikoresho. Ibitarahuzwa na murandasi bishobora kutagaragaramo.)':lang==='fr'?'(Calcul effectué à partir des données enregistrées sur cet appareil. Les modifications non synchronisées peuvent manquer.)':'(Calculated from records saved on this device. Changes not yet synchronized may be missing.)';
     document.getElementById(thinkingId).innerHTML=webSearch?webOffline:(img?photoOffline:'')+offlineAnswer(q||'how am I doing')+'<div class="sub" style="margin-top:6px">'+offlineNote+'</div>';
   }
   box.scrollTop=box.scrollHeight;
@@ -5108,21 +5108,29 @@ async function accUpdate(table,record,collection){
 async function accEnsureBase(){
   if(!state.merchant)return;
   if(!Array.isArray(state.accounts))state.accounts=[];
-  if(!sheriCan('manage_team')||!sheriCan('manage_finance')){
-    const missing=ACC_DEFAULT_ACCOUNTS.some(([code])=>!state.accounts.some(a=>a.code===code));
-    if(missing){
-      if(!navigator.onLine)throw new Error('Operational accounting accounts are not cached. Reconnect once so the secure setup can finish.');
-      const {data,error}=await sb.rpc('shericeri_ensure_operational_accounts',{p_merchant_id:state.merchant.id});
-      if(error)throw error;
-      state.accounts=Array.isArray(data?.accounts)?data.accounts:[];
-    }
+  const canUseServerSetup=['create_sale','manage_expenses','manage_inventory','manage_finance','view_financial_reports'].some(sheriCan);
+  if(navigator.onLine&&canUseServerSetup){
+    // Always refresh authoritative account IDs before creating journal lines.
+    // A stale/partial IndexedDB snapshot must never cause the client to invent
+    // a UUID for an account that already exists under the merchant's chart.
+    const {data,error}=await sb.rpc('shericeri_ensure_operational_accounts',{p_merchant_id:state.merchant.id});
+    if(error)throw error;
+    const serverAccounts=Array.isArray(data?.accounts)?data.accounts:[];
+    const missing=ACC_DEFAULT_ACCOUNTS.filter(([code])=>!serverAccounts.some(a=>a.code===code&&a.active));
+    if(missing.length)throw new Error('The server chart of accounts is incomplete ('+missing.map(x=>x[0]).join(', ')+'). No journal entry was created.');
+    state.accounts=serverAccounts;
     await sheriSaveAccountingSnapshot();
-    return;
+  }else{
+    // Offline posting is allowed only against a complete, previously synced
+    // chart. Never manufacture local ledger-account IDs.
+    const missing=ACC_DEFAULT_ACCOUNTS.filter(([code])=>!state.accounts.some(a=>a.code===code&&a.active));
+    if(missing.length)throw new Error('The complete chart of accounts is not cached. Reconnect and refresh accounting before recording this transaction.');
   }
-  const now=sheriNow();
-  for(const [code,name,type,normal] of ACC_DEFAULT_ACCOUNTS){if(!state.accounts.some(a=>a.code===code)){const a={id:sheriUuid(),merchant_id:state.merchant.id,code,name,type,normal_balance:normal,active:true,created_at:now};state.accounts.push(a);await sheriPut('accounts',a.id,{merchant_id:state.merchant.id,record:{...a}});await sheriQueue({type:'accounting_upsert',table:'chart_of_accounts',record:a})}}
-  if(!state.accountingSettings){state.accountingSettings={id:sheriUuid(),merchant_id:state.merchant.id,locked_through:null,created_at:now,updated_at:now};await sheriPut('accountingSettings','settings',{merchant_id:state.merchant.id,record:{...state.accountingSettings}});await sheriQueue({type:'accounting_settings_upsert',record:state.accountingSettings})}
-  if(!(state.taxRates||[]).length){const t={id:sheriUuid(),merchant_id:state.merchant.id,name:'No tax',rate:0,type:'output',active:true,created_at:now};state.taxRates=[t];await sheriPut('taxRates',t.id,{merchant_id:state.merchant.id,record:{...t}});await sheriQueue({type:'accounting_upsert',table:'tax_rates',record:t})}
+  if(sheriCan('manage_team')&&sheriCan('manage_finance')){
+    const now=sheriNow();
+    if(!state.accountingSettings){state.accountingSettings={id:sheriUuid(),merchant_id:state.merchant.id,locked_through:null,created_at:now,updated_at:now};await sheriPut('accountingSettings','settings',{merchant_id:state.merchant.id,record:{...state.accountingSettings}});await sheriQueue({type:'accounting_settings_upsert',record:state.accountingSettings})}
+    if(!(state.taxRates||[]).length){const t={id:sheriUuid(),merchant_id:state.merchant.id,name:'No tax',rate:0,type:'output',active:true,created_at:now};state.taxRates=[t];await sheriPut('taxRates',t.id,{merchant_id:state.merchant.id,record:{...t}});await sheriQueue({type:'accounting_upsert',table:'tax_rates',record:t})}
+  }
   await sheriSaveAccountingSnapshot();
 }
 async function accEnsureOperationalLedger({approved=false}={}){
