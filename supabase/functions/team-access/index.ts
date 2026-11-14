@@ -200,6 +200,17 @@ Deno.serve(async (req: Request) => {
       if (authUser?.id === merchant.user_id) {
         return json({ ok: false, code: "owner_identity", error: "The business owner's login cannot also be added as an employee." }, 409);
       }
+      // An email already present in Supabase Auth belongs to an existing login.
+      // Do not silently attach that identity to a new staff record or treat it as
+      // a newly-created employee account. Require a unique, unused email for each
+      // newly-created staff login; phone-only staff may still use their own flow.
+      if (email && authUser) {
+        return json({
+          ok: false,
+          code: "email_already_registered",
+          error: "This email is already registered to an existing account. It cannot be reused to create or add a new staff login. Use an unused email address for a new staff account.",
+        }, 409);
+      }
       if (authUser && !authUser.email) {
         return json({ ok: false, code: "existing_phone_account", error: "This phone is already attached to an account without an email login. Add a verified email to that account first, or use a different phone number." }, 409);
       }
