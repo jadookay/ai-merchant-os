@@ -16,6 +16,27 @@ function randomPassword() {
   const bytes = crypto.getRandomValues(new Uint8Array(48));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+function sessionIdFromJwt(token: string): string {
+  const segment = token.split(".")[1];
+  if (!segment) return "";
+  try {
+    const base64 = segment.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")));
+    return String(payload?.session_id || "");
+  } catch {
+    return "";
+  }
+}
+
+async function hasActiveDeviceSession(admin: ReturnType<typeof createClient>, merchantId: string, userId: string, token: string): Promise<boolean> {
+  const sessionId = sessionIdFromJwt(token);
+  if (!sessionId) return false;
+  const { data, error } = await admin.from("merchant_device_sessions")
+    .select("id").eq("merchant_id", merchantId).eq("user_id", userId)
+    .eq("session_id", sessionId).is("revoked_at", null).maybeSingle();
+  if (error) throw error;
+  return !!data;
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
@@ -109,7 +130,11 @@ Deno.serve(async (req: Request) => {
         .from("merchants").select("id,user_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
 
-      let canManage = merchant.user_id === callerData.user.id;
+      const isOwner = merchant.user_id === callerData.user.id;
+      if (!isOwner && !(await hasActiveDeviceSession(admin, merchantId, callerData.user.id, bearer))) {
+        return json({ error: "This device session is no longer authorized. Sign in again." }, 403);
+      }
+      let canManage = isOwner;
       let callerRole = canManage ? "owner" : null;
       let callerPermissions: Record<string, boolean> = {};
       if (!canManage) {
@@ -222,7 +247,11 @@ Deno.serve(async (req: Request) => {
 
       const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
-      let callerRole = merchant.user_id === callerData.user.id ? "owner" : null;
+      const isOwner = merchant.user_id === callerData.user.id;
+      if (!isOwner && !(await hasActiveDeviceSession(admin, merchantId, callerData.user.id, bearer))) {
+        return json({ error: "This device session is no longer authorized. Sign in again." }, 403);
+      }
+      let callerRole = isOwner ? "owner" : null;
       let callerPermissions: Record<string, boolean> = {};
       if (!callerRole) {
         const { data: membership, error: memberError } = await admin.from("merchant_members")
