@@ -806,7 +806,7 @@ async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id){
 }
 async function sheriSaveSnapshot(){
   if(!state.merchant)return;
-  await sheriPut('merchants',state.merchant.id,{record:{...state.merchant}});
+  await sheriPut('merchants',state.merchant.id,{user_id:state.merchant.user_id,local_user_id:session?.user?.id||null,membership:state.currentMembership||null,record:{...state.merchant}});
   for(const p of state.products)await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
   for(const x of state.sales)await sheriPut('sales',x.id,{merchant_id:state.merchant.id,record:{...x}});
   for(const x of state.expenses)await sheriPut('expenses',x.id,{merchant_id:state.merchant.id,record:{...x}});
@@ -1623,8 +1623,8 @@ function merchantProfileComplete(m){return !!(m&&m.name&&m.name!=='My Business'&
 function showOnboarding(){document.getElementById('authScreen').style.display='none';document.getElementById('appRoot').style.display='none';document.getElementById('onboardingScreen').style.display='flex';initProfileSelectors();document.getElementById('onboardCountry').value=state.merchant?.country||'RW';document.getElementById('onboardCurrency').value=state.merchant?.currency||SHERI_COUNTRY_CURRENCY[document.getElementById('onboardCountry').value]||'RWF';document.getElementById('onboardName').value=state.merchant?.name&&state.merchant.name!=='My Business'?state.merchant.name:'';document.getElementById('onboardTin').value=state.merchant?.tin||'';populateFiscalYear('onboardFiscalYear',state.merchant?.fiscal_year)}
 async function ensureMerchant(){
   const cached=await sheriGetAll('merchants');
-  const mine=cached.find(x=>x.record?.user_id===session.user.id||x.user_id===session.user.id);
-  if(mine){state.merchant=mine.record||mine;if(!navigator.onLine){sheriSetConnectivity('offline','Using saved business profile');return true}try{const result=await sheriWithTimeout(sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle(),7000,'Business profile refresh timed out');if(result.error)throw result.error;if(result.data){state.merchant=result.data;await sheriPut('merchants',result.data.id,{user_id:result.data.user_id,record:{...result.data}})}}catch(e){sheriSetConnectivity('degraded','Using saved business profile — server refresh is slow.')}return true}
+  const mine=cached.find(x=>x.local_user_id===session.user.id||x.record?.user_id===session.user.id||x.user_id===session.user.id);
+  if(mine){state.merchant=mine.record||mine;if(mine.local_user_id===session.user.id&&state.merchant.user_id!==session.user.id)state.currentMembership=mine.membership||state.currentMembership;if(!navigator.onLine){sheriSetConnectivity('offline','Using saved business profile');return true}try{const result=await sheriWithTimeout(sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle(),7000,'Business profile refresh timed out');if(result.error)throw result.error;if(result.data){state.merchant=result.data;await sheriPut('merchants',result.data.id,{user_id:result.data.user_id,record:{...result.data}})}}catch(e){sheriSetConnectivity('degraded','Using saved business profile — server refresh is slow.')}return true}
   if(!navigator.onLine)return false;
   const own=await sheriWithTimeout(sb.from('merchants').select('*').eq('user_id',session.user.id).maybeSingle(),7000,'Business profile lookup timed out');
   if(own.error)throw own.error;
@@ -1645,7 +1645,7 @@ async function ensureMerchant(){
   if(business.error)throw business.error;
   if(!business.data)return false;
   state.merchant=business.data;
-  await sheriPut('merchants',business.data.id,{user_id:business.data.user_id,record:{...business.data}});
+  await sheriPut('merchants',business.data.id,{user_id:business.data.user_id,local_user_id:session.user.id,membership:memberResult.data,record:{...business.data}});
   return true;
 }
 async function completeOnboarding(){const name=document.getElementById('onboardName').value.trim(),tin=document.getElementById('onboardTin').value.trim()||null,fy=document.getElementById('onboardFiscalYear').value||null,country=document.getElementById('onboardCountry').value,currency=document.getElementById('onboardCurrency').value,status=document.getElementById('onboardStatus');if(!name||!country||!currency){status.textContent='Business name, country and currency are required.';status.className='sub auth-status bad';return}status.textContent='Saving your business profile…';const record={user_id:session.user.id,name,category:state.merchant?.category||'Other',tin,fiscal_year:fy?Number(fy):null,country,currency};try{let result;if(navigator.onLine){result=state.merchant?.id&&!state.merchant._localOnly?await sb.from('merchants').update(record).eq('id',state.merchant.id).select().single():await sb.from('merchants').insert(record).select().single();if(result.error)throw result.error;state.merchant=result.data}else{state.merchant={id:state.merchant?.id||sheriUuid(),...record,_localOnly:true};await sheriQueue({type:'merchant_upsert',record:{...state.merchant}})}await sheriSaveSnapshot();document.getElementById('onboardingScreen').style.display='none';document.getElementById('appRoot').style.display='';await loadAll();render();if(navigator.onLine)checkAdvisor()}catch(e){status.textContent='Could not save your business profile: '+String(e.message||e);status.className='sub auth-status bad'}}
