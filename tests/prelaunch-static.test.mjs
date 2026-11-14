@@ -556,6 +556,22 @@ test("suspending a staff member revokes refresh sessions and the client revalida
   assert.match(html, /if\(navigator\.onLine&&\!\(await sheriValidateCurrentMembership\(\)\)\)return/);
 });
 
+test("period locks are enforced by server-side triggers and operational RPCs", () => {
+  assert.match(releaseMigration, /create or replace function public\.prevent_locked_operational_write/);
+  for (const table of ["products","sales","purchases","expenses"]) {
+    assert.match(releaseMigration, new RegExp("aibos_period_lock_"+table+" on public\\."+table));
+  }
+  assert.match(releaseMigration, /set_config\('app\.aibos_period_lock_bypass','true',true\)/);
+  assert.match(releaseMigration, /Accounting period is locked through/);
+  assert.match(teamMigration, /v_sale_date:=coalesce\(nullif\(p_sale->>'created_at'/);
+  assert.match(teamMigration, /v_purchase_date:=coalesce\(nullif\(p_purchase->>'purchased_at'/);
+  assert.match(teamMigration, /The sale or current accounting period is locked/);
+  assert.match(html, /Sales cannot be recorded until it is reopened/);
+  assert.match(html, /Received purchases cannot be recorded until it is reopened/);
+  assert.match(html, /Expenses cannot be recorded until it is reopened/);
+  assert.match(html, /Stock cannot be adjusted until it is reopened/);
+});
+
 test("operational journal posting follows each source permission and validates its source amounts", () => {
   const start=releaseMigration.indexOf("create or replace function public.shericeri_sync_journal_batch");
   const end=releaseMigration.indexOf("revoke all on function public.shericeri_sync_journal_batch",start);
