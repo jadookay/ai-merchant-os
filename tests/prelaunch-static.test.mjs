@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import vm from "node:vm";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
@@ -27,7 +29,13 @@ test("production inline JavaScript parses without syntax errors", () => {
     try {
       new vm.Script(match[2], { filename: "index.html inline script " + index });
     } catch (error) {
-      throw new Error("Inline script " + index + " failed to parse: " + error.message + "; ending: " + match[2].slice(-500));
+      const path = "/tmp/aibos-inline-script-" + index + ".js";
+      writeFileSync(path, match[2]);
+      try {
+        execFileSync(process.execPath, ["--check", path], { encoding: "utf8", stdio: "pipe" });
+      } catch (parseError) {
+        throw new Error("Inline script " + index + " failed: " + (parseError.stderr?.toString() || parseError.message));
+      }
     }
   });
 });
