@@ -5541,9 +5541,12 @@ function accLedgerIntegrity(endDate=null){
     const key=line.journal_entry_id,v=totals.get(key)||{count:0,debit:0,credit:0};
     v.count++;v.debit+=Number(line.debit||0);v.credit+=Number(line.credit||0);totals.set(key,v);
   }
+  const reversedEntries=new Set((state.journalEntries||[])
+    .filter(e=>['sale_void','sale_cogs_void'].includes(e.source_type))
+    .map(e=>e.source_id));
   const invalid=[];
   for(const entry of state.journalEntries||[]){
-    if(entry.voided)continue;
+    if(entry.voided&&!reversedEntries.has(entry.id))continue;
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
     if(endDate&&date>endDate)continue;
     const v=totals.get(entry.id)||{count:0,debit:0,credit:0};
