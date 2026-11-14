@@ -697,7 +697,7 @@ async function sheriTogglePendingSync(){
   try{
     const pending=(await sheriGetAll('outbox')).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
     const blocked=pending.filter(x=>x.blocked).length;
-    const labels={sale_upsert:'Sale recorded',sale_delete:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Expense deleted',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
+    const labels={sale_upsert:'Sale recorded',sale_cart_upsert:'Sale cart recorded',sale_delete:'Sale voided',sale_void:'Sale voided',product_upsert:'Product saved',product_delete:'Product deleted',expense_upsert:'Expense recorded',expense_delete:'Legacy expense delete blocked',expense_void:'Expense voided',accounting_journal_batch:'Accounting entry',accounting_upsert:'Accounting record',memory_insert:'Shericeri memory',merchant_upsert:'Business profile',purchase_upsert:'Purchase recorded',cash_upsert:'Cash movement',budget_upsert:'Budget updated'};
     let out='<b>'+pending.length+' pending activities</b> · '+blocked+' need attention';if(!pending.length)out='<b>Everything is synchronized.</b>';
     for(const item of pending){
       const op=item.op||{},status=item.blocked?'Needs attention':item.next_retry_at&&new Date(item.next_retry_at)>new Date()?'Waiting for retry':'Waiting to sync';
@@ -1186,6 +1186,11 @@ async function sheriSyncOutbox(){
         const queued=await sheriGetAll('outbox');
         const saleDependency=queued.find(x=>x.op?.type==='sale_cart_upsert'&&x.op.transaction_id===op.transaction_id);
         if(saleDependency)continue;
+      }
+      if(op.type==='expense_void'&&op.id){
+        const queued=await sheriGetAll('outbox');
+        const expenseDependency=queued.find(x=>x.op?.type==='expense_upsert'&&x.op.record?.id===op.id);
+        if(expenseDependency)continue;
       }
       try{
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
