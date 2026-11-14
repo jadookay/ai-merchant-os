@@ -716,3 +716,184 @@ end;
 $$;
 revoke all on function public.shericeri_sync_purchase_stock(jsonb,uuid,integer,integer,integer,integer) from public,anon;
 grant execute on function public.shericeri_sync_purchase_stock(jsonb,uuid,integer,integer,integer,integer) to authenticated;
+
+
+-- Atomic multi-line sale posting. All product stock checks, stock decrements and
+-- sale rows commit together; one conflicting product leaves the entire invoice untouched.
+create or replace function public.shericeri_sync_sale_cart(
+  p_sales jsonb,
+  p_stock_checks jsonb
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_merchant_id uuid;
+  v_transaction_id uuid;
+  v_invoice_number text;
+  v_line_count integer;
+  v_existing_count integer;
+  v_existing_id_count integer;
+  v_check jsonb;
+  v_product_id uuid;
+  v_expected_stock integer;
+  v_local_stock integer;
+  v_qty integer;
+  v_current_stock integer;
+  v_conflicts jsonb:='[]'::jsonb;
+begin
+  if jsonb_typeof(p_sales)<>'array' or jsonb_array_length(p_sales)<1
+     or jsonb_array_length(p_sales)>100
+     or jsonb_typeof(p_stock_checks)<>'array'
+     or jsonb_array_length(p_stock_checks)<1 then
+    raise exception 'A sale invoice must contain valid sale lines and stock checks';
+  end if;
+
+  v_line_count:=jsonb_array_length(p_sales);
+  v_merchant_id:=nullif(p_sales->0->>'merchant_id','')::uuid;
+  v_transaction_id:=nullif(p_sales->0->>'transaction_id','')::uuid;
+  v_invoice_number:=nullif(trim(p_sales->0->>'invoice_number'),'');
+  if v_merchant_id is null or v_transaction_id is null or v_invoice_number is null then
+    raise exception 'Sale invoice identity is incomplete';
+  end if;
+  if not private.user_can_access_merchant(v_merchant_id,'create_sale') then
+    raise exception 'Not authorized to record sales';
+  end if;
+
+  if exists(
+    select 1 from jsonb_array_elements(p_sales) as s(value)
+    where nullif(s.value->>'id','') is null
+       or nullif(s.value->>'product_id','') is null
+       or nullif(s.value->>'merchant_id','')::uuid is distinct from v_merchant_id
+       or nullif(s.value->>'transaction_id','')::uuid is distinct from v_transaction_id
+       or nullif(trim(s.value->>'invoice_number'),'') is distinct from v_invoice_number
+       or coalesce((s.value->>'qty')::integer,0)<1
+       or coalesce((s.value->>'price')::numeric,-1)<0
+       or coalesce((s.value->>'cost')::numeric,-1)<0
+  ) then
+    raise exception 'Sale invoice contains an invalid or mismatched line';
+  end if;
+
+  if (select count(distinct (s.value->>'id')::uuid) from jsonb_array_elements(p_sales) as s(value))<>v_line_count then
+    raise exception 'Sale invoice contains duplicate line identifiers';
+  end if;
+
+  if exists(
+    select 1 from jsonb_array_elements(p_sales) as s(value)
+    where nullif(s.value->>'customer_id','') is not null
+      and not exists(
+        select 1 from public.customers c
+        where c.id=(s.value->>'customer_id')::uuid and c.merchant_id=v_merchant_id
+      )
+  ) then
+    raise exception 'A sale customer does not belong to this business';
+  end if;
+
+  -- A successful retry is idempotent. A partially existing invoice is never
+  -- silently completed because its stock history may have been changed elsewhere.
+  select count(*) into v_existing_count
+  from public.sales
+  where merchant_id=v_merchant_id and transaction_id=v_transaction_id;
+  if v_existing_count>0 then
+    select count(*) into v_existing_id_count
+    from public.sales s
+    where s.merchant_id=v_merchant_id and s.transaction_id=v_transaction_id
+      and s.id in (select (x.value->>'id')::uuid from jsonb_array_elements(p_sales) as x(value));
+    if v_existing_count=v_line_count and v_existing_id_count=v_line_count then
+      return jsonb_build_object('ok',true,'already_recorded',true,'stock_conflict',false);
+    end if;
+    raise exception 'This invoice already has a partial server record; reconcile it before retrying';
+  end if;
+
+  if exists(
+    select 1 from public.sales s
+    where s.id in (select (x.value->>'id')::uuid from jsonb_array_elements(p_sales) as x(value))
+  ) then
+    raise exception 'A sale line identifier is already in use';
+  end if;
+
+  if jsonb_array_length(p_stock_checks)<>(
+    select count(distinct (s.value->>'product_id')::uuid)
+    from jsonb_array_elements(p_sales) as s(value)
+  ) or (
+    select count(distinct (c.value->>'product_id')::uuid)
+    from jsonb_array_elements(p_stock_checks) as c(value)
+  )<>jsonb_array_length(p_stock_checks) then
+    raise exception 'Stock checks must contain exactly one entry for each invoice product';
+  end if;
+
+  -- Lock products in a deterministic order to avoid deadlocks when invoices
+  -- contain overlapping products on different devices.
+  for v_check in
+    select c.value from jsonb_array_elements(p_stock_checks) as c(value)
+    order by (c.value->>'product_id')::uuid
+  loop
+    v_product_id:=nullif(v_check->>'product_id','')::uuid;
+    v_expected_stock:=nullif(v_check->>'expected_server_stock','')::integer;
+    v_local_stock:=nullif(v_check->>'local_stock','')::integer;
+    v_qty:=nullif(v_check->>'qty','')::integer;
+
+    if v_product_id is null or v_expected_stock is null or v_local_stock is null
+       or v_qty is null or v_qty<1 or v_local_stock<0
+       or v_local_stock<>v_expected_stock-v_qty then
+      raise exception 'A product stock check is invalid';
+    end if;
+    if not exists(
+      select 1 from jsonb_array_elements(p_sales) as s(value)
+      where (s.value->>'product_id')::uuid=v_product_id
+    ) then
+      raise exception 'A stock check references a product outside this invoice';
+    end if;
+    if v_qty<>(
+      select coalesce(sum((s.value->>'qty')::integer),0)
+      from jsonb_array_elements(p_sales) as s(value)
+      where (s.value->>'product_id')::uuid=v_product_id
+    ) then
+      raise exception 'A stock check quantity does not match the invoice lines';
+    end if;
+
+    select coalesce(p.stock,0) into v_current_stock
+    from public.products p
+    where p.id=v_product_id and p.merchant_id=v_merchant_id
+    for update;
+    if not found then
+      raise exception 'An invoice product was not found for this business';
+    end if;
+
+    if v_current_stock<>v_expected_stock then
+      v_conflicts:=v_conflicts||jsonb_build_array(jsonb_build_object(
+        'product_id',v_product_id,'server_stock',v_current_stock,
+        'expected_server_stock',v_expected_stock,'local_stock',v_local_stock,'qty',v_qty
+      ));
+    end if;
+  end loop;
+
+  if jsonb_array_length(v_conflicts)>0 then
+    return jsonb_build_object('ok',false,'stock_conflict',true,'conflicts',v_conflicts);
+  end if;
+
+  for v_check in select value from jsonb_array_elements(p_stock_checks) as c(value)
+  loop
+    update public.products
+    set stock=(v_check->>'local_stock')::integer
+    where id=(v_check->>'product_id')::uuid and merchant_id=v_merchant_id;
+  end loop;
+
+  insert into public.sales
+  select (jsonb_populate_record(
+    null::public.sales,
+    s.value||jsonb_build_object('stock_applied',true,'voided',false)
+  )).*
+  from jsonb_array_elements(p_sales) as s(value);
+
+  return jsonb_build_object(
+    'ok',true,'stock_conflict',false,'already_recorded',false,
+    'transaction_id',v_transaction_id,'invoice_number',v_invoice_number,
+    'line_count',v_line_count
+  );
+end;
+$$;
+revoke all on function public.shericeri_sync_sale_cart(jsonb,jsonb) from public,anon;
+grant execute on function public.shericeri_sync_sale_cart(jsonb,jsonb) to authenticated;
