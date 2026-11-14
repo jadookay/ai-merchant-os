@@ -9,6 +9,7 @@ const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_sto
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
 const releaseMigration = await readFile(new URL("../supabase/migrations/20261114010000_aibos_release_hardening.sql", import.meta.url), "utf8");
+const supabaseConfig = await readFile(new URL("../supabase/config.toml", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -482,6 +483,20 @@ test("PIN throttling locks independent identity and IP buckets and rejects concu
   assert.match(releaseMigration, /grant execute on function public\.verify_merchant_member_pin.*to service_role/);
   assert.match(teamAccess, /const ip = req\.headers\.get\("cf-connecting-ip"\)/);
   assert.match(teamAccess, /: "";/);
+});
+
+test("Kinyarwanda TTS JWT enforcement matches the authenticated browser caller", () => {
+  assert.match(supabaseConfig, /\[functions\.kinya-tts\]\s+verify_jwt = true/);
+  assert.match(html, /functions\/v1\/kinya-tts/);
+  assert.match(html, /'Authorization':'Bearer '\+currentSession\.access_token/);
+  assert.match(html, /if\(res\.status===401\)[\s\S]*?sb\.auth\.refreshSession\(\)/);
+});
+
+test("inventory movement labels are localized in Kinyarwanda and French", () => {
+  assert.match(html, /'stock movement history':'Amateka y’impinduka z’ububiko'/);
+  assert.match(html, /'stock movement history':'Historique des mouvements de stock'/);
+  assert.match(html, /'stock adjustment':'Ihinduka ry’ububiko'/);
+  assert.match(html, /'stock adjustment':'Ajustement de stock'/);
 });
 
 test("inventory movement report includes sales, received purchases, stock corrections and void reversals", () => {
