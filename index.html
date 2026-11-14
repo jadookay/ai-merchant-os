@@ -1739,7 +1739,7 @@ async function loadAll(silent=false){
       }
       return [...sm.values()];
     };
-    state.products=mergeKeepLocal(products,state.products);state.sales=mergeKeepLocal(sales,state.sales).filter(x=>!x.voided);state.expenses=mergeKeepLocal(expenses,state.expenses);
+    state.products=mergeKeepLocal(products,state.products);state.sales=mergeKeepLocal(sales,state.sales);state.expenses=mergeKeepLocal(expenses,state.expenses);
     // Memory/customers failing to load should never block the rest of the
     // app — fall back to whatever's cached locally rather than throwing
     // the whole sync.
@@ -1807,7 +1807,7 @@ function customerStats(){
   // majority, most likely — walk-in customers) are excluded entirely.
   const byId={};
   for(const s of state.sales){
-    if(!s.customer_id)continue;
+    if(s.voided||!s.customer_id)continue;
     const row=byId[s.customer_id]||(byId[s.customer_id]={revenue:0,visits:0,lastPurchase:null});
     row.revenue+=s.qty*s.price;
     row.visits+=1;
@@ -1822,18 +1822,18 @@ function customerStats(){
 }
 function topCustomers(n=5){return customerStats().filter(c=>c.revenue>0).slice(0,n)}
 function repeatCustomerCount(){return customerStats().filter(c=>c.visits>1).length}
-function revenue(){return state.sales.reduce((s,x)=>s+x.qty*x.price,0)}
-function cogs(){return state.sales.reduce((s,x)=>s+x.qty*(x.cost??0),0)}
+function revenue(){return state.sales.filter(x=>!x.voided).reduce((s,x)=>s+x.qty*x.price,0)}
+function cogs(){return state.sales.filter(x=>!x.voided).reduce((s,x)=>s+x.qty*(x.cost??0),0)}
 function totalExpenses(){return state.expenses.reduce((s,x)=>s+x.amount,0)}
 function profit(){return revenue()-cogs()-totalExpenses()}
 function categoryBreakdown(){
   let map={};
-  state.sales.forEach(s=>{const p=product(s.product_id);const cat=p?p.cat:(s.product_name_snapshot?'Other':null);if(!cat)return;map[cat]=map[cat]||{revenue:0,profit:0};map[cat].revenue+=s.qty*s.price;map[cat].profit+=s.qty*(s.price-(s.cost??0))});
+  state.sales.filter(s=>!s.voided).forEach(s=>{const p=product(s.product_id);const cat=p?p.cat:(s.product_name_snapshot?'Other':null);if(!cat)return;map[cat]=map[cat]||{revenue:0,profit:0};map[cat].revenue+=s.qty*s.price;map[cat].profit+=s.qty*(s.price-(s.cost??0))});
   return Object.entries(map).map(([cat,v])=>({cat,...v})).sort((a,b)=>b.revenue-a.revenue);
 }
 function bestProducts(){
   return state.products.map(p=>{
-    const ps=state.sales.filter(s=>s.product_id===p.id);
+    const ps=state.sales.filter(s=>!s.voided&&s.product_id===p.id);
     const rev=ps.reduce((x,s)=>x+s.qty*s.price,0);
     const prof=ps.reduce((x,s)=>x+s.qty*(s.price-(s.cost??0)),0);
     return {...p,rev,profit:prof};
@@ -2051,9 +2051,11 @@ async function voidSale(id){
   await sheriPut('auditLog',auditId,{merchant_id:state.merchant.id,record:{...auditRow}});
   for(const row of rows){
     const p=product(row.product_id);if(p)p.stock=Number(p.stock||0)+Number(row.qty||0);
-    await sheriDelete('sales',row.id);
+    // Keep the original sale in history. Voids are status changes, never deletions.
+    const preserved={...row,voided:true,void_reason:reason.trim(),voided_at:sheriNow(),voided_by:session?.user?.id||null,stock_applied:false};
+    Object.assign(row,preserved);
+    await sheriPut('sales',row.id,{merchant_id:state.merchant.id,record:{...preserved}});
   }
-  state.sales=state.sales.filter(x=>!saleIds.includes(x.id));
   for(const entry of state.journalEntries||[]){
     if(saleIds.includes(entry.source_id)&&['sale','sale_cogs'].includes(entry.source_type)&&!entry.voided){
       entry.voided=true;entry.void_reason=reason.trim();entry.voided_at=sheriNow();entry.voided_by=session?.user?.id||null;
@@ -2080,7 +2082,7 @@ function sheriSearchTable(input){
 function renderSales(){
   const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount or date',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name)]);
   const rows=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\''+s.id+'\')">Void</button>':''}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
+  document.getElementById('salesTable').innerHTML=rows.length?`<table class="table"><tr><th>Time</th><th>Product</th><th>Customer</th><th>Qty</th><th>Revenue</th><th></th></tr>${rows.map(s=>{const p=product(s.product_id),c=s.customer_id?customer(s.customer_id):null;return `<tr class="${s.voided?'voided-sale':''}"><td>${new Date(s.created_at).toLocaleString()}</td><td>${esc(p?p.name:(s.product_name_snapshot||'Deleted product'))}</td><td>${c?esc(c.name):'—'}</td><td>${s.qty}</td><td>${money(s.qty*s.price)}</td><td>${s.voided?'<span class="pill">Voided</span><div class="sub">'+esc(s.void_reason||'No reason recorded')+'</div>':(sheriCan('manage_sales')?'<button class="btn small danger" onclick="voidSale(\\''+s.id+'\\')">Void</button>':'—')}</td></tr>`}).join('')}</table>`:'<div class="empty">No sales in the selected date range.</div>';
 }
 
 // ── Products ─────────────────────────────────────────────────────────────
@@ -5754,6 +5756,86 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'sale saved. syncing to your account…':'Vente enregistrée. Synchronisation avec votre compte…',
     'sale is visible on this device, but saving or sync needs attention. check pending sync.':'La vente est visible sur cet appareil, mais son enregistrement ou sa synchronisation nécessite une vérification. Consultez les éléments en attente.'
   });
+  Object.assign(dictionaries.rw,{
+    'void':'Yahagaritswe','voided':'Yahagaritswe','void sale':'Hagarika igurisha','void reason':'Impamvu yo guhagarika igurisha',
+    'voided sale':'Igurisha ryahagaritswe','voided at':'Igihe ryahagaritswe','voided by':'Uwaryahagaritse',
+    'pending sync':'Ibitegereje koherezwa','pending activities':'Ibikorwa bitaroherezwa','need attention':'Bikeneye kwitabwaho',
+    'needs attention':'Bikeneye kwitabwaho','waiting for retry':'Bitegereje kongera kugeragezwa','waiting to sync':'Bitegereje koherezwa',
+    'everything is synchronized.':'Amakuru yose yaroherejwe kandi arahura.','loading pending activities…':'Turimo kureba ibikorwa bitaroherezwa…',
+    'review and retry blocked items':'Suzuma wongere ugerageze kohereza ibyahagaze','close':'Funga','attempts':'Inshuro zo kugerageza','next retry':'Igihe cyo kongera kugerageza',
+    'sale voided':'Igurisha ryahagaritswe','sale history':'Amateka y’igurisha','sales history':'Amateka y’ibyagurishijwe',
+    'favorites':'Ibyatoranyijwe','favorite':'Icyatoranyijwe','add product':'Ongeraho igicuruzwa','add products':'Ongeraho ibicuruzwa',
+    'ai priorities':'Ibyihutirwa AI igaragaza','priority':'Icyihutirwa','priority actions':'Ibikorwa byihutirwa',
+    'reports':'Raporo','financial reports':'Raporo z’imari','management reports':'Raporo z’ubuyobozi',
+    'revenue':'Amafaranga yinjiye','receivable':'Amafaranga umukiriya akurimo','receivables':'Amafaranga abakiriya bakurimo',
+    'accounts receivable':'Amafaranga abakiriya bakurimo','profit':'Inyungu','gross profit':'Inyungu mbere yo gukuramo andi mafaranga',
+    'net profit':'Inyungu isigara nyuma yo gukuramo ibyakoreshejwe',
+    'enter the reason for voiding this sale (required):':'Andika impamvu yo guhagarika iri gurisha (birakenewe):',
+    'a clear void reason is required.':'Ugomba kwandika neza impamvu yo guhagarika igurisha.',
+    'only an owner, admin or authorized manager can void sales.':'Guhagarika igurisha byemewe kuri nyir’ubucuruzi, ushinzwe ubuyobozi cyangwa umuyobozi wabiherewe uburenganzira gusa.',
+    'inventory':'Ububiko','inventory movements':'Imigendekere y’ibicuruzwa mu bubiko',
+    'devices':'Ibikoresho','devices added':'Ibikoresho byongeweho','registered devices':'Ibikoresho byanditswe',
+    'device name':'Izina ry’igikoresho','last seen':'Giheruka gukoreshwa','revoke device':'Kuraho uburenganzira bw’igikoresho',
+    'audit trail':'Amateka y’ibikorwa','audit log':'Amateka y’impinduka','actor':'Uwakoze igikorwa','action':'Igikorwa','entity':'Ikintu cyahinduwe','details':'Ibisobanuro',
+    'search':'Shakisha','search inventory by product or movement':'Shakisha ibicuruzwa cyangwa uko byinjiye n’uko byasohotse',
+    'search audit trail by user, action or date':'Shakisha amateka ukoresheje umukozi, igikorwa cyangwa itariki',
+    'search reports by name or period':'Shakisha raporo ukoresheje izina cyangwa igihe','type to search':'Andika hano kugira ngo ushakishe',
+    'enter a reason':'Andika impamvu','save changes':'Bika impinduka','cancel':'Reka','confirm':'Emeza','delete':'Siba','edit':'Hindura',
+    'receivables aging':'Igihe imyenda imaze itarishyurwa','payables':'Amafaranga ugomba kwishyura',
+    'cash flow':'Uko amafaranga yinjira n’asohoka','balance sheet':'Imbonerahamwe y’umutungo n’imyenda',
+    'income statement':'Raporo y’inyungu n’igihombo','trial balance':'Urutonde rw’uko konti zingana',
+    'gross margin':'Inyungu rusange ku byagurishijwe','inventory value':'Agaciro k’ibiri mu bubiko',
+    'stock movement':'Imigendekere y’ibicuruzwa','low stock':'Ibicuruzwa biri hafi gushira'
+  });
+  Object.assign(dictionaries.fr,{
+    'void':'Annulée','voided':'Annulée','void sale':'Annuler la vente','void reason':'Motif d’annulation',
+    'voided sale':'Vente annulée','voided at':'Date d’annulation','voided by':'Annulée par',
+    'pending sync':'Synchronisation en attente','pending activities':'Opérations en attente','need attention':'À traiter','needs attention':'À traiter',
+    'waiting for retry':'Nouvelle tentative prévue','waiting to sync':'En attente de synchronisation',
+    'everything is synchronized.':'Toutes les données sont synchronisées.','loading pending activities…':'Chargement des opérations en attente…',
+    'review and retry blocked items':'Examiner et réessayer les opérations bloquées','close':'Fermer','attempts':'Tentatives','next retry':'Prochaine tentative',
+    'sale voided':'Vente annulée','sale history':'Historique des ventes','sales history':'Historique des ventes',
+    'favorites':'Favoris','favorite':'Favori','add product':'Ajouter un produit','add products':'Ajouter des produits',
+    'ai priorities':'Priorités de l’IA','priority':'Priorité','priority actions':'Actions prioritaires',
+    'reports':'Rapports','financial reports':'Rapports financiers','management reports':'Rapports de gestion',
+    'revenue':'Chiffre d’affaires','receivable':'Créance client','receivables':'Créances clients','accounts receivable':'Créances clients',
+    'profit':'Bénéfice','gross profit':'Marge brute','net profit':'Bénéfice net',
+    'enter the reason for voiding this sale (required):':'Indiquez le motif d’annulation de cette vente (obligatoire) :',
+    'a clear void reason is required.':'Un motif d’annulation précis est obligatoire.',
+    'only an owner, admin or authorized manager can void sales.':'Seul le propriétaire, un administrateur ou un gestionnaire autorisé peut annuler des ventes.',
+    'inventory':'Stock','inventory movements':'Mouvements de stock','devices':'Appareils','devices added':'Appareils ajoutés',
+    'registered devices':'Appareils enregistrés','device name':'Nom de l’appareil','last seen':'Dernière activité','revoke device':'Révoquer l’appareil',
+    'audit trail':'Piste d’audit','audit log':'Journal d’audit','actor':'Auteur','action':'Action','entity':'Élément concerné','details':'Détails',
+    'search':'Rechercher','search inventory by product or movement':'Rechercher le stock par produit ou mouvement',
+    'search audit trail by user, action or date':'Rechercher dans la piste d’audit par utilisateur, action ou date',
+    'search reports by name or period':'Rechercher les rapports par nom ou période','type to search':'Saisissez pour rechercher',
+    'enter a reason':'Saisissez un motif','save changes':'Enregistrer les modifications','cancel':'Annuler','confirm':'Confirmer','delete':'Supprimer','edit':'Modifier',
+    'receivables aging':'Ancienneté des créances','payables':'Dettes fournisseurs','cash flow':'Flux de trésorerie',
+    'balance sheet':'Bilan','income statement':'Compte de résultat','trial balance':'Balance générale',
+    'gross margin':'Marge brute','inventory value':'Valeur du stock','stock movement':'Mouvements de stock','low stock':'Stock faible'
+  });
+  const pendingFragments={
+    rw:[
+      ['pending activities','ibikorwa bitaroherezwa'],['need attention','bikeneye kwitabwaho'],
+      ['Waiting for retry','Bitegereje kongera kugeragezwa'],['Waiting to sync','Bitegereje koherezwa'],
+      ['The server rejected this activity. Review permissions or the reported data error.','Seriveri yanze iki gikorwa. Reba uburenganzira cyangwa amakuru y’ikosa yatanzwe.'],
+      ['A previous sync attempt failed; automatic retry is scheduled.','Kohereza byageragejwe biranga; sisitemu izongera kugerageza ubwayo.'],
+      ['Saved on this device and waiting for the next sync attempt.','Byabitswe kuri iki gikoresho, bitegereje kongera koherezwa.'],
+      ['Could not read pending activities.','Ntibyashobotse gusoma ibikorwa bitaroherezwa.'],
+      ['Retry ','Ongera ugerageze kohereza '],[' blocked activities? This resubmits them without changing their business details.',' byahagaze? Bizongera koherezwa hadahinduwe amakuru y’ubucuruzi.']
+    ],
+    fr:[
+      ['pending activities','opérations en attente'],['need attention','à traiter'],
+      ['Waiting for retry','Nouvel essai prévu'],['Waiting to sync','En attente de synchronisation'],
+      ['The server rejected this activity. Review permissions or the reported data error.','Le serveur a rejeté cette opération. Vérifiez les autorisations ou l’erreur signalée.'],
+      ['A previous sync attempt failed; automatic retry is scheduled.','Une tentative précédente a échoué ; une nouvelle tentative automatique est prévue.'],
+      ['Saved on this device and waiting for the next sync attempt.','Enregistré sur cet appareil, en attente de la prochaine synchronisation.'],
+      ['Could not read pending activities.','Impossible de lire les opérations en attente.'],
+      ['Retry ','Réessayer '],[' blocked activities? This resubmits them without changing their business details.',' opérations bloquées ? Elles seront renvoyées sans modifier leurs données commerciales.']
+    ]
+  };
+  phraseFragments.rw.push(...pendingFragments.rw);
+  phraseFragments.fr.push(...pendingFragments.fr);
   const originals=new WeakMap();
   const supported=['en','rw','fr'];
   let current='en';
