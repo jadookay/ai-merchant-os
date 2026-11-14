@@ -106,6 +106,9 @@ begin
   if v_user_id is null or v_session_id is null then
     raise exception 'A valid authenticated session is required';
   end if;
+  if not exists(select 1 from auth.sessions a where a.id=v_session_id and a.user_id=v_user_id) then
+    return jsonb_build_object('ok',false,'revoked',true);
+  end if;
   if p_merchant_id is null or coalesce(length(p_device_id),0)<16
      or coalesce(length(trim(p_device_name)),0)<2 then
     raise exception 'Device identity is incomplete';
@@ -143,6 +146,25 @@ $;
 revoke all on function public.shericeri_register_device_session(uuid,text,text,text) from public,anon;
 grant execute on function public.shericeri_register_device_session(uuid,text,text,text) to authenticated;
 
+create or replace function public.shericeri_is_auth_session_active(
+  p_user_id uuid,
+  p_session_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path=''
+as $
+begin
+  if coalesce(auth.jwt()->>'role','')<>'service_role' then
+    raise exception 'not authorized';
+  end if;
+  return exists(select 1 from auth.sessions a where a.id=p_session_id and a.user_id=p_user_id);
+end;
+$;
+revoke all on function public.shericeri_is_auth_session_active(uuid,uuid) from public,anon,authenticated;
+grant execute on function public.shericeri_is_auth_session_active(uuid,uuid) to service_role;
+
 create or replace function public.shericeri_list_device_sessions(p_merchant_id uuid)
 returns jsonb
 language plpgsql
@@ -158,7 +180,9 @@ begin
       'session_id',ds.session_id,'user_id',ds.user_id,'member_name',coalesce(mm.full_name,'Owner'),
       'role',coalesce(mm.role,'owner'),'device_name',ds.device_name,'platform',ds.platform,
       'device_id',ds.device_id,'created_at',ds.created_at,'last_seen_at',ds.last_seen_at,
-      'revoked_at',ds.revoked_at,'current',ds.session_id=nullif(auth.jwt()->>'session_id','')::uuid
+      'revoked_at',ds.revoked_at,
+      'auth_session_active',exists(select 1 from auth.sessions a where a.id=ds.session_id and a.user_id=ds.user_id),
+      'current',ds.session_id=nullif(auth.jwt()->>'session_id','')::uuid
     ) order by ds.last_seen_at desc)
     from public.merchant_device_sessions ds
     left join public.merchant_members mm on mm.merchant_id=ds.merchant_id and mm.user_id=ds.user_id
