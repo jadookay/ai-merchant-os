@@ -2910,10 +2910,10 @@ async function askAI(webSearch){
 function offlineAnswer(q){
   const lang=window.AIBOS_I18N?.getLanguage?.()||'en',raw=String(q||'').toLowerCase();
   const low=activeProducts().filter(p=>p.stock<=p.reorder),best=bestProducts()[0],rev=revenue(),pr=profit();
-  const isRestock=/restock|stock|réappro|approvision|kongera.*bubiko|ububiko|kongera ibicuruzwa/.test(raw);
-  const isTop=/best|top|product|produit|meilleur|gicuruzwa|byiza|bigurishwa cyane/.test(raw);
-  const isProfit=/profit|benefit|bénéfice|bénéfices|doing|make|inyungu|ubucuruzi.*buhagaze|kunguka/.test(raw);
-  const isSale=/sale|sell|vente|vendre|igurisha|gucuruza|nagurishije/.test(raw);
+  const isRestock=/restock|stock|réappro|approvision|kongera.*bubiko|ububiko|kongera.*ibicuruzwa|ibicuruzwa.*kongera|kongera/.test(raw);
+  const isTop=/best|top|product|produit|meilleur|gicuruzwa|ibicuruzwa|byiza|binyungura|bigurishwa cyane|rentable|rapporte/.test(raw);
+  const isProfit=/profit|benefit|bénéfice|bénéfices|doing|make|inyungu|ubucuruzi.*buhagaze|kunguka|comment se porte|comment va|commerce|chiffre d.?affaires|gagné/.test(raw);
+  const isSale=/sale|sell|vente|ventes|vendre|vendu|igurisha|gucuruza|nagurishije|combien.*vendu/.test(raw);
   if(lang==='rw'){
     if(isRestock)return low.length?('Nakugira inama yo kongera ibi bicuruzwa mu bubiko: <b>'+low.map(p=>esc(p.name)).join(', ')+'</b>.'):'Ibicuruzwa biri mu bubiko biracyahagije ugereranyije n’umubare wagennye.';
     if(isTop){const top=bestProducts().slice(0,3).filter(p=>p.rev>0);return top.length?'Dushingiye ku mafaranga yinjiye, ibi ni byo bicuruzwa byitwaye neza:<br>'+top.map((p,i)=>(i+1)+'. <b>'+esc(p.name)+'</b> — '+money(p.rev)+' yinjiye, inyungu igereranyijwe ni '+money(p.profit)).join('<br>'):'Nta makuru ahagije y’igurisha arahari ngo dushyire ibicuruzwa ku rutonde.';}
