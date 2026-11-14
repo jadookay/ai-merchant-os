@@ -491,6 +491,7 @@ declare
   v_amount numeric;
   v_line_count integer;
   v_sale_ids jsonb;
+  v_lines jsonb := '[]'::jsonb;
   v_sale_date date;
   v_lock date;
   v_original record;
@@ -525,6 +526,14 @@ begin
   end if;
   select coalesce(sum(qty*price),0),count(*),coalesce(jsonb_agg(id),'[]'::jsonb)
     into v_amount,v_line_count,v_sale_ids
+  from public.sales
+  where merchant_id=v_merchant_id
+    and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
+    and coalesce(voided,false)=false;
+  select coalesce(jsonb_agg(jsonb_build_object(
+      'product_id',product_id,'product_name',product_name_snapshot,'qty',qty
+    )),'[]'::jsonb)
+    into v_lines
   from public.sales
   where merchant_id=v_merchant_id
     and (id=p_sale_id or (v_transaction_id is not null and transaction_id=v_transaction_id))
@@ -580,7 +589,7 @@ begin
   insert into public.audit_log(id,merchant_id,actor_user_id,action,entity_type,entity_id,reason,details,created_at)
   values(p_audit_id,v_merchant_id,auth.uid(),'void','sale',p_sale_id,trim(p_reason),
     jsonb_build_object('reason',trim(p_reason),'invoice_number',v_invoice_number,'transaction_id',v_transaction_id,
-      'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids,
+      'amount',v_amount,'line_count',v_line_count,'sale_ids',v_sale_ids,'lines',v_lines,
       'actor_name',case when exists(select 1 from public.merchants where id=v_merchant_id and user_id=auth.uid())
         then 'Owner' else coalesce((select full_name from public.merchant_members where merchant_id=v_merchant_id and user_id=auth.uid() and status='active' limit 1),'Staff') end),now())
   on conflict(id) do nothing;
