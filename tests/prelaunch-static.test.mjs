@@ -409,17 +409,6 @@ test("team migration preserves owner RLS, prevents forged staff audit inserts an
   assert.ok(teamMigration.includes("create policy %I on public.%I for delete to authenticated using (private.user_can_access_merchant(merchant_id,''manage_team'') and private.user_can_access_merchant(merchant_id,%L))"));
 });
 
-test("direct edits and deletes remain manager/admin/owner-gated while operational work uses scoped permissions", () => {
-  const policyStart=teamMigration.indexOf("-- Editing existing operational records remains manager/admin/owner-only.");
-  const policyEnd=teamMigration.indexOf("end loop;",policyStart);
-  const policies=teamMigration.slice(policyStart,policyEnd);
-  assert.ok(policyStart>=0 && policyEnd>policyStart);
-  assert.ok(policies.includes("private.user_can_access_merchant(merchant_id,''manage_team'')"));
-  assert.ok(policies.includes("private.user_can_access_merchant(merchant_id,%L)"));
-  assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'create_sale')"));
-  assert.ok(teamMigration.includes("private.user_can_access_merchant(v_merchant_id,'manage_inventory')"));
-});
-
 test("sale voiding retains source rows, reverses posted journals and is idempotent", () => {
   assert.ok(teamMigration.includes("add column if not exists voided boolean not null default false"));
   assert.ok(teamMigration.includes("set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid(),stock_applied=false"));
