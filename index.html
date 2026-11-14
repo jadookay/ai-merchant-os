@@ -1083,7 +1083,26 @@ function sheriSyncErrorInfo(err){
 function sheriSyncDelayMs(attempts){return Math.min(60000,Math.max(5000,5000*Math.pow(2,Math.min(Number(attempts)||0,4))))}
 async function sheriSyncJournalBatch(op){
   const entry=op.entry||{};
-  const lines=Array.isArray(op.lines)?op.lines:[];
+  let lines=Array.isArray(op.lines)?op.lines:[];
+  // Old offline batches can carry locally-generated/stale account UUIDs.
+  // Resolve them by the merchant's account code before the server validates
+  // the journal. Never guess an account when its original code is unknown.
+  const {data:chartData,error:chartError}=await sb.rpc('shericeri_ensure_operational_accounts',{p_merchant_id:entry.merchant_id});
+  if(chartError)throw chartError;
+  const serverAccounts=Array.isArray(chartData?.accounts)?chartData.accounts:[];
+  const previousAccounts=Array.isArray(state.accounts)?state.accounts:[];
+  const serverById=new Map(serverAccounts.map(a=>[a.id,a]));
+  const serverByCode=new Map(serverAccounts.map(a=>[a.code,a]));
+  const previousById=new Map(previousAccounts.map(a=>[a.id,a]));
+  lines=lines.map(line=>{
+    if(serverById.has(line.account_id))return line;
+    const previous=previousById.get(line.account_id);
+    const replacement=previous&&serverByCode.get(previous.code);
+    if(!replacement||!replacement.active)throw new Error('Queued journal account '+String(previous?.code||line.account_id)+' cannot be matched to an active server ledger account. No entry was posted.');
+    return {...line,account_id:replacement.id};
+  });
+  state.accounts=serverAccounts;
+  await sheriSaveAccountingSnapshot();
   const {data,error}=await sb.rpc('shericeri_sync_journal_batch',{
     p_merchant_id:entry.merchant_id,
     p_entry_id:entry.id,
