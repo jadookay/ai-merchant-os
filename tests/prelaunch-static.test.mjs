@@ -575,3 +575,11 @@ test("sale cart stock checks aggregate repeated product lines before one atomic 
   assert.ok(html.includes("expected_server_stock:Number(p.stock||0)+qty"));
   assert.ok(html.includes("local_stock:Number(p.stock||0),qty"));
 });
+
+
+test("offline merchant-ID reconciliation updates every queued sale-cart line", () => {
+  assert.ok(html.includes("if(Array.isArray(op.records))for(const record of op.records)"));
+  assert.ok(html.includes("if(record?.merchant_id===oldId)record.merchant_id=newId"));
+  assert.ok(teamMigration.includes("p_sales is null or p_stock_checks is null"));
+  assert.ok(teamMigration.includes("jsonb_typeof(p_sales) is distinct from 'array'"));
+});
