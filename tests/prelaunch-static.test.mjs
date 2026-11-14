@@ -682,7 +682,7 @@ test("staff offline workspaces retain local membership metadata and refresh perm
 
 test("inventory adjustment retries are idempotent and grants match the seven-argument RPC", () => {
   assert.ok(teamMigration.includes("inventory_movements_source_unique"));
-  assert.ok(teamMigration.includes("im.movement_type=p_movement_type"));
+  assert.ok(/where\\s+im\\.merchant_id=p_merchant_id\\s+and\\s+im\\.product_id=p_product_id\\s+and\\s+im\\.movement_type=p_movement_type\\s+and\\s+im\\.source_id=p_source_id/.test(teamMigration));
   assert.ok(teamMigration.includes("grant execute on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) to authenticated"));
   assert.ok(teamMigration.includes("revoke all on function public.shericeri_adjust_product_stock(uuid,uuid,integer,integer,text,text,uuid) from public,anon"));
   assert.ok(html.includes("data?.ok===true"));
