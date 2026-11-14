@@ -2903,7 +2903,7 @@ function renderTeamAuditTrail(){
  const host=document.getElementById('teamAuditTrail');if(!host)return;
  if(!sheriCan('view_audit_log')){host.innerHTML='';return;}
  const rows=(state.auditLog||[]).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).slice(0,30);
- host.innerHTML='<h3>Recent audit trail</h3>'+ (rows.length?`<table class="table" style="min-width:720px"><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Reason</th></tr>${rows.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)} · ${esc(x.entity_id||'—')}</td><td>${esc(x.reason||x.details?.reason||'—')}</td></tr>`).join('')}</table>`:'<div class="empty">No audited changes have been recorded yet.</div>');
+ host.innerHTML='<h3>Recent audit trail</h3>'+ (rows.length?`<table class="table" style="min-width:920px"><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Reason</th><th>What changed / amount</th></tr>${rows.map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)} · ${esc(x.entity_id||'—')}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audited changes have been recorded yet.</div>');
 }
 async function loadTeamDevices(){
  const host=document.getElementById('teamDevicesTable');if(!host)return;
