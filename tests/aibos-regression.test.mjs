@@ -7,6 +7,8 @@ const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
 const sixDigitIdMigration = readFileSync(new URL("../supabase/migrations/20261114162636_enforce_six_digit_shericeri_business_ids.sql", import.meta.url), "utf8");
+const idSequenceMigration = readFileSync(new URL("../supabase/migrations/20261114190000_enforce_six_digit_business_id_sequence_max.sql", import.meta.url), "utf8");
+const serviceWorker = readFileSync(new URL("../shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
 const voidBlock = html.slice(html.indexOf("async function voidSale(id){"), html.indexOf("const sheriSearchValues"));
 
 test("Kinyarwanda covers core finance and stock terms", () => {
@@ -203,4 +205,46 @@ test("cross-device server rows override stale local rows and foreground tabs ref
 test("trial balance places abnormal account balances on the opposite side", () => {
   assert.ok(html.includes("debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance)"));
   assert.ok(html.includes("credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance)"));
+});
+
+
+test("ledger repair is explicit, permission-gated and skips voided sales", () => {
+  assert.ok(html.includes("async function accEnsureOperationalLedger({approved=false}={})"));
+  assert.ok(html.includes("if(!approved||!state.merchant||!navigator.onLine||!accServerSnapshotAuthoritative"));
+  assert.ok(html.includes("(state.sales||[]).filter(x=>!x.voided)"));
+  assert.ok(html.includes("async function accReconcileOperationalLedger()"));
+  assert.ok(html.includes("if(!confirm(promptText))return"));
+  assert.ok(html.includes('id="accReconcileButton"'));
+});
+
+test("journal recovery adds only missing expected lines and refuses conflicting entries", () => {
+  assert.ok(html.includes("const existingEntry=sourceType&&sourceId?"));
+  assert.ok(html.includes("const unexpected=existingLines.filter(l=>!used.has(l.id))"));
+  assert.ok(html.includes("Existing journal lines conflict with the source transaction."));
+  assert.ok(html.includes("lines:syncLines"));
+});
+
+test("multi-step records batch local writes before starting network sync", () => {
+  assert.ok(html.includes("let sheriSyncBatchDepth=0"));
+  assert.ok(html.includes("if(navigator.onLine&&sheriSyncBatchDepth===0)sherriSyncKick()"));
+  assert.ok(html.includes("sheriSyncBusy||sheriSyncBatchDepth>0"));
+  assert.ok(html.includes("async function sheriWithSyncBatch(task)"));
+  assert.ok(html.includes("function sheriWrapSyncBatch(name)"));
+});
+
+test("six-digit business ID sequence has a hard upper bound", () => {
+  assert.ok(idSequenceMigration.includes("maxvalue 999999"));
+  assert.ok(idSequenceMigration.includes("minvalue 100000"));
+  assert.ok(sixDigitIdMigration.includes("merchants_shericeri_id_six_digits_check"));
+});
+
+test("service worker cache is bumped to release V14.4.28", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v28"));
+  assert.ok(serviceWorker.includes("V14.4.28"));
+  assert.ok(html.includes('content="V14.4.28 Live sync, six-digit IDs, localized pending activity and ledger integrity controls"'));
+});
+
+test("duplicate team identifiers return a conflict instead of an ambiguous 2xx response", () => {
+  assert.ok(teamAccess.includes('code === "23505"'));
+  assert.ok(teamAccess.includes("duplicate_member_identifier"));
 });
