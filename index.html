@@ -588,7 +588,7 @@ window.ensurePdfJs=async function(){
 </section>
 <section id="reports" class="view">
   <div class="top"><div><h1>Reports</h1><div class="sub">Accounting reports are generated from the double-entry ledger.</div></div><button class="btn" onclick="accValidateLedger()">✓ Check ledger integrity</button></div>
-  <div class="card section"><h2>Report period</h2><div class="formgrid"><div><label>View by</label><select id="reportPeriod" onchange="sheriApplyReportRange()"><option value="all">All time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="custom">Selected dates</option></select></div><div><label>From</label><input id="reportStartDate" type="date"></div><div><label>To</label><input id="reportEndDate" type="date"></div><div style="align-self:end"><button class="btn" onclick="sheriApplyReportRange()">Apply dates</button></div></div><div id="reportRangeLabel" class="sub" style="margin-top:8px">All recorded dates</div></div><div class="metrics" id="reportMetrics"></div>
+  <div class="card section"><h2>Report period</h2><div class="formgrid"><div><label>View by</label><select id="reportPeriod" onchange="sheriApplyReportRange()"><option value="all">All time</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="custom">Selected dates</option></select></div><div><label>From</label><input id="reportStartDate" type="date"></div><div><label>To</label><input id="reportEndDate" type="date"></div><div style="align-self:end"><button class="btn" onclick="sheriApplyReportRange()">Apply dates</button></div></div><div id="reportRangeLabel" class="sub" style="margin-top:8px">All recorded dates</div></div><div class="metrics" id="reportMetrics"></div><div class="row" style="justify-content:flex-end;margin-top:8px"><button id="accReconcileButton" class="btn small secondary" style="display:none" onclick="accReconcileOperationalLedger()">Review and repair ledger</button></div>
   <div class="grid2 section"><div class="card"><div class="report-head"><h2>Profit & Loss</h2><div class="export-wrap"><button class="icon-btn" aria-label="Download Profit & Loss" title="Download Profit & Loss" onclick="toggleExportMenu(this)">⇩ Download</button><div class="export-menu"><button onclick="exportStatement('accPL','Profit & Loss','pdf')">PDF</button><button onclick="exportStatement('accPL','Profit & Loss','doc')">MS Word</button><button onclick="exportStatement('accPL','Profit & Loss','xlsx')">Excel</button></div></div></div><div id="accPL"></div></div><div class="card"><div class="report-head"><h2>Balance Sheet</h2><div class="export-wrap"><button class="icon-btn" aria-label="Download Balance Sheet" title="Download Balance Sheet" onclick="toggleExportMenu(this)">⇩ Download</button><div class="export-menu"><button onclick="exportStatement('accBS','Balance Sheet','pdf')">PDF</button><button onclick="exportStatement('accBS','Balance Sheet','doc')">MS Word</button><button onclick="exportStatement('accBS','Balance Sheet','xlsx')">Excel</button></div></div></div><div id="accBS"></div></div></div>
   <div class="grid2 section"><div class="card"><div class="report-head"><h2>Cash Flow</h2><div class="export-wrap"><button class="icon-btn" aria-label="Download Cash Flow" title="Download Cash Flow" onclick="toggleExportMenu(this)">⇩ Download</button><div class="export-menu"><button onclick="exportStatement('accCF','Cash Flow','pdf')">PDF</button><button onclick="exportStatement('accCF','Cash Flow','doc')">MS Word</button><button onclick="exportStatement('accCF','Cash Flow','xlsx')">Excel</button></div></div></div><div id="accCF"></div></div><div class="card"><div class="report-head"><h2>Trial Balance</h2><div class="export-wrap"><button class="icon-btn" aria-label="Download Trial Balance" title="Download Trial Balance" onclick="toggleExportMenu(this)">⇩ Download</button><div class="export-menu"><button onclick="exportStatement('accTB','Trial Balance','pdf')">PDF</button><button onclick="exportStatement('accTB','Trial Balance','doc')">MS Word</button><button onclick="exportStatement('accTB','Trial Balance','xlsx')">Excel</button></div></div></div><div id="accTB"></div></div></div>
   <div class="card section"><h2>General Ledger</h2><div id="accGL"></div></div>
@@ -5113,16 +5113,17 @@ async function accEnsureBase(){
   if(!(state.taxRates||[]).length){const t={id:sheriUuid(),merchant_id:state.merchant.id,name:'No tax',rate:0,type:'output',active:true,created_at:now};state.taxRates=[t];await sheriPut('taxRates',t.id,{merchant_id:state.merchant.id,record:{...t}});await sheriQueue({type:'accounting_upsert',table:'tax_rates',record:t})}
   await sheriSaveAccountingSnapshot();
 }
-async function accEnsureOperationalLedger(){
-  // Rebuilding historical ledger entries requires an authoritative server
-  // snapshot and full finance/report access. Staff without those permissions
-  // must never infer an empty ledger from RLS and create duplicate journals.
-  if(!state.merchant||!navigator.onLine||!accServerSnapshotAuthoritative||
-     !sheriCan('manage_team')||!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return;
+async function accEnsureOperationalLedger({approved=false}={}){
+  // Historical journal repair is opt-in. It requires an authoritative server
+  // snapshot and explicit owner/finance-manager confirmation from the UI.
+  if(!approved||!state.merchant||!navigator.onLine||!accServerSnapshotAuthoritative||
+     !sheriCan('manage_team')||!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return {repairedLines:0,blocked:0};
   await accEnsureBase();
+  let repairedLines=0,blocked=0;
   const safePost=async payload=>{
-    try{return await accPostEntry(payload)}
-    catch(e){console.warn('[Shericeri ledger repair] entry left unchanged for review',payload.sourceType,payload.sourceId,e);return null}
+    const before=state.journalLines.length;
+    try{await accPostEntry(payload);repairedLines+=Math.max(0,state.journalLines.length-before)}
+    catch(e){blocked++;console.warn('[Shericeri ledger repair] entry left unchanged for review',payload.sourceType,payload.sourceId,e)}
   };
   // Voided sales are retained for history but must never be re-posted as revenue/COGS.
   for(const s of (state.sales||[]).filter(x=>!x.voided)){
@@ -5140,6 +5141,27 @@ async function accEnsureOperationalLedger(){
     if(total>0&&inv&&ap)await safePost({date,description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});
   }
   await sheriSaveAccountingSnapshot();
+  return {repairedLines,blocked};
+}
+async function accReconcileOperationalLedger(){
+  if(!sheriCan('manage_team')||!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return sheriToast('Only an authorized finance manager or owner can repair the ledger.','error');
+  if(!accServerSnapshotAuthoritative)return sheriToast('Refresh the server data before repairing the ledger.','warning');
+  const integrity=accLedgerIntegrity();
+  if(!integrity.invalidCount)return sheriToast('The ledger is already balanced.');
+  const preview=integrity.invalid.slice(0,8).map(x=>'• '+(x.entry.description||x.entry.source_type||'Journal entry')+' — '+(x.count||0)+' existing line(s)').join('\n');
+  const promptText='There are '+integrity.invalidCount+' incomplete or unbalanced journal entries. The repair will add only missing lines that match active source records. Entries with conflicting lines or locked dates will be left unchanged.\n\n'+preview+'\n\nContinue with the repair?';
+  if(!confirm(promptText))return;
+  const button=document.getElementById('accReconcileButton');if(button){button.disabled=true;button.textContent=sheriPendingText('Repairing ledger…');}
+  try{
+    const result=await sheriWithSyncBatch(()=>accEnsureOperationalLedger({approved:true}));
+    await sheriSyncOutbox();
+    await loadAll(true);render();
+    const pending=await sheriQueueCount();
+    if(result?.blocked)sheriToast(result.repairedLines+' ledger line(s) queued; '+result.blocked+' conflicting/locked entry(s) need manual review.','warning');
+    else if(pending)sheriToast(result?.repairedLines+' ledger line(s) queued; synchronization is still pending.','warning');
+    else sheriToast(result?.repairedLines+' missing ledger line(s) repaired and synchronized.');
+  }catch(e){sheriToast(e?.message||'Ledger repair could not be completed.','error');}
+  finally{if(button){button.disabled=false;button.textContent=sheriPendingText('Review and repair ledger');}}
 }
 async function accPostEntry({date,description,sourceType,sourceId,lines}){
   if(!state.merchant)throw new Error('Business not loaded');
@@ -5354,6 +5376,8 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
     document.getElementById('accTB').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accGL').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accAudit').innerHTML='<div class="empty">Audit trail will appear after accounting setup.</div>';return;
   }
   const integrity=accLedgerIntegrity(reportEnd);
+  const reconcileButton=document.getElementById('accReconcileButton');
+  if(reconcileButton){reconcileButton.style.display=integrity.invalidCount&&accServerSnapshotAuthoritative&&sheriCan('manage_team')&&sheriCan('manage_finance')&&sheriCan('view_financial_reports')?'inline-flex':'none';reconcileButton.textContent=sheriPendingText('Review and repair ledger');}
   const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' journal entr'+(integrity.invalidCount===1?'y is':'ies are')+' missing lines or out of balance. Review the General Ledger before relying on these totals.</div>':'';
   const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd);
   const income=accStatementTotal('income',b,'credit');
