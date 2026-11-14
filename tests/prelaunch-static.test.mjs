@@ -639,7 +639,8 @@ test("sale void RPC cannot be authorized by finance permission alone", () => {
 test("disabled team members lose cached merchant data and cannot replay offline work after reconnect", () => {
   assert.ok(html.includes("async function sheriClearMerchantLocalData(merchantId)"));
   assert.ok(html.includes("async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id)"));
-  assert.ok(html.includes("if(data?.status==='active'&&await sheriRegisterDeviceSession(merchantId)){state.currentMembership=data;return true;}"));
+  assert.ok(html.includes("if(data?.status==='active'){"));
+  assert.ok(html.includes("catch(e){console.warn('[Shericeri device] staff session rejected',e)}"));
   assert.ok(html.includes("await sheriClearMerchantLocalData(merchantId)"));
   assert.ok(html.includes("sb.auth.signOut({scope:'local'})"));
   assert.ok(html.includes("if(navigator.onLine&&!(await sheriVerifyActiveStaffMembership(mId)))return"));

@@ -103,7 +103,7 @@ test("authorized multi-device refresh subscribes only to merchant-filtered inser
 });
 
 test("pending sync panel is scrollable and shows business amounts and descriptions", () => {
-  assert.ok(html.includes("panel.style.maxHeight='360px'"));
+  assert.ok(html.includes("panel.style.maxHeight='440px'"));
   assert.ok(html.includes("panel.style.overflowY='auto'"));
   assert.ok(html.includes("function sheriPendingActivityDetails(op)"));
   for(const value of ["Total ","Cost value ","fmt(r.amount)","Waiting to sync"])
@@ -155,4 +155,14 @@ test("live-update migration enables merchant tables in Realtime and tracks owner
   assert.ok(liveSyncMigration.includes("merchant_device_sessions"));
   assert.ok(liveSyncMigration.includes("return jsonb_build_object('ok',true,'owner',v_is_owner"));
   assert.ok(liveSyncMigration.includes("where public.merchant_device_sessions.revoked_at is null"));
+});
+
+
+test("record confirmation immediately queues sync and schedules the next pending pass without an artificial delay", () => {
+  const queueStart=html.indexOf("async function sheriQueue(op)");
+  const queueEnd=html.indexOf("async function sheriQueueMemory",queueStart);
+  const queue=html.slice(queueStart,queueEnd);
+  assert.ok(queue.includes("await sheriPut('outbox',key"));
+  assert.ok(queue.includes("if(navigator.onLine)sherriSyncKick()"));
+  assert.ok(html.includes("const delay=Math.max(0,Math.min(2147483000,dueAt-Date.now()))"));
 });
