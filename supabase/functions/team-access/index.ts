@@ -35,7 +35,12 @@ async function hasActiveDeviceSession(admin: ReturnType<typeof createClient>, me
     .select("id").eq("merchant_id", merchantId).eq("user_id", userId)
     .eq("session_id", sessionId).is("revoked_at", null).maybeSingle();
   if (error) throw error;
-  return !!data;
+  if (!data) return false;
+  const { data: authSessionActive, error: authSessionError } = await admin.rpc("shericeri_is_auth_session_active", {
+    p_user_id: userId, p_session_id: sessionId,
+  });
+  if (authSessionError) throw authSessionError;
+  return authSessionActive === true;
 }
 
 Deno.serve(async (req: Request) => {
