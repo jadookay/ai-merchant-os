@@ -708,7 +708,7 @@ function sheriPendingActivityDetails(op){
 }
 async function sheriTogglePendingSync(){
   const panel=document.getElementById('sheriPendingSyncPanel');if(!panel)return;
-  panel.style.maxHeight='360px';panel.style.overflowY='auto';panel.style.overscrollBehavior='contain';
+  panel.style.maxHeight='440px';panel.style.overflowY='auto';panel.style.overscrollBehavior='contain';
   const opening=panel.style.display!=='block';panel.style.display=opening?'block':'none';if(!opening)return;
   panel.innerHTML='<b>Loading pending activities…</b>';
   try{
@@ -817,7 +817,10 @@ async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id){
   }
   const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,role,permissions,responsibility,status').eq('merchant_id',merchantId).eq('user_id',session.user.id).maybeSingle();
   if(error)throw error;
-  if(data?.status==='active'&&await sheriRegisterDeviceSession(merchantId)){state.currentMembership=data;return true;}
+  if(data?.status==='active'){
+    try{await sheriRegisterDeviceSession(merchantId);state.currentMembership=data;return true;}
+    catch(e){console.warn('[Shericeri device] staff session rejected',e)}
+  }
   await sheriClearMerchantLocalData(merchantId);
   try{await sb.auth.signOut({scope:'local'})}catch(_){}
   return false;
