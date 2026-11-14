@@ -556,6 +556,22 @@ test("suspending a staff member revokes refresh sessions and the client revalida
   assert.match(html, /if\(navigator\.onLine&&\!\(await sheriValidateCurrentMembership\(\)\)\)return/);
 });
 
+test("expense deletion is a soft void with a server-side balanced journal reversal", () => {
+  assert.match(releaseMigration, /add column if not exists voided boolean not null default false/);
+  assert.match(releaseMigration, /create or replace function public\.shericeri_void_expense/);
+  assert.match(releaseMigration, /Only a Manager, Admin or Owner with expense access can void expenses/);
+  assert.match(releaseMigration, /source_type='expense_void'/);
+  assert.match(releaseMigration, /set voided=true,void_reason=trim\(p_reason\)/);
+  assert.match(releaseMigration, /Legacy expense deletion journal entries are blocked/);
+  assert.match(html, /async function sheriSyncVoidExpense\(op\)/);
+  assert.match(html, /type:'expense_void'/);
+  assert.match(html, /expenseDependency=queued\.find/);
+  assert.match(html, /function activeExpenses\(\)/);
+  assert.match(html, /activeExpenses\(\)\.reduce/);
+  assert.match(html, /expense_void:'Expense voided'/);
+  assert.doesNotMatch(html, /sb\.from\('expenses'\)\.delete\(\)/);
+});
+
 test("period locks are enforced by server-side triggers and operational RPCs", () => {
   assert.match(releaseMigration, /create or replace function public\.prevent_locked_operational_write/);
   for (const table of ["products","sales","purchases","expenses"]) {
