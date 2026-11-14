@@ -548,6 +548,30 @@ test("suspending a staff member revokes refresh sessions and the client revalida
   assert.match(html, /if\(navigator\.onLine&&\!\(await sheriValidateCurrentMembership\(\)\)\)return/);
 });
 
+test("operational journal posting follows each source permission and validates its source amounts", () => {
+  const start=releaseMigration.indexOf("create or replace function public.shericeri_sync_journal_batch");
+  const end=releaseMigration.indexOf("revoke all on function public.shericeri_sync_journal_batch",start);
+  assert.ok(start>=0&&end>start);
+  const fn=releaseMigration.slice(start,end);
+  assert.match(fn, /when 'sale' then 'create_sale'/);
+  assert.match(fn, /when 'sale_cogs' then 'create_sale'/);
+  assert.match(fn, /when 'purchase' then 'manage_inventory'/);
+  assert.match(fn, /when 'expense' then 'manage_expenses'/);
+  assert.match(fn, /else 'manage_finance'/);
+  assert.match(fn, /private\.user_can_access_merchant\(p_merchant_id,v_permission\)/);
+  assert.match(fn, /Operational journal lines do not match the source transaction/);
+  assert.match(fn, /This source already has a journal entry/);
+  assert.match(releaseMigration, /journal_entries_merchant_source_unique_idx/);
+  assert.match(releaseMigration, /view_financial_reports/);
+  assert.match(releaseMigration, /case when private\.user_can_access_merchant\(p_merchant_id,'view_audit_log'\)/);
+});
+
+test("recurring journal source IDs are deterministic UUIDs accepted by Postgres", () => {
+  assert.match(html, /async function sheriStableUuid\(value\)/);
+  assert.match(html, /const sourceId=await sheriStableUuid\(r\.id\+'\|'\+r\.next_run\)/);
+  assert.doesNotMatch(html, /sourceId:r\.id\+'-'\+r\.next_run/);
+});
+
 test("privileged accounting RPCs are not executable by anon or PUBLIC", () => {
   assert.match(releaseMigration, /revoke all on function public\.shericeri_get_accounting_snapshot\(uuid\) from public,anon/);
   assert.match(releaseMigration, /revoke all on function public\.shericeri_sync_journal_batch\(uuid,uuid,date,text,text,uuid,jsonb\) from public,anon/);
