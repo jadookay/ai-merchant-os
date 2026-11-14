@@ -57,6 +57,7 @@ create index if not exists merchant_device_sessions_user_idx
   on public.merchant_device_sessions(merchant_id,user_id,last_seen_at desc);
 alter table public.merchant_device_sessions enable row level security;
 revoke all on public.merchant_device_sessions from public,anon,authenticated;
+grant all on public.merchant_device_sessions to service_role;
 
 create or replace function private.user_can_access_merchant(p_merchant_id uuid,p_permission text default 'view_dashboard')
 returns boolean language sql stable security definer set search_path=''
@@ -70,6 +71,7 @@ as $$
       where ds.merchant_id=mm.merchant_id and ds.user_id=mm.user_id
         and ds.session_id=nullif(auth.jwt()->>'session_id','')::uuid
         and ds.revoked_at is null
+        and exists(select 1 from auth.sessions a where a.id=ds.session_id and a.user_id=ds.user_id)
     )
     and (
       (mm.role='admin' and p_permission<>'manage_owner')
