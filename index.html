@@ -368,6 +368,17 @@ window.ensurePdfJs=async function(){
     <h2>Stock movement report</h2>
     <p class="sub">Opening and closing quantities, receipts, sales, returns, void reversals, adjustments and write-offs.</p>
     <div class="formgrid"><div><label>From date</label><input type="date" id="inventoryMovementStart"></div><div><label>To date</label><input type="date" id="inventoryMovementEnd"></div><div style="align-self:end"><button class="btn" onclick="loadInventoryMovementReport()">Load movement report</button></div></div>
+    <div id="inventoryMovementEntry" class="card" style="margin-top:12px;display:none">
+      <h3>Record return, write-off or adjustment</h3>
+      <div class="formgrid">
+        <div><label>Product</label><select id="inventoryMovementProduct"></select></div>
+        <div><label>Movement type</label><select id="inventoryMovementType"><option value="customer_return">Customer return (stock in)</option><option value="supplier_return">Supplier return (stock out)</option><option value="writeoff">Write-off / damaged stock</option><option value="adjustment">Manual adjustment</option></select></div>
+        <div><label>Adjustment direction</label><select id="inventoryMovementDirection"><option value="decrease">Decrease stock</option><option value="increase">Increase stock</option></select></div>
+        <div><label>Quantity</label><input type="number" min="1" step="1" id="inventoryMovementQty"></div>
+        <div style="grid-column:1/-1"><label>Reason (required)</label><input id="inventoryMovementReason" placeholder="Explain the return, damage or stock count difference"></div>
+      </div>
+      <div class="actions" style="margin-top:10px"><button class="btn" onclick="recordInventoryMovement()">Record movement</button></div>
+    </div>
     <div id="inventoryMovementStatus" class="sub" style="margin-top:8px"></div>
     <div id="inventoryMovementSummary" style="overflow-x:auto;margin-top:12px"></div>
     <div id="inventoryMovementDetails" style="overflow-x:auto;margin-top:16px"></div>
@@ -1084,11 +1095,10 @@ async function sheriSyncInventoryAdjustmentOperation(op){
     p_source_id:op.source_id
   });
   if(error)throw error;
-  if(data?.stock_conflict)await sheriRecordConflict({
-    type:'inventory_adjustment_conflict',product_id:op.product_id,
-    expected_stock:op.expected_stock,server_stock:data.server_stock,operation:op
-  });
-  else if(data?.ok!==true)throw new Error('Inventory adjustment was not recorded.');
+  if(data?.stock_conflict){
+    const p=product(op.product_id);if(p&&Number.isFinite(Number(data.server_stock))){p.stock=Number(data.server_stock);await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});render();}
+    await sheriRecordConflict({type:'inventory_adjustment_conflict',product_id:op.product_id,expected_stock:op.expected_stock,server_stock:data.server_stock,operation:op});
+  }else if(data?.ok!==true)throw new Error('Inventory adjustment was not recorded.');
 }
 async function sheriSyncVoidSale(op){
   const {error}=await sb.rpc('shericeri_void_sale',{
@@ -2258,6 +2268,33 @@ function expiryPill(p){
   if(days<=30)return `<br><span class="pill" style="background:#fffbeb;color:#b45309">Expires in ${days}d</span>`;
   return `<br><span class="sub">Exp: ${p.expiry_date}</span>`;
 }
+function renderInventoryMovementEntry(){
+  const panel=document.getElementById('inventoryMovementEntry');if(!panel)return;
+  const allowed=sheriCan('manage_team')&&sheriCan('manage_inventory');
+  panel.style.display=allowed?'block':'none';
+  if(!allowed)return;
+  const select=document.getElementById('inventoryMovementProduct');
+  if(select)select.innerHTML=activeProducts().map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name)+'</option>').join('');
+}
+async function recordInventoryMovement(){
+  if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('Only an authorized Manager, Admin or Owner can record stock adjustments.','error');
+  const p=product(document.getElementById('inventoryMovementProduct').value);
+  const type=document.getElementById('inventoryMovementType').value;
+  const direction=document.getElementById('inventoryMovementDirection').value;
+  const qty=Number(document.getElementById('inventoryMovementQty').value);
+  const reason=document.getElementById('inventoryMovementReason').value.trim();
+  if(!p||!Number.isInteger(qty)||qty<1||reason.length<3)return sheriToast('Choose a product, enter a quantity and provide a clear reason.','error');
+  const delta=type==='customer_return'?qty:(type==='supplier_return'||type==='writeoff'?-qty:(direction==='increase'?qty:-qty));
+  if(Number(p.stock||0)+delta<0)return sheriToast('The movement would make stock negative.','error');
+  const expected=Number(p.stock||0);
+  p.stock=expected+delta;
+  await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
+  await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:expected,quantity_delta:delta,reason,movement_type:type,source_id:sheriUuid()});
+  document.getElementById('inventoryMovementQty').value='';
+  document.getElementById('inventoryMovementReason').value='';
+  render();if(navigator.onLine)await sheriSyncOutbox();
+  await loadInventoryMovementReport();
+}
 async function loadInventoryMovementReport(){
   const status=document.getElementById('inventoryMovementStatus');
   if(!sheriCan('view_inventory')){if(status)status.textContent='You do not have permission to view inventory movements.';return;}
@@ -2290,7 +2327,7 @@ function renderInventoryMovementReport(report){
     moves.map(m=>'<tr><td>'+esc(m.created_at?new Date(m.created_at).toLocaleString():'—')+'</td><td>'+esc(m.product_name||'')+'</td><td>'+esc(m.movement_type||'')+'</td><td>'+Number(m.quantity_delta||0)+'</td><td>'+Number(m.quantity_before||0)+'</td><td>'+Number(m.quantity_after||0)+'</td><td>'+esc(m.source_type||'')+'</td><td>'+esc(m.reason||'')+'</td><td>'+esc(m.actor_user_id||'System')+'</td>'+(costs?'<td>'+money(m.unit_cost||0)+'</td>':'')+'</tr>').join('')+'</table>':'<div class="empty">No individual movements were recorded in this period.</div>');
 }
 function renderInventory(){
-  const list=activeProducts();const search=document.getElementById('inventorySearchHost');if(search)search.innerHTML=sheriSearchControl('inventory','inventoryTable','Search products by name, category or barcode',list.flatMap(p=>[p.name,p.cat,p.barcode]));
+  const list=activeProducts();renderInventoryMovementEntry();const search=document.getElementById('inventorySearchHost');if(search)search.innerHTML=sheriSearchControl('inventory','inventoryTable','Search products by name, category or barcode',list.flatMap(p=>[p.name,p.cat,p.barcode]));
   document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions">${sheriCan('manage_team')&&sheriCan('manage_inventory')?'<button class="btn small secondary" onclick="toggleProductFavorite(\''+p.id+'\')">'+(p.favorite?'★ Favorite':'☆ Favorite')+'</button><button class="btn small secondary" onclick="editProduct(\''+p.id+'\')">Edit</button><button class="btn small danger" onclick="deleteProduct(\''+p.id+'\')">Delete</button>':''}</div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
   renderCategory();
 }
