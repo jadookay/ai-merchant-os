@@ -1085,6 +1085,12 @@ async function sheriSyncVoidSale(op){
   });
   if(error)throw error;
 }
+async function sheriSyncVoidExpense(op){
+  const {error}=await sb.rpc('shericeri_void_expense',{
+    p_merchant_id:op.merchant_id,p_expense_id:op.id,p_reason:op.reason,p_audit_id:op.audit_id
+  });
+  if(error)throw error;
+}
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
   if(sheriCan('manage_team')){
@@ -1188,6 +1194,8 @@ async function sheriSyncOutbox(){
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
         else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op,item)}
         else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
+        else if(op.type==='expense_void'){await sheriSyncVoidExpense(op)}
+        else if(op.type==='expense_delete'){const legacy=new Error('Legacy expense deletion requires manual reconciliation; no automatic delete was performed.');legacy.status=422;throw legacy}
         else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='expense_delete'){const {error}=await sb.from('expenses').delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='sale_delete'){const {error}=await sb.from('sales').delete().eq('id',op.id);if(error)throw error}
@@ -1227,6 +1235,8 @@ async function sheriSyncOutbox(){
               else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
               else if(op.type==='sale_cart_upsert'){await sheriSyncSaleCartOperation(op)}
               else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
+              else if(op.type==='expense_void'){await sheriSyncVoidExpense(op)}
+              else if(op.type==='expense_delete'){const legacy=new Error('Legacy expense deletion requires manual reconciliation; no automatic delete was performed.');legacy.status=422;throw legacy}
               else if(op.type==='purchase_upsert'){await sheriSyncPurchaseOperation(op)}
               else if(op.type==='purchase_delete'){const {error}=await sb.rpc('shericeri_delete_ordered_purchase',{p_merchant_id:op.merchant_id,p_purchase_id:op.id,p_reason:op.reason,p_audit_id:op.audit_id});if(error)throw error}
               else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
@@ -2584,14 +2594,21 @@ async function addExpense(){
   if(navigator.onLine)await sheriSyncOutbox();clearExpenseForm();render();sheriToast('Expense recorded.'+warning,warning?'warning':'success');
 }
 async function deleteExpense(id){
-  if(!sheriCan('manage_team')||!sheriCan('manage_expenses'))return sheriToast('Only a Manager, Admin or Owner with expense access can delete expenses.','error');
-  const expense=state.expenses.find(x=>x.id===id);if(!expense)return;const reason=prompt('Reason for deleting this expense (required):');if(!reason||!reason.trim())return sheriToast('A reason is required to delete an expense.','error');
-  if(!confirm('Delete this expense?\\nReason: '+reason.trim()))return;
-  state.expenses=state.expenses.filter(x=>x.id!==id);await sheriDelete('expenses',id);await sheriSaveSnapshot();
-  await sheriQueue({type:'expense_delete',id});
-  await accAudit('delete','expense',id,{reason:reason.trim(),description:expense.description,amount:expense.amount});
+  if(!sheriCan('manage_team')||!sheriCan('manage_expenses'))return sheriToast('Only a Manager, Admin or Owner with expense access can void expenses.','error');
+  const expense=state.expenses.find(x=>x.id===id);if(!expense||expense.voided)return;
+  const reason=prompt('Reason for voiding this expense (required):');
+  if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required to void an expense.','error');
+  const entryDate=String(expense.created_at||'').slice(0,10)||accToday();
+  if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return sheriToast('This expense cannot be voided while its accounting period is locked.','error');
+  if(!confirm('Void this expense and reverse its accounting entry?\\nReason: '+reason.trim()))return;
+  const now=sheriNow(),auditId=sheriUuid();
+  Object.assign(expense,{voided:true,void_reason:reason.trim(),voided_at:now,voided_by:session?.user?.id||null,updated_at:now});
+  await sheriPut('expenses',expense.id,{merchant_id:state.merchant.id,record:{...expense}});
+  const auditRow={id:auditId,merchant_id:state.merchant.id,actor_user_id:session?.user?.id||null,action:'void',entity_type:'expense',entity_id:expense.id,reason:reason.trim(),details:{reason:reason.trim(),description:expense.description,amount:expense.amount,actor_name:state.currentMembership?.full_name||session?.user?.email||'Owner'},created_at:now};
+  state.auditLog.unshift(auditRow);await sheriPut('auditLog',auditId,{merchant_id:state.merchant.id,record:{...auditRow}});
+  await sheriQueue({type:'expense_void',id:expense.id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:auditId});
   if(navigator.onLine)await sheriSyncOutbox();
-  render();
+  render();sheriToast('Expense voided; accounting reversal is queued or posted.');
 }
 function renderExpenses(){
   const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount or date',state.expenses.flatMap(e=>[e.description,e.cat]));
