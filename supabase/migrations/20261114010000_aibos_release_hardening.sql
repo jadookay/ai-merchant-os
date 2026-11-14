@@ -424,6 +424,9 @@ begin
     raise exception 'Journal batch requires at least two lines';
   end if;
 
+  if p_source_type='expense_delete' then
+    raise exception 'Legacy expense deletion journal entries are blocked; use the audited expense-void operation';
+  end if;
   v_permission := case p_source_type
     when 'sale' then 'create_sale'
     when 'sale_cogs' then 'create_sale'
@@ -459,7 +462,7 @@ begin
       when 'expense' then
         select e.amount::numeric,e.created_at::date into v_expected,v_expected_date
         from public.expenses e
-        where e.id=p_source_id and e.merchant_id=p_merchant_id;
+        where e.id=p_source_id and e.merchant_id=p_merchant_id and coalesce(e.voided,false)=false;
         v_debit_code := '6000'; v_credit_code := '1000';
       when 'product_opening_stock' then
         select coalesce(p.opening_stock_value,p.opening_stock_qty::numeric*p.opening_stock_cost::numeric),p.created_at::date into v_expected,v_expected_date
@@ -661,3 +664,96 @@ for each row execute function public.prevent_locked_operational_write();
 drop trigger if exists aibos_period_lock_expenses on public.expenses;
 create trigger aibos_period_lock_expenses before insert or update on public.expenses
 for each row execute function public.prevent_locked_operational_write();
+
+-- Expense voiding is a soft, audited reversal rather than a destructive row delete.
+alter table public.expenses add column if not exists voided boolean not null default false;
+alter table public.expenses add column if not exists void_reason text;
+alter table public.expenses add column if not exists voided_at timestamptz;
+alter table public.expenses add column if not exists voided_by uuid;
+alter table public.expenses add column if not exists updated_at timestamptz;
+
+create or replace function public.shericeri_void_expense(
+  p_merchant_id uuid,
+  p_expense_id uuid,
+  p_reason text,
+  p_audit_id uuid default gen_random_uuid()
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_expense record;
+  v_lock date;
+  v_original record;
+  v_reversal_id uuid;
+  v_amount numeric;
+begin
+  if p_merchant_id is null or p_expense_id is null or coalesce(length(trim(p_reason)),0)<3 then
+    raise exception 'A clear expense void reason is required';
+  end if;
+  if not private.user_can_access_merchant(p_merchant_id,'manage_expenses')
+     or not private.user_can_access_merchant(p_merchant_id,'manage_team') then
+    raise exception 'Only a Manager, Admin or Owner with expense access can void expenses';
+  end if;
+
+  select * into v_expense
+  from public.expenses e
+  where e.id=p_expense_id and e.merchant_id=p_merchant_id
+  for update;
+  if not found then return jsonb_build_object('ok',true,'already_voided',true); end if;
+  if coalesce(v_expense.voided,false) then
+    return jsonb_build_object('ok',true,'already_voided',true);
+  end if;
+
+  select a.locked_through into v_lock
+  from public.accounting_settings a where a.merchant_id=p_merchant_id;
+  if v_lock is not null and (v_expense.created_at::date<=v_lock or current_date<=v_lock) then
+    raise exception 'The expense or current accounting period is locked';
+  end if;
+  perform pg_catalog.set_config('app.aibos_period_lock_bypass','true',true);
+
+  v_amount:=coalesce(v_expense.amount,0);
+  for v_original in
+    select je.id,je.description
+    from public.journal_entries je
+    where je.merchant_id=p_merchant_id and je.source_type='expense'
+      and je.source_id=p_expense_id and coalesce(je.voided,false)=false
+    for update
+  loop
+    if not exists(
+      select 1 from public.journal_entries je
+      where je.merchant_id=p_merchant_id and je.source_type='expense_void'
+        and je.source_id=v_original.id
+    ) then
+      v_reversal_id:=gen_random_uuid();
+      insert into public.journal_entries(id,merchant_id,entry_date,description,source_type,source_id)
+      values(v_reversal_id,p_merchant_id,current_date,'Reversal: '||v_original.description,'expense_void',v_original.id);
+      insert into public.journal_lines(id,merchant_id,journal_entry_id,account_id,debit,credit,memo)
+      select gen_random_uuid(),jl.merchant_id,v_reversal_id,jl.account_id,jl.credit,jl.debit,
+        coalesce(jl.memo,'')||' (expense void reversal)'
+      from public.journal_lines jl
+      where jl.merchant_id=p_merchant_id and jl.journal_entry_id=v_original.id;
+    end if;
+    update public.journal_entries
+      set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid()
+      where id=v_original.id and merchant_id=p_merchant_id;
+  end loop;
+
+  update public.expenses
+    set voided=true,void_reason=trim(p_reason),voided_at=now(),voided_by=auth.uid(),updated_at=now()
+    where id=p_expense_id and merchant_id=p_merchant_id;
+
+  insert into public.audit_log(id,merchant_id,actor_user_id,action,entity_type,entity_id,reason,details,created_at)
+  values(p_audit_id,p_merchant_id,auth.uid(),'void','expense',p_expense_id,trim(p_reason),
+    jsonb_build_object('reason',trim(p_reason),'description',v_expense.description,
+      'amount',v_amount,'actor_name',coalesce((select mm.full_name from public.merchant_members mm
+        where mm.merchant_id=p_merchant_id and mm.user_id=auth.uid() and mm.status='active' limit 1),'Owner')),now())
+  on conflict(id) do nothing;
+
+  return jsonb_build_object('ok',true,'expense_id',p_expense_id,'amount',v_amount,'voided',true);
+end;
+$$;
+revoke all on function public.shericeri_void_expense(uuid,uuid,text,uuid) from public,anon;
+grant execute on function public.shericeri_void_expense(uuid,uuid,text,uuid) to authenticated;
