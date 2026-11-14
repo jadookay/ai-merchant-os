@@ -149,6 +149,8 @@ declare
   v_conflicts jsonb := '[]'::jsonb;
   v_existing_count integer;
   v_sale_count integer;
+  v_sale_date date;
+  v_locked_through date;
 begin
   if p_merchant_id is null or p_transaction_id is null then
     raise exception 'Sale cart identity is invalid';
@@ -159,6 +161,14 @@ begin
   end if;
   if jsonb_array_length(p_sales)<1 or jsonb_array_length(p_stock_changes)<1 then
     raise exception 'Sale cart must contain at least one sale line and one stock change';
+  end if;
+  v_sale_date:=coalesce(nullif(p_sales->0->>'created_at','')::timestamptz::date,current_date);
+  if exists(select 1 from jsonb_array_elements(p_sales) x where coalesce(nullif(x.value->>'created_at','')::timestamptz::date,current_date)<>v_sale_date) then
+    raise exception 'All lines in a sale cart must have the same transaction date';
+  end if;
+  select a.locked_through into v_locked_through from public.accounting_settings a where a.merchant_id=p_merchant_id;
+  if v_locked_through is not null and v_sale_date<=v_locked_through then
+    raise exception 'Accounting period is locked through %',v_locked_through;
   end if;
   if not private.user_can_access_merchant(p_merchant_id,'create_sale') then
     raise exception 'Not authorized to record sales';
@@ -261,6 +271,7 @@ begin
   end if;
 
   -- No writes occur until all product locks and preconditions have passed.
+  perform pg_catalog.set_config('app.aibos_period_lock_bypass','true',true);
   for v_change in select value from jsonb_array_elements(p_stock_changes) loop
     update public.products
     set stock=(v_change->>'local_stock')::integer
@@ -591,3 +602,62 @@ end;
 $$;
 revoke all on function public.shericeri_get_accounting_snapshot(uuid) from public,anon;
 grant execute on function public.shericeri_get_accounting_snapshot(uuid) to authenticated;
+
+
+-- Server-side period-lock guards for direct operational writes. Trusted RPCs
+-- first validate the period and set a transaction-local bypass flag.
+create or replace function public.prevent_locked_operational_write()
+returns trigger
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_record_date date;
+  v_locked_through date;
+begin
+  if coalesce(pg_catalog.current_setting('app.aibos_period_lock_bypass',true),'')='true'
+     or coalesce(auth.jwt()->>'role','')='service_role' then
+    return new;
+  end if;
+
+  if tg_table_name='products' then
+    if tg_op='UPDATE' then
+      if new.stock is not distinct from old.stock then return new; end if;
+    elsif tg_op='INSERT' then
+      if coalesce(new.stock,0)<=0 then return new; end if;
+    end if;
+    v_record_date:=coalesce(new.updated_at,new.created_at,current_timestamp)::date;
+  elsif tg_table_name='sales' then
+    v_record_date:=coalesce(new.created_at,current_timestamp)::date;
+  elsif tg_table_name='purchases' then
+    if new.status='ordered' then return new; end if;
+    v_record_date:=coalesce(new.purchased_at,new.created_at,current_timestamp)::date;
+  elsif tg_table_name='expenses' then
+    v_record_date:=coalesce(new.created_at,current_timestamp)::date;
+  else
+    return new;
+  end if;
+
+  select a.locked_through into v_locked_through
+  from public.accounting_settings a where a.merchant_id=new.merchant_id;
+  if v_locked_through is not null and v_record_date<=v_locked_through then
+    raise exception 'Accounting period is locked through %',v_locked_through;
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.prevent_locked_operational_write() from public,anon,authenticated;
+
+drop trigger if exists aibos_period_lock_products on public.products;
+create trigger aibos_period_lock_products before insert or update on public.products
+for each row execute function public.prevent_locked_operational_write();
+drop trigger if exists aibos_period_lock_sales on public.sales;
+create trigger aibos_period_lock_sales before insert or update on public.sales
+for each row execute function public.prevent_locked_operational_write();
+drop trigger if exists aibos_period_lock_purchases on public.purchases;
+create trigger aibos_period_lock_purchases before insert or update on public.purchases
+for each row execute function public.prevent_locked_operational_write();
+drop trigger if exists aibos_period_lock_expenses on public.expenses;
+create trigger aibos_period_lock_expenses before insert or update on public.expenses
+for each row execute function public.prevent_locked_operational_write();

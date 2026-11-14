@@ -436,6 +436,8 @@ declare
   v_customer_id uuid;
   v_current_stock integer;
   v_stock_applied boolean;
+  v_sale_date date;
+  v_locked_through date;
 begin
   v_merchant_id:=nullif(p_sale->>'merchant_id','')::uuid;
   v_sale_id:=nullif(p_sale->>'id','')::uuid;
@@ -450,6 +452,12 @@ begin
   if p_product_id is null or p_local_stock is null or p_expected_server_stock is null or p_local_stock<0 or p_local_stock<>p_expected_server_stock-v_qty then
     raise exception 'Sale stock values are invalid';
   end if;
+  v_sale_date:=coalesce(nullif(p_sale->>'created_at','')::timestamptz::date,current_date);
+  select a.locked_through into v_locked_through from public.accounting_settings a where a.merchant_id=v_merchant_id;
+  if v_locked_through is not null and v_sale_date<=v_locked_through then
+    raise exception 'Accounting period is locked through %',v_locked_through;
+  end if;
+  perform pg_catalog.set_config('app.aibos_period_lock_bypass','true',true);
   select coalesce(stock,0) into v_current_stock from public.products where id=p_product_id and merchant_id=v_merchant_id for update;
   if not found then raise exception 'Product was not found for this business'; end if;
   select stock_applied into v_stock_applied from public.sales where id=v_sale_id and merchant_id=v_merchant_id;
@@ -524,6 +532,7 @@ begin
   if v_lock is not null and (v_sale_date<=v_lock or current_date<=v_lock) then
     raise exception 'The sale or current accounting period is locked';
   end if;
+  perform pg_catalog.set_config('app.aibos_period_lock_bypass','true',true);
   select coalesce(sum(qty*price),0),count(*),coalesce(jsonb_agg(id),'[]'::jsonb)
     into v_amount,v_line_count,v_sale_ids
   from public.sales
@@ -675,6 +684,8 @@ declare
   v_expected_cost integer;
   v_status text;
   v_supplier_id uuid;
+  v_purchase_date date;
+  v_locked_through date;
 begin
   v_merchant_id:=nullif(p_purchase->>'merchant_id','')::uuid;
   v_purchase_id:=nullif(p_purchase->>'id','')::uuid;
@@ -691,6 +702,14 @@ begin
     raise exception 'Supplier does not belong to this business';
   end if;
   if v_status not in ('ordered','received') then raise exception 'Purchase status is invalid'; end if;
+  if v_status='received' then
+    v_purchase_date:=coalesce(nullif(p_purchase->>'purchased_at','')::timestamptz::date,nullif(p_purchase->>'created_at','')::timestamptz::date,current_date);
+    select a.locked_through into v_locked_through from public.accounting_settings a where a.merchant_id=v_merchant_id;
+    if v_locked_through is not null and v_purchase_date<=v_locked_through then
+      raise exception 'Accounting period is locked through %',v_locked_through;
+    end if;
+    perform pg_catalog.set_config('app.aibos_period_lock_bypass','true',true);
+  end if;
   select coalesce(stock,0),coalesce(cost,0) into v_current_stock,v_current_cost from public.products
   where id=p_product_id and merchant_id=v_merchant_id for update;
   if not found then raise exception 'Product was not found for this business'; end if;
