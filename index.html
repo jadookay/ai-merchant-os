@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.29 Shericeri multilingual intelligence and Kinyarwanda voice failover">
+<meta name="app-version" content="V14.4.30 continuous voice sessions, natural Kinyarwanda and latency diagnostics">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -1566,11 +1566,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.23';
+const SHERI_RELEASE='V14.4.30';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.23';
+const SHERI_CACHE_VERSION='14.4.30';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -3936,6 +3936,8 @@ async function startShericeriLoop(){
   sheriDiagSet('Microphone request','starting');
   setSheriStatus('Requesting microphone access…');
   const sheriStartIsAndroid=/Android/i.test(navigator.userAgent||'');
+  const micStartupStartedAt=performance.now();
+  sheriDiagSet('Microphone startup clock','started ('+currentShericeriLang()+')');
   // Android voice enumeration can take up to ~1.2s; do not block microphone startup on it.
   if(sheriStartIsAndroid){
     try{ speechSynthesis?.resume(); }catch(_){}
@@ -3960,6 +3962,9 @@ async function startShericeriLoop(){
     }
     try{
       shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
+      sheriMicReadyAt=performance.now();
+      sheriDiagSet('Microphone access latency',Math.round(sheriMicReadyAt-micStartupStartedAt)+' ms ('+currentShericeriLang()+')');
+      sheriDiagSet('Microphone ready','YES — live stream acquired');
     }catch(primaryMicError){
       sheriDiagSet('Microphone selected-input attempt','FAILED — '+(primaryMicError?.name||primaryMicError?.message||primaryMicError));
       if(!isAndroid && sheriSelectedAudioInputId){
@@ -3971,6 +3976,9 @@ async function startShericeriLoop(){
         if(!best)throw primaryMicError;
         sheriSelectedAudioInputId=best.deviceId;
         shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
+        sheriMicReadyAt=performance.now();
+        sheriDiagSet('Microphone access latency',Math.round(sheriMicReadyAt-micStartupStartedAt)+' ms (fallback device; '+currentShericeriLang()+')');
+        sheriDiagSet('Microphone ready','YES — fallback input acquired');
       }else{
         throw primaryMicError;
       }
@@ -4097,6 +4105,13 @@ function shericeriListenOnce(){
       return;
     }
     sheriActiveRecordingId='';
+    if(stopReason==='no speech — keep session open'){
+      sheriDiagSet('Idle listen cycle','NO SPEECH — microphone session remains active');
+      sheriDiagSet('Session state','ACTIVE / waiting for user speech');
+      setSheriStatus('I’m still here and listening…');
+      if(shericeriActive)setTimeout(()=>{if(shericeriActive&&!sheriIsSpeaking&&!sheriStreamActive)shericeriListenOnce();},180);
+      return;
+    }
     sheriRecordingStoppedAt=stoppedAt;
     sheriDiagSet('Recording ID',recordingId);
     sheriDiagSet('Recording duration',Math.round(stoppedAt-recordingStartedAt)+' ms');
@@ -4150,9 +4165,11 @@ function shericeriListenOnce(){
   // relying on a fixed frequency-domain threshold. Android keeps its proven profile.
   let noiseRms=2.5;
   let noiseSamples=0;
-  const silenceStopMs=isAndroid?SHERI_ANDROID_SILENCE_STOP_MS:500;
+  const silenceStopMs=isAndroid?Math.max(SHERI_ANDROID_SILENCE_STOP_MS,1100):900;
   const minSpeechMs=isAndroid?SHERI_ANDROID_MIN_SPEECH_MS:180;
-  const noSpeechTimeoutMs=isAndroid?SHERI_ANDROID_NO_SPEECH_TIMEOUT_MS:2200;
+  // Silence before the user begins is not a reason to end the conversation.
+  // Keep the mic session alive and recycle only the recorder after this idle window.
+  const noSpeechTimeoutMs=15000;
   sheriVadDiag('VAD phase','LISTENING — waiting for speech');
   sheriVadDiag('VAD threshold',vadThreshold+' avg'+(isAndroid?' (Android profile)':''));
   sheriVadDiag('Latency profile','V13.0 — Android silence '+(silenceStopMs/1000).toFixed(2)+'s / min speech '+minSpeechMs+'ms / no-speech safety '+noSpeechTimeoutMs+'ms / VAD poll 75ms / auto-listen guard 100ms');
@@ -4205,6 +4222,8 @@ function shericeriListenOnce(){
           speechStartTime=speechStartTime??speechCandidateStart;
           speechConfirmed=true;
           hasSpoken=true;
+          sheriFirstSpeechAt=performance.now();
+          sheriDiagSet('Mic ready → first speech',sheriMicReadyAt?Math.round(sheriFirstSpeechAt-sheriMicReadyAt)+' ms ('+currentShericeriLang()+')':'mic ready timestamp unavailable');
           sheriVadDiag('VAD speech confirmed','YES');
           sheriVadDiag('VAD speech start',((speechStartTime-startTime)/1000).toFixed(1)+'s');
         }
@@ -4231,14 +4250,19 @@ function shericeriListenOnce(){
         return;
       }
     }else if(now-startTime>=noSpeechTimeoutMs){
-      // Do not throw away a non-empty recording just because VAD never crossed
-      // its threshold. Whisper is the semantic authority for speech. Only stop
-      // after the long safety window, then let Whisper inspect the clip.
-      stopReason='VAD uncertain — sending clip to Whisper';
+      if(!speechEnergyDetected){
+        stopReason='no speech — keep session open';
+        sheriVadDiag('VAD stop reason','15s idle — recycle recorder, keep mic stream');
+        sheriVadDiag('Session state','ACTIVE / continuous idle listening');
+        clearInterval(shericeriVadTimer);
+        sheriStopBrowserRecorder('idle listen cycle — keep microphone session active');
+        return;
+      }
+      stopReason='VAD uncertain — sending captured audio to Whisper';
       sheriVadDiag('VAD stop reason',stopReason);
       sheriVadDiag('VAD phase','VAD UNCERTAIN — Whisper decides');
       clearInterval(shericeriVadTimer);
-      sheriStopBrowserRecorder('VAD/TTS stop')
+      sheriStopBrowserRecorder('VAD uncertain — send captured speech to Whisper');
       return;
     }
     if(now-startTime>=SHERI_MAX_RECORD_MS){
@@ -4378,7 +4402,7 @@ function sheriLanguageKey(){
 }
 function sheriTapGreeting(){
   const k=sheriLanguageKey();
-  return k==='fr'?'Bonjour ! Comment puis-je vous aider aujourd’hui ? Je suis Shericeri.':k==='rw'?'Muraho! Nagufasha iki uyu munsi? Ndi Shericeri.':'Hello, how can I help you today? I’m Shericeri.';
+  return k==='fr'?'Bonjour ! Je suis Shericeri. Dites-moi, que puis-je faire pour vous ?':k==='rw'?'Muraho! Ndi Shericeri. Mbwira icyo nagufasha uyu munsi.':'Hello! I’m Shericeri. What can I help you with today?';
 }
 function sheriLocalizeConversationResponse(kind){
   const k=sheriLanguageKey();
@@ -4542,12 +4566,9 @@ function sheriResetSpeechState(){
 function sheriPrepareSpeechText(text,lang){
   let out=String(text||'').trim();
   if(/^rw/i.test(String(lang||''))){
-    out=out
-      .replace(/[“”„‟"‘’]/g,'')
-      .replace(/[.,!?;:…]+/g,' ')
-      .replace(/[()[\]{}]/g,' ')
-      .replace(/\s+/g,' ')
-      .trim();
+    // Keep sentence punctuation: Kinyarwanda TTS needs natural pauses and
+    // question intonation. Only remove decorative quotation marks.
+    out=out.replace(/[“”„‟"‘’]/g,'').replace(/[()[\]{}]/g,' ').replace(/\s+/g,' ').trim();
   }
   return out;
 }
@@ -4817,8 +4838,9 @@ function sheriDrainSpeakQueue(){
       sheriDiagSet('TTS','STARTED');
       sheriDiagSet('Response phase','TTS speaking');
       sheriDiagSet('TTS turn ID',String(turnId));
-      sheriDiagSet('Turn → TTS start',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
-      sheriDiagSet('TTS queue → start',Math.round(performance.now()-sheriTtsQueuedAt)+' ms');
+      sheriDiagSet('Turn → first audible response',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
+      sheriDiagSet('Mic ready → first audible response',sheriMicReadyAt?Math.round(performance.now()-sheriMicReadyAt)+' ms ('+currentShericeriLang()+')':'mic ready timestamp unavailable');
+      sheriDiagSet('TTS queue → audible start',Math.round(performance.now()-sheriTtsQueuedAt)+' ms');
       sheriDiagSet('TTS requested language',lang);
       if(/^rw/i.test(lang)) sheriDiagSet('Kinyarwanda TTS bridge',window.SHERICERI_VOICE_BRIDGE?.speak?'READY':'NOT INSTALLED');
       sheriDiagSet('TTS selected voice',voice?`${voice.name} (${voice.lang})`:(isAndroid?'Android platform/OS default voice':'none'));
