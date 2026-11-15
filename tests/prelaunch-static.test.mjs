@@ -205,7 +205,7 @@ test("voice sessions keep listening through silence instead of ending after the 
   assert.ok(html.includes("stopReason='no speech — keep session open'"));
   assert.ok(html.includes("NO SPEECH — microphone session remains active"));
   assert.ok(html.includes("if(shericeriActive)setTimeout(()=>{if(shericeriActive&&!sheriIsSpeaking&&!sheriStreamActive)shericeriListenOnce();},180)"));
-  assert.ok(html.includes("const silenceStopMs=isAndroid?Math.max(SHERI_ANDROID_SILENCE_STOP_MS,1100):900"));
+  assert.ok(html.includes("const silenceStopMs=isAndroid?Math.max(SHERI_ANDROID_SILENCE_STOP_MS,1400):1200"));
 });
 
 test("Kinyarwanda speech preserves punctuation and measures voice latency per selected language", () => {
