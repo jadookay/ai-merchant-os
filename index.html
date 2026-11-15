@@ -4019,6 +4019,8 @@ async function startShericeriLoop(){
   if(heroBtn){heroBtn.textContent='🔊 Greeting…';heroBtn.disabled=true;}
   setSheriStatus('Shericeri is greeting you…');
   sheriDiagSet('Session state','GREETING before listening');
+  sheriGreetingQueuedAt=performance.now();
+  sheriDiagSet('Greeting language',currentShericeriLang());
   sheriEnqueueSpeech(sheriTapGreeting(),sheriTurnId);
 }
 function sheriSleepAfterGoodbye(turnId){
@@ -4386,15 +4388,11 @@ function sheriNormalizePhrase(q){
 }
 function sheriIsGoodbyePhrase(q){
   const text=sheriNormalizePhrase(q);
-  if(/^(bye|goodbye|good night|see you|see you later|all right,? bye|alright,? bye|okay,? bye|ok,? bye|bye bye|see ya|murabeho|murabeho cyane)[!.?]*$/i.test(text)) return true;
-  // Natural end-of-task phrases sleep the session without requiring a literal goodbye.
-  if(/^(that's it|thats it|that is it|that's all|thats all|that is all|i am done|i'm done|im done|we are done|we're done|were done|nothing else|no more|that's everything|thats everything|all done|finished for now|c'est tout|j'ai fini|on a terminé|on a termine|c'est bon|je n'ai plus besoin|birarangiye|ndangije|ntakindi|nta kindi|bihagije|turangije|ni ibyo)[!.?]*$/i.test(text)) return true;
-  if(/^(?:thanks?|thank you(?: so much)?|merci(?: beaucoup)?|murakoze(?: cyane)?)[ ,;]+(?:that's it|thats it|that is it|that's all|thats all|that is all|i am done|i'm done|we're done|nothing else|c'est tout|j'ai fini|birarangiye|ndangije|ntakindi)[!.?]*$/i.test(text)) return true;
-  // Also recognize natural closing phrases that end with a goodbye, e.g.
-  // “that's it, thank you, bye” / “thank you, bye” without triggering on
-  // questions that merely mention the word “goodbye”.
-  if(/^(?:that's it|thats it|that is it|okay|ok|alright|all right|thanks?|thank you(?: so much)?|merci(?: beaucoup)?|murakoze(?: cyane)?)(?:[ ,;]+(?:and|then|but)?[ ,;]*(?:thanks?|thank you(?: so much)?|merci(?: beaucoup)?|murakoze(?: cyane)?))?[ ,;]+(?:bye|goodbye|good night|see you(?: later)?|see ya|murabeho(?: cyane)?)[!.?]*$/i.test(text)) return true;
-  return false;
+  const lang=sheriLanguageKey();
+  // Only an explicit farewell in the currently selected language ends a session.
+  if(lang==='rw') return /^(murabeho(?: cyane)?|urabeho(?: neza)?|ndagusezeye|turaongera(?: kuganira)?|tuzongera kuganira|ni aho|tugire amahoro)[!.?]*$/i.test(text);
+  if(lang==='fr') return /^(au revoir|à bientôt|a bientot|à demain|a demain|bonne journée|bonne journee|bonne soirée|bonne soiree|adieu|je vous laisse|on se reparle)[!.?]*$/i.test(text);
+  return /^(bye|goodbye|good night|see you|see you later|see you soon|talk to you later|catch you later|bye bye|see ya|take care|have a good day|have a good evening)[!.?]*$/i.test(text);
 }
 function sheriLanguageKey(){
   const l=currentShericeriLang();
@@ -4547,6 +4545,9 @@ let sheriTurnId=0;
 let sheriResponsePhase='idle';
 let sheriSleepAfterTtsTurnId=0;
 let sheriTurnStartedAt=0;
+let sheriMicReadyAt=0;
+let sheriFirstSpeechAt=0;
+let sheriGreetingQueuedAt=0;
 let sheriTtsQueuedAt=0;
 let sheriTtsStartedAt=0;
 let sheriWhisperFinishedAt=0;
@@ -4665,6 +4666,11 @@ async function sheriOnlineKinyaTts(text,lang,turnId,finish){
     audio.src=url;
     audio.load();
     await new Promise((resolve,reject)=>{
+      audio.onplaying=()=>{
+        const audibleAt=performance.now();
+        sheriDiagSet('Mic ready → first audible response',sheriMicReadyAt?Math.round(audibleAt-sheriMicReadyAt)+' ms (rw-RW)':'mic ready timestamp unavailable');
+        if(sheriGreetingQueuedAt)sheriDiagSet('Greeting queue → audible start',Math.round(audibleAt-sheriGreetingQueuedAt)+' ms (rw-RW)');
+      };
       audio.onended=resolve;
       audio.onerror=()=>reject(new Error('Kinyarwanda TTS audio playback failed ('+(audio.error?.code||'MEDIA_ERR_UNKNOWN')+')'));
       audio.play().catch(reject);
@@ -4837,6 +4843,11 @@ function sheriDrainSpeakQueue(){
     if(typeof sheriDiagSet==='function'){
       sheriDiagSet('TTS','STARTED');
       sheriDiagSet('Response phase','TTS speaking');
+      if(sheriGreetingQueuedAt){
+        sheriDiagSet('Mic ready → greeting audible',sheriMicReadyAt?Math.round(performance.now()-sheriMicReadyAt)+' ms ('+lang+')':'mic ready timestamp unavailable');
+        sheriDiagSet('Greeting queue → audible start',Math.round(performance.now()-sheriGreetingQueuedAt)+' ms ('+lang+')');
+        sheriGreetingQueuedAt=0;
+      }
       sheriDiagSet('TTS turn ID',String(turnId));
       sheriDiagSet('Turn → first audible response',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
       sheriDiagSet('Mic ready → first audible response',sheriMicReadyAt?Math.round(performance.now()-sheriMicReadyAt)+' ms ('+currentShericeriLang()+')':'mic ready timestamp unavailable');
