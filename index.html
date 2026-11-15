@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.30 continuous voice sessions, natural Kinyarwanda and latency diagnostics">
+<meta name="app-version" content="V14.4.31 persistent voice session guard and latency diagnostics">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -1484,9 +1484,9 @@ function sheriOfflineLocalAnswer(q){
     if(/(inyungu|nunguka|inyungu yanjye|igihombo|business.*meze|ubucuruzi.*meze)/i.test(text))
       return pr>=0?`Inyungu igereranijwe ni ${money(pr)}.`:`Ufite igihombo igereranijwe cya ${money(Math.abs(pr))}.`;
     if(/(nakoresheje|amafaranga.*nakoresheje|ibyakoreshejwe|expenses|spending|costs?)/i.test(text))
-      return `Amafaranga wakoresheje yose ni ${money(exp)}.`;
+      return `Amafaranga yose umaze gukoresha ni ${money(exp)}.`;
     if(/(stock|ububiko|ibicuruzwa.*birimo|biri hafi kurangira|byenda kurangira|kongera.*ububiko|ongera.*ibicuruzwa)/i.test(text))
-      return low.length?`Ibyihutirwa kongera mu bubiko ni: ${low.slice(0,3).map(p=>p.name).join(', ')}.`:`Ububiko bwawe bumeze neza; nta gicuruzwa cyihutirwa kongera.`;
+      return low.length?`Ibyo ugomba kongera mu bubiko mbere na mbere ni: ${low.slice(0,3).map(p=>p.name).join(', ')}.`:`Ububiko bwawe bumeze neza; nta gicuruzwa cyihutirwa kongera.`;
     if(/(genda cyane|cyagurishijwe cyane|igicuruzwa.*cyiza|igicuruzwa.*isonga|best product|best sell)/i.test(text))
       return best&&best.rev?`${best.name} ni cyo gicuruzwa kiri ku isonga, gifite amafaranga yinjijwe angana na ${money(best.rev)}.`:'Nta makuru ahagije y’ibicuruzwa yagurishijwe kugira ngo hamenyekane icy’isonga.';
     if(/(ibikorwa.*kugurisha|transactions|transactions zingahe|sales zingahe|ibicuruzwa byagurishijwe kangahe)/i.test(text))
@@ -1566,11 +1566,11 @@ async function sheriOfflineRouteText(text){
 }
 
 // ── Authentication + Business Identity V13 ────────────────────────────────
-const SHERI_RELEASE='V14.4.30';
+const SHERI_RELEASE='V14.4.31';
 const SHERI_PRODUCTION_URL='https://jadookay.github.io/ai-merchant-os/';
 const SHERI_IS_LOCAL=/^(localhost|127\.0\.0\.1)$/i.test(window.location.hostname);
 const SHERI_AUTH_REDIRECT=window.location.origin+window.location.pathname;
-const SHERI_CACHE_VERSION='14.4.30';
+const SHERI_CACHE_VERSION='14.4.31';
 const SHERI_CACHE_BUSTER='sheri_v='+SHERI_CACHE_VERSION;
 function sheriEnsureFreshRelease(){
   try{
@@ -4438,13 +4438,13 @@ function sheriLanguageKey(){
 }
 function sheriTapGreeting(){
   const k=sheriLanguageKey();
-  return k==='fr'?'Bonjour ! Je suis Shericeri. Dites-moi, que puis-je faire pour vous ?':k==='rw'?'Muraho! Ndi Shericeri. Mbwira icyo nagufasha uyu munsi.':'Hello! I’m Shericeri. What can I help you with today?';
+  return k==='fr'?'Bonjour ! Je suis Shericeri. Dites-moi, que puis-je faire pour vous ?':k==='rw'?'Muraho! Ndi Shericeri. Mbwira, uyu munsi ngufashe iki?':'Hello! I’m Shericeri. What can I help you with today?';
 }
 function sheriLocalizeConversationResponse(kind){
   const k=sheriLanguageKey();
-  if(kind==='greeting') return k==='fr'?'Bonjour ! Sur quoi travaillons-nous aujourd’hui ?':k==='rw'?'Muraho! Uyu munsi dukore ku ki?':'Hello! What are we working on today?';
-  if(kind==='thanks') return k==='fr'?'Avec plaisir ! Je suis là pour vous aider.':k==='rw'?'Nta kibazo! Ndi hano kugufasha.':'Anytime! I\'m here to help.';
-  if(kind==='goodbye') return k==='fr'?'Au revoir ! Prenez soin de vous.':k==='rw'?'Murabeho! Witondere ubucuruzi bwawe.':'Bye! Take care and keep those sales moving.';
+  if(kind==='greeting') return k==='fr'?'Bonjour ! Sur quoi travaillons-nous aujourd’hui ?':k==='rw'?'Muraho! Ni iki twakoraho uyu munsi?':'Hello! What are we working on today?';
+  if(kind==='thanks') return k==='fr'?'Avec plaisir ! Je suis là pour vous aider.':k==='rw'?'Nta kibazo rwose, ndi hano ngo ngufashe.':'Anytime! I\'m here to help.';
+  if(kind==='goodbye') return k==='fr'?'Au revoir ! Prenez soin de vous.':k==='rw'?'Murabeho! Uzakomeze ugire umunsi mwiza.':'Bye! Take care and keep those sales moving.';
   return '';
 }
 function sheriTranslateBusinessFast(answer){
@@ -4460,7 +4460,7 @@ function sheriTranslateBusinessFast(answer){
     if(best&&q.includes('star right now'))return `${best.name} est votre meilleur produit actuellement, avec ${money(best.rev)} de chiffre d’affaires.`;
   }
   if(k==='rw'){
-    if(q.includes("you've sold"))return `Wagurishije ${money(rev)} kugeza ubu, mu bikorwa byo kugurisha ${state.sales.filter(s=>!s.voided).length}.`;
+    if(q.includes("you've sold"))return `Kugeza ubu, umaze kugurisha ibifite agaciro ka ${money(rev)}, mu nshuro ${state.sales.filter(s=>!s.voided).length} zo kugurisha.`;
     if(q.includes('total expenses'))return `Amafaranga wakoresheje yose ni ${money(exp)}.`;
     if(q.includes('estimated profit')||q.includes('sitting at'))return pr>=0?`Inyungu igereranijwe ni ${money(pr)}.`:`Igihombo igereranijwe ni ${money(Math.abs(pr))}.`;
     if(q.includes('stock levels'))return low.length?`Ibyihutirwa kongera mu bubiko ni: ${low.slice(0,3).map(p=>p.name).join(', ')}.`:'Ububiko bwawe bumeze neza.';
@@ -4634,7 +4634,7 @@ function sheriEnqueueSpeech(text,turnId=sheriTurnId){
   if(/^rw/i.test(queuedLang) && !window.SHERICERI_VOICE_BRIDGE?.speak && !navigator.onLine){setSheriStatus('Kinyarwanda offline voice is not installed on this device.');sheriDiagSet('TTS','Kinyarwanda native bridge NOT INSTALLED');return;}
   if(!window.speechSynthesis&&!window.SHERICERI_VOICE_BRIDGE?.speak){
     setSheriStatus('(Text-to-speech not supported in this browser — reading only.)');
-    if(sheriSleepAfterTtsTurnId===turnId){
+    if((sheriSleepAfterTtsTurnId!==0 && sheriSleepAfterTtsTurnId===turnId)){
       sheriSleepAfterTtsTurnId=0;
       sheriResetSpeechState();
       /* Keep the last four exchanges available when the next voice session starts. */
@@ -4865,7 +4865,7 @@ function sheriDrainSpeakQueue(){
       sheriDiagSet('Response phase','TTS ended');
       sheriDiagSet('TTS end reason',reason);
     }
-    if(sheriSleepAfterTtsTurnId===turnId){
+    if((sheriSleepAfterTtsTurnId!==0 && sheriSleepAfterTtsTurnId===turnId)){
       sheriSleepAfterTtsTurnId=0;
       sheriDiagSet('Session state','SLEEPING');
       sheriResetSpeechState();
@@ -4940,7 +4940,7 @@ function sheriDrainSpeakQueue(){
     sheriSpeakQueue=sheriSpeakQueue.filter(x=>x.turnId!==turnId);
     sheriStreamActive=false;
     setSheriStatus('I could not play that reply, but I’m still here. Please continue speaking.');
-    if(sheriSleepAfterTtsTurnId===turnId){ sheriSleepAfterTtsTurnId=0; /* Keep the last four exchanges available when the next voice session starts. */ hideSheriHero(); setSheriStatus('Tap to start talking with Shericeri.'); }
+    if((sheriSleepAfterTtsTurnId!==0 && sheriSleepAfterTtsTurnId===turnId)){ sheriSleepAfterTtsTurnId=0; /* Keep the last four exchanges available when the next voice session starts. */ hideSheriHero(); setSheriStatus('Tap to start talking with Shericeri.'); }
     if(window.speechSynthesis)try{speechSynthesis.cancel()}catch(_){}
     if(shericeriActive&&!sheriSleepAfterTtsTurnId)setTimeout(()=>sheriScheduleNextListen(turnId),250);
   };
