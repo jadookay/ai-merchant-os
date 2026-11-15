@@ -111,7 +111,7 @@ test("AI Advisor, extraction and Shericeri use the deployed quick-service functi
   }
   assert.match(html, /functions\/v1\/quick-service/);
   assert.match(quickService, /mode === "shericeri"/);
-  assert.match(quickService, /LANGUAGE REQUIREMENT: Reply entirely in natural everyday Kinyarwanda/);
+  assert.match(quickService, /LANGUAGE REQUIREMENT — KINYARWANDA:[\s\S]*?Do NOT draft in English\/French and translate sentence-by-sentence/);
   assert.match(quickService, /LANGUAGE REQUIREMENT: Reply entirely in clear, natural French/);
   assert.doesNotMatch(html, /sb\.functions\.invoke\('advisor',\{body:\{mode:'(?:extract|barcode|extract_batch|organize_import)/);
 });
@@ -181,21 +181,40 @@ test("Shericeri greets before opening the first recording and starts listening a
   assert.match(flow, /sheriEnqueueSpeech\(sheriTapGreeting\(\),sheriTurnId\)/);
   assert.doesNotMatch(flow, /shericeriListenOnce\(\)/,
     "the mic must not record while the initial greeting is playing");
-  assert.match(html, /function sheriTapGreeting\(\)[\s\S]*?Hello, how can I help you today\?/);
+  assert.match(html, /function sheriTapGreeting\(\)[\s\S]*?Hello! I’m Shericeri\. What can I help you with today\?/);
   assert.match(html, /function sheriDrainSpeakQueue\(\)[\s\S]*?sheriScheduleNextListen\(sheriTurnId\)/);
 });
 
-test("farewell and end-of-task phrases trigger sleep without treating a plain thank-you as goodbye", () => {
+test("only an explicit farewell in the selected language ends the voice session", () => {
   const start = html.indexOf("function sheriIsGoodbyePhrase(q)");
   const end = html.indexOf("\nfunction sheriLanguageKey", start);
   assert.ok(start >= 0 && end > start);
   const goodbye = html.slice(start, end);
-  assert.match(goodbye, /that's it/);
-  assert.match(goodbye, /that's all/);
-  assert.match(goodbye, /i'm done/);
-  assert.match(goodbye, /c'est tout/);
-  assert.match(goodbye, /birarangiye/);
-  assert.doesNotMatch(goodbye, /\^\(thanks\|thank you\)\[!\?\.\]\*\$/);
+  assert.match(goodbye, /Only an explicit farewell in the currently selected language/);
+  assert.match(goodbye, /murabeho/);
+  assert.match(goodbye, /ndagusezeye/);
+  assert.match(goodbye, /au revoir/);
+  assert.match(goodbye, /goodbye/);
+  assert.doesNotMatch(goodbye, /that's it/);
+  assert.doesNotMatch(goodbye, /c'est tout/);
+  assert.doesNotMatch(goodbye, /birarangiye/);
+});
+
+test("voice sessions keep listening through silence instead of ending after the short greeting pause", () => {
+  assert.ok(html.includes("const noSpeechTimeoutMs=15000;"));
+  assert.ok(html.includes("stopReason='no speech — keep session open'"));
+  assert.ok(html.includes("NO SPEECH — microphone session remains active"));
+  assert.ok(html.includes("if(shericeriActive)setTimeout(()=>{if(shericeriActive&&!sheriIsSpeaking&&!sheriStreamActive)shericeriListenOnce();},180)"));
+  assert.ok(html.includes("const silenceStopMs=isAndroid?Math.max(SHERI_ANDROID_SILENCE_STOP_MS,1100):900"));
+});
+
+test("Kinyarwanda speech preserves punctuation and measures voice latency per selected language", () => {
+  assert.ok(html.includes("Keep sentence punctuation: Kinyarwanda TTS needs natural pauses and question intonation."));
+  assert.ok(html.includes("getUserMedia permission latency"));
+  assert.ok(html.includes("Mic ready → first speech"));
+  assert.ok(html.includes("Mic ready → greeting audible"));
+  assert.ok(html.includes("Greeting queue → audible start"));
+  assert.ok(html.includes("Keep session-level microphone/greeting measurements visible"));
 });
 
 test("recent Shericeri history survives sleep and is sent with validated memory to the server", () => {
