@@ -343,7 +343,7 @@ Deno.serve(async (req: Request) => {
     if (!apiKey) return json({ error: "GROQ_API_KEY is not configured on the server." }, 500);
     const selectedLanguage = typeof language === "string" ? language.slice(0, 2).toLowerCase() : "en";
     const languageInstruction = selectedLanguage === "rw"
-      ? "LANGUAGE REQUIREMENT: Reply entirely in natural everyday Kinyarwanda used by Rwandan small-business owners. Use clear, familiar merchant vocabulary. Do not default to English; keep product names, invoice IDs, dates and numbers unchanged."
+      ? "LANGUAGE REQUIREMENT — KINYARWANDA: Compose the answer directly in natural, spoken Kinyarwanda as a fluent Rwandan speaker would say it to another person. Do NOT draft in English/French and translate sentence-by-sentence. Prefer everyday Rwanda expressions, familiar merchant words and natural word order; use a relaxed conversational register, not formal report/book language. Keep sentences short enough to speak comfortably, with natural pauses and question intonation. Use common local terms; retain product names, invoice IDs, dates and figures unchanged. Avoid awkward literal calques, unnecessary English, stiff constructions and over-explaining. If the user naturally code-switches, mirror it lightly; otherwise stay in Kinyarwanda. Before sending, silently rewrite any sentence that sounds translated or unnatural."
       : selectedLanguage === "fr"
       ? "LANGUAGE REQUIREMENT: Reply entirely in clear, natural French. Do not default to English; keep product names, invoice IDs, dates and numbers unchanged."
       : "LANGUAGE REQUIREMENT: Reply in clear English. Keep product names, invoice IDs, dates and numbers unchanged.";
