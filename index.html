@@ -139,6 +139,39 @@ window.ensurePdfJs=async function(){
 .sheri-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:9999;max-width:min(92vw,520px);padding:11px 16px;border-radius:10px;background:#172554;color:#fff;box-shadow:0 8px 30px #0003;font-size:14px}
 .sheri-search{max-width:320px;width:100%;margin:8px 0;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:inherit}
 </style>
+
+<style id="aibos-auth-brand-colors-v1">
+/* Official AIBOS/Shericeri brand treatment for sign-in, staff access and account setup. */
+#authScreen{background:#f5f6ff!important}
+#authScreen .auth-card,
+#onboardingScreen .onboard-card{overflow:hidden!important;border:1.5px solid #010080!important;border-radius:16px!important;box-shadow:0 8px 26px rgba(1,0,128,.10)!important}
+#authScreen .auth-card>.brand,
+#onboardingScreen .onboard-card>.brand{display:block!important;margin:-26px -26px 18px!important;padding:17px 26px!important;background:#010080!important;color:#F7EB5B!important;border-bottom:3px solid #F7EB5B!important;font-weight:700!important;letter-spacing:.1px!important}
+#authScreen .auth-title,
+#onboardingScreen .onboard-card h1{color:#010080!important}
+#authScreen .auth-tabs{background:#fff9c9!important;border:1px solid rgba(1,0,128,.16)!important}
+#authScreen .auth-tabs button{color:#010080!important;font-weight:600!important}
+#authScreen .auth-tabs button.active{background:#010080!important;color:#F7EB5B!important;box-shadow:0 2px 5px rgba(1,0,128,.18)!important}
+#authScreen .btn,
+#onboardingScreen .onboard-actions .btn{background:#010080!important;color:#F7EB5B!important;border:1px solid #010080!important;font-weight:650!important}
+#authScreen .btn:active,
+#onboardingScreen .onboard-actions .btn:active{background:#000066!important}
+#authScreen .text-btn{color:#010080!important}
+#authScreen input:focus,
+#authScreen select:focus,
+#onboardingScreen input:focus,
+#onboardingScreen select:focus{border-color:#010080!important;box-shadow:0 0 0 2px rgba(1,0,128,.12)!important;outline:none!important}
+#authScreen .oauth-btn{border-color:rgba(1,0,128,.28)!important}
+#authScreen .oauth-btn:hover{background:#fff9c9!important;border-color:#010080!important}
+#onboardingScreen .onboard-wrap{background:#f5f6ff!important}
+#onboardingScreen .profile-badge{background:#fff9c9!important;color:#010080!important;border:1px solid rgba(1,0,128,.18)!important}
+@media(max-width:480px){
+ #authScreen.auth-wrap,#onboardingScreen.onboard-wrap{padding:14px!important}
+ #authScreen .auth-card,#onboardingScreen .onboard-card{padding:22px!important}
+ #authScreen .auth-card>.brand,#onboardingScreen .onboard-card>.brand{margin:-22px -22px 16px!important;padding:15px 22px!important}
+}
+</style>
+
 </head>
 <body>
 
