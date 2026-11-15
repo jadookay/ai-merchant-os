@@ -209,7 +209,8 @@ test("voice sessions keep listening through silence instead of ending after the 
 });
 
 test("Kinyarwanda speech preserves punctuation and measures voice latency per selected language", () => {
-  assert.ok(html.includes("Keep sentence punctuation: Kinyarwanda TTS needs natural pauses and question intonation."));
+  assert.ok(html.includes("Keep sentence punctuation: Kinyarwanda TTS needs natural pauses and"));
+  assert.ok(html.includes("question intonation. Only remove decorative quotation marks."));
   assert.ok(html.includes("getUserMedia permission latency"));
   assert.ok(html.includes("Mic ready → first speech"));
   assert.ok(html.includes("Mic ready → greeting audible"));
