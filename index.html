@@ -4395,6 +4395,9 @@ if(typeof sheriRecordingStoppedAt==='number' && sheriRecordingStoppedAt) sheriDi
         transcript=transcriptText;
         sheriDiagSet('Transcript',transcript);
         if(whisperBody?.model)sheriDiagSet('Whisper model',whisperBody.model);
+        if(whisperBody?.provider)sheriDiagSet('STT provider',whisperBody.provider);
+        if(whisperBody?.primary_provider_error)sheriDiagSet('Primary Kinyarwanda STT error',String(whisperBody.primary_provider_error).slice(0,700));
+        if(whisperBody?.language)sheriDiagSet('STT language constraint',String(whisperBody.language));
         if(whisperBody?.audio_bytes!=null)sheriDiagSet('Whisper audio bytes',String(whisperBody.audio_bytes));
         if(whisperBody?.audio_mime)sheriDiagSet('Whisper audio MIME',whisperBody.audio_mime);
         if(whisperBody?.webm_signature)sheriDiagSet('Whisper WebM signature',whisperBody.webm_signature);
@@ -4825,11 +4828,6 @@ function sheriDrainSpeakQueue(){
   utt.lang=lang;
   const isAndroid=/Android/i.test(navigator.userAgent||'');
   const voice=pickVoice(lang);
-  if(/^rw/i.test(lang) && !window.SHERICERI_VOICE_BRIDGE?.hasTtsBridge){
-    // Do not suppress a valid Kinyarwanda answer merely because no named
-    // rw-RW voice is exposed. Attempt platform/default SpeechSynthesis.
-    if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','Kinyarwanda: platform/default voice fallback (Sherpa bridge not installed)');
-  }
   if(voice)utt.voice=voice;
   utt.rate=isAndroid?SHERI_ANDROID_TTS_RATE:1.0;
   utt.pitch=isAndroid?SHERI_ANDROID_TTS_PITCH:1.0;
@@ -4963,7 +4961,7 @@ function sheriDrainSpeakQueue(){
       let selectedVoice=null;
       selectedVoice=pickVoice(lang);
       if(selectedVoice && utt.voice!==selectedVoice) utt.voice=selectedVoice;
-      if(typeof sheriDiagSet==='function')sheriDiagSet('TTS selected voice',selectedVoice?`${selectedVoice.name} (${selectedVoice.lang})`:(isAndroid?'Android platform/OS default voice':'none for requested language'));
+      if(typeof sheriDiagSet==='function')sheriDiagSet('TTS selected voice',/^rw/i.test(lang)&&navigator.onLine?'Not used — Kinyarwanda uses generated online audio':(selectedVoice?`${selectedVoice.name} (${selectedVoice.lang})`:(isAndroid?'Android platform/OS default voice':'none for requested language')));
       if(/^rw/i.test(lang) && navigator.onLine){
         sheriDiagSet('Kinyarwanda TTS route','ONLINE Pindo VoiceAI public — provider default voice; gender not guaranteed');
         const onlineOk=await sheriOnlineKinyaTts(next,lang,turnId,finish);
