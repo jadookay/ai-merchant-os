@@ -754,3 +754,26 @@ test("inventory adjustment retries are idempotent and grants match the seven-arg
   assert.ok(html.includes("data?.ok===true"));
   assert.ok(teamMigration.includes("'already_recorded',true"));
 });
+
+
+test("initial greeting cannot trigger farewell sleep when both turn counters start at zero", () => {
+  const guards = html.match(/if\(\(sheriSleepAfterTtsTurnId!==0 && sheriSleepAfterTtsTurnId===turnId\)\)/g) || [];
+  assert.equal(guards.length, 3, "all TTS completion/error paths must require an armed non-zero farewell turn");
+  const shouldSleep = (sleepTurn, turnId) => sleepTurn !== 0 && sleepTurn === turnId;
+  assert.equal(shouldSleep(0, 0), false, "initial greeting turn 0 must not close the microphone");
+  assert.equal(shouldSleep(12, 12), true, "an explicit farewell turn must close the session after playback");
+  assert.equal(shouldSleep(12, 13), false, "a stale farewell marker must not close a later turn");
+});
+
+test("voice startup warms speech in parallel with microphone access and records per-language greeting latency", () => {
+  assert.ok(html.includes("Warm the speech engine in parallel with microphone permission"));
+  assert.ok(html.includes("Mic ready → greeting queued"));
+  assert.ok(html.includes("Mic ready → greeting audible"));
+  assert.ok(html.includes("Latency by language"));
+});
+
+test("Shericeri generation explicitly requires idiomatic spoken Kinyarwanda rather than translated prose", () => {
+  assert.ok(quickService.includes("native Rwandan speaking spontaneously"));
+  assert.ok(quickService.includes("never like English or French translated into Kinyarwanda"));
+  assert.ok(quickService.includes("would a fluent person in Rwanda actually say this aloud"));
+});
