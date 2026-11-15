@@ -64,13 +64,20 @@ public class MainActivity extends Activity {
 
             @Override public void onPermissionRequest(PermissionRequest request) {
                 runOnUiThread(() -> {
-                    boolean needsMic = false;
+                    java.util.ArrayList<String> missing = new java.util.ArrayList<>();
                     for (String resource : request.getResources()) {
-                        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) needsMic = true;
+                        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)
+                                && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                            missing.add(Manifest.permission.RECORD_AUDIO);
+                        }
+                        if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)
+                                && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                            missing.add(Manifest.permission.CAMERA);
+                        }
                     }
-                    if (needsMic && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    if (!missing.isEmpty()) {
                         pendingWebPermission = request;
-                        requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_PERMISSION);
+                        requestPermissions(missing.toArray(new String[0]), MIC_PERMISSION);
                     } else {
                         request.grant(request.getResources());
                     }
@@ -85,9 +92,10 @@ public class MainActivity extends Activity {
     @Override public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (requestCode == MIC_PERMISSION && pendingWebPermission != null) {
-            if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
-                pendingWebPermission.grant(pendingWebPermission.getResources());
-            } else pendingWebPermission.deny();
+            boolean allGranted = results.length > 0;
+            for (int result : results) allGranted = allGranted && result == PackageManager.PERMISSION_GRANTED;
+            if (allGranted) pendingWebPermission.grant(pendingWebPermission.getResources());
+            else pendingWebPermission.deny();
             pendingWebPermission = null;
         }
     }
