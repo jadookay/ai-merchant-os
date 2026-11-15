@@ -4184,7 +4184,7 @@ function shericeriListenOnce(){
   // relying on a fixed frequency-domain threshold. Android keeps its proven profile.
   let noiseRms=2.5;
   let noiseSamples=0;
-  const silenceStopMs=isAndroid?Math.max(SHERI_ANDROID_SILENCE_STOP_MS,1100):900;
+  const silenceStopMs=isAndroid?Math.max(SHERI_ANDROID_SILENCE_STOP_MS,1400):1200;
   const minSpeechMs=isAndroid?SHERI_ANDROID_MIN_SPEECH_MS:180;
   // Silence before the user begins is not a reason to end the conversation.
   // Keep the mic session alive and recycle only the recorder after this idle window.
