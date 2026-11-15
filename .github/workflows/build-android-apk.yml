@@ -31,10 +31,10 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Build optimized debug APK
         working-directory: android
-        run: gradle --no-daemon :app:assembleDebug
+        run: gradle --no-daemon :app:assembleRelease
       - name: Report APK size
         run: |
-          ls -lh android/app/build/outputs/apk/debug/*.apk
+          ls -lh android/app/build/outputs/apk/release/*.apk
           du -h android/app/build/outputs/apk/debug/*.apk
       - name: Upload APK for tester distribution
         uses: actions/upload-artifact@v4
