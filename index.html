@@ -3793,7 +3793,7 @@ function sheriRecordLatency(field,value,lang=currentShericeriLang()){
   const record=sheriLatencyByLanguage[key]||(sheriLatencyByLanguage[key]={});
   record[field]=Math.round(Number(value));
   const summary=Object.entries(sheriLatencyByLanguage).map(([code,v])=>
-    code+': mic '+(v.mic??'—')+' ms, greeting '+(v.greeting??'—')+' ms, first speech '+(v.firstSpeech??'—')+' ms, reply audio '+(v.response??'—')+' ms'
+    code+': mic '+(v.mic??'—')+' ms, queue '+(v.queue??'—')+' ms, greeting '+(v.greeting??'—')+' ms, first speech '+(v.firstSpeech??'—')+' ms, reply audio '+(v.response??'—')+' ms'
   ).join(' | ');
   sheriDiagSet('Latency by language',summary);
 }
@@ -3962,16 +3962,17 @@ async function startShericeriLoop(){
   const sheriStartIsAndroid=/Android/i.test(navigator.userAgent||'');
   const micStartupStartedAt=performance.now();
   sheriDiagSet('Microphone startup clock','started ('+currentShericeriLang()+')');
-  // Android voice enumeration can take up to ~1.2s; do not block microphone startup on it.
-  if(sheriStartIsAndroid){
-    try{ speechSynthesis?.resume(); }catch(_){}
-    ensureVoicesLoaded(350).catch(()=>{});
-  }else{
-    await ensureVoicesLoaded();
-  }
+  // Warm the speech engine in parallel with microphone permission. Waiting for
+  // the voice list before opening the mic adds avoidable startup latency.
+  try{ speechSynthesis?.resume(); }catch(_){}
+  ensureVoicesLoaded(sheriStartIsAndroid?350:500).catch(()=>{});
   try{
-    await refreshSheriAudioInputs();
     const isAndroid=/Android/i.test(navigator.userAgent);
+    // Android uses the browser-default input; device enumeration is diagnostic
+    // only and must not delay the microphone request. Desktop retains explicit
+    // physical-input selection and verification.
+    if(isAndroid) refreshSheriAudioInputs().catch(()=>{});
+    else await refreshSheriAudioInputs();
     const selected=sheriAudioInputDevices.find(d=>d.deviceId===sheriSelectedAudioInputId);
     if(!isAndroid && (!selected || sheriScoreInputDevice(selected)<0)){
       const physical=[...sheriAudioInputDevices].filter(d=>sheriScoreInputDevice(d)>=0);
@@ -4057,6 +4058,10 @@ async function startShericeriLoop(){
   sheriDiagSet('Session state','GREETING before listening');
   sheriGreetingQueuedAt=performance.now();
   sheriDiagSet('Greeting language',currentShericeriLang());
+  const micToGreetingQueue=sheriMicReadyAt?Math.round(sheriGreetingQueuedAt-sheriMicReadyAt):null;
+  sheriDiagSet('Mic ready → greeting queued',micToGreetingQueue!==null?micToGreetingQueue+' ms ('+currentShericeriLang()+')':'mic timestamp unavailable');
+  if(micToGreetingQueue!==null)sheriRecordLatency('queue',micToGreetingQueue,currentShericeriLang());
+  sheriDiagSet('Farewell sleep guard','NOT ARMED — session stays active until explicit selected-language farewell');
   sheriEnqueueSpeech(sheriTapGreeting(),sheriTurnId);
 }
 function sheriSleepAfterGoodbye(turnId){
