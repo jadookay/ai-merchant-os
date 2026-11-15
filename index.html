@@ -7756,5 +7756,21 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
 })();
 </script>
 
+<!-- Shericeri portrait beside every visible Shericeri heading -->
+<style id="aibos-shericeri-title-thumbnails-v1">
+.sheri-title-thumb{width:26px;height:26px;flex:0 0 26px;object-fit:cover;border-radius:50%;border:1.5px solid #F7EB5B;vertical-align:middle;margin-right:8px;box-shadow:0 1px 5px rgba(0,0,0,.18)}
+#shericeri .top h1{display:flex;align-items:center;gap:0}
+</style>
+<script id="aibos-shericeri-title-thumbnails-v1">
+(function(){
+ const source=document.querySelector('#dashboard .sheri-launcher .sheri-thumb img');
+ if(!source)return;
+ document.querySelectorAll('h1,h2,h3,[role="heading"]').forEach(heading=>{
+   if(!/shericeri/i.test(heading.textContent||'')||heading.querySelector('.sheri-title-thumb'))return;
+   const img=source.cloneNode(true);img.removeAttribute('id');img.className='sheri-title-thumb';img.alt='Shericeri portrait';heading.prepend(img);
+ });
+})();
+</script>
+
 </body>
 </html>
