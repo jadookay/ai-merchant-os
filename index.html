@@ -547,7 +547,7 @@ window.ensurePdfJs=async function(){
     </div>
     <button id="shericeriTalkBtn" class="btn" style="width:120px;height:120px;border-radius:50%;font-size:36px;line-height:1" onclick="toggleShericeri()">🎙️</button>
     <div id="shericeriStatus" class="sub" style="margin-top:16px">Tap to start talking with Shericeri.</div>
-    <div class="sub" style="margin-top:8px">Voice is language-locked: Shericeri speaks one selected language at a time. English and French use Android/browser TTS; Kinyarwanda requires the local Sherpa-ONNX TTS bridge for spoken output on devices without a Kinyarwanda voice.</div>
+    <div class="sub" style="margin-top:8px">Voice is language-locked: Shericeri speaks one selected language at a time. English and French use the device speech engine. Kinyarwanda uses online voice generation when connected, with the installed local voice bridge as an offline option where supported.</div>
   </div>
   <div class="card section chat">
     <div id="shericeriMessages" class="messages">
