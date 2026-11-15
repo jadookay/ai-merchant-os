@@ -556,9 +556,27 @@ test("ordered purchase deletion uses the same guarded RPC after token refresh", 
 });
 
 
-test("reports, sales and expenses include a calendar-year filter", () => {
-  assert.equal(html.split('<option value="yearly">Yearly</option>').length - 1, 3);
+test("reports, sales, expenses, Home and stock movements include calendar-year filters", () => {
+  assert.equal(html.split('<option value="yearly">Yearly</option>').length - 1, 5);
   assert.ok(html.includes("else if(mode==='yearly')start=sheriLocalDateKey(new Date(today.getFullYear(),0,1))"));
+  assert.ok(html.includes("else if(period==='yearly'){start.value=sheriLocalDateInput(new Date(now.getFullYear(),0,1));end.value=today;}"));
+});
+
+test("merchant navigation uses five simple destinations and preserves Shericeri access", () => {
+  assert.match(html, /data-view="dashboard">⌂ Home/);
+  assert.match(html, /data-view="sales">＋ Sell/);
+  assert.match(html, /data-view="inventory">▦ Stock/);
+  assert.match(html, /data-view="money">◈ Money/);
+  assert.match(html, /data-view="records">☰ More/);
+  assert.ok(html.includes('class="sheri-global-launcher"'));
+  assert.ok(html.includes("'suppliers':'Abaranguza'"));
+});
+
+test("Home date controls and Home shortcuts route to relevant business screens", () => {
+  assert.ok(html.includes('id="homePeriod"'));
+  assert.ok(html.includes("sheriApplyHomeRange"));
+  assert.ok(html.includes('class="row home-activity"'));
+  assert.ok(html.includes("className='home-priority'"));
 });
 
 test("team status is presented as an enabled/disabled control while preserving suspended backend state", () => {
