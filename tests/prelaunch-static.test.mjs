@@ -215,6 +215,8 @@ test("Kinyarwanda speech preserves punctuation and measures voice latency per se
   assert.ok(html.includes("Mic ready → first speech"));
   assert.ok(html.includes("Mic ready → greeting audible"));
   assert.ok(html.includes("Greeting queue → audible start"));
+  assert.ok(html.includes("Latency by language"));
+  assert.ok(html.includes("sheriRecordLatency('greeting',greetingLatency,lang)"));
   assert.ok(html.includes("Keep session-level microphone/greeting measurements visible"));
 });
 
