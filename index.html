@@ -3764,7 +3764,7 @@ function sheriDiagClearTurn(){
   // only per-turn ASR/AI/TTS details on the next utterance.
   const keep=new Set([
     'Browser','TTSavailable','MediaRecorder','Selectedlanguage','SelectedTTSvoice',
-    'Microphonestartupclock','getUserMediapermissionlatency','Micstartupready',
+    'Microphonestartupclock','getUserMediapermissionlatency','Micstartupready','Latencybylanguage','Micreadyfirstaudibleresponse','Turnfirstaudibleresponse',
     'Microphoneready','Microphoneautoselection','Microphoneexactdeviceretry',
     'Microphoneselectedinputattempt','Greetinglanguage','Micreadyfirstspeech',
     'Micreadygreetingaudible','Greetingqueueaudiblestart','Turnmode','Sessionstate'
@@ -3785,6 +3785,17 @@ function sheriDiagSet(label,value){
   if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}
   row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>';
   sheriDiagShow();
+}
+const sheriLatencyByLanguage={};
+function sheriRecordLatency(field,value,lang=currentShericeriLang()){
+  const key=String(lang||'en-US').slice(0,2).toUpperCase();
+  if(!Number.isFinite(Number(value)))return;
+  const record=sheriLatencyByLanguage[key]||(sheriLatencyByLanguage[key]={});
+  record[field]=Math.round(Number(value));
+  const summary=Object.entries(sheriLatencyByLanguage).map(([code,v])=>
+    code+': mic '+(v.mic??'—')+' ms, greeting '+(v.greeting??'—')+' ms, first speech '+(v.firstSpeech??'—')+' ms, reply audio '+(v.response??'—')+' ms'
+  ).join(' | ');
+  sheriDiagSet('Latency by language',summary);
 }
 let sheriSelectedAudioInputId='';
 let sheriAudioInputDevices=[];
@@ -3978,8 +3989,12 @@ async function startShericeriLoop(){
       micRequestStartedAt=performance.now();
       shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
       sheriMicReadyAt=performance.now();
-      sheriDiagSet('getUserMedia permission latency',Math.round(sheriMicReadyAt-micRequestStartedAt)+' ms ('+currentShericeriLang()+')');
-      sheriDiagSet('Mic startup → ready',Math.round(sheriMicReadyAt-micStartupStartedAt)+' ms');
+      const micPermissionMs=Math.round(sheriMicReadyAt-micRequestStartedAt);
+      sheriDiagSet('getUserMedia permission latency',micPermissionMs+' ms ('+currentShericeriLang()+')');
+      sheriRecordLatency('mic',micPermissionMs);
+      const micStartupMs=Math.round(sheriMicReadyAt-micStartupStartedAt);
+      sheriDiagSet('Mic startup → ready',micStartupMs+' ms');
+      sheriRecordLatency('startup',micStartupMs);
       sheriDiagSet('Microphone ready','YES — live stream acquired');
     }catch(primaryMicError){
       sheriDiagSet('Microphone selected-input attempt','FAILED — '+(primaryMicError?.name||primaryMicError?.message||primaryMicError));
@@ -3993,8 +4008,12 @@ async function startShericeriLoop(){
         sheriSelectedAudioInputId=best.deviceId;
         shericeriMicStream=await navigator.mediaDevices.getUserMedia(sheriAudioConstraints());
         sheriMicReadyAt=performance.now();
-        sheriDiagSet('getUserMedia permission latency',Math.round(sheriMicReadyAt-micRequestStartedAt)+' ms (fallback device; '+currentShericeriLang()+')');
-        sheriDiagSet('Mic startup → ready',Math.round(sheriMicReadyAt-micStartupStartedAt)+' ms');
+        const micPermissionMs=Math.round(sheriMicReadyAt-micRequestStartedAt);
+        sheriDiagSet('getUserMedia permission latency',micPermissionMs+' ms (fallback device; '+currentShericeriLang()+')');
+        sheriRecordLatency('mic',micPermissionMs);
+        const micStartupMs=Math.round(sheriMicReadyAt-micStartupStartedAt);
+        sheriDiagSet('Mic startup → ready',micStartupMs+' ms');
+        sheriRecordLatency('startup',micStartupMs);
         sheriDiagSet('Microphone ready','YES — fallback input acquired');
       }else{
         throw primaryMicError;
@@ -4242,7 +4261,9 @@ function shericeriListenOnce(){
           speechConfirmed=true;
           hasSpoken=true;
           sheriFirstSpeechAt=performance.now();
-          sheriDiagSet('Mic ready → first speech',sheriMicReadyAt?Math.round(sheriFirstSpeechAt-sheriMicReadyAt)+' ms ('+currentShericeriLang()+')':'mic ready timestamp unavailable');
+          const firstSpeechLatency=sheriMicReadyAt?Math.round(sheriFirstSpeechAt-sheriMicReadyAt):null;
+          sheriDiagSet('Mic ready → first speech',firstSpeechLatency!==null?firstSpeechLatency+' ms ('+currentShericeriLang()+')':'mic ready timestamp unavailable');
+          if(firstSpeechLatency!==null)sheriRecordLatency('firstSpeech',firstSpeechLatency);
           sheriVadDiag('VAD speech confirmed','YES');
           sheriVadDiag('VAD speech start',((speechStartTime-startTime)/1000).toFixed(1)+'s');
         }
@@ -4685,8 +4706,17 @@ async function sheriOnlineKinyaTts(text,lang,turnId,finish){
     await new Promise((resolve,reject)=>{
       audio.onplaying=()=>{
         const audibleAt=performance.now();
-        sheriDiagSet('Mic ready → first audible response',sheriMicReadyAt?Math.round(audibleAt-sheriMicReadyAt)+' ms (rw-RW)':'mic ready timestamp unavailable');
-        if(sheriGreetingQueuedAt)sheriDiagSet('Greeting queue → audible start',Math.round(audibleAt-sheriGreetingQueuedAt)+' ms (rw-RW)');
+        if(sheriGreetingQueuedAt){
+          const greetingLatency=sheriMicReadyAt?Math.round(audibleAt-sheriMicReadyAt):null;
+          sheriDiagSet('Mic ready → greeting audible',greetingLatency!==null?greetingLatency+' ms (rw-RW)':'mic ready timestamp unavailable');
+          if(greetingLatency!==null)sheriRecordLatency('greeting',greetingLatency,'rw-RW');
+          sheriDiagSet('Greeting queue → audible start',Math.round(audibleAt-sheriGreetingQueuedAt)+' ms (rw-RW)');
+          sheriGreetingQueuedAt=0;
+        }else{
+          const responseLatency=sheriMicReadyAt?Math.round(audibleAt-sheriMicReadyAt):null;
+          sheriDiagSet('Mic ready → first audible response',responseLatency!==null?responseLatency+' ms (rw-RW)':'mic ready timestamp unavailable');
+          if(responseLatency!==null)sheriRecordLatency('response',responseLatency,'rw-RW');
+        }
       };
       audio.onended=resolve;
       audio.onerror=()=>reject(new Error('Kinyarwanda TTS audio playback failed ('+(audio.error?.code||'MEDIA_ERR_UNKNOWN')+')'));
@@ -4861,13 +4891,18 @@ function sheriDrainSpeakQueue(){
       sheriDiagSet('TTS','STARTED');
       sheriDiagSet('Response phase','TTS speaking');
       if(sheriGreetingQueuedAt){
-        sheriDiagSet('Mic ready → greeting audible',sheriMicReadyAt?Math.round(performance.now()-sheriMicReadyAt)+' ms ('+lang+')':'mic ready timestamp unavailable');
+        const greetingLatency=sheriMicReadyAt?Math.round(performance.now()-sheriMicReadyAt):null;
+        sheriDiagSet('Mic ready → greeting audible',greetingLatency!==null?greetingLatency+' ms ('+lang+')':'mic ready timestamp unavailable');
+        if(greetingLatency!==null)sheriRecordLatency('greeting',greetingLatency,lang);
         sheriDiagSet('Greeting queue → audible start',Math.round(performance.now()-sheriGreetingQueuedAt)+' ms ('+lang+')');
         sheriGreetingQueuedAt=0;
+      }else{
+        const responseLatency=sheriMicReadyAt?Math.round(performance.now()-sheriMicReadyAt):null;
+        sheriDiagSet('Mic ready → first audible response',responseLatency!==null?responseLatency+' ms ('+currentShericeriLang()+')':'mic ready timestamp unavailable');
+        if(responseLatency!==null)sheriRecordLatency('response',responseLatency,currentShericeriLang());
       }
       sheriDiagSet('TTS turn ID',String(turnId));
       sheriDiagSet('Turn → first audible response',Math.round(performance.now()-sheriTurnStartedAt)+' ms');
-      sheriDiagSet('Mic ready → first audible response',sheriMicReadyAt?Math.round(performance.now()-sheriMicReadyAt)+' ms ('+currentShericeriLang()+')':'mic ready timestamp unavailable');
       sheriDiagSet('TTS queue → audible start',Math.round(performance.now()-sheriTtsQueuedAt)+' ms');
       sheriDiagSet('TTS requested language',lang);
       if(/^rw/i.test(lang)) sheriDiagSet('Kinyarwanda TTS bridge',window.SHERICERI_VOICE_BRIDGE?.speak?'READY':'NOT INSTALLED');
