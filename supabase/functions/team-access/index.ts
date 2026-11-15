@@ -16,6 +16,20 @@ function randomPassword() {
   const bytes = crypto.getRandomValues(new Uint8Array(48));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+function normalizePhoneForAuth(value: string | null, country: string | null): string | null {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const digits = raw.replace(/[^0-9]/g, "");
+  let normalized = "";
+  if (raw.startsWith("+")) normalized = "+" + digits;
+  else if (digits.startsWith("00")) normalized = "+" + digits.slice(2);
+  else if (String(country || "").toUpperCase() === "RW") {
+    if (digits.startsWith("250")) normalized = "+" + digits;
+    else if (digits.startsWith("0")) normalized = "+250" + digits.slice(1);
+    else if (digits.length === 9) normalized = "+250" + digits;
+  }
+  return /^\+[1-9]\d{7,14}$/.test(normalized) ? normalized : null;
+}
 function sessionIdFromJwt(token: string): string {
   const segment = token.split(".")[1];
   if (!segment) return "";
@@ -66,7 +80,7 @@ Deno.serve(async (req: Request) => {
 
       const ip = req.headers.get("cf-connecting-ip") || "unknown";
       const ipHash = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip))), b => b.toString(16).padStart(2, "0")).join("");
-      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id").eq("shericeri_id", Number(merchantCode)).maybeSingle();
+      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,country").eq("shericeri_id", Number(merchantCode)).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account ID was not recognized." }, 404);
       const { data: verified, error: verifyError } = await admin.rpc("verify_merchant_member_pin", {
         p_merchant_id: merchant.id,
@@ -93,7 +107,7 @@ Deno.serve(async (req: Request) => {
       return json({
         ok: true,
         token_hash: tokenHash,
-        type: "magiclink",
+        type: "email",
         email: loginEmail,
         phone: verified.phone || null,
         merchant_id: verified.merchant_id,
@@ -115,7 +129,7 @@ Deno.serve(async (req: Request) => {
       const merchantId = String(body?.merchant_id || "");
       const fullName = String(body?.full_name || "").trim();
       const email = String(body?.email || "").trim().toLowerCase() || null;
-      const phone = String(body?.phone || "").trim() || null;
+      let phone = String(body?.phone || "").trim() || null;
       const username = String(body?.username || "").trim().toLowerCase() || null;
       const pin = String(body?.pin || "");
       const role = String(body?.role || "cashier");
@@ -125,16 +139,19 @@ Deno.serve(async (req: Request) => {
         return json({ error: "Provide a business, full name, verified email or phone, and a 6–8 digit PIN." }, 400);
       }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
-      if (phone && !/^\+?\d{7,15}$/.test(phone)) return json({ error: "Enter a phone number in international format." }, 400);
+      
       if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
       if (!["admin", "manager", "cashier", "inventory", "accountant", "custom"].includes(role)) {
         return json({ error: "Invalid team role." }, 400);
       }
 
       const { data: merchant, error: merchantError } = await admin
-        .from("merchants").select("id,user_id").eq("id", merchantId).maybeSingle();
+        .from("merchants").select("id,user_id,country").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
-
+      if (phone) {
+        phone = normalizePhoneForAuth(phone, merchant.country);
+        if (!phone) return json({ error: "Enter a valid international phone number. For Rwanda, you may enter 078… or +25078… ." }, 400);
+      }
       const isOwner = merchant.user_id === callerData.user.id;
       if (!isOwner && !(await hasActiveDeviceSession(admin, merchantId, callerData.user.id, bearer))) {
         return json({ error: "This device session is no longer authorized. Sign in again." }, 403);
@@ -294,7 +311,7 @@ Deno.serve(async (req: Request) => {
       const memberId = String(body?.member_id || "");
       const fullName = String(body?.full_name || "").trim();
       const email = body?.email === undefined ? undefined : (String(body.email || "").trim().toLowerCase() || null);
-      const phone = body?.phone === undefined ? undefined : (String(body.phone || "").replace(/[^0-9+]/g, "") || null);
+      let phone = body?.phone === undefined ? undefined : (String(body.phone || "").trim() || null);
       const username = body?.username === undefined ? undefined : (String(body.username || "").trim().toLowerCase() || null);
       const responsibility = String(body?.responsibility || "").trim() || null;
       const role = String(body?.role || "cashier");
@@ -303,14 +320,18 @@ Deno.serve(async (req: Request) => {
       const pin = String(body?.pin || "");
       if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
-      if (phone && !/^\+?\d{7,15}$/.test(phone)) return json({ error: "Enter a phone number in international format." }, 400);
+      
       if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
       if (!["admin", "manager", "cashier", "inventory", "accountant", "custom"].includes(role)) return json({ error: "Invalid team role." }, 400);
       if (!["active", "suspended"].includes(status)) return json({ error: "Invalid team status." }, 400);
       if (pin && !/^\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
 
-      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id").eq("id", merchantId).maybeSingle();
+      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id,country").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
+      if (phone) {
+        phone = normalizePhoneForAuth(phone, merchant.country);
+        if (!phone) return json({ error: "Enter a valid international phone number. For Rwanda, you may enter 078… or +25078… ." }, 400);
+      }
       const isOwner = merchant.user_id === callerData.user.id;
       if (!isOwner && !(await hasActiveDeviceSession(admin, merchantId, callerData.user.id, bearer))) {
         return json({ error: "This device session is no longer authorized. Sign in again." }, 403);
