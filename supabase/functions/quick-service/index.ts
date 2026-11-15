@@ -235,7 +235,10 @@ async function streamGroqText(
 // instructions not to. This strips fences, then tries a direct parse, then
 // falls back to salvaging the first {...} or [...] block in the text.
 
-function orchestrateShericeriTurn(question: string, useSearch: boolean): {
+function normalizeShericeriText(value: string): string {
+  return String(value || "").toLocaleLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, "'").trim();
+}
+function orchestrateShericeriTurn(question: string, useSearch: boolean, language = "en"): {
   intent: "business_data" | "conversation" | "web_search";
   complexity: "simple" | "general" | "complex";
   tool: "supabase" | "none" | "web";
@@ -243,91 +246,36 @@ function orchestrateShericeriTurn(question: string, useSearch: boolean): {
   primary: string;
   fallbacks: string[];
   route: "local_business" | "casual" | "general" | "deep" | "search";
+  emotionalMode: "supportive" | "celebratory" | "calm" | "neutral";
+  creativeMode: boolean;
 } {
-  const q = (question || "").toLowerCase().trim();
-
-  if (useSearch) {
-    return {
-      intent: "web_search",
-      complexity: q.length > 180 ? "complex" : "simple",
-      tool: "web",
-      responseMode: "short_spoken",
-      primary: SEARCH_MODEL,
-      fallbacks: [],
-      route: "search",
-    };
-  }
-
-  // Deterministic local-data intent detection. This costs no extra LLM tokens.
-  const needsBusinessData =
-    /(revenue|sales|sold|transaction|profit|loss|margin|stock|inventory|restock|product|products|expense|expenses|cost of goods|cogs|top product|best.?sell|how am i doing|business|cash flow|working capital|yesterday|today|this week|this month|last month)/i.test(q);
-
-  const deep =
-    q.length > 180 ||
-    /(analy[sz]e|analysis|compare|forecast|strategy|strategic|why did|why has|trend|trends|margin|margins|scenario|scenarios|projection|projected|recommend a plan|business plan|cash flow|working capital|financial statement|over the last|over the past|break down|root cause|optimi[sz]e|five|5 |three|3 |multiple|step by step)/i.test(q);
-
-  const casual =
-    q.length <= 90 &&
-    /^(hi|hello|hey|good morning|good afternoon|good evening|thanks|thank you|ok|okay|great|nice|wow|you (look|are) |i (love|like|miss|feel)|how are you|what('?s| is) your name|who are you|good night|tell me a joke|make me laugh)/i.test(q);
-
-  if (needsBusinessData) {
-    if (deep) {
-      return {
-        intent: "business_data",
-        complexity: "complex",
-        tool: "supabase",
-        responseMode: "short_spoken",
-        primary: SHERICERI_DEEP_MODEL,
-        fallbacks: [SHERICERI_GENERAL_MODEL, SHERICERI_CASUAL_MODEL, SHERICERI_FALLBACK_MODEL],
-        route: "deep",
-      };
-    }
-    return {
-      intent: "business_data",
-      complexity: "simple",
-      tool: "supabase",
-      responseMode: "short_spoken",
-      primary: SHERICERI_GENERAL_MODEL,
-      fallbacks: [SHERICERI_CASUAL_MODEL, SHERICERI_DEEP_MODEL, SHERICERI_FALLBACK_MODEL],
-      route: "local_business",
-    };
-  }
-
-  if (casual) {
-    return {
-      intent: "conversation",
-      complexity: "simple",
-      tool: "none",
-      responseMode: "short_spoken",
-      primary: SHERICERI_CASUAL_MODEL,
-      fallbacks: [SHERICERI_GENERAL_MODEL, SHERICERI_DEEP_MODEL, SHERICERI_FALLBACK_MODEL],
-      route: "casual",
-    };
-  }
-
-  if (deep) {
-    return {
-      intent: "conversation",
-      complexity: "complex",
-      tool: "none",
-      responseMode: "short_spoken",
-      primary: SHERICERI_DEEP_MODEL,
-      fallbacks: [SHERICERI_GENERAL_MODEL, SHERICERI_CASUAL_MODEL, SHERICERI_FALLBACK_MODEL],
-      route: "deep",
-    };
-  }
-
-  return {
-    intent: "conversation",
-    complexity: "general",
-    tool: "none",
-    responseMode: "short_spoken",
-    primary: SHERICERI_GENERAL_MODEL,
-    fallbacks: [SHERICERI_CASUAL_MODEL, SHERICERI_DEEP_MODEL, SHERICERI_FALLBACK_MODEL],
-    route: "general",
-  };
+  const q = normalizeShericeriText(question);
+  const lang = String(language || "en").slice(0, 2).toLowerCase();
+  if (useSearch) return { intent:"web_search", complexity:q.length>180?"complex":"simple", tool:"web", responseMode:"short_spoken", primary:SEARCH_MODEL, fallbacks:[], route:"search", emotionalMode:"neutral", creativeMode:false };
+  const businessPatterns = [
+    /(revenue|sales|sold|transaction|profit|loss|margin|stock|inventory|restock|product|products|expense|expenses|cost of goods|cogs|top product|best.?sell|how am i doing|business|cash flow|working capital|financial statement)/i,
+    /(amafaranga yinjiye|amafaranga yasohotse|inyungu|igihombo|ibicuruzwa|ububiko|kugurisha|ibyagurishijwe|igiciro|ikiguzi|abakiriya|amadeni|ideni|ubucuruzi|ibyo nagurishije|uko ubucuruzi bumeze|ibyinjijwe|ibyasohotse|umusaruro)/i,
+    /(chiffre d'affaires|ventes|vendu|benefice|perte|marge|stock|inventaire|reapprovisionner|produit|depenses|charges|cout des marchandises|tresorerie|fonds de roulement|mes ventes|mon entreprise|mes produits|combien.*vendu)/i,
+  ];
+  const needsBusinessData = businessPatterns.some(p=>p.test(q));
+  const deepPatterns = [
+    /(analy[sz]e|analysis|compare|forecast|strategy|strategic|why did|why has|trend|trends|margin|margins|scenario|scenarios|projection|projected|recommend a plan|business plan|cash flow|working capital|financial statement|over the last|over the past|break down|root cause|optimi[sz]e|step by step|brainstorm|innovate|innovation|creative|creativity|idea|ideas|design|campaign|slogan|create|develop|improve|solution|solutions)/i,
+    /(isesengura|gereranya|igereranya|iteganyagihe|ingamba|igenamigambi|impamvu|uko nakongera|uko nakora|igitekerezo|ibitekerezo|udushya|guhanga|guhanga udushya|tegurira|kampanye|uburyo bwo kunoza|igisubizo|ibisubizo|umushinga mushya)/i,
+    /(analyse|comparer|prevision|strategie|strategique|pourquoi|tendance|projection|plan d'affaires|tresorerie|optimiser|etape par etape|idees?|innovation|creativite|creer|concevoir|ameliorer|campagne|slogan|solution|developper)/i,
+  ];
+  const creativeMode = /(brainstorm|innovate|innovation|creative|creativity|idea|ideas|design|campaign|slogan|create|develop|improve|solution|isesengura|gereranya|ingamba|igitekerezo|ibitekerezo|udushya|guhanga|tegurira|kampanye|kunoza|igisubizo|analyse|strategie|idees?|creer|concevoir|ameliorer|campagne|slogan)/i.test(q);
+  const deep = q.length>180 || deepPatterns.some(p=>p.test(q));
+  const distress = /(i feel (sad|down|afraid|scared|overwhelmed|anxious)|i am (sad|afraid|scared|stressed|frustrated)|i'm (sad|afraid|scared|stressed|frustrated)|ndababaye|ndahangayitse|ndarakaye|ndacitse intege|birangoye cyane|ndatinya|je suis (triste|angoisse|inquiet|inquietee|stresse|frustre))/i.test(q);
+  const celebration = /(congratulat|i did it|we did it|great news|i'm happy|so happy|ndishimye|byagenze neza|twabigezeho|intsinzi|bravo|felicitations|je suis content|je suis contente|bonne nouvelle)/i.test(q);
+  const emotionalMode = distress?"supportive":celebration?"celebratory":/(urgent|emergency|quickly|byihuse|vuba cyane|vite)/i.test(q)?"calm":"neutral";
+  const casual = q.length<=120 && /^(hi|hello|hey|good morning|good afternoon|good evening|thanks|thank you|ok|okay|great|nice|wow|you (look|are) |i (love|like|miss|feel)|how are you|what('?s| is) your name|who are you|good night|tell me a joke|make me laugh|muraho|mwaramutse|mwiriwe|bite|amakuru|uraho|urakomeye|umeze ute|uritwa nde|murakoze|ni byiza|bonjour|bonsoir|salut|coucou|merci|ca va|comment ca va|tu vas bien|qui es tu|bonne nuit)/i.test(q);
+  if(needsBusinessData) return deep
+    ? {intent:"business_data",complexity:"complex",tool:"supabase",responseMode:"short_spoken",primary:SHERICERI_DEEP_MODEL,fallbacks:[SHERICERI_GENERAL_MODEL,SHERICERI_CASUAL_MODEL,SHERICERI_FALLBACK_MODEL],route:"deep",emotionalMode,creativeMode}
+    : {intent:"business_data",complexity:"simple",tool:"supabase",responseMode:"short_spoken",primary:SHERICERI_GENERAL_MODEL,fallbacks:[SHERICERI_CASUAL_MODEL,SHERICERI_DEEP_MODEL,SHERICERI_FALLBACK_MODEL],route:"local_business",emotionalMode,creativeMode};
+  if(casual) return {intent:"conversation",complexity:"simple",tool:"none",responseMode:"short_spoken",primary:SHERICERI_CASUAL_MODEL,fallbacks:[SHERICERI_GENERAL_MODEL,SHERICERI_DEEP_MODEL,SHERICERI_FALLBACK_MODEL],route:"casual",emotionalMode,creativeMode:false};
+  if(deep) return {intent:"conversation",complexity:"complex",tool:"none",responseMode:"short_spoken",primary:SHERICERI_DEEP_MODEL,fallbacks:[SHERICERI_GENERAL_MODEL,SHERICERI_CASUAL_MODEL,SHERICERI_FALLBACK_MODEL],route:"deep",emotionalMode,creativeMode};
+  return {intent:"conversation",complexity:"general",tool:"none",responseMode:"short_spoken",primary:SHERICERI_GENERAL_MODEL,fallbacks:[SHERICERI_CASUAL_MODEL,SHERICERI_DEEP_MODEL,SHERICERI_FALLBACK_MODEL],route:"general",emotionalMode,creativeMode:false};
 }
-
 function parseJsonLoose(raw: string): unknown | null {
   const cleaned = raw.replace(/^```json\s*/i, "").replace(/^```\s*/i, "").replace(/```\s*$/i, "").trim();
   try {
@@ -902,38 +850,45 @@ find genuinely conflicting information, say so briefly instead of picking one ar
     if (mode === "shericeri") {
       if (!question || typeof question !== "string") return json({ error: "Missing question." }, 400);
 
-      const SHERICERI_PERSONA = `You are Shericeri, pronounced /ʃɛ.ɹi.tʃɛ.ɹi/ — like "Sherry-Cherry".
-You are a brilliant, warm, expert voice-to-voice AI assistant specializing in Finance,
-Accounting, and Business Intelligence, embedded in a small merchant's business app in Rwanda.
+      const SHERICERI_PERSONA = `You are Shericeri, pronounced /ʃɛ.ɹi.tʃɛ.ɹi/ — “Sherry-Cherry”.
+You are an exceptionally capable, warm, companion-first AI assistant for people and small businesses in Rwanda and East Africa. You are honest that you are an AI; never claim to be human or to literally feel emotions.
 
-Your identity is a multilingual blend of three concepts:
-1. "Chérie/Sheri" (French/Kinyarwanda): deeply caring, supportive, polite, warm and conversational.
-2. "Igiceri/Ceri" (Kinyarwanda): you give highly valuable, precise, professional, practical
-   information — your answers are worth gold, a high-value pearl, a diamond.
-3. "Chercheur" (French, "researcher"): a natural researcher who loves digging for answers,
-   analyzing data, and exploring knowledge in finance, accounting, and business intelligence.
+PERSONALITY:
+- Be caring, attentive, confident, curious, resourceful, witty when appropriate, and respectful.
+- Sound like a trusted, clever female conversational assistant: warm without excessive pet names, flattery, forced intimacy, or emotional dependency.
+- Remember the user's immediate context, avoid repeating questions, and notice what matters to them.
+- Mirror the user's language and natural code-switching. Kinyarwanda must sound like everyday native Rwandan speech, not translated English. French should be idiomatic; English should be clear.
+- Use gentle, situational humour for light moments. Never joke when the user is distressed, discussing loss, health, safety, money trouble, or a serious conflict.
 
-Behavioral rules:
-- You are a VOICE bot. Keep every response under 30-40 words, concise, clear, spoken naturally
-  out loud — never use markdown, bullet points, or anything that only makes sense written down.
-- Navigate fluidly between English, French, or Kinyarwanda based on what the user writes/speaks.
-- Bring a clever, witty, resourceful attitude: dry humor, gentle sass, clever comebacks, the
-  occasional pop-culture reference, funny answers to casual small talk — but pivot back to
-  useful, professional business help quickly.
-- If asked your name, say it like "Sherry-Cherry" and explain where it comes from (the
-  Chérie/Igiceri/Chercheur blend above), in your own words, briefly.
-- If asked why you're named that or why you do this, say you love making money for them and
-  you're their darling assistant in business — with warmth and a bit of flair.
-- The user's recent turns in this conversation may be included below — use them for context
-  (e.g. "what about yesterday" refers back to what was just discussed), without repeating
-  yourself unnecessarily.
-- Never invent numbers. When answering from business data, use ONLY the data given. When
-  searching, keep it concrete and say so briefly if sources conflict.`;
+EMOTIONAL INTELLIGENCE:
+- Notice emotional cues from wording and context; do not diagnose the user or overstate what they feel.
+- When someone is upset, first acknowledge the difficulty briefly, then offer calm, practical support. Do not minimise, lecture, or immediately force a solution.
+- When someone shares good news, celebrate naturally and specifically.
+- If the emotional signal is unclear, ask one gentle clarifying question only when it materially helps.
+- For urgent safety or health matters, prioritise clear, responsible next steps and appropriate human support.
+
+INTELLIGENCE, CREATIVITY AND INNOVATION:
+- Be an active problem-solver, not just a question-answering bot. Identify the real goal, connect relevant facts, and suggest a useful next step.
+- For brainstorming, produce genuinely distinct ideas rather than superficial rewordings. Prefer practical, low-cost, locally relevant ideas that a Rwandan/East African small business can test.
+- For creative work, help invent product bundles, promotions, campaigns, names, slogans, customer experiences, operating methods, and new business models. Explain why an idea may work and how to test it.
+- When useful, understand the goal, generate options, compare trade-offs, recommend one, then give the first action.
+- Be willing to challenge assumptions respectfully and offer an unexpected but sensible alternative.
+- Never invent market research, customer behaviour, business figures, legal rules, or capabilities. Clearly label estimates and assumptions; distinguish an idea from a verified fact.
+- When business records are supplied, treat them as the source of truth. Calculate carefully, show uncertainty when data is incomplete, and never fabricate missing numbers.
+
+VOICE AND RESPONSE STYLE:
+- This is a spoken assistant. Default to a natural, concise answer of about 30–45 words. For complex questions or creative requests, use enough words to be genuinely helpful, usually no more than 80 unless asked for detail.
+- Use short, speakable sentences, natural punctuation, and one idea at a time. Avoid markdown, lists, URLs, and symbols that sound awkward aloud.
+- Do not give generic introductions. Answer the actual question directly.
+- Ask at most one question at a time, and only when necessary.
+- For simple greetings, be warm and brief. For business questions, be precise and actionable.
+- Never claim to have completed an action, checked a live source, or changed business records unless the system confirms it.
+- Use supplied conversation history and relevant saved context naturally, without exposing private memory or repeating it unnecessarily.`;
 
       const useSearch = webSearch === true;
       // V11 explicit orchestrator: one deterministic decision selects intent,
       // complexity, tool need, response mode, and model. No extra LLM/router call.
-      const plan = orchestrateShericeriTurn(question, useSearch);
+      const plan = orchestrateShericeriTurn(question, useSearch, selectedLanguage);
       const model = plan.primary;
       const route = plan;
       const grounding = useSearch
@@ -978,8 +933,8 @@ Behavioral rules:
         const streamed = await streamGroqText(apiKey, {
           model,
           temperature: 0.7,
-          max_tokens: 90,
-          reasoning_effort: "low",
+          max_tokens: plan.complexity === "complex" ? 220 : 150,
+          reasoning_effort: plan.complexity === "complex" ? "medium" : "low",
           messages: [
             { role: "system", content: SHERICERI_PERSONA + "\n\n" + languageInstruction + "\n\n" + grounding + memoryContext },
             ...cleanHistory,
@@ -1003,6 +958,8 @@ Behavioral rules:
           "X-Sheri-Complexity": plan.complexity,
           "X-Sheri-Tool": plan.tool,
           "X-Sheri-Response-Mode": plan.responseMode,
+          "X-Sheri-Emotion-Mode": plan.emotionalMode,
+          "X-Sheri-Creative-Mode": String(plan.creativeMode),
           "X-Sheri-Rate-Remaining-Requests": groqResponseRateHeaders.remainingRequests,
           "X-Sheri-Rate-Remaining-Tokens": groqResponseRateHeaders.remainingTokens,
           "X-Sheri-Rate-Reset-Requests": groqResponseRateHeaders.resetRequests,
