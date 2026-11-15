@@ -324,6 +324,7 @@ window.ensurePdfJs=async function(){
     <button data-view="money">◈ Money</button>
     <button data-view="records">☰ More</button>
   </div>
+  <div class="sheri-global-launcher" role="button" tabindex="0" onclick="launchShericeri()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();launchShericeri()}">🎙️ Shericeri</div>
 </aside>
 <main class="main">
   <div id="sheriOfflineBar" style="display:flex;gap:10px;align-items:center;justify-content:space-between;padding:8px 12px;margin:0 0 16px;border-radius:10px;background:#f8fafc;border:1px solid #cbd5e1;font-size:12px;position:sticky;top:8px;z-index:20">
@@ -2145,7 +2146,7 @@ function sheriRecentActivitiesHtml(){
   for(const p of state.purchases||[])if(p.status!=='ordered')rows.push({when:p.purchased_at||p.created_at,type:'Purchase',title:p.product_name_snapshot||product(p.product_id)?.name||'Purchase',amount:-Number(p.total||Number(p.qty||0)*Number(p.unit_cost||0))});
   for(const c of state.cashEntries||[])rows.push({when:c.occurred_at||c.created_at,type:c.kind==='income'?'Cash income':c.kind==='expense'?'Cash expense':'Cash transfer',title:c.description||'Cash movement',amount:c.kind==='income'?Number(c.amount||0):c.kind==='expense'?-Number(c.amount||0):0});
   for(const p of state.payments||[])rows.push({when:p.payment_date||p.created_at,type:p.direction==='receipt'?'Customer receipt':'Payment',title:p.reference||p.source_type||'Payment',amount:p.direction==='receipt'?Number(p.amount||0):-Number(p.amount||0)});
-  return rows.filter(x=>sheriDateInReportRange(x.when)).sort((a,b)=>String(b.when||'').localeCompare(String(a.when||''))).slice(0,7).map(x=>{const target=['Sale','Voided sale'].includes(x.type)?'sales':x.type==='Expense'?'expenses':x.type==='Purchase'?'businessOS':'money';return '<button type="button" class="row home-activity" onclick="show(\\''+target+'\\')"><span><b>'+esc(x.title)+'</b><span class="sub">'+esc(x.type)+' · '+esc(x.when?new Date(x.when).toLocaleString():'Time unavailable')+'</span></span><b>'+money(x.amount)+'</b></button>'}).join('')||'<div class="empty">No recent activity in this date range.</div>';
+  return rows.filter(x=>sheriDateInReportRange(x.when)).sort((a,b)=>String(b.when||'').localeCompare(String(a.when||''))).slice(0,7).map(x=>{const target=['Sale','Voided sale'].includes(x.type)?'sales':x.type==='Expense'?'expenses':x.type==='Purchase'?'businessOS':'money';return '<button type="button" class="row home-activity" onclick="show(&quot;'+target+'&quot;)"><span><b>'+esc(x.title)+'</b><span class="sub">'+esc(x.type)+' · '+esc(x.when?new Date(x.when).toLocaleString():'Time unavailable')+'</span></span><b>'+money(x.amount)+'</b></button>'}).join('')||'<div class="empty">No recent activity in this date range.</div>';
 }
 function sheriCan(permission){if(!session?.user||!state.merchant)return false;if(state.merchant.user_id===session.user.id)return true;if(state.currentMembership?.role==='admin')return true;if(['manage_team','manage_sales'].includes(permission)&&state.currentMembership?.role!=='manager')return false;return state.currentMembership?.permissions?.[permission]===true}
 function sheriPermissionButton(permission,html){return sheriCan(permission)?html:''}
@@ -2225,29 +2226,7 @@ function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script>
-<script id="aibos-merchant-navigation-report-shortcuts-v1">
-(function(){
-  'use strict';
-  window.sheriApplyHomeRange=function(){const mode=document.getElementById('homePeriod')?.value||'all';if(typeof window.sheriApplyDateRange==='function')window.sheriApplyDateRange(mode,'homeStartDate','homeEndDate');};
-  const originalRender=window.render;
-  if(typeof originalRender==='function'&&!originalRender.__merchantNavWrapped){
-    const wrapped=function(){const result=originalRender.apply(this,arguments);const host=document.getElementById('priorities');if(host)Array.from(host.children).forEach(item=>{if(item.dataset.homePriorityWrapped==='1')return;const t=(item.textContent||'').toLowerCase();const target=/restock|stock|expiry|expiration|expired|ibicuruzwa|kurangira igihe/.test(t)?'inventory':/profit|loss|inyungu|igihombo|revenue|amafaranga/.test(t)?'reports':'sales';const b=document.createElement('button');b.type='button';b.className='home-priority';b.dataset.homePriorityWrapped='1';b.innerHTML=item.innerHTML;b.onclick=()=>show(target);item.replaceWith(b);});return result;};
-    wrapped.__merchantNavWrapped=true;window.render=wrapped;
-  }
-  const st=document.createElement('style');st.id='aibos-merchant-navigation-report-shortcuts-style';st.textContent=`
-    .home-activity,.home-priority{width:100%;font:inherit;color:inherit;text-align:left;background:transparent;border:0;cursor:pointer}
-    .home-activity{display:flex;align-items:center;justify-content:space-between;gap:12px;text-decoration:none}
-    .home-activity:hover,.home-priority:hover{background:#f8fafc;border-radius:9px}
-    .home-activity:focus-visible,.home-priority:focus-visible{outline:2px solid #010080;outline-offset:2px}
-    .home-priority{display:block;padding:10px 8px;border-bottom:1px solid var(--line);border-radius:8px}
-    #businessOS .legacy-os{display:block!important}
-    #businessOS .legacy-os>.metrics{display:none!important}
-    #businessOS .legacy-os>.grid2:nth-child(n+3),#businessOS .legacy-os>.card.section{display:none!important}
-    #businessOS .legacy-os>.grid2:nth-child(2){display:grid!important}
-    @media(max-width:650px){.home-period-card .formgrid{grid-template-columns:1fr 1fr}.home-period-card .formgrid>div:last-child{grid-column:1/-1}}
-  `;document.head.appendChild(st);
-})();
-</script>
+
 
 </body></html>');w.document.close();
 }
@@ -7705,5 +7684,32 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
  #appRoot .side .nav button{font-size:13.3px!important;font-weight:400!important;min-height:50px!important;padding:8px 2px!important;white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;hyphens:none!important}
 }
 </style>
+<script id="aibos-merchant-navigation-report-shortcuts-v1">
+(function(){
+  'use strict';
+  window.sheriApplyHomeRange=function(){const mode=document.getElementById('homePeriod')?.value||'all';if(typeof window.sheriApplyDateRange==='function')window.sheriApplyDateRange(mode,'homeStartDate','homeEndDate');};
+  const originalRender=window.render;
+  if(typeof originalRender==='function'&&!originalRender.__merchantNavWrapped){
+    const wrapped=function(){const result=originalRender.apply(this,arguments);const host=document.getElementById('priorities');if(host)Array.from(host.children).forEach(item=>{if(item.dataset.homePriorityWrapped==='1')return;const t=(item.textContent||'').toLowerCase();const target=/restock|stock|expiry|expiration|expired|ibicuruzwa|kurangira igihe/.test(t)?'inventory':/profit|loss|inyungu|igihombo|revenue|amafaranga/.test(t)?'reports':'sales';const b=document.createElement('button');b.type='button';b.className='home-priority';b.dataset.homePriorityWrapped='1';b.innerHTML=item.innerHTML;b.onclick=()=>show(target);item.replaceWith(b);});return result;};
+    wrapped.__merchantNavWrapped=true;window.render=wrapped;
+  }
+  const st=document.createElement('style');st.id='aibos-merchant-navigation-report-shortcuts-style';st.textContent=`
+    .sheri-global-launcher{display:flex;align-items:center;justify-content:center;gap:7px;margin:14px 6px 0;padding:11px 9px;border:1px solid #F7EB5B;border-radius:10px;background:#010080;color:#F7EB5B;font-size:13.3px;font-weight:650;cursor:pointer}
+    .sheri-global-launcher:hover{background:#11118f}
+    .sheri-global-launcher:focus-visible{outline:2px solid #F7EB5B;outline-offset:3px}
+    @media(max-width:650px){#appRoot .side .sheri-global-launcher{margin:7px auto 0;min-height:36px;width:100%;max-width:100%;padding:6px 8px}}
+    .home-activity,.home-priority{width:100%;font:inherit;color:inherit;text-align:left;background:transparent;border:0;cursor:pointer}
+    .home-activity{display:flex;align-items:center;justify-content:space-between;gap:12px;text-decoration:none}
+    .home-activity:hover,.home-priority:hover{background:#f8fafc;border-radius:9px}
+    .home-activity:focus-visible,.home-priority:focus-visible{outline:2px solid #010080;outline-offset:2px}
+    .home-priority{display:block;padding:10px 8px;border-bottom:1px solid var(--line);border-radius:8px}
+    #businessOS .legacy-os{display:block!important}
+    #businessOS .legacy-os>.metrics{display:none!important}
+    #businessOS .legacy-os>.grid2:nth-child(n+3),#businessOS .legacy-os>.card.section{display:none!important}
+    #businessOS .legacy-os>.grid2:nth-child(2){display:grid!important}
+    @media(max-width:650px){.home-period-card .formgrid{grid-template-columns:1fr 1fr}.home-period-card .formgrid>div:last-child{grid-column:1/-1}}
+  `;document.head.appendChild(st);
+})();
+</script>
 </body>
 </html>
