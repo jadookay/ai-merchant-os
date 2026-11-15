@@ -28,7 +28,7 @@ async function synthesizeIjwi(text:string):Promise<{base64:string;mime:string;by
  if(!key)throw new Error("IjwiLab API key is not configured; its free Studio is not an API endpoint.");
  const response=await fetch("https://ijwilab.com/api/v1/tts.php",{
   method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
-  body:JSON.stringify({input:text,language:"rw",speaker_id:19}),signal:AbortSignal.timeout(15000)});
+  body:JSON.stringify({input:text,language:"rw",speaker_id:0}),signal:AbortSignal.timeout(15000)});
  const raw=await response.text();let payload:any=null;try{payload=raw?JSON.parse(raw):null}catch{}
  if(!response.ok)throw new Error(`IjwiLab TTS HTTP ${response.status}: ${raw.slice(0,240)}`);
  const outputUrl=payload?.output_url;if(typeof outputUrl!=="string"||!outputUrl.trim())throw new Error("IjwiLab did not return an output URL.");
