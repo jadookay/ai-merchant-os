@@ -1,117 +1,56 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
-  });
+const corsHeaders = {"Access-Control-Allow-Origin":"*","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS"};
+function json(body: unknown,status=200){return new Response(JSON.stringify(body),{status,headers:{...corsHeaders,"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});}
+function encodeAudio(bytes:Uint8Array):string{let binary="";for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));return btoa(binary);}
+async function downloadProviderAudio(audioUrl:string,allowedHost:string):Promise<{base64:string;mime:string;bytes:number}>{
+ const url=new URL(audioUrl,allowedHost==="api.pindo.io"?"https://api.pindo.io/":"https://ijwilab.com/");
+ if(url.protocol!=="https:"||(url.hostname!==allowedHost&&!url.hostname.endsWith("."+allowedHost)))throw new Error("TTS provider returned an untrusted audio URL.");
+ const response=await fetch(url.toString(),{signal:AbortSignal.timeout(15000)});
+ if(!response.ok)throw new Error(`Generated audio download failed: HTTP ${response.status}`);
+ const bytes=new Uint8Array(await response.arrayBuffer());
+ if(!bytes.length||bytes.length>12000000)throw new Error("Generated speech audio was empty or too large.");
+ return {base64:encodeAudio(bytes),mime:response.headers.get("content-type")||"audio/wav",bytes:bytes.length};
 }
-
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "Method not allowed." }, 405);
-
-  try {
-    const token = Deno.env.get("PINDO_API_TOKEN");
-    if (!token) {
-      console.error("kinya-tts: PINDO_API_TOKEN secret is missing.");
-      return json({ error: "Kinyarwanda voice is not configured on the server." }, 503);
-    }
-
-    const body = await req.json().catch(() => null);
-    const text = typeof body?.text === "string" ? body.text.trim() : "";
-    const lang = typeof body?.lang === "string" ? body.lang.toLowerCase() : "rw";
-
-    if (!text) return json({ error: "Missing TTS text." }, 400);
-    if (text.length > 1200) return json({ error: "Speech text is too long." }, 413);
-    if (lang !== "rw") return json({ error: "This endpoint supports Kinyarwanda (rw) only." }, 400);
-
-    const callPindo = async () => {
-      const response = await fetch("https://api.pindo.io/ai/tts/rw", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ text, lang: "rw", speech_rate: 1.06 }),
-        signal: AbortSignal.timeout(20000),
-      });
-      const raw = await response.text();
-      let payload: any = null;
-      try { payload = raw ? JSON.parse(raw) : null; } catch { /* handled below */ }
-      if (!response.ok) {
-        // Log only a bounded provider response body; never log the bearer token.
-        console.warn("kinya-tts: Pindo returned HTTP", response.status, "body:", raw.slice(0, 500));
-        return { response, payload, raw };
-      }
-      const audioPath = payload?.data?.generated_audio_url ?? payload?.generated_audio_url;
-      if (typeof audioPath !== "string" || !audioPath.trim()) {
-        console.warn("kinya-tts: Pindo response did not contain generated_audio_url.");
-        return { response, payload, raw };
-      }
-      return { response, payload, raw, audioUrl: new URL(audioPath, "https://api.pindo.io/").toString() };
-    };
-
-    let result = await callPindo();
-    if (result.response.status >= 500) {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-      result = await callPindo();
-    }
-
-    if (!result.response.ok) {
-      const status = result.response.status;
-      const providerMessage =
-        (typeof result.payload?.message === "string" && result.payload.message) ||
-        (typeof result.payload?.error === "string" && result.payload.error) ||
-        (typeof result.payload?.details === "string" && result.payload.details) ||
-        (typeof result.payload?.detail === "string" && result.payload.detail) ||
-        (typeof result.payload?.description === "string" && result.payload.description) ||
-        (status === 409
-          ? "Pindo returned HTTP 409 Conflict. Check the provider detail below; this is not the browser playback error."
-          : status === 429
-            ? "Pindo rate limit or quota reached."
-            : "Pindo TTS request failed.");
-      const rawDetail = !result.payload && result.raw ? result.raw.slice(0, 350) : undefined;
-      return json({
-        error: providerMessage,
-        provider: "Pindo VoiceAI",
-        provider_status: status,
-        ...(rawDetail ? { provider_detail: rawDetail } : {}),
-      }, status === 429 || status === 409 ? status : 502);
-    }
-    if (!result.audioUrl) return json({ error: "Pindo did not return an audio URL.", provider: "Pindo VoiceAI" }, 502);
-
-    const audioResponse = await fetch(result.audioUrl, { signal: AbortSignal.timeout(20000) });
-    if (!audioResponse.ok) {
-      console.warn("kinya-tts: audio download returned HTTP", audioResponse.status);
-      return json({ error: "Could not retrieve generated speech audio.", provider_status: audioResponse.status }, 502);
-    }
-    const audioBytes = new Uint8Array(await audioResponse.arrayBuffer());
-    if (!audioBytes.length || audioBytes.length > 12_000_000) {
-      return json({ error: "Generated speech audio was empty or unexpectedly large." }, 502);
-    }
-
-    let binary = "";
-    for (let i = 0; i < audioBytes.length; i += 0x8000) {
-      binary += String.fromCharCode(...audioBytes.subarray(i, i + 0x8000));
-    }
-
-    return json({
-      provider: "Pindo VoiceAI (authenticated)",
-      language: "rw",
-      mime_type: audioResponse.headers.get("content-type") || "audio/wav",
-      audio_base64: btoa(binary),
-      audio_bytes: audioBytes.length,
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("kinya-tts failed:", message);
-    return json({ error: message.includes("timed out") ? "Pindo voice request timed out." : "Kinyarwanda speech generation failed." }, 502);
-  }
+async function synthesizePindo(text:string,authenticated:boolean):Promise<{base64:string;mime:string;bytes:number}>{
+ const token=Deno.env.get("PINDO_API_TOKEN");
+ if(authenticated&&!token)throw new Error("Pindo authenticated fallback is not configured.");
+ const response=await fetch(authenticated?"https://api.pindo.io/ai/tts/rw":"https://api.pindo.io/ai/tts/rw/public",{
+  method:"POST",headers:{"Content-Type":"application/json",...(authenticated&&token?{"Authorization":`Bearer ${token}`}:{})},
+  body:JSON.stringify({text,lang:"rw",speech_rate:1.0}),signal:AbortSignal.timeout(15000)});
+ const raw=await response.text();let payload:any=null;try{payload=raw?JSON.parse(raw):null}catch{}
+ if(!response.ok)throw new Error(`Pindo ${authenticated?"authenticated":"public"} TTS HTTP ${response.status}: ${raw.slice(0,240)}`);
+ const audioPath=payload?.data?.generated_audio_url??payload?.generated_audio_url;
+ if(typeof audioPath!=="string"||!audioPath.trim())throw new Error("Pindo did not return an audio URL.");
+ return downloadProviderAudio(audioPath,"api.pindo.io");
+}
+async function synthesizeIjwi(text:string):Promise<{base64:string;mime:string;bytes:number}>{
+ const key=Deno.env.get("IJWILAB_API_KEY");
+ if(!key)throw new Error("IjwiLab API key is not configured; its free Studio is not an API endpoint.");
+ const response=await fetch("https://ijwilab.com/api/v1/tts.php",{
+  method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
+  body:JSON.stringify({input:text,language:"rw",speaker_id:19}),signal:AbortSignal.timeout(15000)});
+ const raw=await response.text();let payload:any=null;try{payload=raw?JSON.parse(raw):null}catch{}
+ if(!response.ok)throw new Error(`IjwiLab TTS HTTP ${response.status}: ${raw.slice(0,240)}`);
+ const outputUrl=payload?.output_url;if(typeof outputUrl!=="string"||!outputUrl.trim())throw new Error("IjwiLab did not return an output URL.");
+ return downloadProviderAudio(outputUrl,"ijwilab.com");
+}
+Deno.serve(async(req:Request)=>{
+ if(req.method==="OPTIONS")return new Response("ok",{headers:corsHeaders});
+ if(req.method!=="POST")return json({error:"Method not allowed."},405);
+ try{
+  const body=await req.json().catch(()=>null);const text=typeof body?.text==="string"?body.text.trim():"";const lang=typeof body?.lang==="string"?body.lang.toLowerCase():"rw";
+  if(!text)return json({error:"Missing TTS text."},400);if(text.length>1200)return json({error:"Speech text is too long."},413);if(lang!=="rw")return json({error:"This endpoint supports Kinyarwanda (rw) only."},400);
+  const attempts:string[]=[];
+  const providers:Array<{name:string;run:()=>Promise<{base64:string;mime:string;bytes:number}>}>=[
+   {name:"Pindo VoiceAI public",run:()=>synthesizePindo(text,false)},
+   {name:"IjwiLab Keza",run:()=>synthesizeIjwi(text)},
+   {name:"Pindo VoiceAI authenticated",run:()=>synthesizePindo(text,true)},
+  ];
+  for(const provider of providers){try{
+   const audio=await provider.run();
+   return json({provider:provider.name,language:"rw",mime_type:audio.mime,audio_base64:audio.base64,audio_bytes:audio.bytes,fallback_used:attempts.length>0,attempts:attempts.map(x=>x.slice(0,180))});
+  }catch(error){const message=error instanceof Error?error.message:String(error);attempts.push(`${provider.name}: ${message}`);console.warn("kinya-tts provider attempt failed:",provider.name,message.slice(0,220));}}
+  const limited=attempts.some(a=>/HTTP 429|rate limit|quota/i.test(a));
+  return json({error:"Kinyarwanda speech is temporarily unavailable. The written reply is still available.",provider:"none",attempts:attempts.map(x=>x.slice(0,180)),rate_limited:limited},502);
+ }catch(error){console.error("kinya-tts failed:",error instanceof Error?error.message:String(error));return json({error:"Kinyarwanda speech generation failed. The written reply is still available."},502);}
 });
