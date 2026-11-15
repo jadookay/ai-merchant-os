@@ -758,7 +758,9 @@ test("inventory adjustment retries are idempotent and grants match the seven-arg
 
 test("initial greeting cannot trigger farewell sleep when both turn counters start at zero", () => {
   const guards = html.match(/if\(\(sheriSleepAfterTtsTurnId!==0 && sheriSleepAfterTtsTurnId===turnId\)\)/g) || [];
-  assert.equal(guards.length, 3, "all TTS completion/error paths must require an armed non-zero farewell turn");
+  assert.equal(guards.length, 3, "all explicit farewell completion/error paths must require an armed non-zero farewell turn");
+  assert.ok(html.includes("if(sheriSleepAfterTtsTurnId!==0 && sheriSleepAfterTtsTurnId===sheriTurnId)return;"), "empty greeting queue must not mistake turn 0 for an armed farewell");
+  assert.doesNotMatch(html, /if\(sheriSleepAfterTtsTurnId===sheriTurnId\)return;/, "no unguarded zero-sentinel equality may suppress listening after greeting");
   const shouldSleep = (sleepTurn, turnId) => sleepTurn !== 0 && sleepTurn === turnId;
   assert.equal(shouldSleep(0, 0), false, "initial greeting turn 0 must not close the microphone");
   assert.equal(shouldSleep(12, 12), true, "an explicit farewell turn must close the session after playback");
