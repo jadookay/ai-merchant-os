@@ -22,7 +22,7 @@ function encodeAudio(bytes: Uint8Array): string {
 function isAllowedPindoUrl(url: URL): boolean {
   return url.protocol === "https:" &&
     !url.username && !url.password &&
-    (url.hostname === "pindo.io" || url.hostname.endsWith(".pindo.io")) &&
+    (url.hostname === "pindo.io" || url.hostname.endsWith(".pindo.io") || url.hostname === "pindo-ai-api-generated.s3.af-south-1.amazonaws.com") &&
     (!url.port || url.port === "443");
 }
 
