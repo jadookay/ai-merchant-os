@@ -3757,7 +3757,20 @@ function sheriDiagEnsure(){
   return d;
 }
 function sheriDiagShow(){const d=sheriDiagEnsure();d.style.display='block';refreshSheriAudioInputs();const rows=d.querySelector('#sheriDiagRows');if(rows){const set=(label,value)=>{let row=document.getElementById('sheriDiag_'+label.replace(/[^a-z0-9]/gi,''));if(!row){row=document.createElement('div');row.id='sheriDiag_'+label.replace(/[^a-z0-9]/gi,'');row.style.cssText='padding:3px 0;border-bottom:1px solid rgba(255,255,255,.08)';rows.appendChild(row)}row.innerHTML='<span style="opacity:.72">'+esc(label)+'</span>: <b>'+esc(String(value))+'</b>'};set('Runtime version','V14.4 Cross-Platform Voice');set('Service Worker controller',navigator.serviceWorker?.controller?'ACTIVE / CONTROLLING':'NOT CONTROLLING YET');set('Service Worker script',navigator.serviceWorker?.controller?.scriptURL||'none yet')}}
-function sheriDiagClearTurn(){const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');if(rows)rows.innerHTML='';}
+function sheriDiagClearTurn(){
+  const d=sheriDiagEnsure(),rows=d.querySelector('#sheriDiagRows');
+  if(!rows)return;
+  // Keep session-level microphone/greeting measurements visible while replacing
+  // only per-turn ASR/AI/TTS details on the next utterance.
+  const keep=new Set([
+    'Browser','TTSavailable','MediaRecorder','Selectedlanguage','SelectedTTSvoice',
+    'Microphonestartupclock','getUserMediapermissionlatency','Micstartupready',
+    'Microphoneready','Microphoneautoselection','Microphoneexactdeviceretry',
+    'Microphoneselectedinputattempt','Greetinglanguage','Micreadyfirstspeech',
+    'Micreadygreetingaudible','Greetingqueueaudiblestart','Turnmode','Sessionstate'
+  ]);
+  [...rows.children].forEach(row=>{if(!keep.has(row.id.replace(/^sheriDiag_/,'')))row.remove();});
+}
 function sheriResetTurnDiagnostics(){
   sheriTurnStartedAt=performance.now();
   sheriTtsQueuedAt=0;
@@ -4888,12 +4901,13 @@ function sheriDrainSpeakQueue(){
     if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e?.error||'unknown'));
     if(retrySpeech('engine error: '+(e?.error||'unknown')))return;
     sheriIsSpeaking=false;
-    sheriTurnFailed=true;
+    sheriTurnFailed=false;
     sheriSpeakQueue=sheriSpeakQueue.filter(x=>x.turnId!==turnId);
     sheriStreamActive=false;
-    setSheriStatus('Shericeri could not play that response. Tap to try again.');
+    setSheriStatus('I could not play that reply, but I’m still here. Please continue speaking.');
     if(sheriSleepAfterTtsTurnId===turnId){ sheriSleepAfterTtsTurnId=0; /* Keep the last four exchanges available when the next voice session starts. */ hideSheriHero(); setSheriStatus('Tap to start talking with Shericeri.'); }
     if(window.speechSynthesis)try{speechSynthesis.cancel()}catch(_){}
+    if(shericeriActive&&!sheriSleepAfterTtsTurnId)setTimeout(()=>sheriScheduleNextListen(turnId),250);
   };
 
   const speakNow=async()=>{
@@ -4945,10 +4959,11 @@ function sheriDrainSpeakQueue(){
       if(turnId!==sheriTurnId)return;
       if(typeof sheriDiagSet==='function')sheriDiagSet('TTS','ERROR: '+(e.message||String(e)));
       sheriIsSpeaking=false;
-      sheriTurnFailed=true;
+      sheriTurnFailed=false;
       sheriSpeakQueue=sheriSpeakQueue.filter(x=>x.turnId!==turnId);
       sheriStreamActive=false;
-      setSheriStatus('Shericeri could not play that response. Tap to try again.');
+      setSheriStatus('I could not play that reply, but the conversation is still active. Please continue speaking.');
+      if(shericeriActive)setTimeout(()=>sheriScheduleNextListen(turnId),250);
     }
   };
 
