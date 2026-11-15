@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.32 greeting-to-listening sentinel fix and diagnostics">
+<meta name="app-version" content="V14.4.33 Kinyarwanda public TTS URL and voice fallback repair">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -4965,16 +4965,14 @@ function sheriDrainSpeakQueue(){
       if(selectedVoice && utt.voice!==selectedVoice) utt.voice=selectedVoice;
       if(typeof sheriDiagSet==='function')sheriDiagSet('TTS selected voice',selectedVoice?`${selectedVoice.name} (${selectedVoice.lang})`:(isAndroid?'Android platform/OS default voice':'none for requested language'));
       if(/^rw/i.test(lang) && navigator.onLine){
-        sheriDiagSet('Kinyarwanda TTS route','ONLINE Pindo VoiceAI — single female voice');
+        sheriDiagSet('Kinyarwanda TTS route','ONLINE Pindo VoiceAI public — provider default voice; gender not guaranteed');
         const onlineOk=await sheriOnlineKinyaTts(next,lang,turnId,finish);
         if(onlineOk)return;
-        if(window.SHERICERI_VOICE_BRIDGE?.hasTtsBridge){sheriDiagSet('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE');await window.SHERICERI_VOICE_BRIDGE.speak(next,lang);finish('local-bridge-fallback');return;}
-        // Last-resort playback: one browser utterance for the whole answer.
-        // This keeps a response audible if Pindo is temporarily unavailable;
-        // browser language/voice quality depends on voices installed on-device.
-        sheriDiagSet('Kinyarwanda TTS fallback','BROWSER SPEECH SYNTHESIS — single utterance; device voice may not support Kinyarwanda');
-        speechSynthesis.resume();
-        speechSynthesis.speak(utt);
+        // Never silently switch to an unverified Android/browser voice.
+        // Keep the written answer available and continue the conversation.
+        sheriDiagSet('Kinyarwanda TTS fallback','NONE — text-only; no unverified voice substitution');
+        setSheriStatus('Igisubizo kiri hano mu nyandiko. Ijwi ry’Ikinyarwanda ntiriboneka ubu.');
+        finish('text-only-voice-unavailable');
         return;
       }
       if(window.SHERICERI_VOICE_BRIDGE?.hasTtsBridge){await window.SHERICERI_VOICE_BRIDGE.speak(next,lang);finish('local-bridge-complete');return;}
