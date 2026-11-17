@@ -1,3 +1,8 @@
+-- AIBOS MVP staff identity requirements.
+-- Existing production staff rows were inspected and both already have phone numbers.
+alter table public.merchant_members
+  alter column phone set not null;
+
 -- AIBOS MVP: make sale creation audit atomic with the sale, stock and ledger transaction.
 -- Additive trigger only. Existing financial posting triggers and account mappings are unchanged.
 create or replace function private.audit_sale_after_insert()
