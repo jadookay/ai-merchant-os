@@ -124,7 +124,7 @@ test("browser TTS fallback is used when the compatibility bridge is only a place
   const browserSpeak = html.indexOf("speechSynthesis.speak(utt);", browserFallback);
   assert.ok(browserFallback >= 0 && browserSpeak > browserFallback && browserSpeak - browserFallback < 800,
     "without a native bridge, Kinyarwanda must fail explicitly and browser TTS must remain reachable for supported languages");
-  assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{sheriDiagSet\('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE'\)/);
+  assert.match(html, /sheriDiagSet\('Kinyarwanda TTS fallback','NONE — text-only; no unverified voice substitution'\)/);
 });
 
 
@@ -225,7 +225,7 @@ test("recent Shericeri history survives sleep and is sent with validated memory 
     "session sleep must not erase the last exchanges");
   assert.match(html, /memory:sheriMemoryPayload/);
   assert.match(quickService, /history, memory \} = await req\.json\(\)/);
-  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 10\)/);
+  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 5\)/);
   assert.match(quickService, /grounding \+ memoryContext/);
 });
 
@@ -329,8 +329,10 @@ test("staff login identifiers can be edited without exposing PIN hashes", () => 
   assert.ok(html.includes('id="teamEditPhone"'));
   assert.ok(html.includes('id="teamEditUsername"'));
   assert.ok(teamAccess.includes("const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status"));
-  assert.ok(teamAccess.includes("admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true })"));
-  assert.ok(teamAccess.includes("Keep at least one staff login identifier"));
+  assert.ok(teamAccess.includes("authPatch.email = email"));
+  assert.ok(teamAccess.includes("authPatch.phone = phone"));
+  assert.ok(teamAccess.includes("phone === null"));
+  assert.ok(teamAccess.includes("A staff phone number is mandatory. Email and username are optional."));
   assert.doesNotMatch(teamAccess, /select\([^\n]*pin_hash/);
 });
 
@@ -544,7 +546,9 @@ test("team status changes preserve omitted email, phone and username login ident
 
 test("team account creation validates email, phone, username and PIN formats", () => {
   assert.ok(teamAccess.includes('if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
-  assert.ok(teamAccess.includes('if (phone && !/^\\+?\\d{7,15}$/.test(phone))'));
+  assert.ok(teamAccess.includes('!phone || !/^\\d{6,8}$/.test(pin)'));
+  assert.ok(teamAccess.includes('phone = normalizePhoneForAuth(phone, merchant.country)'));
+  assert.ok(teamAccess.includes('Enter a valid international phone number. For Rwanda'));
   assert.ok(teamAccess.includes('if (username && !/^[a-z0-9._-]{3,40}$/.test(username))'));
   assert.ok(teamAccess.includes('!/^\\d{6,8}$/.test(pin)'));
 });
@@ -796,4 +800,33 @@ test("Shericeri generation explicitly requires idiomatic spoken Kinyarwanda rath
   assert.ok(quickService.includes("native Rwandan speaking spontaneously"));
   assert.ok(quickService.includes("never like English or French translated into Kinyarwanda"));
   assert.ok(quickService.includes("would a fluent person in Rwanda actually say this aloud"));
+});
+
+
+test("MVP staff creation requires owner business ID, phone and PIN while email stays optional", () => {
+  assert.ok(teamAccess.includes('new Uint8Array(32)'), "generated Auth password must remain below Supabase's 72-character limit");
+  assert.ok(teamAccess.includes('!ownerAccountId || fullName.length < 2 || !phone'));
+  assert.ok(teamAccess.includes('String(merchant.shericeri_id || "") !== ownerAccountId'));
+  assert.ok(html.includes('id="teamOwnerAccountId" readonly required'));
+  assert.ok(html.includes('id="teamPhone" type="tel" required'));
+  assert.ok(html.includes('Email (optional)'));
+});
+
+test("sale creation audit is committed atomically without changing sale account mappings", () => {
+  assert.ok(saleAuditMigration.includes('after insert on public.sales'));
+  assert.ok(saleAuditMigration.includes('private.audit_sale_after_insert'));
+  assert.ok(saleAuditMigration.includes('sales_post_ledger_after_insert') === false,
+    "the additive audit trigger must not replace the existing financial posting trigger");
+  assert.ok(quickService.includes("shericeri_sync_sale_cart"));
+});
+
+test("expense insert posts the existing cash expense mapping atomically and void reversals are audited", () => {
+  assert.ok(expenseMigration.includes("code='6000'"));
+  assert.ok(expenseMigration.includes("code='1000'"));
+  assert.ok(expenseMigration.includes("after insert on public.expenses"));
+  assert.ok(expenseMigration.includes("public.shericeri_void_expense"));
+  assert.ok(expenseMigration.includes("source_type='expense_void'"));
+  assert.ok(expenseMigration.includes("Use the audited void workflow"));
+  assert.ok(html.includes("sb.rpc('shericeri_void_expense'"));
+  assert.ok(html.includes("sourceIntegrity.invalidCount===0"));
 });
