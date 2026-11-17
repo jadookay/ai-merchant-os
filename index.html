@@ -355,7 +355,7 @@ window.ensurePdfJs=async function(){
     <div class="formgrid">
       <div><label>Product</label><select id="saleProduct"></select></div>
       <div><label>Quantity</label><input id="saleQty" type="number" min="1" value="1"></div>
-      <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="salePrice" type="number" min="0"></div>
+      <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="salePrice" type="number" min="0" step="0.01"></div>
       <div><label>Customer (optional)</label><select id="saleCustomer"><option value="">— Anonymous —</option></select></div>
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn secondary" onclick="addSaleToCart()">＋ Add to cart</button><button class="btn secondary" onclick="focusSaleProduct()">＋ Add more products</button><button class="btn" onclick="recordSale()">Confirm sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
@@ -371,8 +371,8 @@ window.ensurePdfJs=async function(){
     <div class="formgrid">
       <div><label>Product name</label><input id="pName"></div>
       <div><label>Category</label><select id="pCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div>
-      <div><label>Cost / unit (<span data-currency-label>RWF</span>)</label><input id="pCost" type="number"></div>
-      <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="pSell" type="number"></div>
+      <div><label>Cost / unit (<span data-currency-label>RWF</span>)</label><input id="pCost" type="number" min="0" step="0.01"></div>
+      <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="pSell" type="number" min="0" step="0.01"></div>
       <div><label>Current stock</label><input id="pStock" type="number"></div>
       <div><label>Reorder level</label><input id="pReorder" type="number"></div>
       <div><label>Barcode (optional)</label><input id="pBarcode" placeholder="Scanned automatically, or type manually"></div>
@@ -456,7 +456,7 @@ window.ensurePdfJs=async function(){
   <div class="card">
     <div class="formgrid">
       <div><label>Description</label><input id="eDesc" placeholder="Transport"></div>
-      <div><label>Amount (<span data-currency-label>RWF</span>)</label><input id="eAmt" type="number"></div>
+      <div><label>Amount (<span data-currency-label>RWF</span>)</label><input id="eAmt" type="number" min="0" step="0.01"></div>
       <div><label>Category</label><select id="eCat"><option>Transport</option><option>Rent</option><option>Utilities</option><option>Supplies</option><option>Other</option></select></div>
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn" onclick="addExpense()">Add expense</button><button class="btn secondary" onclick="sheriStartFormVoice('expenseVoiceStatus',parseVoiceExpense,'Say expense description and amount')">🎙 Voice entry</button><button class="btn secondary" onclick="clearExpenseForm()">Discard</button></div><div id="expenseVoiceStatus" class="sub" style="margin-top:8px"></div>
@@ -600,7 +600,7 @@ window.ensurePdfJs=async function(){
       <div><label>Supplier</label><select id="osPurchaseSupplier"></select></div>
       <div><label>Product</label><select id="osPurchaseProduct"></select></div>
       <div><label>Quantity</label><input id="osPurchaseQty" type="number" min="1" value="1"></div>
-      <div><label>Unit cost (<span data-currency-label>RWF</span>)</label><input id="osPurchaseCost" type="number" min="0"></div>
+      <div><label>Unit cost (<span data-currency-label>RWF</span>)</label><input id="osPurchaseCost" type="number" min="0" step="0.01"></div>
       <div><label>Due date (optional)</label><input id="osPurchaseDue" type="date"></div>
       <div><label>Status</label><select id="osPurchaseStatus"><option value="received">Received</option><option value="ordered">Ordered</option></select></div>
     </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="addOSPurchase()">Record purchase</button></div><div id="osPurchaseTable" style="margin-top:12px"></div></div>
@@ -5379,7 +5379,7 @@ async function addOSPurchase(){
   let localStock=null,localCost=null;
   if(status!=='ordered'){
     localStock=oldStock+qty;
-    localCost=localStock>0?Math.round(((oldStock*oldCost)+(qty*unitCost))/localStock):unitCost;
+    localCost=localStock>0?Number((((oldStock*oldCost)+(qty*unitCost))/localStock).toFixed(4)):unitCost;
     p.stock=localStock;p.cost=localCost;p.updated_at=now;
   }
   state.purchases.push(data);
