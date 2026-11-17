@@ -2922,6 +2922,7 @@ function renderForecast(){
 let teamLoadedForMerchant=null;
 let teamDeviceSessions=[];
 async function loadTeamMembers(force=false){
+ const ownerIdField=document.getElementById('teamOwnerAccountId');if(ownerIdField)ownerIdField.value=String(state.merchant?.shericeri_id||'');
  if(!state.merchant||!sb)return;if(!force&&teamLoadedForMerchant===state.merchant.id)return;teamLoadedForMerchant=state.merchant.id;
  try{const {data,error}=await sb.from('merchant_members').select('id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,last_login_at').eq('merchant_id',state.merchant.id).order('created_at',{ascending:false});if(error)throw error;state.teamMembers=data||[];state.currentMembership=state.teamMembers.find(x=>x.user_id===session?.user?.id)||null;const can=state.merchant.user_id===session?.user?.id||state.currentMembership?.role==='admin'||(state.currentMembership?.role==='manager'&&state.currentMembership?.permissions?.manage_team===true);const card=document.getElementById('teamAccessCard');if(card)card.style.display=can?'block':'none';renderTeamMembers();renderTeamAuditTrail();await loadTeamDevices()}catch(e){teamLoadedForMerchant=null;console.warn('[AIBOS team]',e)}
 }
