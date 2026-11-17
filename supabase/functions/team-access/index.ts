@@ -397,7 +397,7 @@ Deno.serve(async (req: Request) => {
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
-      const authPatch: Record<string, unknown> = {};
+      const authPatch: { email?: string; email_confirm?: boolean; phone?: string; phone_confirm?: boolean } = {};
       if (email && email !== target.email) {
         authPatch.email = email;
         authPatch.email_confirm = true;
