@@ -1826,6 +1826,7 @@ function sheriSubscribeMerchantRealtime(merchantId){
 async function onAuthed(sess){
   if(!sess?.user)return;
   session=sess;
+  sheriUpdateVoiceDiagnosticsAccess();
   // A valid Supabase session is the authentication boundary. Never leave the
   // user trapped on the login screen because a merchant-data request is slow.
   document.getElementById('authScreen').style.display='none';
@@ -3430,6 +3431,7 @@ let sheriDiagAnalyser=null;
 
 const SHERI_DEVELOPER_USER_IDS=new Set(['05b3bf21-2267-480b-a3d2-426b4f95271a']);
 function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id&&SHERI_DEVELOPER_USER_IDS.has(session.user.id);}
+function sheriUpdateVoiceDiagnosticsAccess(){const b=document.getElementById('sheriVoiceDiagnosticButton');if(b)b.style.display=sheriCanUseVoiceDiagnostics()?'inline-flex':'none';if(!sheriCanUseVoiceDiagnostics()){const p=document.getElementById('sheriDiagnostic');if(p)p.style.display='none';}}
 function toggleShericeriDiagnostic(){
   if(!sheriCanUseVoiceDiagnostics())return;
   const el=document.getElementById('sheriDiagnostic');
