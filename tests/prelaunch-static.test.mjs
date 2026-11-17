@@ -295,35 +295,6 @@ test("sale, product, advisor and expense voice entry share MediaRecorder and aut
 
 test("sales and expenses confirm before saving; expenses post atomically on the server", () => {
   const saleStart = html.indexOf("async function recordSale()");
-  const saleEnd = html.indexOf("\nasync function voidSale", saleStart);
-  assert.ok(saleStart >= 0 && saleEnd > saleStart, "expected the complete sale recording function");
-  const sale = html.slice(saleStart, saleEnd);
-  assert.ok(sale.includes("confirm('Confirm sale?"), "sale must be confirmed before it is recorded");
-  assert.ok(sale.includes("sheriToast(sheriLocalized('Sale captured."), "sale acknowledgement must appear before durable persistence");
-  assert.ok(sale.indexOf("sheriToast(sheriLocalized('Sale captured.") < sale.indexOf("await sheriSaveSnapshot()"), "sale acknowledgement must not wait for full snapshot persistence");
-  assert.ok(sale.includes("Promise.resolve().then(()=>sheriSyncOutbox())"), "background sync must not delay the sale confirmation");
-
-  const saleAccountingStart = html.indexOf("const _v14_1_recordSale=recordSale");
-  const saleAccountingEnd = html.indexOf("const _v14_1_addOSPurchase", saleAccountingStart);
-  assert.ok(saleAccountingStart >= 0 && saleAccountingEnd > saleAccountingStart, "expected the sale accounting wrapper");
-  const saleAccounting = html.slice(saleAccountingStart, saleAccountingEnd);
-  assert.ok(saleAccounting.includes("sourceType:'sale',sourceId:s.id"));
-  assert.ok(saleAccounting.includes("sourceType:'sale_cogs',sourceId:s.id"));
-
-  const expenseStart = html.indexOf("async function addExpense()");
-  const expenseEnd = html.indexOf("\nasync function deleteExpense", expenseStart);
-  assert.ok(expenseStart >= 0 && expenseEnd > expenseStart, "expected the complete expense recording function");
-  const expense = html.slice(expenseStart, expenseEnd);
-  assert.ok(expense.includes("confirm('Record this expense?"));
-  assert.ok(expense.includes("type:'expense_upsert',record:data"));
-  assert.ok(expense.includes("sheriSyncOutbox()"));
-  assert.doesNotMatch(expense,/accPostEntry/);
-  assert.ok(expense.includes("sheriToast(pending?'Expense saved on this device."));
-  assert.ok(expenseMigration.includes("after insert on public.expenses"));
-});
-
-test("sales and expenses confirm before saving; expenses post atomically on the server", () => {
-  const saleStart = html.indexOf("async function recordSale()");
   const saleEnd = html.indexOf("\\nasync function voidSale", saleStart);
   assert.ok(saleStart >= 0 && saleEnd > saleStart, "expected the complete sale recording function");
   const sale = html.slice(saleStart, saleEnd);
