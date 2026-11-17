@@ -13,7 +13,7 @@ const json = (body: unknown, status = 200) =>
   });
 
 function randomPassword() {
-  const bytes = crypto.getRandomValues(new Uint8Array(48));
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 function normalizePhoneForAuth(value: string | null, country: string | null): string | null {
@@ -127,6 +127,7 @@ Deno.serve(async (req: Request) => {
       if (callerError || !callerData?.user) return json({ error: "Manager session is invalid." }, 401);
 
       const merchantId = String(body?.merchant_id || "");
+      const ownerAccountId = String(body?.owner_account_id || "").trim();
       const fullName = String(body?.full_name || "").trim();
       const email = String(body?.email || "").trim().toLowerCase() || null;
       let phone = String(body?.phone || "").trim() || null;
@@ -135,8 +136,8 @@ Deno.serve(async (req: Request) => {
       const role = String(body?.role || "cashier");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
 
-      if (!merchantId || fullName.length < 2 || (!email && !phone) || !/^\d{6,8}$/.test(pin)) {
-        return json({ error: "Provide a business, full name, verified email or phone, and a 6–8 digit PIN." }, 400);
+      if (!merchantId || !ownerAccountId || fullName.length < 2 || !phone || !/^\d{6,8}$/.test(pin)) {
+        return json({ error: "Provide the business account, full name, phone number and a 6–8 digit PIN. Email is optional." }, 400);
       }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       
@@ -146,8 +147,9 @@ Deno.serve(async (req: Request) => {
       }
 
       const { data: merchant, error: merchantError } = await admin
-        .from("merchants").select("id,user_id,country").eq("id", merchantId).maybeSingle();
+        .from("merchants").select("id,user_id,country,shericeri_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
+      if (String(merchant.shericeri_id || "") !== ownerAccountId) return json({ error: "The owner business ID does not match the selected business account." }, 403);
       if (phone) {
         phone = normalizePhoneForAuth(phone, merchant.country);
         if (!phone) return json({ error: "Enter a valid international phone number. For Rwanda, you may enter 078… or +25078… ." }, 400);
@@ -229,7 +231,13 @@ Deno.serve(async (req: Request) => {
         }, 409);
       }
       if (authUser && !authUser.email) {
-        return json({ ok: false, code: "existing_phone_account", error: "This phone is already attached to an account without an email login. Add a verified email to that account first, or use a different phone number." }, 409);
+        const internalEmail = "staff-" + authUser.id + "@example.com";
+        const { data: updatedIdentity, error: identityError } = await admin.auth.admin.updateUserById(authUser.id, {
+          email: internalEmail,
+          email_confirm: true,
+        });
+        if (identityError || !updatedIdentity?.user) throw identityError || new Error("Could not prepare the staff sign-in identity.");
+        authUser = updatedIdentity.user;
       }
       if (authUser) {
         const { data: existingMember, error: existingMemberError } = await admin.from("merchant_members")
@@ -318,7 +326,7 @@ Deno.serve(async (req: Request) => {
       const status = String(body?.status || "active");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
       const pin = String(body?.pin || "");
-      if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
+      if (!merchantId || !memberId || fullName.length < 2 || phone === null) return json({ error: "Business, member, full name and phone number are required. Email is optional." }, 400);
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       
       if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
@@ -326,7 +334,7 @@ Deno.serve(async (req: Request) => {
       if (!["active", "suspended"].includes(status)) return json({ error: "Invalid team status." }, 400);
       if (pin && !/^\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
 
-      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id,country").eq("id", merchantId).maybeSingle();
+      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id,country,shericeri_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
       if (phone) {
         phone = normalizePhoneForAuth(phone, merchant.country);
@@ -350,13 +358,13 @@ Deno.serve(async (req: Request) => {
       }
       const privileged = callerRole === "owner" || callerRole === "admin";
       const { data: target, error: targetError } = await admin.from("merchant_members")
-        .select("id,user_id,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
+        .select("id,user_id,full_name,responsibility,permissions,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
       const nextEmail = email === undefined ? target.email : email;
       const nextPhone = phone === undefined ? target.phone : phone;
       const nextUsername = username === undefined ? target.username : username;
-      if (!nextEmail && !nextPhone && !nextUsername) return json({ error: "Keep at least one staff login identifier: email, phone or username." }, 400);
+      if (!nextPhone) return json({ error: "A staff phone number is mandatory. Email and username are optional." }, 400);
       if (target.user_id === callerData.user.id) return json({ error: "Use the owner account to change another administrator's access; self-edits are disabled here." }, 403);
       if (target.role === "admin" && !privileged) return json({ error: "Only the owner or an administrator can change an administrator account." }, 403);
       if ((permissions.manage_team === true || permissions.manage_sales === true) && role !== "manager" && role !== "admin") return json({ error: "Manager-level controls can only be assigned to a manager or administrator role." }, 400);
@@ -389,11 +397,24 @@ Deno.serve(async (req: Request) => {
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
+      const authPatch: { email?: string; email_confirm?: boolean; phone?: string; phone_confirm?: boolean } = {};
       if (email && email !== target.email) {
-        const { error: authEmailError } = await admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true });
-        if (authEmailError) {
-          await admin.from("merchant_members").update({ email: target.email, phone: target.phone, username: target.username }).eq("id", memberId).eq("merchant_id", merchantId);
-          throw authEmailError;
+        authPatch.email = email;
+        authPatch.email_confirm = true;
+      }
+      if (phone !== undefined && phone !== target.phone) {
+        authPatch.phone = phone;
+        authPatch.phone_confirm = true;
+      }
+      if (Object.keys(authPatch).length) {
+        const { error: authIdentityError } = await admin.auth.admin.updateUserById(target.user_id, authPatch);
+        if (authIdentityError) {
+          await admin.from("merchant_members").update({
+            email: target.email, phone: target.phone, username: target.username,
+            full_name: target.full_name, responsibility: target.responsibility,
+            role: target.role, permissions: target.permissions, status: target.status
+          }).eq("id", memberId).eq("merchant_id", merchantId);
+          throw authIdentityError;
         }
       }
       if (pin) {

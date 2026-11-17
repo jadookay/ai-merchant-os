@@ -10,6 +10,8 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const saleAuditMigration = await readFile(new URL("../supabase/migrations/20261117100000_atomic_sale_creation_audit.sql", import.meta.url), "utf8");
+const expenseMigration = await readFile(new URL("../supabase/migrations/20261117110000_atomic_expense_posting_and_void.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -56,8 +58,14 @@ test("team permission delegation cannot exceed the manager's own permissions", (
   assert.ok(teamAccess.includes('status: "suspended"') || teamAccess.includes('status=suspended'));
 });
 
-test("cancelled expense deletion does not post an accounting reversal", () => {
-  assert.match(html, /await _v14_1_deleteExpense\(id\);if\(state\.expenses\.some\(x=>x\.id===id\)\)return;/);
+test("cancelled expense void does not alter the source or post a reversal", () => {
+  const start=html.indexOf("async function sheriVoidExpense");
+  const end=html.indexOf("\nfunction renderExpenses",start);
+  const code=html.slice(start,end);
+  assert.ok(start>=0&&end>start);
+  assert.match(code,/if\(!confirm\([\s\S]*?\)\)return;/);
+  assert.ok(code.includes("sb.rpc('shericeri_void_expense'"));
+  assert.doesNotMatch(code,/accPostEntry/);
 });
 
 test("sale void reason and transaction references are persisted to the audit trail", () => {
@@ -74,13 +82,16 @@ test("cancelled sale void leaves records and accounting untouched", () => {
   assert.doesNotMatch(html, /const _v14_1_voidSale=voidSale/);
 });
 
-test("locally deleted expenses are removed but voided sales remain preserved in IndexedDB", () => {
-  assert.match(html, /state\.expenses=state\.expenses\.filter\(x=>x\.id!==id\);await sheriDelete\('expenses',id\)/);
+test("expenses are retained and voided through an audited server reversal while voided sales remain preserved", () => {
+  assert.ok(html.includes("sb.rpc('shericeri_void_expense'"));
+  assert.doesNotMatch(html,/sheriDelete\('expenses'/);
+  assert.ok(html.includes("expense_void"));
+  assert.match(expenseMigration,/before delete on public\.expenses/);
   const voidStart=html.indexOf("async function voidSale(id){");
   const voidEnd=html.indexOf("const sheriSearchValues",voidStart);
   const voidCode=html.slice(voidStart,voidEnd);
   assert.ok(voidCode.includes("await sheriPut('sales',row.id"));
-  assert.doesNotMatch(voidCode, /sheriDelete\('sales'/);
+  assert.doesNotMatch(voidCode,/sheriDelete\('sales'/);
   assert.ok(voidCode.includes("Voids are status changes, never deletions"));
 });
 
@@ -124,7 +135,7 @@ test("browser TTS fallback is used when the compatibility bridge is only a place
   const browserSpeak = html.indexOf("speechSynthesis.speak(utt);", browserFallback);
   assert.ok(browserFallback >= 0 && browserSpeak > browserFallback && browserSpeak - browserFallback < 800,
     "without a native bridge, Kinyarwanda must fail explicitly and browser TTS must remain reachable for supported languages");
-  assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{sheriDiagSet\('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE'\)/);
+  assert.match(html, /sheriDiagSet\('Kinyarwanda TTS fallback','NONE — text-only; no unverified voice substitution'\)/);
 });
 
 
@@ -225,7 +236,7 @@ test("recent Shericeri history survives sleep and is sent with validated memory 
     "session sleep must not erase the last exchanges");
   assert.match(html, /memory:sheriMemoryPayload/);
   assert.match(quickService, /history, memory \} = await req\.json\(\)/);
-  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 10\)/);
+  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 5\)/);
   assert.match(quickService, /grounding \+ memoryContext/);
 });
 
@@ -282,7 +293,7 @@ test("sale, product, advisor and expense voice entry share MediaRecorder and aut
   assert.match(html, /sheriStartFormVoice\('expenseVoiceStatus',parseVoiceExpense/);
 });
 
-test("sales and expenses confirm before saving and post balanced journal entries immediately", () => {
+test("sales and expenses confirm before saving; expenses post atomically on the server", () => {
   const saleStart = html.indexOf("async function recordSale()");
   const saleEnd = html.indexOf("\nasync function voidSale", saleStart);
   assert.ok(saleStart >= 0 && saleEnd > saleStart, "expected the complete sale recording function");
@@ -299,13 +310,16 @@ test("sales and expenses confirm before saving and post balanced journal entries
   assert.ok(saleAccounting.includes("sourceType:'sale',sourceId:s.id"));
   assert.ok(saleAccounting.includes("sourceType:'sale_cogs',sourceId:s.id"));
 
-  const expenseStart = html.indexOf("function addExpense()");
+  const expenseStart = html.indexOf("async function addExpense()");
   const expenseEnd = html.indexOf("\nasync function deleteExpense", expenseStart);
   assert.ok(expenseStart >= 0 && expenseEnd > expenseStart, "expected the complete expense recording function");
   const expense = html.slice(expenseStart, expenseEnd);
   assert.ok(expense.includes("confirm('Record this expense?"));
-  assert.ok(expense.includes("sourceType:'expense',sourceId:data.id"));
-  assert.ok(expense.includes("sheriToast('Expense recorded."));
+  assert.ok(expense.includes("type:'expense_upsert',record:data"));
+  assert.ok(expense.includes("sheriSyncOutbox()"));
+  assert.doesNotMatch(expense,/accPostEntry/);
+  assert.ok(expense.includes("sheriToast(pending?'Expense saved on this device."));
+  assert.ok(expenseMigration.includes("after insert on public.expenses"));
 });
 
 test("cashier sales use an atomic stock RPC on normal sync and auth-retry paths", () => {
@@ -329,8 +343,10 @@ test("staff login identifiers can be edited without exposing PIN hashes", () => 
   assert.ok(html.includes('id="teamEditPhone"'));
   assert.ok(html.includes('id="teamEditUsername"'));
   assert.ok(teamAccess.includes("const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status"));
-  assert.ok(teamAccess.includes("admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true })"));
-  assert.ok(teamAccess.includes("Keep at least one staff login identifier"));
+  assert.ok(teamAccess.includes("authPatch.email = email"));
+  assert.ok(teamAccess.includes("authPatch.phone = phone"));
+  assert.ok(teamAccess.includes("phone === null"));
+  assert.ok(teamAccess.includes("A staff phone number is mandatory. Email and username are optional."));
   assert.doesNotMatch(teamAccess, /select\([^\n]*pin_hash/);
 });
 
@@ -544,7 +560,9 @@ test("team status changes preserve omitted email, phone and username login ident
 
 test("team account creation validates email, phone, username and PIN formats", () => {
   assert.ok(teamAccess.includes('if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
-  assert.ok(teamAccess.includes('if (phone && !/^\\+?\\d{7,15}$/.test(phone))'));
+  assert.ok(teamAccess.includes('!phone || !/^\\d{6,8}$/.test(pin)'));
+  assert.ok(teamAccess.includes('phone = normalizePhoneForAuth(phone, merchant.country)'));
+  assert.ok(teamAccess.includes('Enter a valid international phone number. For Rwanda'));
   assert.ok(teamAccess.includes('if (username && !/^[a-z0-9._-]{3,40}$/.test(username))'));
   assert.ok(teamAccess.includes('!/^\\d{6,8}$/.test(pin)'));
 });
@@ -796,4 +814,43 @@ test("Shericeri generation explicitly requires idiomatic spoken Kinyarwanda rath
   assert.ok(quickService.includes("native Rwandan speaking spontaneously"));
   assert.ok(quickService.includes("never like English or French translated into Kinyarwanda"));
   assert.ok(quickService.includes("would a fluent person in Rwanda actually say this aloud"));
+});
+
+
+test("MVP staff creation requires owner business ID, phone and PIN while email stays optional", () => {
+  assert.ok(teamAccess.includes('new Uint8Array(32)'), "generated Auth password must remain below Supabase's 72-character limit");
+  assert.ok(teamAccess.includes('!ownerAccountId || fullName.length < 2 || !phone'));
+  assert.ok(teamAccess.includes('String(merchant.shericeri_id || "") !== ownerAccountId'));
+  assert.ok(html.includes('id="teamOwnerAccountId" readonly required'));
+  assert.ok(html.includes('id="teamPhone" type="tel" required'));
+  assert.ok(html.includes('Email (optional)'));
+});
+
+test("sale creation audit is committed atomically without changing sale account mappings", () => {
+  assert.ok(saleAuditMigration.includes('after insert on public.sales'));
+  assert.ok(saleAuditMigration.includes('private.audit_sale_after_insert'));
+  assert.ok(saleAuditMigration.includes('sales_post_ledger_after_insert') === false,
+    "the additive audit trigger must not replace the existing financial posting trigger");
+  assert.ok(html.includes("sheriSyncSaleCartOperation"));
+});
+
+test("expense insert posts the existing cash expense mapping atomically and void reversals are audited", () => {
+  assert.ok(expenseMigration.includes("code='6000'"));
+  assert.ok(expenseMigration.includes("code='1000'"));
+  assert.ok(expenseMigration.includes("after insert on public.expenses"));
+  assert.ok(expenseMigration.includes("public.shericeri_void_expense"));
+  assert.ok(expenseMigration.includes("source_type='expense_void'"));
+  assert.ok(expenseMigration.includes("Use the audited void workflow"));
+  assert.ok(html.includes("sb.rpc('shericeri_void_expense'"));
+  assert.ok(html.includes("sourceIntegrity.invalidCount===0"));
+});
+
+
+test("financial statement verification includes inventory movement source completeness", () => {
+  assert.ok(html.includes("sb.from('inventory_movements').select('*')"));
+  assert.ok(html.includes("Inventory '+movement.movement_type"));
+  assert.ok(html.includes("purchase_receipt"));
+  assert.ok(html.includes("customer_return"));
+  assert.ok(html.includes("supplier_return"));
+  assert.ok(html.includes("sourceIntegrity.invalidCount===0"));
 });
