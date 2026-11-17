@@ -1313,7 +1313,7 @@ async function sheriSyncOutbox(){
         else if(op.type==='sale_upsert'){await sheriSyncSaleOperation(op)}
         else if(op.type==='sale_void'){await sheriSyncVoidSale(op)}
         else if(op.type==='expense_upsert'){const {error}=await sb.from('expenses').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
-        else if(op.type==='expense_delete'){const {error}=await sb.from('expenses').delete().eq('id',op.id);if(error)throw error}
+        else if(op.type==='expense_delete'){const legacyAudit=(state.auditLog||[]).find(a=>a.entity_type==='expense'&&a.entity_id===op.id&&a.action==='delete'),reason=legacyAudit?.reason||legacyAudit?.details?.reason;if(!reason)throw new Error('Legacy expense deletion has no recorded reason; blocked for manual accounting review.');const {error}=await sb.rpc('shericeri_void_expense',{p_merchant_id:state.merchant.id,p_expense_id:op.id,p_reason:String(reason),p_audit_id:legacyAudit.id||sheriUuid()});if(error)throw error}
         else if(op.type==='sale_delete')throw new Error('Direct sale deletion is disabled; use the audited sale-void workflow.')
         else if(op.type==='supplier_upsert'){const {error}=await sb.from('suppliers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='supplier_delete'){const {error}=await sb.from('suppliers').update({deleted:true}).eq('id',op.id);if(error)throw error}
@@ -5689,24 +5689,55 @@ function accSourceIntegrity(){
     const credit=rows.some(l=>accountCode.get(l.account_id)===creditCode&&Math.abs(Number(l.credit||0)-amount)<=0.005&&Number(l.debit||0)===0);
     if(!debit||!credit)issues.push(label+': incorrect account mapping or amount');
   };
+  const checkReversal=(reversal,original,label)=>{
+    if(!original){issues.push(label+': missing original journal');return;}
+    const sourceLines=linesByEntry.get(original.id)||[],reversalLines=linesByEntry.get(reversal.id)||[];
+    if(sourceLines.length<2||reversalLines.length!==sourceLines.length){issues.push(label+': reversal line count does not match original');return;}
+    const used=new Set();
+    for(const line of sourceLines){
+      const match=reversalLines.find((candidate,index)=>!used.has(index)&&candidate.account_id===line.account_id&&
+        Math.abs(Number(candidate.debit||0)-Number(line.credit||0))<=0.005&&
+        Math.abs(Number(candidate.credit||0)-Number(line.debit||0))<=0.005);
+      if(!match){issues.push(label+': reversal does not exactly reverse original account lines');return;}
+      used.add(reversalLines.indexOf(match));
+    }
+  };
   for(const sale of sales){
-    const saleEntry=entryBySource.get(sale.merchant_id+'|sale|'+sale.id)||[];
-    const cogsEntry=entryBySource.get(sale.merchant_id+'|sale_cogs|'+sale.id)||[];
-    if(!sale.voided){
-      const revenueAmount=Number(sale.qty||0)*Number(sale.price||0);
-      if(revenueAmount>0)checkMapping(saleEntry[0],revenueAmount,'1000','4000','Sale '+sale.id);
-      const costAmount=Number(sale.qty||0)*Number(sale.cost||0);
-      if(costAmount>0)checkMapping(cogsEntry[0],costAmount,'5000','1200','Sale COGS '+sale.id);
+    const saleEntry=(entryBySource.get(sale.merchant_id+'|sale|'+sale.id)||[])[0];
+    const cogsEntry=(entryBySource.get(sale.merchant_id+'|sale_cogs|'+sale.id)||[])[0];
+    const revenueAmount=Number(sale.qty||0)*Number(sale.price||0);
+    if(revenueAmount>0)checkMapping(saleEntry,revenueAmount,'1000','4000','Sale '+sale.id);
+    const costAmount=Number(sale.qty||0)*Number(sale.cost||0);
+    if(costAmount>0)checkMapping(cogsEntry,costAmount,'5000','1200','Sale COGS '+sale.id);
+    if(sale.voided&&saleEntry){
+      const reversal=(entryBySource.get(sale.merchant_id+'|sale_void|'+saleEntry.id)||[])[0];
+      if(!reversal)issues.push('Sale '+sale.id+': missing revenue reversal');
+      else checkReversal(reversal,saleEntry,'Sale '+sale.id+' revenue reversal');
+    }
+    if(sale.voided&&cogsEntry){
+      const reversal=(entryBySource.get(sale.merchant_id+'|sale_void|'+cogsEntry.id)||[])[0]||
+        (entryBySource.get(sale.merchant_id+'|sale_cogs_void|'+cogsEntry.id)||[])[0];
+      if(!reversal)issues.push('Sale '+sale.id+': missing COGS reversal');
+      else checkReversal(reversal,cogsEntry,'Sale '+sale.id+' COGS reversal');
     }
   }
   for(const expense of expenses){
-    const matches=entryBySource.get(expense.merchant_id+'|expense|'+expense.id)||[];
-    if(!expense.voided)checkMapping(matches[0],Number(expense.amount||0),'6000','1000','Expense '+expense.id);
+    const original=(entryBySource.get(expense.merchant_id+'|expense|'+expense.id)||[])[0];
+    checkMapping(original,Number(expense.amount||0),'6000','1000','Expense '+expense.id);
+    if(expense.voided&&original){
+      const reversal=(entryBySource.get(expense.merchant_id+'|expense_void|'+original.id)||[])[0];
+      if(!reversal)issues.push('Expense '+expense.id+': missing journal reversal');
+      else checkReversal(reversal,original,'Expense '+expense.id+' reversal');
+    }
   }
   for(const entry of entries){
     if(['sale','sale_cogs'].includes(entry.source_type)&&!sales.some(s=>s.id===entry.source_id&&s.merchant_id===entry.merchant_id))issues.push('Orphaned '+entry.source_type+' source '+entry.source_id);
     if(entry.source_type==='expense'&&!expenses.some(e=>e.id===entry.source_id&&e.merchant_id===entry.merchant_id))issues.push('Orphaned expense source '+entry.source_id);
-    if(['sale_void','sale_cogs_void','expense_void'].includes(entry.source_type)&&!entryById.has(entry.source_id))issues.push('Orphaned '+entry.source_type+' reversal '+entry.source_id);
+    if(['sale_void','sale_cogs_void','expense_void'].includes(entry.source_type)){
+      const original=entryById.get(entry.source_id);
+      if(!original)issues.push('Orphaned '+entry.source_type+' reversal '+entry.source_id);
+      else checkReversal(entry,original,entry.source_type+' '+entry.id);
+    }
   }
   for(const [key,rows] of entryBySource)if(rows.length>1)issues.push('Duplicate journal source '+key);
   return {invalidCount:issues.length,issues};
