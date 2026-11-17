@@ -127,6 +127,7 @@ Deno.serve(async (req: Request) => {
       if (callerError || !callerData?.user) return json({ error: "Manager session is invalid." }, 401);
 
       const merchantId = String(body?.merchant_id || "");
+      const ownerAccountId = String(body?.owner_account_id || "").trim();
       const fullName = String(body?.full_name || "").trim();
       const email = String(body?.email || "").trim().toLowerCase() || null;
       let phone = String(body?.phone || "").trim() || null;
@@ -135,7 +136,7 @@ Deno.serve(async (req: Request) => {
       const role = String(body?.role || "cashier");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
 
-      if (!merchantId || fullName.length < 2 || !phone || !/^\d{6,8}$/.test(pin)) {
+      if (!merchantId || !ownerAccountId || fullName.length < 2 || !phone || !/^\d{6,8}$/.test(pin)) {
         return json({ error: "Provide the business account, full name, phone number and a 6–8 digit PIN. Email is optional." }, 400);
       }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
@@ -146,8 +147,9 @@ Deno.serve(async (req: Request) => {
       }
 
       const { data: merchant, error: merchantError } = await admin
-        .from("merchants").select("id,user_id,country").eq("id", merchantId).maybeSingle();
+        .from("merchants").select("id,user_id,country,shericeri_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
+      if (String(merchant.shericeri_id || "") !== ownerAccountId) return json({ error: "The owner business ID does not match the selected business account." }, 403);
       if (phone) {
         phone = normalizePhoneForAuth(phone, merchant.country);
         if (!phone) return json({ error: "Enter a valid international phone number. For Rwanda, you may enter 078… or +25078… ." }, 400);
@@ -229,7 +231,13 @@ Deno.serve(async (req: Request) => {
         }, 409);
       }
       if (authUser && !authUser.email) {
-        return json({ ok: false, code: "existing_phone_account", error: "This phone is already attached to an account without an email login. Add a verified email to that account first, or use a different phone number." }, 409);
+        const internalEmail = "staff-" + authUser.id + "@example.com";
+        const { data: updatedIdentity, error: identityError } = await admin.auth.admin.updateUserById(authUser.id, {
+          email: internalEmail,
+          email_confirm: true,
+        });
+        if (identityError || !updatedIdentity?.user) throw identityError || new Error("Could not prepare the staff sign-in identity.");
+        authUser = updatedIdentity.user;
       }
       if (authUser) {
         const { data: existingMember, error: existingMemberError } = await admin.from("merchant_members")
@@ -326,7 +334,7 @@ Deno.serve(async (req: Request) => {
       if (!["active", "suspended"].includes(status)) return json({ error: "Invalid team status." }, 400);
       if (pin && !/^\d{6,8}$/.test(pin)) return json({ error: "A new PIN must contain 6 to 8 digits." }, 400);
 
-      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id,country").eq("id", merchantId).maybeSingle();
+      const { data: merchant, error: merchantError } = await admin.from("merchants").select("id,user_id,country,shericeri_id").eq("id", merchantId).maybeSingle();
       if (merchantError || !merchant) return json({ error: "Business account not found." }, 404);
       if (phone) {
         phone = normalizePhoneForAuth(phone, merchant.country);
