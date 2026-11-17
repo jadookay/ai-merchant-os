@@ -116,7 +116,13 @@ security definer
 set search_path = ''
 as $$
 begin
-  raise exception 'Expenses are retained for accounting history. Use the audited void workflow instead.';
+  if auth.uid() is not null and exists(
+    select 1 from public.journal_entries
+    where merchant_id=old.merchant_id and source_type='expense' and source_id=old.id
+  ) then
+    raise exception 'Expenses with posted journals are retained for accounting history. Use the audited void workflow instead.';
+  end if;
+  return old;
 end;
 $$;
 revoke all on function private.prevent_expense_hard_delete() from public,anon,authenticated;
