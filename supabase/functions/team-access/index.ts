@@ -13,7 +13,7 @@ const json = (body: unknown, status = 200) =>
   });
 
 function randomPassword() {
-  const bytes = crypto.getRandomValues(new Uint8Array(48));
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 function normalizePhoneForAuth(value: string | null, country: string | null): string | null {
@@ -135,8 +135,8 @@ Deno.serve(async (req: Request) => {
       const role = String(body?.role || "cashier");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
 
-      if (!merchantId || fullName.length < 2 || (!email && !phone) || !/^\d{6,8}$/.test(pin)) {
-        return json({ error: "Provide a business, full name, verified email or phone, and a 6–8 digit PIN." }, 400);
+      if (!merchantId || fullName.length < 2 || !phone || !/^\d{6,8}$/.test(pin)) {
+        return json({ error: "Provide the business account, full name, phone number and a 6–8 digit PIN. Email is optional." }, 400);
       }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       
@@ -318,7 +318,7 @@ Deno.serve(async (req: Request) => {
       const status = String(body?.status || "active");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
       const pin = String(body?.pin || "");
-      if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
+      if (!merchantId || !memberId || fullName.length < 2 || phone === null) return json({ error: "Business, member, full name and phone number are required. Email is optional." }, 400);
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       
       if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
@@ -356,7 +356,7 @@ Deno.serve(async (req: Request) => {
       const nextEmail = email === undefined ? target.email : email;
       const nextPhone = phone === undefined ? target.phone : phone;
       const nextUsername = username === undefined ? target.username : username;
-      if (!nextEmail && !nextPhone && !nextUsername) return json({ error: "Keep at least one staff login identifier: email, phone or username." }, 400);
+      if (!nextPhone) return json({ error: "A staff phone number is mandatory. Email and username are optional." }, 400);
       if (target.user_id === callerData.user.id) return json({ error: "Use the owner account to change another administrator's access; self-edits are disabled here." }, 403);
       if (target.role === "admin" && !privileged) return json({ error: "Only the owner or an administrator can change an administrator account." }, 403);
       if ((permissions.manage_team === true || permissions.manage_sales === true) && role !== "manager" && role !== "admin") return json({ error: "Manager-level controls can only be assigned to a manager or administrator role." }, 400);
@@ -389,11 +389,24 @@ Deno.serve(async (req: Request) => {
         .eq("id", memberId).eq("merchant_id", merchantId)
         .select("id,merchant_id,user_id,full_name,username,email,phone,role,permissions,responsibility,status,created_at,updated_at,last_login_at").single();
       if (updateError) throw updateError;
+      const authPatch: Record<string, unknown> = {};
       if (email && email !== target.email) {
-        const { error: authEmailError } = await admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true });
-        if (authEmailError) {
-          await admin.from("merchant_members").update({ email: target.email, phone: target.phone, username: target.username }).eq("id", memberId).eq("merchant_id", merchantId);
-          throw authEmailError;
+        authPatch.email = email;
+        authPatch.email_confirm = true;
+      }
+      if (phone !== undefined && phone !== target.phone) {
+        authPatch.phone = phone;
+        authPatch.phone_confirm = true;
+      }
+      if (Object.keys(authPatch).length) {
+        const { error: authIdentityError } = await admin.auth.admin.updateUserById(target.user_id, authPatch);
+        if (authIdentityError) {
+          await admin.from("merchant_members").update({
+            email: target.email, phone: target.phone, username: target.username,
+            full_name: target.full_name, responsibility: target.responsibility,
+            role: target.role, permissions: target.permissions, status: target.status
+          }).eq("id", memberId).eq("merchant_id", merchantId);
+          throw authIdentityError;
         }
       }
       if (pin) {
