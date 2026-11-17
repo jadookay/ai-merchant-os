@@ -5675,6 +5675,7 @@ function accSourceIntegrity(){
   const sales=state.sales||[],expenses=state.expenses||[],entries=state.journalEntries||[],lines=state.journalLines||[],accounts=state.accounts||[];
   const issues=[],entryBySource=new Map(),entryById=new Map(entries.map(e=>[e.id,e]));
   for(const e of entries){
+    if(!e.source_type||!e.source_id)continue;
     const key=String(e.merchant_id)+'|'+String(e.source_type)+'|'+String(e.source_id);
     entryBySource.set(key,(entryBySource.get(key)||[]).concat(e));
   }
