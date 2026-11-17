@@ -10,6 +10,8 @@ const quickService = await readFile(new URL("../supabase/functions/quick-service
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
+const saleAuditMigration = await readFile(new URL("../supabase/migrations/20261117100000_atomic_sale_creation_audit.sql", import.meta.url), "utf8");
+const expenseMigration = await readFile(new URL("../supabase/migrations/20261117110000_atomic_expense_posting_and_void.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
@@ -817,7 +819,7 @@ test("sale creation audit is committed atomically without changing sale account 
   assert.ok(saleAuditMigration.includes('private.audit_sale_after_insert'));
   assert.ok(saleAuditMigration.includes('sales_post_ledger_after_insert') === false,
     "the additive audit trigger must not replace the existing financial posting trigger");
-  assert.ok(quickService.includes("shericeri_sync_sale_cart"));
+  assert.ok(html.includes("sheriSyncSaleCartOperation"));
 });
 
 test("expense insert posts the existing cash expense mapping atomically and void reversals are audited", () => {
