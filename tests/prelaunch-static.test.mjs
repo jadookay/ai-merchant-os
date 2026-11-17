@@ -844,3 +844,13 @@ test("expense insert posts the existing cash expense mapping atomically and void
   assert.ok(html.includes("sb.rpc('shericeri_void_expense'"));
   assert.ok(html.includes("sourceIntegrity.invalidCount===0"));
 });
+
+
+test("financial statement verification includes inventory movement source completeness", () => {
+  assert.ok(html.includes("sb.from('inventory_movements').select('*')"));
+  assert.ok(html.includes("Inventory '+movement.movement_type"));
+  assert.ok(html.includes("purchase_receipt"));
+  assert.ok(html.includes("customer_return"));
+  assert.ok(html.includes("supplier_return"));
+  assert.ok(html.includes("sourceIntegrity.invalidCount===0"));
+});
