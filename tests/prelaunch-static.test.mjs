@@ -295,7 +295,7 @@ test("sale, product, advisor and expense voice entry share MediaRecorder and aut
 
 test("sales and expenses confirm before saving; expenses post atomically on the server", () => {
   const saleStart = html.indexOf("async function recordSale()");
-  const saleEnd = html.indexOf("\\nasync function voidSale", saleStart);
+  const saleEnd = html.indexOf("\nasync function voidSale", saleStart);
   assert.ok(saleStart >= 0 && saleEnd > saleStart, "expected the complete sale recording function");
   const sale = html.slice(saleStart, saleEnd);
   assert.ok(sale.includes("confirm('Confirm sale?"), "sale must be confirmed before it is recorded");
@@ -311,7 +311,7 @@ test("sales and expenses confirm before saving; expenses post atomically on the 
   assert.ok(saleAccounting.includes("sourceType:'sale_cogs',sourceId:s.id"));
 
   const expenseStart = html.indexOf("async function addExpense()");
-  const expenseEnd = html.indexOf("\\nasync function deleteExpense", expenseStart);
+  const expenseEnd = html.indexOf("\nasync function deleteExpense", expenseStart);
   assert.ok(expenseStart >= 0 && expenseEnd > expenseStart, "expected the complete expense recording function");
   const expense = html.slice(expenseStart, expenseEnd);
   assert.ok(expense.includes("confirm('Record this expense?"));
