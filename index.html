@@ -3435,7 +3435,8 @@ function sheriUpdateVoiceDiagnosticsAccess(){const b=document.getElementById('sh
 function toggleShericeriDiagnostic(){
   if(!sheriCanUseVoiceDiagnostics())return;
   const el=document.getElementById('sheriDiagnostic');
-  if(el)el.style.display=el.style.display==='none'?'block':'none';
+  if(!el)return;
+  if(el.style.display==='none'){sheriDiagReset();sheriDiagShow();}else el.style.display='none';
 }
 function sheriSpeakerStatusSet(text){
   const el=document.getElementById('sheriDiagStatus');
@@ -3876,7 +3877,7 @@ function sheriAudioConstraints(){
 
 function sheriDiagReset(){
   const d=sheriDiagEnsure(), rows=d.querySelector('#sheriDiagRows');
-  rows.innerHTML=''; sheriDiagShow();
+  rows.innerHTML='';
   sheriDiagSet('Browser',navigator.userAgent.includes('Android')?'Android':'Other');
   sheriDiagSet('TTS available',!!window.speechSynthesis);
   sheriDiagSet('MediaRecorder',!!window.MediaRecorder);
