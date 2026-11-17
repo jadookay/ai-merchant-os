@@ -1972,7 +1972,8 @@ async function loadAll(silent=false){
         sb.from('tax_rates').select('*').eq('merchant_id',mId).order('name'),
         sb.from('recurring_transactions').select('*').eq('merchant_id',mId).order('next_run'),
         sb.from('accounting_settings').select('*').eq('merchant_id',mId).maybeSingle(),
-        sb.from('audit_log').select('*').eq('merchant_id',mId).order('created_at',{ascending:false}).limit(100)
+        sb.from('audit_log').select('*').eq('merchant_id',mId).order('created_at',{ascending:false}).limit(100),
+        sb.from('inventory_movements').select('*').eq('merchant_id',mId).order('created_at',{ascending:false})
       ]);
       // Accounting is also local-first. A temporary empty/partial server response
       // must never erase an offline journal, invoice, bill, payment, or bank snapshot
@@ -1981,7 +1982,7 @@ async function loadAll(silent=false){
         ['accounts',q[0].data,q[0].error],['journalEntries',q[1].data,q[1].error],['journalLines',q[2].data,q[2].error],
         ['invoices',q[3].data,q[3].error],['bills',q[4].data,q[4].error],['payments',q[5].data,q[5].error],
         ['bankAccounts',q[6].data,q[6].error],['taxRates',q[7].data,q[7].error],['recurringTransactions',q[8].data,q[8].error],
-        ['auditLog',q[10].data,q[10].error]
+        ['auditLog',q[10].data,q[10].error],['inventoryMovements',q[11].data,q[11].error]
       ];
       const accountingErrors=accountingMerges.filter(([,rows,error])=>!!error).map(([key,rows,error])=>key+': '+(error.message||String(error)));
       if(q[9].error)accountingErrors.push('accounting settings: '+(q[9].error.message||String(q[9].error)));
@@ -5672,7 +5673,7 @@ function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('re
 function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accSourceIntegrity(){
-  const sales=state.sales||[],expenses=state.expenses||[],entries=state.journalEntries||[],lines=state.journalLines||[],accounts=state.accounts||[];
+  const sales=state.sales||[],expenses=state.expenses||[],movements=state.inventoryMovements||[],entries=state.journalEntries||[],lines=state.journalLines||[],accounts=state.accounts||[];
   const issues=[],entryBySource=new Map(),entryById=new Map(entries.map(e=>[e.id,e]));
   for(const e of entries){
     if(!e.source_type||!e.source_id)continue;
@@ -5730,9 +5731,25 @@ function accSourceIntegrity(){
       else checkReversal(reversal,original,'Expense '+expense.id+' reversal');
     }
   }
+  for(const movement of movements){
+    if(['adjustment','writeoff'].includes(movement.movement_type)){
+      const amount=Math.abs(Number(movement.quantity_delta||0))*Number(movement.unit_cost||0);
+      if(amount>0){
+        const debitCode=Number(movement.quantity_delta)<0?'6000':'1200';
+        const creditCode=Number(movement.quantity_delta)<0?'1200':'4100';
+        const entry=(entryBySource.get(movement.merchant_id+'|inventory_adjustment|'+movement.id)||[])[0];
+        checkMapping(entry,amount,debitCode,creditCode,'Inventory '+movement.movement_type+' '+movement.id);
+      }
+    }
+    if(movement.movement_type==='purchase_receipt'&&!entryBySource.has(movement.merchant_id+'|purchase_receipt|'+movement.id))
+      issues.push('Purchase receipt '+movement.id+': missing inventory/payables journal');
+    if(['customer_return','supplier_return'].includes(movement.movement_type))
+      issues.push('Inventory '+movement.movement_type+' '+movement.id+': accounting treatment requires source/payment linkage');
+  }
   for(const entry of entries){
     if(['sale','sale_cogs'].includes(entry.source_type)&&!sales.some(s=>s.id===entry.source_id&&s.merchant_id===entry.merchant_id))issues.push('Orphaned '+entry.source_type+' source '+entry.source_id);
     if(entry.source_type==='expense'&&!expenses.some(e=>e.id===entry.source_id&&e.merchant_id===entry.merchant_id))issues.push('Orphaned expense source '+entry.source_id);
+    if(entry.source_type==='inventory_adjustment'&&!movements.some(m=>m.id===entry.source_id&&m.merchant_id===entry.merchant_id))issues.push('Orphaned inventory adjustment source '+entry.source_id);
     if(['sale_void','sale_cogs_void','expense_void'].includes(entry.source_type)){
       const original=entryById.get(entry.source_id);
       if(!original)issues.push('Orphaned '+entry.source_type+' reversal '+entry.source_id);
