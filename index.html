@@ -7473,6 +7473,16 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){return _v14_1_add
     'total':'Total','delete':'Supprimer','phone':'Téléphone','email':'E-mail',
     'cash / 30 days':'Comptant / 30 jours'
   });
+  Object.assign(dictionaries.rw,{
+    'unit cost (':'Ikiguzi cyo kugura kuri kimwe (',
+    'ai business advisor':'Umujyanama w’ubucuruzi (AI)',
+    'aibos command center':'Igenzura ry’ubucuruzi'
+  });
+  Object.assign(dictionaries.fr,{
+    'unit cost (':'Coût unitaire (',
+    'ai business advisor':'Conseiller commercial IA',
+    'aibos command center':'Centre de gestion AIBOS'
+  });
   const normalize=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
   function translateString(original,lang){
     if(lang==='en')return original;
