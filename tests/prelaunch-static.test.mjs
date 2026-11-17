@@ -322,9 +322,9 @@ test("sales and expenses confirm before saving; expenses post atomically on the 
   assert.ok(expenseMigration.includes("after insert on public.expenses"));
 });
 
-test("sales and expenses confirm before saving and post balanced journal entries immediately", () => {
+test("sales and expenses confirm before saving; expenses post atomically on the server", () => {
   const saleStart = html.indexOf("async function recordSale()");
-  const saleEnd = html.indexOf("\nasync function voidSale", saleStart);
+  const saleEnd = html.indexOf("\\nasync function voidSale", saleStart);
   assert.ok(saleStart >= 0 && saleEnd > saleStart, "expected the complete sale recording function");
   const sale = html.slice(saleStart, saleEnd);
   assert.ok(sale.includes("confirm('Confirm sale?"), "sale must be confirmed before it is recorded");
@@ -339,13 +339,16 @@ test("sales and expenses confirm before saving and post balanced journal entries
   assert.ok(saleAccounting.includes("sourceType:'sale',sourceId:s.id"));
   assert.ok(saleAccounting.includes("sourceType:'sale_cogs',sourceId:s.id"));
 
-  const expenseStart = html.indexOf("function addExpense()");
-  const expenseEnd = html.indexOf("\nasync function deleteExpense", expenseStart);
+  const expenseStart = html.indexOf("async function addExpense()");
+  const expenseEnd = html.indexOf("\\nasync function deleteExpense", expenseStart);
   assert.ok(expenseStart >= 0 && expenseEnd > expenseStart, "expected the complete expense recording function");
   const expense = html.slice(expenseStart, expenseEnd);
   assert.ok(expense.includes("confirm('Record this expense?"));
-  assert.ok(expense.includes("sourceType:'expense',sourceId:data.id"));
-  assert.ok(expense.includes("sheriToast('Expense recorded."));
+  assert.ok(expense.includes("type:'expense_upsert',record:data"));
+  assert.ok(expense.includes("sheriSyncOutbox()"));
+  assert.doesNotMatch(expense,/accPostEntry/);
+  assert.ok(expense.includes("sheriToast(pending?'Expense saved on this device."));
+  assert.ok(expenseMigration.includes("after insert on public.expenses"));
 });
 
 test("cashier sales use an atomic stock RPC on normal sync and auth-retry paths", () => {
