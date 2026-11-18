@@ -6334,6 +6334,42 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     'record purchase / restock':'Enregistrer un achat / réapprovisionner',
     'good morning,':'Bonjour,','good afternoon,':'Bon après-midi,','good evening,':'Bonsoir,','good night,':'Bonne nuit,'
   });
+  Object.assign(dictionaries.rw,{
+    'manage supplier details, record purchases and restock products.':'Cunga amakuru y’abaranguza, andika ibyo uguze kandi wongere ibicuruzwa mu bubiko.',
+    'customer details, balances and purchase history.':'Amakuru y’abakiriya, imyenda yabo n’amateka y’ibyo baguze.',
+    'record and review business expenses.':'Andika kandi usuzume amafaranga yakoreshejwe mu bucuruzi.',
+    'sales, profit, cash flow and financial statements.':'Ibyagurishijwe, inyungu, uko amafaranga yinjira n’asohoka na raporo z’imari.',
+    'business profile, language and app preferences.':'Amakuru y’ubucuruzi, ururimi n’imiterere ya porogaramu.',
+    'ask questions about your recorded business activity.':'Baza ibibazo ku bikorwa by’ubucuruzi wanditse.',
+    'talk to your business assistant.':'Ganira n’umufasha wawe mu bucuruzi.',
+    'invoices, bills, payments, cash, tax and bookkeeping.':'Inyemezabuguzi, fagitire, ubwishyu, amafaranga, imisoro n’ibaruramari.',
+    'sales trends, stock risk and practical forecasts.':'Imigendekere y’igurisha, ibyago by’ububiko n’iteganyagihe.',
+    'returns, refunds and discounts.':'Ibyagaruwe, gusubiza amafaranga n’igabanyirizwa.',
+    'ask shericeri what needs attention in your business.':'Baza Shericeri ibikwiye kwitabwaho mu bucuruzi bwawe.',
+    'supplier name':'Izina ry’uwuranguza','payment terms':'Amasezerano yo kwishyura','cash / 30 days':'Amafaranga ako kanya / iminsi 30',
+    'add supplier':'Ongeraho umuranguza','supplier optional':'Umuranguza (si ngombwa)','unit cost':'Igiciro kuri kimwe',
+    'due date (optional)':'Itariki ntarengwa (si ngombwa)','record purchase':'Andika ibyo uguze','no suppliers yet.':'Nta muranguza urashyirwamo.',
+    'no purchases recorded.':'Nta byo waguze birandikwa.','supplier spend':'Amafaranga yakoreshejwe ku baranguza',
+    'purchase / restock':'Kugura / kongera ibicuruzwa mu bubiko'
+  });
+  Object.assign(dictionaries.fr,{
+    'manage supplier details, record purchases and restock products.':'Gérez les fournisseurs, enregistrez les achats et réapprovisionnez les produits.',
+    'customer details, balances and purchase history.':'Coordonnées des clients, soldes et historique des achats.',
+    'record and review business expenses.':'Enregistrez et consultez les dépenses de l’entreprise.',
+    'sales, profit, cash flow and financial statements.':'Ventes, bénéfices, flux de trésorerie et états financiers.',
+    'business profile, language and app preferences.':'Profil de l’entreprise, langue et préférences de l’application.',
+    'ask questions about your recorded business activity.':'Posez des questions sur les activités enregistrées de votre entreprise.',
+    'talk to your business assistant.':'Discutez avec votre assistante commerciale.',
+    'invoices, bills, payments, cash, tax and bookkeeping.':'Factures, paiements, trésorerie, impôts et comptabilité.',
+    'sales trends, stock risk and practical forecasts.':'Tendances des ventes, risques de stock et prévisions pratiques.',
+    'returns, refunds and discounts.':'Retours, remboursements et remises.',
+    'ask shericeri what needs attention in your business.':'Demandez à Shericeri ce qui mérite votre attention dans l’entreprise.',
+    'supplier name':'Nom du fournisseur','payment terms':'Conditions de paiement','cash / 30 days':'Comptant / 30 jours',
+    'add supplier':'Ajouter un fournisseur','supplier optional':'Fournisseur (facultatif)','unit cost':'Coût unitaire',
+    'due date (optional)':'Date d’échéance (facultatif)','record purchase':'Enregistrer l’achat','no suppliers yet.':'Aucun fournisseur pour le moment.',
+    'no purchases recorded.':'Aucun achat enregistré.','supplier spend':'Dépenses fournisseurs',
+    'purchase / restock':'Achat / réapprovisionnement'
+  });
   const phraseFragments={
     rw:[
       ["Confirm sale?","Emeza igurisha?"],["Sale confirmed.","Igurisha ryemejwe."],
@@ -7822,11 +7858,11 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   const n=new Date().getHours(),period=n>=5&&n<12?'morning':n>=12&&n<17?'afternoon':n>=17&&n<21?'evening':'night';
   const lang=window.AIBOS_I18N?.getLanguage?.()||'en',copy=(phrases[lang]||phrases.en)[period],first=h.firstChild;
   if(first&&first.nodeType===Node.TEXT_NODE)first.nodeValue=copy[0]+' ';else h.insertBefore(document.createTextNode(copy[0]+' '),name);
-  const today=document.getElementById('today');if(today){const date=today.getAttribute('data-aibos-date')||today.textContent.split(' · ')[0];today.setAttribute('data-aibos-date',date);today.textContent=date+' · '+copy[1];}
+  const today=document.getElementById('today');if(today){const date=today.textContent.split(' · ')[0];today.textContent=date+' · '+copy[1];}
  }
  const original=window.render;if(typeof original==='function'&&!original.__timeGreetingWrapped){const wrapped=function(){const r=original.apply(this,arguments);refresh();return r};wrapped.__timeGreetingWrapped=true;window.render=wrapped;}
  window.addEventListener('aibos:languagechange',refresh);
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});else refresh();
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});else refresh();\n setInterval(refresh,60000);
 })();
 </script>
 </body>
