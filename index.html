@@ -566,7 +566,7 @@ window.ensurePdfJs=async function(){
   <div class="top"><div><h1>More</h1><div class="sub">Customers, suppliers, reports and business settings.</div></div></div>
   <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
     <button class="card hub-card" onclick="show('customers')"><h2>☺ Customers</h2><div class="sub">Customer details, balances and purchase history.</div></button>
-    <button class="card hub-card" onclick="show('businessOS')"><h2>📦 Suppliers & purchases</h2><div class="sub">Abaranguza, supplier details, purchases and restocking.</div></button>
+    <button class="card hub-card" onclick="show('suppliersPurchases')"><h2>📦 Suppliers & purchases</h2><div class="sub">Abaranguza, supplier details, purchases and restocking.</div></button>
     <button class="card hub-card" onclick="show('expenses')"><h2>◉ Expenses</h2><div class="sub">Record and review business expenses.</div></button>
     <button class="card hub-card" onclick="show('reports')"><h2>▤ Reports</h2><div class="sub">Sales, profit, cash flow and financial statements.</div></button>
     <button class="card hub-card" onclick="show('settings')"><h2>⚙ Settings</h2><div class="sub">Business profile, language and app preferences.</div></button>
@@ -576,17 +576,8 @@ window.ensurePdfJs=async function(){
   </div>
 </section>
 
-<section id="businessOS" class="view">
-  <div class="top"><div><h1>AIBOS Command Center</h1><div class="sub">Your AI-powered business control center. Choose a business function.</div></div><button class="btn" onclick="generateOSInsight()">✦ AI Business Insight</button></div>
-  <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
-    <button class="card hub-card" onclick="show('money')"><h2>💰 Money</h2><div class="sub">Invoices, bills, payments, cash, tax and bookkeeping.</div></button>
-    <button class="card hub-card" onclick="show('forecast')"><h2>📈 Forecast</h2><div class="sub">Sales trends, stock risk and practical forecasts.</div></button>
-    <button class="card hub-card" onclick="show('adjustments')"><h2>↩ Returns</h2><div class="sub">Returns, refunds and discounts.</div></button>
-    <button class="card hub-card" onclick="generateOSInsight()"><h2>✦ AI Business Insight</h2><div id="aibosHubInsight" class="sub">Ask Shericeri what needs attention in your business.</div></button>
-  </div>
-  <div class="notice"><b>AIBOS is working from your records.</b> The numbers shown across the app come from the same business data, whether recorded online or offline.</div>
-  <div class="legacy-os" aria-hidden="true">
-  <div class="metrics" id="osMetrics"></div>
+<section id="suppliersPurchases" class="view">
+  <div class="top"><div><h1>Suppliers & purchases</h1><div class="sub">Manage supplier details, record purchases and restock products.</div></div></div>
   <div class="grid2 section">
     <div class="card"><h2>Procurement & Suppliers</h2><div class="formgrid">
       <div><label>Supplier name</label><input id="osSupplierName" placeholder="Supplier / wholesaler"></div>
@@ -603,6 +594,19 @@ window.ensurePdfJs=async function(){
       <div><label>Status</label><select id="osPurchaseStatus"><option value="received">Received</option><option value="ordered">Ordered</option></select></div>
     </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="addOSPurchase()">Record purchase</button></div><div id="osPurchaseTable" style="margin-top:12px"></div></div>
   </div>
+</section>
+
+<section id="businessOS" class="view">
+  <div class="top"><div><h1>AIBOS Command Center</h1><div class="sub">Your AI-powered business control center. Choose a business function.</div></div><button class="btn" onclick="generateOSInsight()">✦ AI Business Insight</button></div>
+  <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
+    <button class="card hub-card" onclick="show('money')"><h2>💰 Money</h2><div class="sub">Invoices, bills, payments, cash, tax and bookkeeping.</div></button>
+    <button class="card hub-card" onclick="show('forecast')"><h2>📈 Forecast</h2><div class="sub">Sales trends, stock risk and practical forecasts.</div></button>
+    <button class="card hub-card" onclick="show('adjustments')"><h2>↩ Returns</h2><div class="sub">Returns, refunds and discounts.</div></button>
+    <button class="card hub-card" onclick="generateOSInsight()"><h2>✦ AI Business Insight</h2><div id="aibosHubInsight" class="sub">Ask Shericeri what needs attention in your business.</div></button>
+  </div>
+  <div class="notice"><b>AIBOS is working from your records.</b> The numbers shown across the app come from the same business data, whether recorded online or offline.</div>
+  <div class="legacy-os" aria-hidden="true">
+  <div class="metrics" id="osMetrics"></div>
   <div class="grid2 section">
     <div class="card"><h2>Cash & Budget Control</h2><div class="formgrid">
       <div><label>Movement</label><select id="osCashKind"><option value="income">Cash in</option><option value="expense">Cash out</option><option value="transfer">Transfer</option></select></div>
@@ -7795,7 +7799,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
 .sheri-title-thumb{width:26px;height:26px;flex:0 0 26px;object-fit:cover;border-radius:50%;border:1.5px solid #F7EB5B;vertical-align:middle;margin-right:8px;box-shadow:0 1px 5px rgba(0,0,0,.18)}
 #shericeri .top h1{display:flex;align-items:center;gap:0}
 </style>
-<script id="aibos-shericeri-title-thumbnails-v1">
+<script id="aibos-shericeri-title-thumbnails-script-v1">
 (function(){
  const source=document.querySelector('#dashboard .sheri-launcher .sheri-thumb img');
  if(!source)return;
