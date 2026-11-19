@@ -462,14 +462,13 @@ window.ensurePdfJs=async function(){
 </section>
 
 <section id="customers" class="view">
-  <div class="top"><div><h1>Customers</h1><div class="sub">Optional — track individual customers when it's useful. Most sales can stay anonymous.</div>
+  <div class="top"><div><h1>Customers</h1><div class="sub">Optional — track individual customers when it's useful. Most sales can stay anonymous.</div></div></div>
   <div class="card section"><h2>Customer Invoice</h2><div class="card"><h2>Customer invoice</h2><div class="formgrid">
       <div><label>Customer</label><select id="accInvoiceCustomer"></select></div><div><label>Issue date</label><input id="accInvoiceDate" type="date"></div><div><label>Due date</label><input id="accInvoiceDue" type="date"></div>
       <div><label>Product / description</label><input id="accInvoiceDesc" placeholder="Product or service"></div><div><label>Quantity</label><input id="accInvoiceQty" type="number" min="0.01" step="0.01" value="1"></div><div><label>Unit price</label><input id="accInvoicePrice" type="number" min="0" step="0.01"></div>
       <div><label>Tax rate</label><select id="accInvoiceTax"></select></div><div><label>Discount</label><input id="accInvoiceDiscount" type="number" min="0" step="0.01" value="0"></div><div><label>Notes</label><input id="accInvoiceNotes" placeholder="Optional"></div>
     </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateInvoice()">Create invoice</button></div><div id="accInvoiceSearchHost"></div><div id="accInvoiceTable" style="margin-top:12px"></div></div></div>
-</div></div>
-  <div class="card">
+<div class="card">
     <div class="formgrid">
       <div><label>Name</label><input id="cName" placeholder="Alice Uwase"></div>
       <div><label>Phone (optional)</label><input id="cPhone" placeholder="078..."></div>
@@ -588,11 +587,11 @@ window.ensurePdfJs=async function(){
       <div><label>Email</label><input id="osSupplierEmail" type="email"></div>
       <div><label>Payment terms</label><input id="osSupplierTerms" placeholder="Cash / 30 days"></div>
     </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="addOSSupplier()">Add supplier</button></div><div id="osSupplierTable" style="margin-top:12px"></div></div>
-    <div class="card"><h2>Supplier Bill</h2><div class="card"><h2>Supplier bill</h2><div class="formgrid">
+    <div class="card"><h2>Supplier bill</h2><div class="formgrid">
       <div><label>Supplier</label><select id="accBillSupplier"></select></div><div><label>Issue date</label><input id="accBillDate" type="date"></div><div><label>Due date</label><input id="accBillDue" type="date"></div>
       <div><label>Product / description</label><input id="accBillDesc" placeholder="Stock or service"></div><div><label>Quantity</label><input id="accBillQty" type="number" min="0.01" step="0.01" value="1"></div><div><label>Unit cost</label><input id="accBillCost" type="number" min="0" step="0.01"></div>
       <div><label>Tax rate</label><select id="accBillTax"></select></div><div><label>Discount</label><input id="accBillDiscount" type="number" min="0" step="0.01" value="0"></div><div><label>Notes</label><input id="accBillNotes" placeholder="Optional"></div>
-    </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBill()">Create bill</button></div><div id="accBillSearchHost"></div><div id="accBillTable" style="margin-top:12px"></div></div></div>
+    </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBill()">Create bill</button></div><div id="accBillSearchHost"></div><div id="accBillTable" style="margin-top:12px"></div></div>
 <div class="card"><h2>Record Purchase / Restock</h2><div class="formgrid">
       <div><label>Supplier</label><select id="osPurchaseSupplier"></select></div>
       <div><label>Product</label><select id="osPurchaseProduct"></select></div>
@@ -633,7 +632,6 @@ window.ensurePdfJs=async function(){
   <div class="top"><div><h1>Money</h1><div class="sub">Track business money and review the reports generated from your records.</div></div><div class="actions"><button class="btn secondary" onclick="show('expenses')">Expenses</button><button class="btn" onclick="show('reports')">View reports</button></div></div>
   <div class="metrics" id="accMetrics"></div>
   <div class="grid2 section">
-    <div class="grid2 section">
     <div class="card"><h2>Receive / make payment</h2><div class="formgrid"><div><label>Payment type</label><select id="accPaymentType"><option value="customer_receipt">Customer payment received</option><option value="supplier_payment">Supplier payment</option><option value="expense_payment">Expense paid</option><option value="other_income">Other income</option><option value="other_expense">Other expense</option></select></div><div><label>Related invoice/bill <span class="sub">(optional)</span></label><select id="accPaymentSource"></select></div><div><label>Amount</label><input id="accPaymentAmount" type="number" min="0" step="0.01"></div><div><label>Cash / bank account</label><select id="accPaymentAccount"></select></div><div><label>Date</label><input id="accPaymentDate" type="date"></div><div><label>Reference</label><input id="accPaymentRef" placeholder="Receipt / transaction ref"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreatePayment()">Record payment</button></div><div id="accPaymentSearchHost"></div><div id="accPaymentTable" style="margin-top:12px"></div></div>
     <div class="card"><h2>Cash & bank accounts</h2><div class="formgrid"><div><label>Account name</label><input id="accBankName" placeholder="Cash till / Bank account"></div><div><label>Type</label><select id="accBankType"><option value="cash">Cash</option><option value="bank">Bank</option><option value="mobile_money">Mobile money</option></select></div><div><label>Opening balance</label><input id="accBankOpening" type="number" min="0" step="0.01" value="0"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBankAccount()">Add account</button></div><div id="accBankTable" style="margin-top:12px"></div><div class="sub" style="margin-top:10px">Reconciliation records the last date you checked the account against its statement.</div></div>
   </div>
