@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.42 Shericeri portrait and locale display fix">
+<meta name="app-version" content="V14.4.43 Shericeri nav portrait and selector repair">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -8758,6 +8758,53 @@ html[lang="fr"] #appRoot #dashboard .sheri-launcher .sheri-thumb img{display:blo
 })();
 </script>
 
+
+
+<!-- V14.4.43: harden the actual Shericeri nav image node and compact the standalone language selector -->
+<style id="aibos-rendered-nav-image-guard-v43">
+#appRoot .side .nav>button[data-nav-shericeri="1"]{display:flex!important;align-items:center!important;gap:8px!important;overflow:hidden!important}
+#appRoot .side .nav>button[data-nav-shericeri="1"]>img,
+#appRoot .side .nav>button[data-nav-shericeri="1"] .sheri-thumb,
+#appRoot .side .nav>button[data-nav-shericeri="1"] .sheri-nav-thumb{
+ display:inline-block!important;position:relative!important;box-sizing:border-box!important;
+ flex:0 0 26px!important;width:26px!important;min-width:26px!important;max-width:26px!important;
+ height:26px!important;min-height:26px!important;max-height:26px!important;
+ overflow:hidden!important;object-fit:cover!important;border-radius:50%!important;
+}
+#appRoot .side .nav>button[data-nav-shericeri="1"] .sheri-thumb img{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;object-fit:cover!important}
+#aibosLanguageSwitcher{position:fixed!important;top:10px!important;right:12px!important;left:auto!important;bottom:auto!important;inset:10px 12px auto auto!important;z-index:1400!important;display:inline-flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:max-content!important;min-width:0!important;max-width:calc(100vw - 260px)!important;height:auto!important;min-height:0!important;margin:0!important;padding:6px 8px!important;box-sizing:border-box!important}
+#aibosLanguageSwitcher select{width:auto!important;min-width:132px!important;max-width:100%!important}
+@media(max-width:650px){#aibosLanguageSwitcher{position:static!important;inset:auto!important;align-self:center!important;margin:8px auto 2px!important;max-width:calc(100% - 16px)!important}}
+</style>
+<script id="aibos-rendered-nav-image-guard-v43">
+(function(){
+ const nav=document.querySelector('#appRoot .side .nav');
+ const picker=document.getElementById('aibosLanguageSwitcher');
+ function constrainNavPortrait(){
+  const item=nav?.querySelector('[data-nav-shericeri="1"]');
+  if(item){
+   item.querySelectorAll('img').forEach(img=>{
+    img.removeAttribute('width');img.removeAttribute('height');
+    for(const [k,v] of Object.entries({display:'inline-block',position:'relative',width:'26px',height:'26px',minWidth:'26px',minHeight:'26px',maxWidth:'26px',maxHeight:'26px',objectFit:'cover',borderRadius:'50%',flex:'0 0 26px'}))img.style.setProperty(k.replace(/[A-Z]/g,m=>'-'+m.toLowerCase()),v,'important');
+   });
+   item.querySelectorAll('.sheri-thumb').forEach(w=>{
+    for(const [k,v] of Object.entries({display:'inline-block',position:'relative',width:'26px',height:'26px',minWidth:'26px',minHeight:'26px',maxWidth:'26px',maxHeight:'26px',overflow:'hidden',borderRadius:'50%',flex:'0 0 26px'}))w.style.setProperty(k.replace(/[A-Z]/g,m=>'-'+m.toLowerCase()),v,'important');
+   });
+  }
+ }
+ function compactLanguageSelector(){
+  if(!picker)return;
+  for(const [k,v] of Object.entries({position:'fixed',top:'10px',right:'12px',left:'auto',bottom:'auto',width:'max-content',minWidth:'0',maxWidth:'calc(100vw - 260px)',height:'auto',display:'inline-flex',margin:'0',zIndex:'1400',boxSizing:'border-box'}))picker.style.setProperty(k.replace(/[A-Z]/g,m=>'-'+m.toLowerCase()),v,'important');
+  const select=picker.querySelector('select');
+  if(select){select.style.setProperty('width','auto','important');select.style.setProperty('min-width','132px','important')}
+  if(window.innerWidth<=650){picker.style.setProperty('position','static','important');picker.style.setProperty('margin','8px auto 2px','important');picker.style.setProperty('max-width','calc(100% - 16px)','important')}
+ }
+ constrainNavPortrait();compactLanguageSelector();
+ if(nav)new MutationObserver(constrainNavPortrait).observe(nav,{subtree:true,childList:true});
+ window.addEventListener('resize',compactLanguageSelector,{passive:true});
+ window.addEventListener('aibos:languagechange',()=>{constrainNavPortrait();compactLanguageSelector()});
+})();
+</script>
 
 </body>
 </html>
