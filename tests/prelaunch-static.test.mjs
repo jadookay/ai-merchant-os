@@ -562,13 +562,16 @@ test("reports, sales, expenses, Home and stock movements include calendar-year f
   assert.ok(html.includes("else if(period==='yearly'){start.value=sheriLocalDateInput(new Date(now.getFullYear(),0,1));end.value=today;}"));
 });
 
-test("merchant navigation uses five simple destinations and preserves Shericeri access", () => {
+test("merchant navigation preserves the approved Home/Sell/Stock, Money/More and Shericeri structure", () => {
   assert.match(html, /data-view="dashboard">⌂ Home/);
   assert.match(html, /data-view="sales">＋ Sell/);
   assert.match(html, /data-view="inventory">▦ Stock/);
-  assert.match(html, /data-view="money">◈ Money/);
-  assert.match(html, /data-view="records">☰ More/);
-  assert.ok(html.includes('class="sheri-global-launcher"'));
+  assert.match(html, /data-view="money">💰 Money/);
+  assert.match(html, /data-view="businessOS" data-nav-command-center="1"[^>]*>⋯ More/);
+  assert.match(html, /onclick="show\('settings'\)">Settings/);
+  assert.match(html, /const labels=\{en:\['Home','Sell','Stock','Money','More','Shericeri'\]/);
+  assert.ok(html.includes('data-nav-shericeri'));
+  assert.ok(html.includes('sheri-nav-thumb'));
   assert.ok(html.includes("'suppliers':'Abaranguza'"));
 });
 
