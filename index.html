@@ -7855,7 +7855,8 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
  }
  const original=window.render;if(typeof original==='function'&&!original.__timeGreetingWrapped){const wrapped=function(){const r=original.apply(this,arguments);refresh();return r};wrapped.__timeGreetingWrapped=true;window.render=wrapped;}
  window.addEventListener('aibos:languagechange',refresh);
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});else refresh();\n setInterval(refresh,60000);
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',refresh,{once:true});else refresh();
+ setInterval(refresh,60000);
 })();
 </script>
 </body>
