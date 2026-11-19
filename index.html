@@ -226,6 +226,53 @@ window.ensurePdfJs=async function(){
 }
 </style>
 
+<!-- V14.4.45: one locale-independent navigation theme and responsive layout -->
+<style id="aibos-navigation-locale-parity-v45">
+/* Language changes labels only. Keep the exact same navy/gold navigation in EN, RW and FR. */
+#appRoot .side{background:#010080!important;color:#F7EB5B!important}
+#appRoot .side>.brand{color:#F7EB5B!important}
+#appRoot .side .brand span{color:#F7EB5B!important}
+#appRoot .side .nav{
+ box-sizing:border-box!important;width:100%!important;min-width:0!important;
+ border:2px solid #F7EB5B!important;border-radius:14px!important;
+ background:#010080!important;padding:7px!important;gap:8px!important;
+}
+#appRoot .side .nav>button{
+ box-sizing:border-box!important;display:flex!important;align-items:center!important;
+ justify-content:flex-start!important;flex:0 0 auto!important;
+ width:100%!important;min-width:0!important;max-width:100%!important;
+ height:auto!important;min-height:56px!important;max-height:none!important;
+ margin:0!important;padding:8px 10px!important;
+ border:1px solid rgba(247,235,91,.72)!important;border-radius:10px!important;
+ background:#010080!important;color:#F7EB5B!important;
+ font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif!important;
+ font-size:13.3px!important;font-weight:600!important;line-height:1.2!important;
+ text-align:left!important;white-space:normal!important;overflow-wrap:anywhere!important;
+ word-break:normal!important;hyphens:none!important;letter-spacing:normal!important;
+}
+#appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important;border-color:#F7EB5B!important}
+#appRoot .side .nav>button[data-nav-shericeri="1"]{justify-content:flex-start!important;gap:9px!important}
+#appRoot .side .nav .sheri-nav-thumb{display:inline-block!important;flex:0 0 26px!important;width:26px!important;min-width:26px!important;max-width:26px!important;height:26px!important;min-height:26px!important;max-height:26px!important;object-fit:cover!important;border:1.5px solid #F7EB5B!important;border-radius:50%!important}
+#appRoot #aibosCommandSubnav{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;background:#010080!important;border:1px solid rgba(247,235,91,.55)!important;border-radius:11px!important}
+#appRoot #aibosCommandSubnav>button{box-sizing:border-box!important;width:100%!important;min-width:0!important;min-height:42px!important;height:auto!important;padding:8px 10px!important;background:#010080!important;color:#F7EB5B!important;border:1px solid rgba(247,235,91,.4)!important;border-radius:8px!important;font-size:13.3px!important;line-height:1.2!important;text-align:left!important;white-space:normal!important;overflow-wrap:anywhere!important}
+@media(min-width:651px){
+ #appRoot .side .nav{display:flex!important;flex-direction:column!important;align-items:stretch!important}
+ #appRoot .side .nav>button{min-height:56px!important}
+}
+@media(max-width:650px){
+ #appRoot .side .nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(60px,auto))!important;grid-auto-rows:minmax(60px,auto)!important;grid-auto-flow:row!important;align-items:stretch!important;gap:6px!important;padding:7px!important}
+ #appRoot .side .nav>button{grid-column:span 2!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;height:100%!important;min-height:60px!important;max-height:none!important;padding:7px 4px!important;font-size:13.3px!important;line-height:1.16!important;text-align:center!important;overflow-wrap:anywhere!important}
+ #appRoot .side .nav>button:nth-child(1){grid-column:1 / span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button:nth-child(2){grid-column:3 / span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button:nth-child(3){grid-column:5 / span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button:nth-child(4){grid-column:2 / span 2!important;grid-row:2!important}
+ #appRoot .side .nav>button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
+ #appRoot .side .nav>button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
+ #appRoot .side .nav>button[data-nav-shericeri="1"]{gap:5px!important}
+ #appRoot #aibosLanguageSwitcher{background:#010080!important;border:1px solid #F7EB5B!important;border-radius:10px!important}
+ #appRoot #aibosLanguageSwitcher select{background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important}
+}
+</style>
 </head>
 <body>
 
@@ -2278,93 +2325,7 @@ function renderSaleCart(){
 function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script>
-<!-- V14.4.45: one locale-independent navigation theme and responsive layout -->
-<style id="aibos-navigation-locale-parity-v45">
-/* Language changes labels only. Keep the exact same navy/gold navigation in EN, RW and FR. */
-#appRoot .side{background:#010080!important;color:#F7EB5B!important}
-#appRoot .side>.brand{color:#F7EB5B!important}
-#appRoot .side .brand span{color:#F7EB5B!important}
-#appRoot .side .nav{
- box-sizing:border-box!important;width:100%!important;min-width:0!important;
- border:2px solid #F7EB5B!important;border-radius:14px!important;
- background:#010080!important;padding:7px!important;gap:8px!important;
-}
-#appRoot .side .nav>button{
- box-sizing:border-box!important;display:flex!important;align-items:center!important;
- justify-content:flex-start!important;flex:0 0 auto!important;
- width:100%!important;min-width:0!important;max-width:100%!important;
- height:auto!important;min-height:56px!important;max-height:none!important;
- margin:0!important;padding:8px 10px!important;
- border:1px solid rgba(247,235,91,.72)!important;border-radius:10px!important;
- background:#010080!important;color:#F7EB5B!important;
- font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif!important;
- font-size:13.3px!important;font-weight:600!important;line-height:1.2!important;
- text-align:left!important;white-space:normal!important;overflow-wrap:anywhere!important;
- word-break:normal!important;hyphens:none!important;letter-spacing:normal!important;
-}
-#appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important;border-color:#F7EB5B!important}
-#appRoot .side .nav>button[data-nav-shericeri="1"]{justify-content:flex-start!important;gap:9px!important}
-#appRoot .side .nav .sheri-nav-thumb{display:inline-block!important;flex:0 0 26px!important;width:26px!important;min-width:26px!important;max-width:26px!important;height:26px!important;min-height:26px!important;max-height:26px!important;object-fit:cover!important;border:1.5px solid #F7EB5B!important;border-radius:50%!important}
-#appRoot #aibosCommandSubnav{box-sizing:border-box!important;width:100%!important;min-width:0!important;max-width:100%!important;background:#010080!important;border:1px solid rgba(247,235,91,.55)!important;border-radius:11px!important}
-#appRoot #aibosCommandSubnav>button{box-sizing:border-box!important;width:100%!important;min-width:0!important;min-height:42px!important;height:auto!important;padding:8px 10px!important;background:#010080!important;color:#F7EB5B!important;border:1px solid rgba(247,235,91,.4)!important;border-radius:8px!important;font-size:13.3px!important;line-height:1.2!important;text-align:left!important;white-space:normal!important;overflow-wrap:anywhere!important}
-@media(min-width:651px){
- #appRoot .side .nav{display:flex!important;flex-direction:column!important;align-items:stretch!important}
- #appRoot .side .nav>button{min-height:56px!important}
-}
-@media(max-width:650px){
- #appRoot .side .nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(60px,auto))!important;grid-auto-rows:minmax(60px,auto)!important;grid-auto-flow:row!important;align-items:stretch!important;gap:6px!important;padding:7px!important}
- #appRoot .side .nav>button{grid-column:span 2!important;display:flex!important;align-items:center!important;justify-content:center!important;width:100%!important;height:100%!important;min-height:60px!important;max-height:none!important;padding:7px 4px!important;font-size:13.3px!important;line-height:1.16!important;text-align:center!important;overflow-wrap:anywhere!important}
- #appRoot .side .nav>button:nth-child(1){grid-column:1 / span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(2){grid-column:3 / span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(3){grid-column:5 / span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(4){grid-column:2 / span 2!important;grid-row:2!important}
- #appRoot .side .nav>button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
- #appRoot .side .nav>button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
- #appRoot .side .nav>button[data-nav-shericeri="1"]{gap:5px!important}
- #appRoot #aibosLanguageSwitcher{background:#010080!important;border:1px solid #F7EB5B!important;border-radius:10px!important}
- #appRoot #aibosLanguageSwitcher select{background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important}
-}
-</style>
-
-<script id="aibos-auth-password-visibility-v45">
-(function(){
- const words={
-  en:{show:'View PW',hide:'Hide PW'},
-  rw:{show:'Reba PW',hide:'Hisha PW'},
-  fr:{show:'Voir MDP',hide:'Masquer MDP'}
- };
- function currentLanguage(){
-  return String(window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en').slice(0,2).toLowerCase();
- }
- function label(visible){const w=words[currentLanguage()]||words.en;return visible?w.hide:w.show;}
- function refresh(){
-  document.querySelectorAll('#authScreen .pw-toggle').forEach(button=>{
-   const input=button.parentElement?.querySelector('input');
-   if(!input)return;
-   const visible=input.type==='text';
-   button.textContent=label(visible);
-   button.setAttribute('aria-label',visible?'Hide password':'View password');
-   button.setAttribute('aria-pressed',visible?'true':'false');
-  });
- }
- window.togglePassword=function(id,button){
-  const input=document.getElementById(id);
-  if(!input)return;
-  input.type=input.type==='password'?'text':'password';
-  const visible=input.type==='text';
-  if(button){
-   button.textContent=label(visible);
-   button.setAttribute('aria-label',visible?'Hide password':'View password');
-   button.setAttribute('aria-pressed',visible?'true':'false');
-  }
- };
- window.addEventListener('aibos:languagechange',refresh);
- refresh();
-})();
-</script>
-
-</body></html>');w.document.close();
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script></body></html>');w.document.close();
 }
 async function recordSale(){
   if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
@@ -8944,5 +8905,41 @@ html[lang="fr"] #appRoot #dashboard .sheri-launcher .sheri-thumb img{display:blo
 })();
 </script>
 
+<script id="aibos-auth-password-visibility-v45">
+(function(){
+ const words={
+  en:{show:'View PW',hide:'Hide PW'},
+  rw:{show:'Reba PW',hide:'Hisha PW'},
+  fr:{show:'Voir MDP',hide:'Masquer MDP'}
+ };
+ function currentLanguage(){
+  return String(window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en').slice(0,2).toLowerCase();
+ }
+ function label(visible){const w=words[currentLanguage()]||words.en;return visible?w.hide:w.show;}
+ function refresh(){
+  document.querySelectorAll('#authScreen .pw-toggle').forEach(button=>{
+   const input=button.parentElement?.querySelector('input');
+   if(!input)return;
+   const visible=input.type==='text';
+   button.textContent=label(visible);
+   button.setAttribute('aria-label',visible?'Hide password':'View password');
+   button.setAttribute('aria-pressed',visible?'true':'false');
+  });
+ }
+ window.togglePassword=function(id,button){
+  const input=document.getElementById(id);
+  if(!input)return;
+  input.type=input.type==='password'?'text':'password';
+  const visible=input.type==='text';
+  if(button){
+   button.textContent=label(visible);
+   button.setAttribute('aria-label',visible?'Hide password':'View password');
+   button.setAttribute('aria-pressed',visible?'true':'false');
+  }
+ };
+ window.addEventListener('aibos:languagechange',refresh);
+ refresh();
+})();
+</script>
 </body>
 </html>
