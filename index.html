@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.41 Authentication controls restored">
+<meta name="app-version" content="V14.4.42 Shericeri portrait and locale display fix">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -2224,7 +2224,47 @@ function renderSaleCart(){
 function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script></body></html>');w.document.close();
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script>
+<!-- V14.4.42: prevent Shericeri hero portrait from leaking into dashboard after locale changes -->
+<style id="aibos-sheri-portrait-containment-v42">
+/* The dashboard launcher must remain a compact circular thumbnail in every locale. */
+#appRoot #dashboard .sheri-launcher,
+html[lang="rw"] #appRoot #dashboard .sheri-launcher,
+html[lang="en"] #appRoot #dashboard .sheri-launcher,
+html[lang="fr"] #appRoot #dashboard .sheri-launcher{display:flex!important;position:relative!important;flex:0 0 auto!important;width:auto!important;height:auto!important;max-width:90px!important;overflow:visible!important;align-items:center!important;justify-content:center!important}
+#appRoot #dashboard .sheri-launcher .sheri-thumb,
+html[lang="rw"] #appRoot #dashboard .sheri-launcher .sheri-thumb,
+html[lang="en"] #appRoot #dashboard .sheri-launcher .sheri-thumb,
+html[lang="fr"] #appRoot #dashboard .sheri-launcher .sheri-thumb{display:block!important;position:relative!important;box-sizing:border-box!important;flex:0 0 42px!important;width:42px!important;min-width:42px!important;max-width:42px!important;height:42px!important;min-height:42px!important;max-height:42px!important;overflow:hidden!important;border-radius:50%!important}
+#appRoot #dashboard .sheri-launcher .sheri-thumb img,
+html[lang="rw"] #appRoot #dashboard .sheri-launcher .sheri-thumb img,
+html[lang="en"] #appRoot #dashboard .sheri-launcher .sheri-thumb img,
+html[lang="fr"] #appRoot #dashboard .sheri-launcher .sheri-thumb img{display:block!important;position:static!important;box-sizing:border-box!important;width:100%!important;min-width:100%!important;max-width:100%!important;height:100%!important;min-height:100%!important;max-height:100%!important;object-fit:cover!important;border-radius:50%!important;transform:none!important}
+#sheriHero{display:none!important;position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;z-index:10000!important;align-items:center!important;justify-content:center!important;background:rgba(0,0,0,.95)!important}
+#sheriHero.active{display:flex!important}
+#sheriHero>div{position:relative!important;display:flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;width:auto!important;height:auto!important}
+#sheriHero #sheriHeroImg{display:block!important;position:relative!important;box-sizing:border-box!important;width:94px!important;min-width:94px!important;max-width:94px!important;height:151px!important;min-height:151px!important;max-height:151px!important;object-fit:cover!important;border-radius:18px!important}
+@media(min-width:651px){
+ #aibosLanguageSwitcher{position:fixed!important;top:10px!important;right:12px!important;left:auto!important;bottom:auto!important;z-index:1400!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:max-content!important;min-width:0!important;max-width:calc(100vw - 260px)!important;margin:0!important;padding:6px 8px!important;border-radius:10px!important}
+ #aibosLanguageSwitcher select{width:auto!important;min-width:132px!important}
+}
+</style>
+<script id="aibos-sheri-locale-hero-guard-v42">
+(function(){
+ const hero=document.getElementById('sheriHero');
+ if(!hero||window.__aibosSheriLocaleHeroGuardV42)return;
+ window.__aibosSheriLocaleHeroGuardV42=true;
+ function closeHeroOnLocaleChange(){
+  hero.classList.remove('active','show-img','listening');
+  hero.setAttribute('aria-hidden','true');
+ }
+ closeHeroOnLocaleChange();
+ window.addEventListener('aibos:languagechange',closeHeroOnLocaleChange);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&!window.shericeriActive)closeHeroOnLocaleChange()});
+})();
+</script>
+
+</body></html>');w.document.close();
 }
 async function recordSale(){
   if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
