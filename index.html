@@ -7483,8 +7483,6 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
 })();
 </script>
 <script>
-(function(){const nav=document.querySelector('.nav button[data-view="shericeri"]');const source=document.querySelector('.sheri-launcher .sheri-thumb');if(nav&&source&&!nav.querySelector('.sheri-thumb'))nav.replaceChildren(source.cloneNode(true),document.createTextNode(' Shericeri'));})();
-
 function sheriWrapSyncBatch(name){
   const original=window[name];
   if(typeof original!=='function'||original.__sheriSyncBatchWrapped)return;
