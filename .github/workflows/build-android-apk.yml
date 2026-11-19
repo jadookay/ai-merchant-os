@@ -29,17 +29,19 @@ jobs:
         uses: android-actions/setup-android@v3
       - name: Install Android build tools
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - name: Build optimized debug APK
+      - name: Build installable release APK
         working-directory: android
-        run: gradle --no-daemon :app:assembleRelease
-      - name: Report APK size
+        run: gradle --no-daemon --stacktrace :app:assembleRelease
+      - name: Verify and report APK
         run: |
-          ls -lh android/app/build/outputs/apk/release/*.apk
-          du -h android/app/build/outputs/apk/debug/*.apk
-      - name: Upload APK for tester distribution
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          ls -lh "$APK"
+          sha256sum "$APK"
+      - name: Upload installable APK for tester distribution
         uses: actions/upload-artifact@v4
         with:
-          name: AIBOS-Android-MVP-APK
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: AIBOS-Android-Release-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
