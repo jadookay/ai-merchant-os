@@ -2271,7 +2271,13 @@ function printLastReceipt(){
  if(!root||!side||!nav||window.__aibosAuthoritativeNavV5)return;
  window.__aibosAuthoritativeNavV5=true;
  const picker=document.getElementById('aibosLanguageSwitcher');
- if(picker&&picker.parentElement!==side)side.appendChild(picker);
+ function placePicker(){
+  if(!picker)return;
+  if(getComputedStyle(root).display!=='none'&&picker.parentElement!==side)side.appendChild(picker);
+ }
+ placePicker();
+ const visibilityObserver=new MutationObserver(placePicker);
+ visibilityObserver.observe(root,{attributes:true,attributeFilter:['style','class']});
  const labels={en:['Home','Sell','Stock','Setting','AIBOS Command Center','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Igenamiterere','Igenzura ry’ubucuruzi','Shericeri'],fr:['Accueil','Vendre','Stock','Paramètres','Centre de commande AIBOS','Shericeri']};
  const icons=['⌂','＋','▦','⚙','◈'];
  function paint(language){
