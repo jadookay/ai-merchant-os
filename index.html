@@ -2224,7 +2224,77 @@ function renderSaleCart(){
 function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script></body></html>');w.document.close();
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script>
+<!-- V14.4.39: authoritative desktop/mobile navigation and Shericeri portrait containment -->
+<style id="aibos-authoritative-layout-v5">
+#appRoot .side{box-sizing:border-box!important;background:#010080!important;color:#F7EB5B!important}
+#appRoot .side>.brand{color:#F7EB5B!important;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif!important}
+#appRoot .side .nav{box-sizing:border-box!important;width:100%!important;min-width:0!important;padding:7px!important;gap:8px!important;border:2px solid #F7EB5B!important;border-radius:14px!important;background:#010080!important}
+#appRoot .side .nav>button{box-sizing:border-box!important;width:100%!important;min-width:0!important;min-height:46px!important;height:auto!important;max-height:none!important;margin:0!important;padding:9px 10px!important;display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:9px!important;overflow:hidden!important;border:1px solid rgba(247,235,91,.72)!important;border-radius:10px!important;background:#010080!important;color:#F7EB5B!important;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif!important;font-size:13.3px!important;font-weight:600!important;line-height:1.2!important;letter-spacing:normal!important;text-align:left!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;hyphens:none!important}
+#appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important;border-color:#F7EB5B!important}
+#appRoot .side .nav>button[data-nav-shericeri="1"]{min-height:46px!important}
+#appRoot .side .nav .sheri-nav-thumb{display:block!important;box-sizing:border-box!important;flex:0 0 26px!important;width:26px!important;min-width:26px!important;max-width:26px!important;height:26px!important;min-height:26px!important;max-height:26px!important;object-fit:cover!important;border:1.5px solid #F7EB5B!important;border-radius:50%!important;margin:0!important;padding:0!important}
+#appRoot #aibosLanguageSwitcher{position:static!important;inset:auto!important;z-index:auto!important;display:flex!important;align-self:center!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;width:max-content!important;max-width:100%!important;margin:14px auto 8px!important;padding:6px 8px!important;border:1.5px solid #F7EB5B!important;border-radius:10px!important;background:#010080!important;box-shadow:none!important}
+#appRoot #aibosLanguageSwitcher select{width:auto!important;min-width:150px!important;max-width:100%!important;background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;border-radius:7px!important}
+#appRoot .main{box-sizing:border-box!important}
+#dashboard .sheri-launcher{display:flex!important;flex:0 0 auto!important;align-items:center!important}
+#dashboard .sheri-launcher .sheri-thumb{box-sizing:border-box!important;display:block!important;position:relative!important;width:42px!important;min-width:42px!important;max-width:42px!important;height:42px!important;min-height:42px!important;max-height:42px!important;overflow:hidden!important;border-radius:50%!important}
+#dashboard .sheri-launcher .sheri-thumb img{display:block!important;width:100%!important;min-width:100%!important;max-width:100%!important;height:100%!important;min-height:100%!important;max-height:100%!important;object-fit:cover!important}
+#appRoot .side .nav .sheri-nav-thumb{object-fit:cover!important}
+#sheriHero:not(.active){display:none!important}
+#sheriHero.active{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;height:100dvh!important;display:flex!important;align-items:center!important;justify-content:center!important;background:rgba(0,0,0,.95)!important;z-index:5000!important}
+#sheriHero #sheriHeroImg{display:block!important;width:94px!important;min-width:94px!important;max-width:94px!important;height:151px!important;min-height:151px!important;max-height:151px!important;object-fit:cover!important;border-radius:18px!important}
+@media(min-width:651px){
+ #appRoot .side{position:fixed!important;inset:0 auto 0 0!important;width:230px!important;height:100vh!important;height:100dvh!important;max-height:100dvh!important;overflow-y:auto!important;overflow-x:hidden!important;display:flex!important;flex-direction:column!important;padding:16px 12px!important;border-right:3px solid #F7EB5B!important;z-index:1300!important}
+ #appRoot .side .nav{display:flex!important;flex-direction:column!important;align-items:stretch!important}
+ #appRoot .main{margin:0 0 0 230px!important;width:calc(100% - 230px)!important;max-width:none!important;padding:18px 16px!important}
+}
+@media(max-width:650px){
+ #appRoot .side{position:fixed!important;inset:0 0 auto 0!important;width:100%!important;height:auto!important;max-height:calc(100dvh - 8px)!important;overflow-y:auto!important;overflow-x:hidden!important;display:flex!important;flex-direction:column!important;padding:9px 10px 10px!important;border:0!important;border-bottom:2px solid #F7EB5B!important;border-radius:0 0 14px 14px!important;z-index:1300!important}
+ #appRoot .side>.brand{width:100%!important;text-align:center!important;margin:0 0 5px!important;padding:0 0 5px!important}
+ #appRoot .side .nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(54px,auto))!important;grid-auto-flow:row!important;gap:6px!important}
+ #appRoot .side .nav>button{grid-column:span 2!important;min-height:54px!important;justify-content:center!important;text-align:center!important;padding:7px 4px!important}
+ #appRoot .side .nav>button:nth-child(1){grid-column:1 / span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button:nth-child(2){grid-column:3 / span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button:nth-child(3){grid-column:5 / span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button:nth-child(4){grid-column:2 / span 2!important;grid-row:2!important}
+ #appRoot .side .nav>button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
+ #appRoot .side .nav>button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
+ #appRoot .side .nav>button[data-nav-shericeri="1"]{gap:5px!important}
+ #appRoot #aibosLanguageSwitcher{margin:9px auto 2px!important}
+ #appRoot .main{margin:calc(var(--aibos-side-height,330px) + 14px) 0 0!important;width:100%!important;max-width:100%!important;padding:14px 12px 18px!important}
+}
+</style>
+<script id="aibos-authoritative-navigation-v5">
+(function(){
+ const root=document.getElementById('appRoot'),side=root?.querySelector('.side'),nav=side?.querySelector('.nav');
+ if(!root||!side||!nav||window.__aibosAuthoritativeNavV5)return;
+ window.__aibosAuthoritativeNavV5=true;
+ const picker=document.getElementById('aibosLanguageSwitcher');
+ if(picker&&picker.parentElement!==side)side.appendChild(picker);
+ const labels={en:['Home','Sell','Stock','Setting','AIBOS Command Center','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Igenamiterere','Igenzura ry’ubucuruzi','Shericeri'],fr:['Accueil','Vendre','Stock','Paramètres','Centre de commande AIBOS','Shericeri']};
+ const icons=['⌂','＋','▦','⚙','◈'];
+ function paint(language){
+  const lang=(language||window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en').slice(0,2);
+  const names=labels[lang]||labels.en;
+  let sheri=nav.querySelector('[data-nav-shericeri="1"]');
+  if(!sheri){sheri=document.createElement('button');sheri.type='button';sheri.dataset.navShericeri='1';sheri.className='sheri-nav-item';nav.appendChild(sheri)}
+  const base=Array.from(nav.querySelectorAll(':scope>button')).filter(b=>b!==sheri);
+  base.slice(0,5).forEach((b,i)=>{b.textContent=icons[i]+' '+names[i];b.setAttribute('aria-label',names[i])});
+  sheri.replaceChildren();
+  const portrait=document.querySelector('#dashboard .sheri-launcher .sheri-thumb img');
+  if(portrait){const img=portrait.cloneNode(true);img.removeAttribute('id');img.removeAttribute('width');img.removeAttribute('height');img.className='sheri-nav-thumb';img.alt='Shericeri';sheri.appendChild(img)}
+  sheri.appendChild(document.createTextNode(names[5]));
+  sheri.onclick=()=>{if(typeof window.launchShericeri==='function')window.launchShericeri()};
+  sheri.setAttribute('aria-label',names[5]);sheri.title=names[5];
+ }
+ paint();
+ window.addEventListener('aibos:languagechange',e=>paint(e.detail?.language));
+ picker?.querySelector('select')?.addEventListener('change',e=>paint(e.target.value));
+})();
+</script>
+
+</body></html>');w.document.close();
 }
 async function recordSale(){
   if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
