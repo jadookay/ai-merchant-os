@@ -317,13 +317,10 @@ window.ensurePdfJs=async function(){
 <div class="app" id="appRoot" style="display:none">
   <aside class="side">
   <div class="brand">AI Business OS (AIBOS)</div>
-  <div class="nav">
-    <button class="active" data-view="dashboard">⌂ Home</button>
-    <button data-view="sales">＋ Sell</button>
-    <button data-view="inventory">▦ Stock</button>
-    <button data-view="money">◈ Money</button>
-    <button data-view="records">☰ More</button>
+  <div class="nav" aria-label="Main navigation">
+    <button class="active" data-view="dashboard">⌂ Home</button><button data-view="sales">＋ Sell</button><button data-view="inventory">▦ Stock</button><button data-view="settings">⚙ Settings</button><button data-view="businessOS" data-nav-command-center="1" aria-expanded="false">◈ AIBOS Command Center</button>
   </div>
+  <div id="aibosCommandSubnav" class="aibos-command-subnav" aria-label="AIBOS Command Center sections"><button type="button" onclick="show('customers')">Customer</button><button type="button" onclick="show('suppliersPurchases')">Suppliers &amp; Purchases</button><button type="button" onclick="show('expenses')">Expenses</button><button type="button" onclick="show('reports')">Reports</button><button type="button" onclick="show('money')">Money</button><button type="button" onclick="show('advisor')">AI Advisor</button><button type="button" onclick="show('forecast')">Forecast</button><button type="button" onclick="show('adjustments')">Return</button><button type="button" onclick="generateOSInsight()">AI Business Insight</button></div>
   <div class="sheri-global-launcher" role="button" tabindex="0" onclick="launchShericeri()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();launchShericeri()}">🎙️ Shericeri</div>
 </aside>
 <main class="main">
@@ -366,7 +363,7 @@ window.ensurePdfJs=async function(){
 </section>
 
 <section id="inventory" class="view">
-  <div class="top"><div><h1>Inventory</h1><div class="sub">Track stock and see what needs attention.</div></div><button class="btn" onclick="toggleAddProduct()">+ Add product</button></div>
+  <div class="top"><div><h1>Inventory</h1><div class="sub">Track stock and see what needs attention.</div></div><div class="actions"><button class="btn" onclick="toggleAddProduct()">+ Add a new product</button><button class="btn secondary" onclick="show('suppliersPurchases')">Restock / Reorder</button></div></div>
   <div id="addProduct" class="card" style="display:none">
     <div class="formgrid">
       <div><label>Product name</label><input id="pName"></div>
@@ -465,7 +462,13 @@ window.ensurePdfJs=async function(){
 </section>
 
 <section id="customers" class="view">
-  <div class="top"><div><h1>Customers</h1><div class="sub">Optional — track individual customers when it's useful. Most sales can stay anonymous.</div></div></div>
+  <div class="top"><div><h1>Customers</h1><div class="sub">Optional — track individual customers when it's useful. Most sales can stay anonymous.</div>
+  <div class="card section"><h2>Customer Invoice</h2><div class="card"><h2>Customer invoice</h2><div class="formgrid">
+      <div><label>Customer</label><select id="accInvoiceCustomer"></select></div><div><label>Issue date</label><input id="accInvoiceDate" type="date"></div><div><label>Due date</label><input id="accInvoiceDue" type="date"></div>
+      <div><label>Product / description</label><input id="accInvoiceDesc" placeholder="Product or service"></div><div><label>Quantity</label><input id="accInvoiceQty" type="number" min="0.01" step="0.01" value="1"></div><div><label>Unit price</label><input id="accInvoicePrice" type="number" min="0" step="0.01"></div>
+      <div><label>Tax rate</label><select id="accInvoiceTax"></select></div><div><label>Discount</label><input id="accInvoiceDiscount" type="number" min="0" step="0.01" value="0"></div><div><label>Notes</label><input id="accInvoiceNotes" placeholder="Optional"></div>
+    </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateInvoice()">Create invoice</button></div><div id="accInvoiceSearchHost"></div><div id="accInvoiceTable" style="margin-top:12px"></div></div></div>
+</div></div>
   <div class="card">
     <div class="formgrid">
       <div><label>Name</label><input id="cName" placeholder="Alice Uwase"></div>
@@ -585,7 +588,12 @@ window.ensurePdfJs=async function(){
       <div><label>Email</label><input id="osSupplierEmail" type="email"></div>
       <div><label>Payment terms</label><input id="osSupplierTerms" placeholder="Cash / 30 days"></div>
     </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="addOSSupplier()">Add supplier</button></div><div id="osSupplierTable" style="margin-top:12px"></div></div>
-    <div class="card"><h2>Record Purchase / Restock</h2><div class="formgrid">
+    <div class="card"><h2>Supplier Bill</h2><div class="card"><h2>Supplier bill</h2><div class="formgrid">
+      <div><label>Supplier</label><select id="accBillSupplier"></select></div><div><label>Issue date</label><input id="accBillDate" type="date"></div><div><label>Due date</label><input id="accBillDue" type="date"></div>
+      <div><label>Product / description</label><input id="accBillDesc" placeholder="Stock or service"></div><div><label>Quantity</label><input id="accBillQty" type="number" min="0.01" step="0.01" value="1"></div><div><label>Unit cost</label><input id="accBillCost" type="number" min="0" step="0.01"></div>
+      <div><label>Tax rate</label><select id="accBillTax"></select></div><div><label>Discount</label><input id="accBillDiscount" type="number" min="0" step="0.01" value="0"></div><div><label>Notes</label><input id="accBillNotes" placeholder="Optional"></div>
+    </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBill()">Create bill</button></div><div id="accBillSearchHost"></div><div id="accBillTable" style="margin-top:12px"></div></div></div>
+<div class="card"><h2>Record Purchase / Restock</h2><div class="formgrid">
       <div><label>Supplier</label><select id="osPurchaseSupplier"></select></div>
       <div><label>Product</label><select id="osPurchaseProduct"></select></div>
       <div><label>Quantity</label><input id="osPurchaseQty" type="number" min="1" value="1"></div>
@@ -598,12 +606,7 @@ window.ensurePdfJs=async function(){
 
 <section id="businessOS" class="view">
   <div class="top"><div><h1>AIBOS Command Center</h1><div class="sub">Your AI-powered business control center. Choose a business function.</div></div><button class="btn" onclick="generateOSInsight()">✦ AI Business Insight</button></div>
-  <div class="grid3" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px">
-    <button class="card hub-card" onclick="show('money')"><h2>💰 Money</h2><div class="sub">Invoices, bills, payments, cash, tax and bookkeeping.</div></button>
-    <button class="card hub-card" onclick="show('forecast')"><h2>📈 Forecast</h2><div class="sub">Sales trends, stock risk and practical forecasts.</div></button>
-    <button class="card hub-card" onclick="show('adjustments')"><h2>↩ Returns</h2><div class="sub">Returns, refunds and discounts.</div></button>
-    <button class="card hub-card" onclick="generateOSInsight()"><h2>✦ AI Business Insight</h2><div id="aibosHubInsight" class="sub">Ask Shericeri what needs attention in your business.</div></button>
-  </div>
+  <div class="grid3 aibos-command-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px"><button class="card hub-card" onclick="show('customers')"><h2>☺ Customer</h2><div class="sub">Customer records and customer invoices.</div></button><button class="card hub-card" onclick="show('suppliersPurchases')"><h2>📦 Suppliers &amp; Purchases</h2><div class="sub">Supplier records, supplier bills and restocking.</div></button><button class="card hub-card" onclick="show('expenses')"><h2>◉ Expenses</h2><div class="sub">Record and review business expenses.</div></button><button class="card hub-card" onclick="show('reports')"><h2>▤ Reports</h2><div class="sub">Sales, profit, cash flow and financial statements.</div></button><button class="card hub-card" onclick="show('money')"><h2>💰 Money</h2><div class="sub">Payments, cash, tax, accounts and bookkeeping.</div></button><button class="card hub-card" onclick="show('advisor')"><h2>✦ AI Advisor</h2><div class="sub">Ask questions about your business records.</div></button><button class="card hub-card" onclick="show('forecast')"><h2>📈 Forecast</h2><div class="sub">Sales trends, stock risk and practical forecasts.</div></button><button class="card hub-card" onclick="show('adjustments')"><h2>↩ Return</h2><div class="sub">Returns, refunds and discounts.</div></button><button class="card hub-card" onclick="generateOSInsight()"><h2>✦ AI Business Insight</h2><div id="aibosHubInsight" class="sub">Ask Shericeri what needs attention in your business.</div></button></div>
   <div class="notice"><b>AIBOS is working from your records.</b> The numbers shown across the app come from the same business data, whether recorded online or offline.</div>
   <div class="legacy-os" aria-hidden="true">
   <div class="metrics" id="osMetrics"></div>
@@ -630,18 +633,7 @@ window.ensurePdfJs=async function(){
   <div class="top"><div><h1>Money</h1><div class="sub">Track business money and review the reports generated from your records.</div></div><div class="actions"><button class="btn secondary" onclick="show('expenses')">Expenses</button><button class="btn" onclick="show('reports')">View reports</button></div></div>
   <div class="metrics" id="accMetrics"></div>
   <div class="grid2 section">
-    <div class="card"><h2>Customer invoice</h2><div class="formgrid">
-      <div><label>Customer</label><select id="accInvoiceCustomer"></select></div><div><label>Issue date</label><input id="accInvoiceDate" type="date"></div><div><label>Due date</label><input id="accInvoiceDue" type="date"></div>
-      <div><label>Product / description</label><input id="accInvoiceDesc" placeholder="Product or service"></div><div><label>Quantity</label><input id="accInvoiceQty" type="number" min="0.01" step="0.01" value="1"></div><div><label>Unit price</label><input id="accInvoicePrice" type="number" min="0" step="0.01"></div>
-      <div><label>Tax rate</label><select id="accInvoiceTax"></select></div><div><label>Discount</label><input id="accInvoiceDiscount" type="number" min="0" step="0.01" value="0"></div><div><label>Notes</label><input id="accInvoiceNotes" placeholder="Optional"></div>
-    </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateInvoice()">Create invoice</button></div><div id="accInvoiceSearchHost"></div><div id="accInvoiceTable" style="margin-top:12px"></div></div>
-    <div class="card"><h2>Supplier bill</h2><div class="formgrid">
-      <div><label>Supplier</label><select id="accBillSupplier"></select></div><div><label>Issue date</label><input id="accBillDate" type="date"></div><div><label>Due date</label><input id="accBillDue" type="date"></div>
-      <div><label>Product / description</label><input id="accBillDesc" placeholder="Stock or service"></div><div><label>Quantity</label><input id="accBillQty" type="number" min="0.01" step="0.01" value="1"></div><div><label>Unit cost</label><input id="accBillCost" type="number" min="0" step="0.01"></div>
-      <div><label>Tax rate</label><select id="accBillTax"></select></div><div><label>Discount</label><input id="accBillDiscount" type="number" min="0" step="0.01" value="0"></div><div><label>Notes</label><input id="accBillNotes" placeholder="Optional"></div>
-    </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBill()">Create bill</button></div><div id="accBillSearchHost"></div><div id="accBillTable" style="margin-top:12px"></div></div>
-  </div>
-  <div class="grid2 section">
+    <div class="grid2 section">
     <div class="card"><h2>Receive / make payment</h2><div class="formgrid"><div><label>Payment type</label><select id="accPaymentType"><option value="customer_receipt">Customer payment received</option><option value="supplier_payment">Supplier payment</option><option value="expense_payment">Expense paid</option><option value="other_income">Other income</option><option value="other_expense">Other expense</option></select></div><div><label>Related invoice/bill <span class="sub">(optional)</span></label><select id="accPaymentSource"></select></div><div><label>Amount</label><input id="accPaymentAmount" type="number" min="0" step="0.01"></div><div><label>Cash / bank account</label><select id="accPaymentAccount"></select></div><div><label>Date</label><input id="accPaymentDate" type="date"></div><div><label>Reference</label><input id="accPaymentRef" placeholder="Receipt / transaction ref"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreatePayment()">Record payment</button></div><div id="accPaymentSearchHost"></div><div id="accPaymentTable" style="margin-top:12px"></div></div>
     <div class="card"><h2>Cash & bank accounts</h2><div class="formgrid"><div><label>Account name</label><input id="accBankName" placeholder="Cash till / Bank account"></div><div><label>Type</label><select id="accBankType"><option value="cash">Cash</option><option value="bank">Bank</option><option value="mobile_money">Mobile money</option></select></div><div><label>Opening balance</label><input id="accBankOpening" type="number" min="0" step="0.01" value="0"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBankAccount()">Add account</button></div><div id="accBankTable" style="margin-top:12px"></div><div class="sub" style="margin-top:10px">Reconciliation records the last date you checked the account against its statement.</div></div>
   </div>
@@ -669,7 +661,7 @@ window.ensurePdfJs=async function(){
     <div class="sub" style="margin-bottom:10px">Your Shericeri ID: <b id="setMerchantCode">—</b> <span style="opacity:.7">(say this number if you contact support)</span></div>
     <div class="formgrid"><div><label>Business / merchant name</label><input id="setName"></div><div><label>Primary category</label><select id="setCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div><div><label>TIN number <span class="sub">(optional)</span></label><input id="setTin"></div><div><label>Fiscal year <span class="sub">(optional)</span></label><select id="setFiscalYear"></select></div><div><label>Country</label><select id="setCountry"></select></div><div><label>Currency</label><select id="setCurrency"></select></div></div>
     <div class="actions" style="margin-top:14px">
-      <button class="btn" onclick="saveSettings()">Save</button>
+      <button class="btn" onclick="saveSettings()">Save</button><button class="btn secondary" type="button" onclick="showSignIn()">Sign in</button>
       <div class="export-wrap"><button class="icon-btn" onclick="toggleExportMenu(this)">⇩ Data</button><div class="export-menu">
         <button onclick="exportData()">Export backup</button>
         <label class="menu-file">Import backup<input type="file" accept="application/json" onchange="importData(this)"></label>
@@ -1870,6 +1862,7 @@ async function onAuthed(sess){
     else{const n=document.getElementById('shericeriNotice');if(n)n.textContent='Offline mode — saved business data is still available.'}
   }else showOnboarding()
 }
+function showSignIn(){const a=document.getElementById('authScreen'),p=document.getElementById('appRoot'),o=document.getElementById('onboardingScreen');if(o)o.style.display='none';if(p)p.style.display='none';if(a)a.style.display='flex';if(typeof switchAuthMode==='function')switchAuthMode('signin');const e=document.getElementById('authEmail');if(e)e.focus()}
 async function signOut(){sheriStopMerchantRealtime();await sb.auth.signOut({scope:'local'});session=null;location.reload()}
 
 // ── Data loading ─────────────────────────────────────────────────────────
@@ -5852,6 +5845,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
       'good morning,':'Mwaramutse,',
       'dashboard':'Ahabanza','home':'Ahabanza','sell':'Gurisha','stock':'Ibicuruzwa / Stock','more':'Ibindi','record sale':'Andika igurisha','record a sale':'Andika igurisha',
       'records':'Ibyanditswe','aibos command center':'Igenzura ry’ubucuruzi',
+      'add a new product':'Ongeramo igicuruzwa Gishya','restock / reorder':'Rangura','customer invoice':'Inyemezabuguzi y’umukiriya','supplier bill':'Inyemezabuguzi y’utanga ibicuruzwa','suppliers & purchases':'Abaranguza n’ibyaguzwe','ai business insight':'Inama z’ubucuruzi za AI','return':'Ibyasubijwe',
       'ai advisor':'Umujyanama w’ubucuruzi (AI)','shericeri':'Shericeri','settings':'Igenamiterere',
     'revenue':'Amafaranga yinjiye','receivables':'Amafaranga abakiriya batarishyura','receivable':'Amafaranga umukiriya atarishyura','profit':'Inyungu','profits':'Inyungu','void':'Hagarika','voided':'Byahagaritswe','favorite':'Ibyo ukunda','favorites':'Ibyo ukunda','add products':'Ongeraho ibicuruzwa','add product':'Ongeraho igicuruzwa','pending sync':'Ibikorwa bitegereje koherezwa','pending syncs':'Ibikorwa bitegereje koherezwa','devices added':'Ibikoresho byongeweho','device added':'Igikoresho cyongeweho','ai priorities':'Ibyo AI ishyira imbere','priority':'Icyihutirwa','audit trail':'Amateka y’ibikorwa',
       'money':'Amafaranga','inventory':'Ibicuruzwa / Stock','inventory / stock':'Ububiko bw’ibicuruzwa',
@@ -5953,6 +5947,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     fr:{
       'dashboard':'Accueil','home':'Accueil','sell':'Vendre','stock':'Stock','more':'Plus','record sale':'Enregistrer une vente','record a sale':'Enregistrer une vente',
       'records':'Registres','aibos command center':'Centre de gestion AIBOS',
+      'add a new product':'Ajouter un nouveau produit','restock / reorder':'Réapprovisionner / recommander','customer invoice':'Facture client','supplier bill':'Facture fournisseur','suppliers & purchases':'Fournisseurs et achats','ai business insight':'Conseils commerciaux IA','return':'Retours',
       'ai advisor':'Conseiller IA','shericeri':'Shericeri','settings':'Paramètres',
     'revenue':'Chiffre d’affaires','receivables':'Créances clients','receivable':'Créance client','profit':'Bénéfice','profits':'Bénéfices','void':'Annuler','voided':'Annulée','favorite':'Favori','favorites':'Favoris','add products':'Ajouter des produits','add product':'Ajouter un produit','pending sync':'Synchronisation en attente','pending syncs':'Synchronisations en attente','devices added':'Appareils ajoutés','device added':'Appareil ajouté','ai priorities':'Priorités de l’IA','priority':'Priorité','audit trail':'Journal d’audit',
       'money':'Finances','inventory':'Stock','inventory / stock':'Stock / Inventaire',
@@ -7811,13 +7806,13 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
 <script id="aibos-navigation-3-2-1-localization-v1">
 (function(){
   const nav=document.querySelector('#appRoot .side .nav');if(!nav)return;
-  const labels={en:['Home','Sell','Stock','Money','More','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Amafaranga','Ibindi','Shericeri'],fr:['Accueil','Vendre','Stock','Finances','Plus','Shericeri']};
+  const labels={en:['Home','Sell','Stock','Settings','AIBOS Command Center','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Igenamiterere','Igenzura ry’ubucuruzi','Shericeri'],fr:['Accueil','Vendre','Stock','Paramètres','Centre de commande AIBOS','Shericeri']};
   let sheri=nav.querySelector('[data-nav-shericeri="1"]');
   if(!sheri){sheri=document.createElement('button');sheri.type='button';sheri.dataset.navShericeri='1';sheri.className='sheri-nav-item';sheri.addEventListener('click',()=>{if(typeof window.launchShericeri==='function')window.launchShericeri()});nav.appendChild(sheri)}
   const portrait=document.querySelector('#dashboard .sheri-launcher .sheri-thumb img');
   function paint(language){
     const names=labels[language]||labels.en;
-    Array.from(nav.querySelectorAll('button')).filter(b=>b!==sheri).slice(0,5).forEach((button,index)=>{button.textContent=['⌂','＋','▦','◈','☰'][index]+' '+names[index];button.setAttribute('aria-label',names[index])});
+    Array.from(nav.querySelectorAll('button')).filter(b=>b!==sheri).slice(0,5).forEach((button,index)=>{button.textContent=['⌂','＋','▦','⚙','◈'][index]+' '+names[index];button.setAttribute('aria-label',names[index])});const subnav=document.getElementById('aibosCommandSubnav');if(subnav){const w={en:['Customer','Suppliers & Purchases','Expenses','Reports','Money','AI Advisor','Forecast','Return','AI Business Insight'],rw:['Umukiriya','Abaranguza n’ibyaguzwe','Amafaranga yakoreshejwe','Raporo','Amafaranga','Umujyanama wa AI','Iteganyagihe','Ibyasubijwe','Inama z’ubucuruzi za AI'],fr:['Clients','Fournisseurs & achats','Dépenses','Rapports','Finances','Conseiller IA','Prévisions','Retours','Conseils commerciaux IA']};subnav.querySelectorAll('button').forEach((b,i)=>b.textContent=(w[language]||w.en)[i]||b.textContent)}
     sheri.replaceChildren();
     if(portrait){const img=portrait.cloneNode(true);img.removeAttribute('id');img.className='sheri-nav-thumb';img.alt='Shericeri';sheri.appendChild(img)}
     sheri.appendChild(document.createTextNode(names[5]));sheri.setAttribute('aria-label',names[5]);sheri.title=names[5];
@@ -7826,7 +7821,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   const picker=document.getElementById('aibosLanguageSelect'),getLanguage=()=>picker?.value||window.AIBOS_I18N?.getLanguage?.()||'en';
   paint(getLanguage());
   window.addEventListener('aibos:languagechange',event=>paint(event.detail?.language||getLanguage()));
-  picker?.addEventListener('change',()=>paint(getLanguage()));
+  picker?.addEventListener('change',()=>paint(getLanguage()));const cb=nav.querySelector('[data-nav-command-center=\"1\"]'),sn=document.getElementById('aibosCommandSubnav');if(cb&&sn){cb.addEventListener('click',()=>{const o=sn.classList.toggle('open');cb.setAttribute('aria-expanded',String(o))});sn.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{sn.classList.remove('open');cb.setAttribute('aria-expanded','false')}))}const st=document.createElement('style');st.id='aibos-command-subnav-style';st.textContent='.aibos-command-subnav{display:none;flex-direction:column;gap:5px;margin:8px 0 0;padding:7px;border:1px solid rgba(247,235,91,.55);border-radius:11px;background:#010080}.aibos-command-subnav.open{display:flex}.aibos-command-subnav button{width:100%;text-align:left;padding:8px 10px;border:1px solid rgba(247,235,91,.4);border-radius:8px;background:#010080;color:#F7EB5B;font:600 12.5px inherit;cursor:pointer}.aibos-command-subnav button:hover{background:#F7EB5B;color:#010080}.aibos-command-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}@media(max-width:650px){.aibos-command-subnav button{text-align:center;font-size:13px;padding:8px 5px}.aibos-command-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}';document.head.appendChild(st);
 })();
 </script>
 
