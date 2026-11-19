@@ -2225,70 +2225,7 @@ function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script>
-<!-- Final targeted correction: restore approved navy/gold navigation and right-size Shericeri portrait. -->
-<style id="aibos-navigation-brand-thumbnail-correction-v2">
-#appRoot .side{background:#010080!important;color:#F7EB5B!important}
-#appRoot .side .brand{color:#F7EB5B!important}
-#appRoot .side .nav{
-  box-sizing:border-box!important;
-  border:2px solid #F7EB5B!important;
-  border-radius:14px!important;
-  background:#010080!important;
-  box-shadow:0 0 0 1px rgba(247,235,91,.12)!important;
-}
-#appRoot .side .nav button{
-  background:#010080!important;
-  color:#F7EB5B!important;
-  border:1px solid rgba(247,235,91,.72)!important;
-}
-#appRoot .side .nav button.active{
-  background:#F7EB5B!important;
-  color:#010080!important;
-  border-color:#F7EB5B!important;
-}
-#appRoot .side .nav .sheri-nav-item{
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  gap:6px!important;
-}
-#appRoot .side .nav .sheri-nav-thumb{
-  display:inline-block!important;
-  box-sizing:border-box!important;
-  flex:0 0 20px!important;
-  width:20px!important;
-  min-width:20px!important;
-  max-width:20px!important;
-  height:20px!important;
-  min-height:20px!important;
-  max-height:20px!important;
-  object-fit:cover!important;
-  border:1.5px solid #F7EB5B!important;
-  border-radius:50%!important;
-  margin:0!important;
-}
-@media(max-width:650px){
-  #appRoot .side{border-bottom:2px solid #F7EB5B!important}
-  #appRoot .side .nav{
-    display:grid!important;
-    grid-template-columns:repeat(6,minmax(0,1fr))!important;
-    grid-template-rows:repeat(3,minmax(50px,auto))!important;
-    gap:6px!important;
-    padding:7px!important;
-  }
-  #appRoot .side .nav button:nth-child(1){grid-column:1 / span 2!important;grid-row:1!important}
-  #appRoot .side .nav button:nth-child(2){grid-column:3 / span 2!important;grid-row:1!important}
-  #appRoot .side .nav button:nth-child(3){grid-column:5 / span 2!important;grid-row:1!important}
-  #appRoot .side .nav button:nth-child(4){grid-column:2 / span 2!important;grid-row:2!important}
-  #appRoot .side .nav button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
-  #appRoot .side .nav button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
-  #appRoot .side .nav .sheri-nav-item{min-height:50px!important}
-}
-@media(min-width:651px){
-  #appRoot .side{border-right:3px solid #F7EB5B!important}
-  #appRoot .side .nav{padding:7px!important}
-}
-</style>
+
 </body></html>');w.document.close();
 }
 async function recordSale(){
@@ -7988,6 +7925,70 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   #appRoot .side .nav{gap:5px!important;padding:6px!important}
   #appRoot .side .nav button{font-size:13.3px!important;min-height:48px!important;padding:6px 2px!important}
   #appRoot .main{margin-top:252px!important;min-height:calc(100vh - 252px)!important}
+}
+</style>
+<!-- Final targeted correction: restore approved navy/gold navigation and right-size Shericeri portrait. -->
+<style id="aibos-navigation-brand-thumbnail-correction-v2">
+#appRoot .side{background:#010080!important;color:#F7EB5B!important}
+#appRoot .side .brand{color:#F7EB5B!important}
+#appRoot .side .nav{
+  box-sizing:border-box!important;
+  border:2px solid #F7EB5B!important;
+  border-radius:14px!important;
+  background:#010080!important;
+  box-shadow:0 0 0 1px rgba(247,235,91,.12)!important;
+}
+#appRoot .side .nav button{
+  background:#010080!important;
+  color:#F7EB5B!important;
+  border:1px solid rgba(247,235,91,.72)!important;
+}
+#appRoot .side .nav button.active{
+  background:#F7EB5B!important;
+  color:#010080!important;
+  border-color:#F7EB5B!important;
+}
+#appRoot .side .nav .sheri-nav-item{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:6px!important;
+}
+#appRoot .side .nav .sheri-nav-thumb{
+  display:inline-block!important;
+  box-sizing:border-box!important;
+  flex:0 0 20px!important;
+  width:20px!important;
+  min-width:20px!important;
+  max-width:20px!important;
+  height:20px!important;
+  min-height:20px!important;
+  max-height:20px!important;
+  object-fit:cover!important;
+  border:1.5px solid #F7EB5B!important;
+  border-radius:50%!important;
+  margin:0!important;
+}
+@media(max-width:650px){
+  #appRoot .side{border-bottom:2px solid #F7EB5B!important}
+  #appRoot .side .nav{
+    display:grid!important;
+    grid-template-columns:repeat(6,minmax(0,1fr))!important;
+    grid-template-rows:repeat(3,minmax(50px,auto))!important;
+    gap:6px!important;
+    padding:7px!important;
+  }
+  #appRoot .side .nav button:nth-child(1){grid-column:1 / span 2!important;grid-row:1!important}
+  #appRoot .side .nav button:nth-child(2){grid-column:3 / span 2!important;grid-row:1!important}
+  #appRoot .side .nav button:nth-child(3){grid-column:5 / span 2!important;grid-row:1!important}
+  #appRoot .side .nav button:nth-child(4){grid-column:2 / span 2!important;grid-row:2!important}
+  #appRoot .side .nav button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
+  #appRoot .side .nav button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
+  #appRoot .side .nav .sheri-nav-item{min-height:50px!important}
+}
+@media(min-width:651px){
+  #appRoot .side{border-right:3px solid #F7EB5B!important}
+  #appRoot .side .nav{padding:7px!important}
 }
 </style>
 </body>
