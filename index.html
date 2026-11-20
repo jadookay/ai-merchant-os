@@ -309,7 +309,8 @@ window.ensurePdfJs=async function(){
       window.__SHERI_KEEP_LOGGED_IN=keep;
       // Move any current token to the selected storage scope immediately.
       try{
-        const key=Object.keys(window.localStorage).find(k=>k.startsWith('sb-')&&k.endsWith('-auth-token'));
+        const keys=[...new Set([...Object.keys(window.localStorage),...Object.keys(window.sessionStorage)])];
+        const key=keys.find(k=>k.startsWith('sb-')&&k.endsWith('-auth-token'));
         if(key){
           const value=window.localStorage.getItem(key)||window.sessionStorage.getItem(key);
           if(value!==null)window.__SHERI_AUTH_STORAGE.setItem(key,value);
