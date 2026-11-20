@@ -256,4 +256,6 @@ test("financial statement verification checks missing source postings and cash r
   assert.ok(html.includes("Source sale has no active revenue journal"));
   assert.ok(html.includes("accounting_correction"));
   assert.ok(html.includes("cashFlow.reconciliationDifference"));
+  assert.ok(html.includes("history_incomplete_count"));
+  assert.ok(html.includes("opening_history_complete"));
 });
