@@ -973,6 +973,22 @@ function sheriOpenLocalDb(){
 }
 function sheriTx(store,mode='readonly'){if(!sheriOfflineDb)throw new Error('Offline database not initialized');return sheriOfflineDb.transaction(store,mode).objectStore(store);}
 async function sheriPut(store,key,value){const db=await sheriOpenLocalDb();if(!db){sheriMemoryStore(store).set(key,{key,...value});return true;}return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').put({key,...value});req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)});}
+async function sheriBulkPut(store,rows){
+  const items=(rows||[]).filter(x=>x&&x.key);
+  if(!items.length)return true;
+  const db=await sheriOpenLocalDb();
+  if(!db){const map=sheriMemoryStore(store);for(const item of items)map.set(item.key,item);return true;}
+  return new Promise((resolve,reject)=>{
+    let settled=false;
+    const finish=(fn,value)=>{if(settled)return;settled=true;fn(value);};
+    let tx;
+    try{tx=db.transaction(store,'readwrite');const os=tx.objectStore(store);for(const item of items)os.put(item);}
+    catch(e){finish(reject,e);return;}
+    tx.oncomplete=()=>finish(resolve,true);
+    tx.onerror=()=>finish(reject,tx.error||new Error('Local cache batch write failed'));
+    tx.onabort=()=>finish(reject,tx.error||new Error('Local cache batch write was aborted'));
+  });
+}
 async function sheriGet(store,key){const db=await sheriOpenLocalDb();if(!db)return sheriMemoryStore(store).get(key)||null;return new Promise((resolve,reject)=>{const req=sheriTx(store).get(key);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error)});}
 async function sheriGetAll(store){const db=await sheriOpenLocalDb();if(!db)return [...sheriMemoryStore(store).values()];return new Promise((resolve,reject)=>{const req=sheriTx(store).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)});}
 async function sheriDelete(store,key){const db=await sheriOpenLocalDb();if(!db){sheriMemoryStore(store).delete(key);return true;}return new Promise((resolve,reject)=>{const req=sheriTx(store,'readwrite').delete(key);req.onsuccess=()=>resolve(true);req.onerror=()=>reject(req.error)});}
@@ -1039,23 +1055,22 @@ async function sheriVerifyActiveStaffMembership(merchantId=state.merchant?.id){
 }
 async function sheriSaveSnapshot(){
   if(!state.merchant)return;
-  await sheriPut('merchants',state.merchant.id,{user_id:state.merchant.user_id,local_user_id:session?.user?.id||null,membership:state.currentMembership||null,record:{...state.merchant}});
-  for(const p of state.products)await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
-  for(const x of state.sales)await sheriPut('sales',x.id,{merchant_id:state.merchant.id,record:{...x}});
-  for(const x of state.expenses)await sheriPut('expenses',x.id,{merchant_id:state.merchant.id,record:{...x}});
-  for(const m of state.memory)await sheriPut('memory',m.id,{merchant_id:state.merchant.id,record:{...m}});
-  for(const c of state.customers)await sheriPut('customers',c.id,{merchant_id:state.merchant.id,record:{...c}});
-  for(const x of state.suppliers)await sheriPut('suppliers',x.id,{merchant_id:state.merchant.id,record:{...x}});
-  for(const x of state.purchases)await sheriPut('purchases',x.id,{merchant_id:state.merchant.id,record:{...x}});
-  for(const x of state.cashEntries)await sheriPut('cashEntries',x.id,{merchant_id:state.merchant.id,record:{...x}});
-  for(const x of state.budgets)await sheriPut('budgets',x.id,{merchant_id:state.merchant.id,record:{...x}});
+  const mid=state.merchant.id;
+  const jobs=[
+    sheriBulkPut('merchants',[{key:mid,user_id:state.merchant.user_id,local_user_id:session?.user?.id||null,membership:state.currentMembership||null,record:{...state.merchant}}]),
+    ...[['products',state.products],['sales',state.sales],['expenses',state.expenses],['memory',state.memory],['customers',state.customers],['suppliers',state.suppliers],['purchases',state.purchases],['cashEntries',state.cashEntries],['budgets',state.budgets]].map(([store,rows])=>
+      sheriBulkPut(store,(rows||[]).map(row=>({key:row.id,merchant_id:mid,record:{...row}})))
+    )
+  ];
+  await Promise.all(jobs);
 }
 async function sheriSaveAccountingSnapshot(){
   if(!state.merchant)return;
   const mid=state.merchant.id;
   const groups=[['accounts',state.accounts],['journalEntries',state.journalEntries],['journalLines',state.journalLines],['invoices',state.invoices],['bills',state.bills],['payments',state.payments],['bankAccounts',state.bankAccounts],['taxRates',state.taxRates],['recurringTransactions',state.recurringTransactions],['auditLog',state.auditLog]];
-  for(const [store,rows] of groups)for(const row of (rows||[]))await sheriPut(store,row.id||row.key,{merchant_id:mid,record:{...row}});
-  if(state.accountingSettings)await sheriPut('accountingSettings','settings',{merchant_id:mid,record:{...state.accountingSettings}});
+  const jobs=groups.map(([store,rows])=>sheriBulkPut(store,(rows||[]).map(row=>({key:row.id||row.key,merchant_id:mid,record:{...row}})));
+  if(state.accountingSettings)jobs.push(sheriBulkPut('accountingSettings',[{key:'settings',merchant_id:mid,record:{...state.accountingSettings}}]));
+  await Promise.all(jobs);
 }
 async function sheriLoadAccountingSnapshot(merchantId){
   await sheriOpenLocalDb();
@@ -2908,7 +2923,7 @@ async function loadInventoryMovementReport(){
       if(items.some(p=>p.product_id===selected))productFilter.value=selected;
     }
     renderInventoryMovementReport(inventoryMovementReportCache);
-    if(status)status.textContent=(data?.items||[]).length+' products · '+(data?.can_view_costs?'Valuation and COGS included':'Quantities only; valuation access is restricted');
+    if(status)status.textContent=(data?.items||[]).length+' products · '+(data?.can_view_costs?'Valuation and COGS included':'Quantities only; valuation access is restricted')+(data?.movement_detail_truncated?' · '+sheriLocalized('Showing latest 1,000 of '+Number(data.movement_count||0)+' movements; summary totals include all movements.','Affichage des 1 000 mouvements les plus récents sur '+Number(data.movement_count||0)+' ; les totaux du résumé couvrent tous les mouvements.','Hagaragazwa ihinduka 1,000 riheruka muri '+Number(data.movement_count||0)+'; imibare y’incamake ikubiyemo ihinduka ryose.'): '');
   }catch(e){if(status)status.textContent=e?.message||'Could not load the stock movement report.';}
 }
 function renderInventoryMovementReport(report){
