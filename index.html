@@ -2751,6 +2751,16 @@ async function loadInventoryMovementReport(){
     });
     if(error)throw error;
     inventoryMovementReportCache=data||{};
+    try{
+      const sourceIds=[...new Set((inventoryMovementReportCache.items||[]).flatMap(p=>(p.movements||[]).map(m=>m.source_id).filter(Boolean)))];
+      if(sourceIds.length){
+        const {data:actorRows,error:actorError}=await sb.from('inventory_movements').select('source_id,product_id,actor_name').eq('merchant_id',state.merchant.id).in('source_id',sourceIds);
+        if(!actorError&&Array.isArray(actorRows)){
+          const actorMap=new Map(actorRows.map(x=>[String(x.source_id)+'|'+String(x.product_id),x.actor_name]));
+          for(const p of inventoryMovementReportCache.items||[])for(const m of p.movements||[])m.actor_name=actorMap.get(String(m.source_id)+'|'+String(p.product_id))||m.actor_name||null;
+        }
+      }
+    }catch(actorLookupError){console.warn('[Shericeri inventory] actor-name lookup unavailable',actorLookupError);}
     const productFilter=document.getElementById('inventoryMovementFilterProduct');
     if(productFilter){
       const selected=productFilter.value;
