@@ -8175,6 +8175,34 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
       return sum+(side===naturalSide?value:-value);
     },0);
   }
+  function accountRowsAdjusted(accounts,balances,naturalSide,adjustments={}){
+    return accounts.map(a=>{
+      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
+      const side=String(a.normal_balance||defaultSide).toLowerCase();
+      const raw=Number(balances?.[a.code]||0);
+      const value=(side===naturalSide?raw:-raw)-Number(adjustments[a.code]||0);
+      return Math.abs(value)>0.005?moneyRow(esc(a.name)+' <small>('+esc(a.code)+')</small>',value):'';
+    }).join('');
+  }
+  function sourceAccountTotal(sourceType,accountCode,startDate,endDate){
+    const entries=state.journalEntries||[],lines=state.journalLines||[];
+    const adjustmentIds=new Set(entries.filter(e=>e.source_type===sourceType).flatMap(e=>[e.id,e.source_id].filter(Boolean)));
+    const accountsById=new Map((state.accounts||[]).map(a=>[a.id,a]));
+    const reversed=new Set(entries.filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction'].includes(e.source_type)).map(e=>e.source_id));
+    const entriesById=new Map(entries.map(e=>[e.id,e]));
+    let total=0;
+    for(const line of lines){
+      const entry=entriesById.get(line.journal_entry_id);
+      if(!entry||!(entry.source_type===sourceType||(entry.source_type==='accounting_correction'&&adjustmentIds.has(entry.source_id))))continue;
+      if(entry.voided&&!reversed.has(entry.id)&&!reversed.has(entry.source_id))continue;
+      const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
+      if(endDate&&date>endDate)continue;
+      if(startDate&&date<startDate)continue;
+      if(accountsById.get(line.account_id)?.code!==accountCode)continue;
+      total+=Number(line.debit||0)-Number(line.credit||0);
+    }
+    return total;
+  }
   const wrapped=function(){
     original.apply(this,arguments);
     try{
@@ -8195,9 +8223,13 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
       const cumulative=accStatementTotal('income',bs,'credit')-accStatementTotal('cogs',bs,'debit')-accStatementTotal('expense',bs,'debit');
       const equity=accStatementTotal('equity',bs,'credit')+cumulative;
       const periodIncome=accStatementTotal('income',period,'credit'),periodCogs=accStatementTotal('cogs',period,'debit');
+      const salesIncomeAccounts=accounts.filter(a=>['4000','4050'].includes(String(a.code)));
+      const otherIncomeAccounts=accounts.filter(a=>a.type==='income'&&!['4000','4050'].includes(String(a.code)));
+      const salesRevenue=totalRows(salesIncomeAccounts,period,'credit'),otherIncome=totalRows(otherIncomeAccounts,period,'credit');
       const expenseAccounts=accounts.filter(a=>a.type==='expense'),operatingAccounts=expenseAccounts.filter(a=>String(a.code)!=='6100'),taxAccounts=expenseAccounts.filter(a=>String(a.code)==='6100');
-      const operatingExpenses=totalRows(operatingAccounts,period,'debit'),taxExpense=totalRows(taxAccounts,period,'debit');
-      const net=periodIncome-periodCogs-operatingExpenses-taxExpense,pretax=net+taxExpense;
+      const inventoryWriteOffs=sourceAccountTotal('inventory_adjustment','6000',start,end);
+      const operatingExpenses=totalRows(operatingAccounts,period,'debit')-inventoryWriteOffs,taxExpense=totalRows(taxAccounts,period,'debit');
+      const net=periodIncome-periodCogs-operatingExpenses-inventoryWriteOffs-taxExpense,pretax=net+taxExpense;
       const plEl=document.getElementById('accPL'),bsEl=document.getElementById('accBS');
       const prefix=el=>(el?.innerHTML||'').match(/^(.*?)(?=<div class="row")/s)?.[1]||'';
       const periodText='<div class="statement-period"><span>For the period ended</span> '+esc(end)+(start?' (from '+esc(start)+')':'')+' · '+esc(state.merchant?.currency||'')+'</div>';
@@ -8222,13 +8254,15 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
           '<div class="sub" style="margin-top:8px">Assets = liabilities + equity. '+(Math.abs(assets-liabilities-equity)<=0.005?'The statement balances.':'Difference: '+money(assets-liabilities-equity)+'. The statement is not reconciled.')+'</div><div class="sub" style="margin-top:8px">IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions and tax.</div>';
       }
       if(plEl){
-        const incomeAccounts=accounts.filter(a=>a.type==='income'),cogsAccounts=accounts.filter(a=>a.type==='cogs');
-        const incomeRows=accountRows(incomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
-        const opRows=accountRows(operatingAccounts,period,'debit'),taxRows=accountRows(taxAccounts,period,'debit');
+        const cogsAccounts=accounts.filter(a=>a.type==='cogs');
+        const incomeRows=accountRows(salesIncomeAccounts,period,'credit'),otherIncomeRows=accountRows(otherIncomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
+        const opRows=accountRowsAdjusted(operatingAccounts,period,'debit',{'6000':inventoryWriteOffs}),taxRows=accountRows(taxAccounts,period,'debit');
         plEl.innerHTML=prefix(plEl)+'<div class="row statement-section-row"><span>Statement of profit or loss</span><b></b></div>'+periodText+
-          section('Revenue',incomeRows,'Total revenue',periodIncome)+
+          section('Revenue',incomeRows,'Total revenue',salesRevenue)+
           section('Cost of sales',cogsRows,'Total cost of sales',periodCogs)+
-          moneyRow('Gross profit',periodIncome-periodCogs,'statement-total-row')+
+          moneyRow('Gross profit',salesRevenue-periodCogs,'statement-total-row')+
+          (Math.abs(inventoryWriteOffs)>0.005?moneyRow('Inventory write-offs / stock losses',inventoryWriteOffs):'')+
+          section('Other income',otherIncomeRows,'Total other income',otherIncome)+
           section('Operating expenses',opRows,'Total operating expenses',operatingExpenses)+
           moneyRow('Profit before tax',pretax,'statement-total-row')+
           section('Income tax expense',taxRows,'Total income tax expense',taxExpense)+
