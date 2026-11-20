@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.46 Login and language layout repair">
+<meta name="app-version" content="V14.4.47 Laptop layout and remember session">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -276,7 +276,7 @@ window.ensurePdfJs=async function(){
 </head>
 <body>
 
-<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS (AIBOS)</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" type="button" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" type="button" onclick="switchAuthMode('signup')">Create account</button><button id="authTabStaff" type="button" onclick="switchAuthMode('staff')">Staff PIN</button></div><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('authPassword',this)">View PW</button></div><button id="authSignInBtn" class="btn" type="button" style="width:100%;margin-top:14px">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="staffPanel" class="auth-panel"><label>Business account ID</label><input id="staffMerchantCode" inputmode="numeric" maxlength="6" pattern="[0-9]{1,6}" placeholder="6-digit business ID"><label style="margin-top:10px">Name, phone or email</label><input id="staffIdentifier" autocomplete="username" placeholder="Your name, phone or email"><label style="margin-top:10px">PIN (6–8 digits)</label><div class="auth-field"><input id="staffPin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter your PIN"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('staffPin',this)">View PW</button></div><button class="btn" type="button" style="width:100%;margin-top:14px" onclick="signInWithTeamPin()">Sign in as team member</button><div class="field-help">Forgot your PIN? Ask your Owner, Admin or an authorized Manager to reset it securely. Do not share your PIN with anyone.</div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn2" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPasswordConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div>
+<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS (AIBOS)</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" type="button" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" type="button" onclick="switchAuthMode('signup')">Create account</button><button id="authTabStaff" type="button" onclick="switchAuthMode('staff')">Staff PIN</button></div><label class="auth-remember-row" for="keepMeLoggedIn"><input id="keepMeLoggedIn" type="checkbox" checked><span>Keep me logged in on this device</span></label><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('authPassword',this)">View PW</button></div><button id="authSignInBtn" class="btn" type="button" style="width:100%;margin-top:14px">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="staffPanel" class="auth-panel"><label>Business account ID</label><input id="staffMerchantCode" inputmode="numeric" maxlength="6" pattern="[0-9]{1,6}" placeholder="6-digit business ID"><label style="margin-top:10px">Name, phone or email</label><input id="staffIdentifier" autocomplete="username" placeholder="Your name, phone or email"><label style="margin-top:10px">PIN (6–8 digits)</label><div class="auth-field"><input id="staffPin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter your PIN"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('staffPin',this)">View PW</button></div><button class="btn" type="button" style="width:100%;margin-top:14px" onclick="signInWithTeamPin()">Sign in as team member</button><div class="field-help">Forgot your PIN? Ask your Owner, Admin or an authorized Manager to reset it securely. Do not share your PIN with anyone.</div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn2" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPasswordConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div>
 <script>
 /* SHERI AUTH SAFETY NET — deliberately independent of the main application boot. */
 (function(){
@@ -284,11 +284,39 @@ window.ensurePdfJs=async function(){
   const KEY='sb_publishable_zRtqPyHL9Gqjck1hoAZibQ_KD9TiazY';
   const REDIRECT='https://jadookay.github.io/ai-merchant-os/';
   const authMemory=new Map();
+  window.__SHERI_KEEP_LOGGED_IN=true;
   window.__SHERI_AUTH_STORAGE={
-    getItem(key){try{const v=window.localStorage.getItem(key);if(v!==null)return v;}catch(_){}try{const v=window.sessionStorage.getItem(key);if(v!==null)return v;}catch(_){}return authMemory.get(key)??null;},
-    setItem(key,value){try{window.localStorage.setItem(key,value);return;}catch(_){}try{window.sessionStorage.setItem(key,value);return;}catch(_){}authMemory.set(key,String(value));},
-    removeItem(key){try{window.localStorage.removeItem(key);}catch(_){}try{window.sessionStorage.removeItem(key);}catch(_){}authMemory.delete(key);}
+    getItem(key){
+      const stores=window.__SHERI_KEEP_LOGGED_IN===false?[window.sessionStorage,window.localStorage]:[window.localStorage,window.sessionStorage];
+      for(const store of stores){try{const value=store.getItem(key);if(value!==null)return value;}catch(_){}}
+      return authMemory.get(key)??null;
+    },
+    setItem(key,value){
+      const keep=window.__SHERI_KEEP_LOGGED_IN!==false;
+      const primary=keep?window.localStorage:window.sessionStorage;
+      const secondary=keep?window.sessionStorage:window.localStorage;
+      try{primary.setItem(key,value);try{secondary.removeItem(key)}catch(_){}return;}catch(_){}
+      try{secondary.setItem(key,value);return;}catch(_){}
+      authMemory.set(key,String(value));
+    },
+    removeItem(key){try{window.localStorage.removeItem(key)}catch(_){}try{window.sessionStorage.removeItem(key)}catch(_){}authMemory.delete(key);}
   };
+  const rememberControl=document.getElementById('keepMeLoggedIn');
+  if(rememberControl){
+    rememberControl.checked=true;
+    rememberControl.addEventListener('change',()=>{
+      const keep=rememberControl.checked;
+      window.__SHERI_KEEP_LOGGED_IN=keep;
+      // Move any current token to the selected storage scope immediately.
+      try{
+        const key=Object.keys(window.localStorage).find(k=>k.startsWith('sb-')&&k.endsWith('-auth-token'));
+        if(key){
+          const value=window.localStorage.getItem(key)||window.sessionStorage.getItem(key);
+          if(value!==null)window.__SHERI_AUTH_STORAGE.setItem(key,value);
+        }
+      }catch(_){}
+    });
+  }
   function status(msg,bad){
     const el=document.getElementById('authStatus');
     if(el){el.textContent=msg;el.className='sub auth-status'+(bad?' bad':'');}
@@ -7661,6 +7689,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   const onboarding=document.getElementById('onboardingScreen');
   const placeLanguagePicker=()=>{
     if(!picker)return;
+    const setPosition=(values)=>Object.entries(values).forEach(([key,value])=>picker.style.setProperty(key,value,'important'));
     const loginVisible=!!auth&&getComputedStyle(auth).display!=='none';
     const signedIn=!!appRoot&&appRoot.style.display!=='none';
     const onboardingVisible=!!onboarding&&getComputedStyle(onboarding).display!=='none';
@@ -7675,10 +7704,12 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
         heading.appendChild(title);
       }
       if(heading&&picker.parentElement!==heading)heading.appendChild(picker);
+      setPosition({position:'static',top:'auto',right:'auto',bottom:'auto',left:'auto',inset:'auto',transform:'none',width:'max-content',maxWidth:'48%',margin:'0',zIndex:'1'});
     }else if(signedIn&&main){
       if(syncBar&&syncBar.parentElement===main){
-        if(picker.parentElement!==main||picker.previousElementSibling!==syncBar)syncBar.after(picker);
+        if(picker.parentElement!==main||picker.nextElementSibling!==syncBar)main.insertBefore(picker,syncBar);
       }else if(picker.parentElement!==main)main.prepend(picker);
+      setPosition({position:'relative',top:'auto',right:'auto',bottom:'auto',left:'auto',inset:'auto',transform:'none',width:'max-content',maxWidth:'100%',margin:'0 0 10px auto',zIndex:'1'});
     }else if(onboardingVisible){
       const card=onboarding.querySelector('.onboard-card');
       if(card&&picker.parentElement!==card)card.appendChild(picker);
@@ -8921,6 +8952,31 @@ html[lang="fr"] #appRoot #dashboard .sheri-launcher .sheri-thumb img{display:blo
 })();
 </script>
 
+<style id="aibos-laptop-language-and-remember-v47">
+/* Laptop: language selector gets its own right-aligned row above sync, never over it. */
+@media(min-width:701px){
+ #appRoot .main{padding-top:24px!important}
+ #appRoot .main>#aibosLanguageSwitcher{
+  position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;inset:auto!important;
+  align-self:flex-end!important;display:flex!important;flex:0 0 auto!important;
+  width:max-content!important;max-width:100%!important;margin:0 0 10px auto!important;
+  padding:5px 7px!important;z-index:1!important;transform:none!important;
+ }
+ #appRoot .main>#sheriOfflineBar{position:relative!important;top:auto!important;z-index:1!important;margin-top:0!important}
+}
+#authScreen .auth-remember-row{
+ display:flex!important;align-items:center!important;justify-content:flex-start!important;
+ gap:9px!important;width:100%!important;margin:2px 0 12px!important;padding:0!important;
+ color:#010080!important;font-size:13px!important;line-height:1.3!important;cursor:pointer!important;
+}
+#authScreen .auth-remember-row input{
+ appearance:auto!important;-webkit-appearance:checkbox!important;
+ display:inline-block!important;flex:0 0 17px!important;width:17px!important;min-width:17px!important;
+ height:17px!important;min-height:17px!important;margin:0!important;padding:0!important;
+ accent-color:#010080!important;box-shadow:none!important;
+}
+#authScreen .auth-remember-row span{display:inline!important;margin:0!important;color:#010080!important;font-size:13px!important}
+</style>
 <style id="aibos-login-language-layout-v46">
 /* Keep the application shell out of sight until authentication is complete. */
 body.aibos-auth-visible #appRoot,
