@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.65 validate active POS reversals and ledger source integrity">
+<meta name="app-version" content="V14.4.66 support legacy and current POS reversal links">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -5983,9 +5983,6 @@ function accLedgerIntegrity(endDate=null){
     linesByEntry.get(key).push(line);
   }
   const reversalTypes=['sale_void','sale_cogs_void'];
-  const reversedEntries=new Set((state.journalEntries||[])
-    .filter(e=>!e.voided&&reversalTypes.includes(e.source_type))
-    .map(e=>e.source_id));
   const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
   const hasExactReversal=entry=>{
     const original=linesByEntry.get(entry.id)||[];
@@ -6047,7 +6044,7 @@ function accReportTotals(startDate=null,endDate=null){
     .map(e=>e.source_id));
   for(const line of state.journalLines||[]){
     const entry=entries.get(line.journal_entry_id);
-    if(!entry||(entry.voided&&!reversedEntries.has(entry.id)))continue;
+    if(!entry||(entry.voided&&!reversedEntries.has(entry.id)&&!reversedEntries.has(entry.source_id)))continue;
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
     if(endDate&&date>endDate)continue;if(startDate&&date<startDate)continue;
     const account=state.accounts.find(a=>a.id===line.account_id);if(!account)continue;
@@ -6119,7 +6116,7 @@ function accCashFlowForPeriod(startDate,endDate){
   }
   let inflows=0,outflows=0,opening=0,closing=0;
   for(const entry of state.journalEntries||[]){
-    if(entry.voided&&!reversedEntries.has(entry.id))continue;
+    if(entry.voided&&!reversedEntries.has(entry.id)&&!reversedEntries.has(entry.source_id))continue;
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
     const lines=linesByEntry.get(entry.id)||[];
     const cashLines=lines.filter(line=>cashIds.has(line.account_id));
