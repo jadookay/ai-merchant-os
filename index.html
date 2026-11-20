@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.49 Unified multilingual login layout">
+<meta name="app-version" content="V14.4.50 Stable authentication handler binding">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -425,17 +425,29 @@ window.ensurePdfJs=async function(){
     const signIn=document.getElementById('authSignInBtn');
     const google1=document.getElementById('authGoogleBtn');
     const google2=document.getElementById('authGoogleBtn2');
-    if(signIn){
-      if(typeof window.handleSignIn==='function') signIn.addEventListener('click',window.handleSignIn);
-      else signIn.addEventListener('click',passwordLogin);
+    // Resolve the application handler at click time, not at DOMContentLoaded.
+    // This avoids capturing the fallback merely because the main app script
+    // has not finished registering its auth functions yet.
+    if(signIn&&!signIn.dataset.sheriAuthBound){
+      signIn.dataset.sheriAuthBound='1';
+      signIn.addEventListener('click',async event=>{
+        event.preventDefault();
+        try{
+          const handler=window.handleSignIn;
+          if(typeof handler==='function')await handler();
+          else await passwordLogin();
+        }catch(error){
+          status(String(error?.message||error||'Sign-in could not be completed.'),true);
+        }
+      });
     }
-    if(google1){
-      if(typeof window.signInOAuth==='function') google1.addEventListener('click',()=>window.signInOAuth('google'));
-      else google1.addEventListener('click',googleLogin);
+    if(google1&&!google1.dataset.sheriAuthBound){
+      google1.dataset.sheriAuthBound='1';
+      google1.addEventListener('click',()=>typeof window.signInOAuth==='function'?window.signInOAuth('google'):googleLogin());
     }
-    if(google2){
-      if(typeof window.signInOAuth==='function') google2.addEventListener('click',()=>window.signInOAuth('google'));
-      else google2.addEventListener('click',googleLogin);
+    if(google2&&!google2.dataset.sheriAuthBound){
+      google2.dataset.sheriAuthBound='1';
+      google2.addEventListener('click',()=>typeof window.signInOAuth==='function'?window.signInOAuth('google'):googleLogin());
     }
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();
