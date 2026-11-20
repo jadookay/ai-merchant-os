@@ -1357,8 +1357,9 @@ async function sheriSyncSaleCartOperation(op){
 }
 async function sheriEnsureProductBeforeStockChange(op){
   const merchantId=op.merchant_id,productId=op.product_id;
-  let {data:serverProduct,error}=await sb.from('products').select('id').eq('id',productId).eq('merchant_id',merchantId).maybeSingle();
+  let {data:serverProduct,error}=await sb.from('products').select('id,merchant_id').eq('id',productId).maybeSingle();
   if(error)throw error;
+  if(serverProduct&&serverProduct.merchant_id!==merchantId)throw new Error('The selected product belongs to another business. Its stock was not changed.');
   if(serverProduct)return;
   const queued=await sheriGetAll('outbox');
   const pending=queued.find(x=>x.op?.type==='product_upsert'&&x.op.record?.id===productId);
@@ -1447,7 +1448,7 @@ async function sheriEnsurePurchaseDependencies(op){
       if(listError)throw listError;
       const norm=value=>String(value||'').trim().toLocaleLowerCase();
       const phone=value=>String(value||'').replace(/[^0-9+]/g,'');
-      const same=(serverSuppliers||[]).filter(x=>norm(x.name)===norm(local.name)&&(!local.phone||phone(x.phone)===phone(local.phone)));
+      const same=(serverSuppliers||[]).filter(x=>norm(x.name)===norm(local.name)&&(!local.phone||!x.phone||phone(x.phone)===phone(local.phone)));
       if(same.length===1){
         record.supplier_id=same[0].id;
         op.record={...op.record,supplier_id:same[0].id};
