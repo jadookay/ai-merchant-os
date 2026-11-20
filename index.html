@@ -1444,13 +1444,35 @@ async function sheriSyncOutbox(){
     let successCount=0,failedCount=0,firstFailure=null;
     for(const item of items){
       const op=item.op||{};
-      const pendingDependencies=(await sheriGetAll('outbox')).filter(x=>x.key!==item.key).map(x=>x.op||{});
-      const hasPendingProduct=id=>pendingDependencies.some(x=>x.type==='product_upsert'&&x.record?.id===id);
-      const hasPendingSupplier=id=>id&&pendingDependencies.some(x=>x.type==='supplier_upsert'&&x.record?.id===id);
-      const hasPendingCustomer=id=>id&&pendingDependencies.some(x=>x.type==='customer_upsert'&&x.record?.id===id);
-      if(op.type==='inventory_adjustment'&&hasPendingProduct(op.product_id))continue;
-      if(op.type==='purchase_upsert'&&(hasPendingProduct(op.productId||op.record?.product_id)||hasPendingSupplier(op.record?.supplier_id)))continue;
-      if(op.type==='sale_cart_upsert'&&(op.records||[]).some(x=>hasPendingProduct(x.product_id)||hasPendingCustomer(x.customer_id)))continue;
+      const pendingDependencies=(await sheriGetAll('outbox')).filter(x=>x.key!==item.key);
+      const isEarlier=(dependency)=>{
+        const dateOrder=String(dependency.created_at||'').localeCompare(String(item.created_at||''));
+        if(dateOrder!==0)return dateOrder<0;
+        const priorityOrder=sheriOutboxPriority(dependency.op)-sheriOutboxPriority(op);
+        if(priorityOrder!==0)return priorityOrder<0;
+        return String(dependency.key||'').localeCompare(String(item.key||''))<0;
+      };
+      const earlierOps=pendingDependencies.filter(isEarlier).map(x=>x.op||{});
+      const hasEarlier=(type,predicate)=>earlierOps.some(x=>x.type===type&&predicate(x));
+      const hasEarlierProduct=id=>hasEarlier('product_upsert',x=>x.record?.id===id);
+      const hasEarlierSupplier=id=>!!id&&hasEarlier('supplier_upsert',x=>x.record?.id===id);
+      const hasEarlierCustomer=id=>!!id&&hasEarlier('customer_upsert',x=>x.record?.id===id);
+      const hasEarlierStockChange=id=>!!id&&(
+        hasEarlier('inventory_adjustment',x=>x.product_id===id)||
+        hasEarlier('purchase_upsert',x=>(x.productId||x.record?.product_id)===id)||
+        hasEarlier('sale_upsert',x=>(x.productId||x.record?.product_id)===id)||
+        hasEarlier('sale_cart_upsert',x=>(x.records||[]).some(r=>r.product_id===id))
+      );
+      if(op.type==='inventory_adjustment'&&(hasEarlierProduct(op.product_id)||hasEarlierStockChange(op.product_id)))continue;
+      if(op.type==='purchase_upsert'){
+        const productId=op.productId||op.record?.product_id;
+        if(hasEarlierProduct(productId)||hasEarlierSupplier(op.record?.supplier_id)||hasEarlierStockChange(productId))continue;
+      }
+      if(op.type==='sale_upsert'){
+        const productId=op.productId||op.record?.product_id;
+        if(hasEarlierProduct(productId)||hasEarlierCustomer(op.record?.customer_id)||hasEarlierStockChange(productId))continue;
+      }
+      if(op.type==='sale_cart_upsert'&&(op.records||[]).some(x=>hasEarlierProduct(x.product_id)||hasEarlierCustomer(x.customer_id)||hasEarlierStockChange(x.product_id)))continue;
       try{
         if(op.type==='merchant_upsert'){const {error}=await sb.from('merchants').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='product_upsert'){await sheriSyncProductOperation(op)}
