@@ -248,7 +248,7 @@ test("large accounting reads paginate beyond the PostgREST row limit", () => {
 test("large local snapshots use batched IndexedDB writes", () => {
   assert.ok(html.includes("async function sheriBulkPut"));
   assert.ok(html.includes("await Promise.all(jobs)"));
-  assert.ok(html.includes("sheriBulkPut('journalLines'"));
+  assert.ok(html.includes("['journalLines',state.journalLines]"));
 });
  
 test("financial statement verification checks missing source postings and cash reconciliation", () => {
