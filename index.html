@@ -8206,7 +8206,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
         const rowsCurrentAssets=accountRows(currentAssets,bs,'debit'),rowsNonCurrentAssets=accountRows(nonCurrentAssets,bs,'debit'),rowsUnclassifiedAssets=accountRows(unclassifiedAssets,bs,'debit');
         const rowsCurrentLiab=accountRows(currentLiabs,bs,'credit'),rowsNonCurrentLiab=accountRows(nonCurrentLiabs,bs,'credit'),rowsUnclassifiedLiab=accountRows(unclassifiedLiabs,bs,'credit'),rowsEquity=accountRows(equityList,bs,'credit');
         const unclassifiedTotal=unclassifiedAssetsTotal+unclassifiedLiabsTotal;
-        const unclassifiedNotice=(unclassifiedAssets.length||unclassifiedLiabs.length)?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">Some balance-sheet accounts have not been classified as current or non-current. Their balances are shown separately and must be classified before relying on the current/non-current subtotals.</div>':'';
+        const unclassifiedNotice=(Math.abs(unclassifiedTotal)>0.005)?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">Some balance-sheet accounts have not been classified as current or non-current. Their balances are shown separately and must be classified before relying on the current/non-current subtotals.</div>':'';
         const notices=prefix(bsEl);
         bsEl.innerHTML=notices+'<div class="row statement-section-row"><span>Statement of financial position</span><b></b></div>'+asAt+unclassifiedNotice+
           section('Current assets',rowsCurrentAssets,'Total current assets',currentAssetsTotal)+
