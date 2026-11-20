@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const serviceWorker = readFileSync(new URL("../shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
@@ -229,4 +230,9 @@ test("received purchases persist the updated local stock and record the register
   const block=html.slice(start,end);
   assert.ok(block.includes("created_by_name:sheriCurrentActor()"));
   assert.ok(block.includes("await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}})"));
+});
+ 
+test("the offline application shell cache is bumped with the V14.4.57 release", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v57"));
+  assert.ok(serviceWorker.includes("const RELEASE='V14.4.57'"));
 });
