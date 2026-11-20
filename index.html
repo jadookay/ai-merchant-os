@@ -2147,6 +2147,18 @@ async function signOut(){sheriStopMerchantRealtime();await sb.auth.signOut({scop
 
 // ── Data loading ─────────────────────────────────────────────────────────
 let sheriAccountingRefreshError=null;
+async function sheriFetchAllRows(buildQuery,pageSize=500){
+  const rows=[];let offset=0;
+  while(true){
+    const {data,error}=await buildQuery().range(offset,offset+pageSize-1);
+    if(error)return {data:null,error};
+    const page=Array.isArray(data)?data:[];
+    rows.push(...page);
+    if(page.length<pageSize)break;
+    offset+=pageSize;
+  }
+  return {data:rows,error:null};
+}
 async function loadAll(silent=false){
   accServerSnapshotAuthoritative=false;
   const mId=state.merchant?.id; if(!mId)return;
@@ -2157,15 +2169,15 @@ async function loadAll(silent=false){
   if(!navigator.onLine){await accEnsureBase();await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
   try{
     const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr},{data:memory,error:mErr},{data:customers,error:cErr},{data:suppliers,error:supErr},{data:purchases,error:purErr},{data:cashEntries,error:cashErr},{data:budgets,error:budErr}]=await Promise.all([
-      sb.from('products').select('*').eq('merchant_id',mId).order('created_at'),
-      sb.from('sales').select('*').eq('merchant_id',mId).order('created_at'),
-      sb.from('expenses').select('*').eq('merchant_id',mId).order('created_at'),
+      sheriFetchAllRows(()=>sb.from('products').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+      sheriFetchAllRows(()=>sb.from('sales').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+      sheriFetchAllRows(()=>sb.from('expenses').select('*').eq('merchant_id',mId).order('created_at').order('id')),
       sb.from('shericeri_memory').select('*').eq('merchant_id',mId).eq('deleted',false).order('created_at',{ascending:false}).limit(200),
-      sb.from('customers').select('*').eq('merchant_id',mId).eq('deleted',false).order('name'),
-      sb.from('suppliers').select('*').eq('merchant_id',mId).eq('deleted',false).order('name'),
-      sb.from('purchases').select('*').eq('merchant_id',mId).order('purchased_at',{ascending:false}),
-      sb.from('cash_entries').select('*').eq('merchant_id',mId).order('occurred_at',{ascending:false}),
-      sb.from('budgets').select('*').eq('merchant_id',mId).order('month',{ascending:false})
+      sheriFetchAllRows(()=>sb.from('customers').select('*').eq('merchant_id',mId).eq('deleted',false).order('name').order('id')),
+      sheriFetchAllRows(()=>sb.from('suppliers').select('*').eq('merchant_id',mId).eq('deleted',false).order('name').order('id')),
+      sheriFetchAllRows(()=>sb.from('purchases').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+      sheriFetchAllRows(()=>sb.from('cash_entries').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+      sheriFetchAllRows(()=>sb.from('budgets').select('*').eq('merchant_id',mId).order('month').order('id'))
     ]);
     if(pErr||sErr||eErr){
       const coreErr=pErr||sErr||eErr;
@@ -2238,15 +2250,15 @@ async function loadAll(silent=false){
     await sheriSaveSnapshot();
     try{
       const q=await Promise.all([
-        sb.from('chart_of_accounts').select('*').eq('merchant_id',mId).order('code'),
-        sb.from('journal_entries').select('*').eq('merchant_id',mId).order('entry_date',{ascending:false}),
-        sb.from('journal_lines').select('*').eq('merchant_id',mId),
-        sb.from('invoices').select('*').eq('merchant_id',mId).order('issue_date',{ascending:false}),
-        sb.from('bills').select('*').eq('merchant_id',mId).order('issue_date',{ascending:false}),
-        sb.from('payments').select('*').eq('merchant_id',mId).order('payment_date',{ascending:false}),
-        sb.from('bank_accounts').select('*').eq('merchant_id',mId).order('name'),
-        sb.from('tax_rates').select('*').eq('merchant_id',mId).order('name'),
-        sb.from('recurring_transactions').select('*').eq('merchant_id',mId).order('next_run'),
+        sheriFetchAllRows(()=>sb.from('chart_of_accounts').select('*').eq('merchant_id',mId).order('code').order('id')),
+        sheriFetchAllRows(()=>sb.from('journal_entries').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+        sheriFetchAllRows(()=>sb.from('journal_lines').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+        sheriFetchAllRows(()=>sb.from('invoices').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+        sheriFetchAllRows(()=>sb.from('bills').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+        sheriFetchAllRows(()=>sb.from('payments').select('*').eq('merchant_id',mId).order('created_at').order('id')),
+        sheriFetchAllRows(()=>sb.from('bank_accounts').select('*').eq('merchant_id',mId).order('name').order('id')),
+        sheriFetchAllRows(()=>sb.from('tax_rates').select('*').eq('merchant_id',mId).order('name').order('id')),
+        sheriFetchAllRows(()=>sb.from('recurring_transactions').select('*').eq('merchant_id',mId).order('created_at').order('id')),
         sb.from('accounting_settings').select('*').eq('merchant_id',mId).maybeSingle(),
         sb.from('audit_log').select('*').eq('merchant_id',mId).order('created_at',{ascending:false}).limit(100)
       ]);
@@ -5991,51 +6003,61 @@ function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('re
 function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accLedgerIntegrity(endDate=null){
-  const totals=new Map(),linesByEntry=new Map();
-  for(const line of state.journalLines||[]){
+  const entries=state.journalEntries||[],lines=state.journalLines||[],sales=state.sales||[];
+  const totals=new Map(),linesByEntry=new Map(),entryById=new Map(entries.map(e=>[e.id,e]));
+  const saleById=new Map(sales.map(s=>[s.id,s]));
+  const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
+  const activeSources=new Set(),reversalsBySource=new Map();
+  for(const e of entries){
+    if(!e.voided&&e.source_type&&e.source_id)activeSources.add(e.source_type+'|'+e.source_id);
+    if(!e.voided&&['sale_void','sale_cogs_void'].includes(e.source_type)&&e.source_id){
+      if(!reversalsBySource.has(e.source_id))reversalsBySource.set(e.source_id,[]);
+      reversalsBySource.get(e.source_id).push(e);
+    }
+  }
+  for(const line of lines){
     const key=line.journal_entry_id,v=totals.get(key)||{count:0,debit:0,credit:0};
     v.count++;v.debit+=Number(line.debit||0);v.credit+=Number(line.credit||0);totals.set(key,v);
     if(!linesByEntry.has(key))linesByEntry.set(key,[]);
     linesByEntry.get(key).push(line);
   }
-  const reversalTypes=['sale_void','sale_cogs_void'];
-  const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
+  const exactInverse=(original,reversal)=>{
+    if(original.length<2||reversal.length!==original.length)return false;
+    const counts=new Map();
+    const sig=(account,debit,credit)=>String(account)+'|'+Math.round(Number(debit||0)*100)+'|'+Math.round(Number(credit||0)*100);
+    for(const line of original){const k=sig(line.account_id,line.credit,line.debit);counts.set(k,(counts.get(k)||0)+1);}
+    for(const line of reversal){const k=sig(line.account_id,line.debit,line.credit),n=counts.get(k)||0;if(!n)return false;if(n===1)counts.delete(k);else counts.set(k,n-1);}
+    return counts.size===0;
+  };
   const hasExactReversal=entry=>{
     const original=linesByEntry.get(entry.id)||[];
-    return (state.journalEntries||[]).filter(r=>!r.voided&&reversalTypes.includes(r.source_type)&&
-      (r.source_id===entry.id||r.source_id===entry.source_id)).some(r=>{
-        const reversal=linesByEntry.get(r.id)||[];
-        return original.length>=2&&reversal.length===original.length&&original.every(line=>reversal.some(other=>
-          other.account_id===line.account_id&&
-          Math.abs(Number(other.debit||0)-Number(line.credit||0))<=0.005&&
-          Math.abs(Number(other.credit||0)-Number(line.debit||0))<=0.005
-        ));
-      });
+    const candidates=[...(reversalsBySource.get(entry.id)||[]),...(reversalsBySource.get(entry.source_id)||[])];
+    for(const r of candidates){if(exactInverse(original,linesByEntry.get(r.id)||[]))return true;}
+    return false;
   };
   const invalid=[];
-  for(const entry of state.journalEntries||[]){
+  const addInvalid=(entry,reason,count=0,debit=0,credit=0)=>invalid.push({entry,count,debit,credit,difference:debit-credit,reason});
+  for(const entry of entries){
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
     if(endDate&&date>endDate)continue;
     const v=totals.get(entry.id)||{count:0,debit:0,credit:0};
-    const lines=linesByEntry.get(entry.id)||[];
+    const linesForEntry=linesByEntry.get(entry.id)||[];
     const hasReversal=hasExactReversal(entry);
     if(entry.voided&&!hasReversal){
-      if(['sale','sale_cogs'].includes(entry.source_type))invalid.push({entry,count:v.count,debit:v.debit,credit:v.credit,difference:v.debit-v.credit,reason:'Voided POS journal has no matching active reversal'});
+      if(['sale','sale_cogs'].includes(entry.source_type))addInvalid(entry,'Voided POS journal has no matching active reversal',v.count,v.debit,v.credit);
       continue;
     }
     let reason=null;
     if(v.count<2||v.debit<=0||Math.abs(v.debit-v.credit)>0.005)reason='Journal entry is missing lines or is not balanced';
     if(!reason&&['sale','sale_cogs'].includes(entry.source_type)){
-      const sale=(state.sales||[]).find(s=>s.id===entry.source_id);
+      const sale=saleById.get(entry.source_id);
       if(!sale&&!hasReversal)reason='POS journal has no matching source sale record or reversal';
       else if(sale){
-        const expectedAmount=entry.source_type==='sale'
-          ?Number(sale.qty||0)*Number(sale.price||0)
-          :Number(sale.qty||0)*Number(sale.cost||0);
+        const expectedAmount=entry.source_type==='sale'?Number(sale.qty||0)*Number(sale.price||0):Number(sale.qty||0)*Number(sale.cost||0);
         const expected=entry.source_type==='sale'
           ?[{code:'1000',debit:expectedAmount,credit:0},{code:'4000',debit:0,credit:expectedAmount}]
           :[{code:'5000',debit:expectedAmount,credit:0},{code:'1200',debit:0,credit:expectedAmount}];
-        const exact=expectedAmount>0&&lines.length===2&&expected.every(want=>lines.some(line=>
+        const exact=expectedAmount>0&&linesForEntry.length===2&&expected.every(want=>linesForEntry.some(line=>
           accountCodeById.get(line.account_id)===want.code&&
           Math.abs(Number(line.debit||0)-want.debit)<=0.005&&
           Math.abs(Number(line.credit||0)-want.credit)<=0.005
@@ -6045,16 +6067,36 @@ function accLedgerIntegrity(endDate=null){
         if(!reason&&!exact)reason='POS journal lines do not match the sale quantity, price or cost';
       }
     }
-    if(reason)invalid.push({entry,count:v.count,debit:v.debit,credit:v.credit,difference:v.debit-v.credit,reason});
+    if(reason)addInvalid(entry,reason,v.count,v.debit,v.credit);
+  }
+  // A balanced ledger can still omit an entire source posting. Check operational
+  // source records independently so missing journals cannot disappear from the audit.
+  for(const sale of sales){
+    const date=String(sale.created_at||'').slice(0,10);
+    if(sale.voided||(endDate&&date>endDate))continue;
+    if(Number(sale.qty||0)*Number(sale.price||0)>0&&!activeSources.has('sale|'+sale.id))
+      addInvalid({id:'missing-sale-'+sale.id,description:'Sale '+(sale.product_name_snapshot||''),source_type:'sale',source_id:sale.id,entry_date:date},'Source sale has no active revenue journal');
+    if(sale.stock_applied&&Number(sale.qty||0)*Number(sale.cost||0)>0&&!activeSources.has('sale_cogs|'+sale.id))
+      addInvalid({id:'missing-cogs-'+sale.id,description:'COGS '+(sale.product_name_snapshot||''),source_type:'sale_cogs',source_id:sale.id,entry_date:date},'Stock-applied sale has no active COGS journal');
+  }
+  for(const expense of state.expenses||[]){
+    const date=String(expense.created_at||'').slice(0,10);
+    if(expense.deleted||(endDate&&date>endDate)||Number(expense.amount||0)<=0)continue;
+    if(!activeSources.has('expense|'+expense.id))
+      addInvalid({id:'missing-expense-'+expense.id,description:'Expense '+(expense.description||''),source_type:'expense',source_id:expense.id,entry_date:date},'Active expense has no active expense journal');
+  }
+  for(const purchase of state.purchases||[]){
+    const date=String(purchase.purchased_at||purchase.created_at||'').slice(0,10);
+    if(purchase.status==='ordered'||(endDate&&date>endDate)||Number(purchase.total||0)<=0)continue;
+    if(!activeSources.has('purchase|'+purchase.id))
+      addInvalid({id:'missing-purchase-'+purchase.id,description:'Purchase '+(purchase.product_name_snapshot||''),source_type:'purchase',source_id:purchase.id,entry_date:date},'Received purchase has no active purchase journal');
   }
   return {invalidCount:invalid.length,invalid};
 }
 function accReportTotals(startDate=null,endDate=null){
-  const by={};for(const a of state.accounts)by[a.code]=0;
+  const by={};for(const a of state.accounts||[])by[a.code]=0;
   const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
-  // A sale void posts a balanced reversal and marks the original entry voided.
-  // Include that original only when its reversal exists, so the two entries
-  // net to zero rather than leaving the reversal as a second subtraction.
+  const accounts=new Map((state.accounts||[]).map(a=>[a.id,a]));
   const reversedEntries=new Set((state.journalEntries||[])
     .filter(e=>!e.voided&&['sale_void','sale_cogs_void'].includes(e.source_type))
     .map(e=>e.source_id));
@@ -6062,8 +6104,9 @@ function accReportTotals(startDate=null,endDate=null){
     const entry=entries.get(line.journal_entry_id);
     if(!entry||(entry.voided&&!reversedEntries.has(entry.id)&&!reversedEntries.has(entry.source_id)))continue;
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
-    if(endDate&&date>endDate)continue;if(startDate&&date<startDate)continue;
-    const account=state.accounts.find(a=>a.id===line.account_id);if(!account)continue;
+    if(endDate&&date>endDate)continue;
+    if(startDate&&date<startDate)continue;
+    const account=accounts.get(line.account_id);if(!account)continue;
     const raw=Number(line.debit||0)-Number(line.credit||0);
     const defaultSide=['liability','equity','income'].includes(account.type)?'credit':'debit';
     const normalSide=String(account.normal_balance||defaultSide).toLowerCase();
