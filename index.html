@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.56 stock, actor attribution and table layout repair">
+<meta name="app-version" content="V14.4.57 locale-invariant tables and dependency-safe transaction sync">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -1355,7 +1355,23 @@ async function sheriSyncSaleCartOperation(op){
   }
   if(data?.ok!==true)throw new Error('The complete sale cart was not synchronized.');
 }
+async function sheriEnsureProductBeforeStockChange(op){
+  const merchantId=op.merchant_id,productId=op.product_id;
+  let {data:serverProduct,error}=await sb.from('products').select('id').eq('id',productId).eq('merchant_id',merchantId).maybeSingle();
+  if(error)throw error;
+  if(serverProduct)return;
+  const queued=await sheriGetAll('outbox');
+  const pending=queued.find(x=>x.op?.type==='product_upsert'&&x.op.record?.id===productId);
+  const local=product(productId),source=pending?.op?.record||local;
+  if(!source)throw new Error('Inventory adjustment is waiting for its product to sync.');
+  const openingRecord={...source,merchant_id:merchantId,stock:Number(pending?.op?.record?.stock??op.expected_stock??0)};
+  await sheriSyncProductOperation({record:openingRecord});
+  const verify=await sb.from('products').select('id').eq('id',productId).eq('merchant_id',merchantId).maybeSingle();
+  if(verify.error)throw verify.error;
+  if(!verify.data)throw new Error('The product has not reached the server yet; its stock movement remains pending.');
+}
 async function sheriSyncInventoryAdjustmentOperation(op){
+  await sheriEnsureProductBeforeStockChange(op);
   const {data,error}=await sb.rpc('shericeri_adjust_product_stock',{
     p_merchant_id:op.merchant_id,p_product_id:op.product_id,p_expected_stock:op.expected_stock,
     p_quantity_delta:op.quantity_delta,p_reason:op.reason,p_movement_type:op.movement_type||'adjustment',
@@ -1401,9 +1417,59 @@ async function sheriSyncProductOperation(op){
   if(data)return; // Non-managers may create a product, but never overwrite an existing one.
   const {error:insertError}=await sb.from('products').insert(record);if(insertError)throw insertError;
 }
+async function sheriEnsurePurchaseDependencies(op){
+  const record=sheriServerRecord(op.record),merchantId=record.merchant_id;
+  const productId=op.productId||record.product_id;
+  let {data:serverProduct,error:productError}=await sb.from('products').select('id,merchant_id').eq('id',productId).maybeSingle();
+  if(productError)throw productError;
+  if(serverProduct&&serverProduct.merchant_id!==merchantId)throw new Error('The selected product belongs to another business. The purchase was not posted.');
+  if(!serverProduct){
+    const queued=await sheriGetAll('outbox');
+    const pending=queued.find(x=>x.op?.type==='product_upsert'&&x.op.record?.id===productId);
+    const local=product(productId),source=pending?.op?.record||local;
+    if(!source)throw new Error('Purchase is waiting for its product to sync. No purchase or stock change was posted.');
+    const serverStock=Number(pending?.op?.record?.stock??op.expectedServerStock??local?.stock??0);
+    await sheriSyncProductOperation({record:{...source,merchant_id:merchantId,stock:serverStock}});
+    const verify=await sb.from('products').select('id').eq('id',productId).eq('merchant_id',merchantId).maybeSingle();
+    if(verify.error)throw verify.error;
+    if(!verify.data)throw new Error('Purchase is waiting for its product to sync. No purchase or stock change was posted.');
+  }
+  if(record.supplier_id){
+    let {data:serverSupplier,error:supplierError}=await sb.from('suppliers').select('id,merchant_id').eq('id',record.supplier_id).maybeSingle();
+    if(supplierError)throw supplierError;
+    if(serverSupplier&&serverSupplier.merchant_id!==merchantId)throw new Error('The selected supplier belongs to another business. The purchase was not posted.');
+    if(!serverSupplier){
+      const queued=await sheriGetAll('outbox');
+      const pending=queued.find(x=>x.op?.type==='supplier_upsert'&&x.op.record?.id===record.supplier_id);
+      const local=(state.suppliers||[]).find(x=>x.id===record.supplier_id)||pending?.op?.record;
+      if(!local||local.merchant_id!==merchantId)throw new Error('Purchase is waiting for the selected supplier to sync. No purchase was posted.');
+      const {data:serverSuppliers,error:listError}=await sb.from('suppliers').select('id,name,phone').eq('merchant_id',merchantId).limit(100);
+      if(listError)throw listError;
+      const norm=value=>String(value||'').trim().toLocaleLowerCase();
+      const phone=value=>String(value||'').replace(/[^0-9+]/g,'');
+      const same=(serverSuppliers||[]).filter(x=>norm(x.name)===norm(local.name)&&(!local.phone||phone(x.phone)===phone(local.phone)));
+      if(same.length===1){
+        record.supplier_id=same[0].id;
+        op.record={...op.record,supplier_id:same[0].id};
+        const localPurchase=(state.purchases||[]).find(x=>x.id===record.id);
+        if(localPurchase){localPurchase.supplier_id=same[0].id;await sheriPut('purchases',localPurchase.id,{merchant_id:merchantId,record:{...localPurchase}});}
+      }else if(same.length>1){
+        throw new Error('More than one supplier matches this purchase. Select the correct supplier before retrying.');
+      }else{
+        const {error:upsertError}=await sb.from('suppliers').upsert(sheriServerRecord(local),{onConflict:'id'});
+        if(upsertError)throw upsertError;
+        const verify=await sb.from('suppliers').select('id').eq('id',local.id).eq('merchant_id',merchantId).maybeSingle();
+        if(verify.error)throw verify.error;
+        if(!verify.data)throw new Error('Purchase is waiting for its supplier to sync. No purchase was posted.');
+      }
+    }
+  }
+  return record;
+}
 async function sheriSyncPurchaseOperation(op){
+  const purchaseRecord=await sheriEnsurePurchaseDependencies(op);
   const {data,error}=await sb.rpc('shericeri_sync_purchase_stock',{
-    p_purchase:sheriServerRecord(op.record),
+    p_purchase:purchaseRecord,
     p_product_id:op.productId||op.record.product_id,
     p_expected_server_stock:op.expectedServerStock??null,
     p_expected_server_cost:op.expectedServerCost??null,
@@ -1416,8 +1482,26 @@ async function sheriSyncPurchaseOperation(op){
     local_stock:op.localStock,server_stock:data.server_stock,
     local_cost:op.localCost,server_cost:data.server_cost,purchase_id:op.record.id,operation:op
   });
+  else if(data?.ok!==true)throw new Error('The server did not confirm that this purchase was recorded.');
 }
 function sheriOutboxPriority(op){return ({merchant_upsert:0,product_upsert:1,supplier_upsert:1,customer_upsert:1,inventory_adjustment:2,purchase_upsert:3,sale_cart_upsert:4,sale_upsert:4})[op?.type]??5;}
+async function sheriUnblockSchemaRepairedOperations(){
+  const queued=await sheriGetAll('outbox');
+  const candidates=queued.filter(item=>item.blocked&&(
+    (/created_by/i.test(String(item.last_error||''))&&/schema cache|column/i.test(String(item.last_error||''))&&['product_upsert','supplier_upsert'].includes(item.op?.type))||
+    (item.op?.type==='inventory_adjustment'&&/product not found/i.test(String(item.last_error||''))&&(state.products||[]).some(p=>p.id===item.op.product_id))||
+    (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(String(item.last_error||'')))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)))
+  ));
+  if(!candidates.length)return;
+  const [products,suppliers]=await Promise.all([
+    sb.from('products').select('created_by,created_by_name').limit(0),
+    sb.from('suppliers').select('created_by,created_by_name').limit(0)
+  ]);
+  if(products.error||suppliers.error)return;
+  for(const item of candidates){
+    await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,recovered_at:sheriNow()});
+  }
+}
 async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy||sheriSyncBatchDepth>0)return;
   sheriSyncBusy=true;
@@ -1430,6 +1514,7 @@ async function sheriSyncOutbox(){
       if(refreshed?.data?.session){session=refreshed.data.session;}
     }catch(_){/* Supabase auto-refresh may still be completing; continue below. */}
     await sheriReconcileMerchantId();
+    await sheriUnblockSchemaRepairedOperations();
     const now=Date.now();
     const items=(await sheriGetAll('outbox'))
       .filter(item=>!item.blocked)
@@ -5585,6 +5670,7 @@ async function addOSPurchase(){
     localCost=localStock>0?Number((((oldStock*oldCost)+(qty*unitCost))/localStock).toFixed(4)):unitCost;
     p.stock=localStock;p.cost=localCost;p.updated_at=now;
   }
+  if(status!=='ordered')await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
   state.purchases.push(data);
   await sheriPut('purchases',data.id,{merchant_id:state.merchant.id,record:{...data}});
   await sheriQueue({type:'purchase_upsert',record:data,productId:p.id,expectedServerStock:status==='ordered'?null:oldStock,expectedServerCost:status==='ordered'?null:oldCost,localStock,localCost});
@@ -9380,6 +9466,32 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
   pinLaptopPickerToItsOwnRow();
 })();
 </script>
+
+<!-- V14.4.57: locale-independent data table sizing; translation changes text only -->
+<style id="aibos-locale-invariant-data-layout-v57">
+/* One layout contract for English, French and Kinyarwanda; no language-specific overrides. */
+#appRoot .main :is(div,section,article):has(> table.table){
+  box-sizing:border-box!important;display:block!important;width:100%!important;min-width:0!important;
+  max-width:100%!important;overflow-x:auto!important;overflow-y:visible!important;
+  overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+}
+#appRoot .main table.table{
+  display:table!important;width:max-content!important;min-width:100%!important;max-width:none!important;
+  table-layout:auto!important;border-collapse:collapse!important;
+}
+#appRoot .main table.table th{
+  white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important;
+  hyphens:none!important;vertical-align:middle!important;
+}
+#appRoot .main table.table td{
+  white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;
+  hyphens:none!important;vertical-align:middle!important;
+}
+@media(max-width:650px){
+  #appRoot .main table.table{font-size:12px!important}
+  #appRoot .main table.table th,#appRoot .main table.table td{padding:8px 7px!important}
+}
+</style>
 
 </body>
 </html>
