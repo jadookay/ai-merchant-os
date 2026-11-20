@@ -1,7 +1,7 @@
 /* Shericeri V14.4 — inheritance-safe offline application shell + sync wake-up worker */
-const CACHE_NAME='shericeri-v14.4-aibos-sync-v54';
+const CACHE_NAME='shericeri-v14.4-aibos-sync-v55';
 const APP='./index.html';
-const RELEASE='V14.4.54';
+const RELEASE='V14.4.55';
 
 async function patchAppResponse(response){
   if(!response||!response.ok)return response;
