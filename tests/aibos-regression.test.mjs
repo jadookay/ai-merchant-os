@@ -204,3 +204,27 @@ test("trial balance places abnormal account balances on the opposite side", () =
   assert.ok(html.includes("debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance)"));
   assert.ok(html.includes("credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance)"));
 });
+
+test("English, French and Kinyarwanda share one horizontal whole-word table layout", () => {
+  assert.ok(html.includes('id="aibos-locale-invariant-data-layout-v57"'));
+  assert.ok(html.includes("width:max-content!important"));
+  assert.ok(html.includes("word-break:normal!important"));
+  assert.ok(html.includes("overflow-wrap:normal!important"));
+  assert.ok(html.includes("white-space:nowrap!important"));
+});
+
+test("opening stock and purchase synchronization verify parent records before posting", () => {
+  assert.ok(html.includes("async function sheriEnsureProductBeforeStockChange(op)"));
+  assert.ok(html.includes("async function sheriEnsurePurchaseDependencies(op)"));
+  assert.ok(html.includes("await sheriUnblockSchemaRepairedOperations()"));
+  assert.ok(html.includes("Purchase is waiting for its supplier to sync"));
+  assert.ok(html.includes("The server did not confirm that this purchase was recorded."));
+});
+
+test("received purchases persist the updated local stock and record the registered actor name", () => {
+  const start=html.indexOf("async function addOSPurchase()");
+  const end=html.indexOf("async function deleteOSPurchase",start);
+  const block=html.slice(start,end);
+  assert.ok(block.includes("created_by_name:sheriCurrentActor()"));
+  assert.ok(block.includes("await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}})"));
+});
