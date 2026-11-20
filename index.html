@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.45 Authentication controls repair">
+<meta name="app-version" content="V14.4.46 Login and language layout repair">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -7656,17 +7656,33 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   const authCard=auth?.querySelector('.auth-card');
   const side=appRoot?.querySelector('.side');
   const nav=side?.querySelector('.nav');
-  const originalPickerParent=picker?.parentElement;
-  const originalPickerNext=picker?.nextSibling;
-  const isMobile=()=>window.matchMedia&&window.matchMedia('(max-width:650px)').matches;
+  const main=appRoot?.querySelector('.main');
+  const syncBar=document.getElementById('sheriOfflineBar');
+  const onboarding=document.getElementById('onboardingScreen');
   const placeLanguagePicker=()=>{
     if(!picker)return;
+    const loginVisible=!!auth&&getComputedStyle(auth).display!=='none';
     const signedIn=!!appRoot&&appRoot.style.display!=='none';
-    if(signedIn&&isMobile()&&nav&&picker.parentElement!==side)nav.after(picker);
-    else if(signedIn&&!isMobile()&&originalPickerParent&&picker.parentElement!==originalPickerParent){
-      if(originalPickerNext&&originalPickerNext.parentElement===originalPickerParent)originalPickerParent.insertBefore(picker,originalPickerNext);
-      else originalPickerParent.append(picker);
-    }else if(!signedIn&&authCard&&picker.parentElement!==authCard)authCard.append(picker);
+    const onboardingVisible=!!onboarding&&getComputedStyle(onboarding).display!=='none';
+    document.body.classList.toggle('aibos-auth-visible',loginVisible);
+    if(loginVisible&&authCard){
+      let heading=authCard.querySelector('.auth-heading-row');
+      const title=document.getElementById('authTitle');
+      if(!heading&&title){
+        heading=document.createElement('div');
+        heading.className='auth-heading-row';
+        authCard.insertBefore(heading,title);
+        heading.appendChild(title);
+      }
+      if(heading&&picker.parentElement!==heading)heading.appendChild(picker);
+    }else if(signedIn&&main){
+      if(syncBar&&syncBar.parentElement===main){
+        if(picker.parentElement!==main||picker.previousElementSibling!==syncBar)syncBar.after(picker);
+      }else if(picker.parentElement!==main)main.prepend(picker);
+    }else if(onboardingVisible){
+      const card=onboarding.querySelector('.onboard-card');
+      if(card&&picker.parentElement!==card)card.appendChild(picker);
+    }
   };
   placeLanguagePicker();
   window.addEventListener('resize',placeLanguagePicker,{passive:true});
@@ -8905,37 +8921,87 @@ html[lang="fr"] #appRoot #dashboard .sheri-launcher .sheri-thumb img{display:blo
 })();
 </script>
 
-<script id="aibos-auth-password-visibility-v45">
+<style id="aibos-login-language-layout-v46">
+/* Keep the application shell out of sight until authentication is complete. */
+body.aibos-auth-visible #appRoot,
+body.aibos-auth-visible #appRoot .side{display:none!important}
+#authScreen .auth-card{position:relative!important}
+#authScreen .auth-heading-row{
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ gap:8px!important;width:100%!important;min-width:0!important;margin:4px 0 8px!important;
+}
+#authScreen .auth-heading-row .auth-title{
+ flex:1 1 auto!important;min-width:0!important;margin:0!important;
+ font-size:clamp(19px,5.2vw,25px)!important;line-height:1.18!important;
+ overflow-wrap:anywhere!important;
+}
+#authScreen #aibosLanguageSwitcher{
+ position:static!important;inset:auto!important;transform:none!important;
+ display:flex!important;flex:0 0 auto!important;align-items:center!important;
+ width:max-content!important;max-width:48%!important;min-width:0!important;
+ margin:0!important;padding:3px!important;gap:0!important;
+ border:1px solid rgba(1,0,128,.28)!important;border-radius:8px!important;
+ background:#fff!important;box-shadow:none!important;z-index:1!important;
+}
+#authScreen #aibosLanguageSwitcher select{
+ display:block!important;width:auto!important;min-width:0!important;max-width:100%!important;
+ padding:6px 5px!important;border:0!important;background:#fff!important;color:#010080!important;
+ font-size:12px!important;line-height:1.2!important;
+}
+#authScreen .auth-field>input{padding-right:50px!important}
+#authScreen .auth-field>.pw-toggle{
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ position:absolute!important;right:7px!important;top:50%!important;transform:translateY(-50%)!important;
+ width:34px!important;min-width:34px!important;height:34px!important;min-height:34px!important;
+ margin:0!important;padding:5px!important;border:0!important;border-radius:7px!important;
+ background:transparent!important;color:#010080!important;box-shadow:none!important;
+ font-size:0!important;line-height:0!important;cursor:pointer!important;
+}
+#authScreen .auth-field>.pw-toggle svg{display:block!important;width:20px!important;height:20px!important}
+#authScreen .auth-field>.pw-toggle:hover{background:#fff9c9!important}
+#authScreen .auth-field>.pw-toggle:focus-visible{outline:2px solid #010080!important;outline-offset:2px!important}
+#aibosLanguageSwitcher{
+ position:static!important;inset:auto!important;transform:none!important;
+ display:flex!important;align-items:center!important;justify-content:flex-end!important;
+ width:max-content!important;max-width:100%!important;min-width:0!important;
+ margin:0 0 12px auto!important;padding:5px 7px!important;
+ box-sizing:border-box!important;z-index:1!important;
+}
+#aibosLanguageSwitcher select{
+ width:auto!important;min-width:132px!important;max-width:100%!important;
+}
+@media(min-width:651px){
+ #appRoot .main{padding-top:16px!important}
+}
+@media(max-width:420px){
+ #authScreen .auth-heading-row{gap:5px!important}
+ #authScreen .auth-heading-row .auth-title{font-size:19px!important}
+ #authScreen #aibosLanguageSwitcher{max-width:47%!important}
+ #authScreen #aibosLanguageSwitcher select{font-size:11px!important;padding:6px 3px!important}
+}
+</style>
+<script id="aibos-auth-password-visibility-v46">
 (function(){
- const words={
-  en:{show:'View PW',hide:'Hide PW'},
-  rw:{show:'Reba PW',hide:'Hisha PW'},
-  fr:{show:'Voir MDP',hide:'Masquer MDP'}
- };
- function currentLanguage(){
-  return String(window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en').slice(0,2).toLowerCase();
+ const eye='<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
+ const eyeOff='<svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 5.2A10.7 10.7 0 0 1 12 5c6.4 0 10 7 10 7a15.8 15.8 0 0 1-3.1 3.9M6.2 6.2C3.5 8 2 12 2 12s3.6 7 10 7a10.7 10.7 0 0 0 4-.8"/></svg>';
+ function paint(button,input){
+  const visible=input.type==='text';
+  button.innerHTML=visible?eyeOff:eye;
+  button.setAttribute('aria-label',visible?'Hide password':'Show password');
+  button.setAttribute('title',visible?'Hide password':'Show password');
+  button.setAttribute('aria-pressed',visible?'true':'false');
  }
- function label(visible){const w=words[currentLanguage()]||words.en;return visible?w.hide:w.show;}
  function refresh(){
   document.querySelectorAll('#authScreen .pw-toggle').forEach(button=>{
    const input=button.parentElement?.querySelector('input');
-   if(!input)return;
-   const visible=input.type==='text';
-   button.textContent=label(visible);
-   button.setAttribute('aria-label',visible?'Hide password':'View password');
-   button.setAttribute('aria-pressed',visible?'true':'false');
+   if(input)paint(button,input);
   });
  }
  window.togglePassword=function(id,button){
   const input=document.getElementById(id);
   if(!input)return;
   input.type=input.type==='password'?'text':'password';
-  const visible=input.type==='text';
-  if(button){
-   button.textContent=label(visible);
-   button.setAttribute('aria-label',visible?'Hide password':'View password');
-   button.setAttribute('aria-pressed',visible?'true':'false');
-  }
+  if(button)paint(button,input);
  };
  window.addEventListener('aibos:languagechange',refresh);
  refresh();
