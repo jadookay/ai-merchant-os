@@ -8186,7 +8186,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   }
   function sourceAccountTotal(sourceType,accountCode,startDate,endDate){
     const entries=state.journalEntries||[],lines=state.journalLines||[];
-    const adjustmentIds=new Set(entries.filter(e=>e.source_type===sourceType).map(e=>e.id));
+    const adjustmentIds=new Set(entries.filter(e=>e.source_type===sourceType).flatMap(e=>[e.id,e.source_id].filter(Boolean)));
     const accountsById=new Map((state.accounts||[]).map(a=>[a.id,a]));
     const reversed=new Set(entries.filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction'].includes(e.source_type)&&(!endDate||String(e.entry_date||e.created_at||'').slice(0,10)<=endDate)).map(e=>e.source_id));
     const entriesById=new Map(entries.map(e=>[e.id,e]));
