@@ -1478,12 +1478,17 @@ async function sheriSyncPurchaseOperation(op){
     p_local_cost:op.localCost??null
   });
   if(error)throw error;
-  if(data?.stock_conflict)await sheriRecordConflict({
-    type:'purchase_stock_conflict',product_id:op.productId||op.record.product_id,
-    local_stock:op.localStock,server_stock:data.server_stock,
-    local_cost:op.localCost,server_cost:data.server_cost,purchase_id:op.record.id,operation:op
-  });
-  else if(data?.ok!==true)throw new Error('The server did not confirm that this purchase was recorded.');
+  if(data?.stock_conflict){
+    await sheriRecordConflict({
+      type:'purchase_stock_conflict',product_id:op.productId||op.record.product_id,
+      local_stock:op.localStock,server_stock:data.server_stock,
+      local_cost:op.localCost,server_cost:data.server_cost,purchase_id:op.record.id,operation:op
+    });
+    const conflict=new Error('Purchase stock conflict — manual review is required. The purchase remains preserved for review.');
+    conflict.status=422;
+    throw conflict;
+  }
+  if(data?.ok!==true)throw new Error('The server did not confirm that this purchase was recorded.');
 }
 function sheriOutboxPriority(op){return ({merchant_upsert:0,product_upsert:1,supplier_upsert:1,customer_upsert:1,inventory_adjustment:2,purchase_upsert:3,sale_cart_upsert:4,sale_upsert:4})[op?.type]??5;}
 async function sheriUnblockSchemaRepairedOperations(){
