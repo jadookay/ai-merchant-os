@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.66 support legacy and current POS reversal links">
+<meta name="app-version" content="V14.4.67 honor account normal balances and reversed POS ledger entries">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -5742,8 +5742,24 @@ function accToday(){return new Date().toISOString().slice(0,10)}
 function accAccount(id){return (state.accounts||[]).find(a=>a.id===id)}
 function accAccountCode(code){return (state.accounts||[]).find(a=>a.code===code)}
 function accLinesForEntry(id){return (state.journalLines||[]).filter(x=>x.journal_entry_id===id)}
-function accBalance(accountId){let n=0;const voided=new Set((state.journalEntries||[]).filter(e=>e.voided).map(e=>e.id));for(const l of state.journalLines||[]){if(l.account_id!==accountId||voided.has(l.journal_entry_id))continue;n+=Number(l.debit||0)-Number(l.credit||0)}return n}
-function accNormalAmount(a){const b=accBalance(a.id);return ['liability','equity','income'].includes(a.type)?-b:b}
+function accBalance(accountId){
+  let n=0;
+  const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
+  const activeReversals=new Set((state.journalEntries||[])
+    .filter(e=>!e.voided&&['sale_void','sale_cogs_void'].includes(e.source_type))
+    .map(e=>e.source_id));
+  for(const line of state.journalLines||[]){
+    if(line.account_id!==accountId)continue;
+    const entry=entries.get(line.journal_entry_id);
+    if(!entry)continue;
+    const hasReversal=activeReversals.has(entry.id)||
+      (['sale','sale_cogs'].includes(entry.source_type)&&activeReversals.has(entry.source_id));
+    if(entry.voided&&!hasReversal)continue;
+    n+=Number(line.debit||0)-Number(line.credit||0);
+  }
+  return n;
+}
+function accNormalAmount(a){const b=accBalance(a.id),defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit',normalSide=String(a.normal_balance||defaultSide).toLowerCase();return normalSide==='credit'?-b:b}
 function accPeriodLocked(date){const lock=state.accountingSettings?.locked_through;return !!(lock&&date&&date<=lock)}
 async function accUpsert(table,record){
   const clean={...record,merchant_id:state.merchant.id,created_by:record.created_by||session?.user?.id||null,created_by_name:record.created_by_name||sheriCurrentActor()};
