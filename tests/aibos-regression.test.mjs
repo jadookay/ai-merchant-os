@@ -219,6 +219,8 @@ test("opening stock and purchase synchronization verify parent records before po
   assert.ok(html.includes("await sheriUnblockSchemaRepairedOperations()"));
   assert.ok(html.includes("Purchase is waiting for its supplier to sync"));
   assert.ok(html.includes("The server did not confirm that this purchase was recorded."));
+  assert.ok(html.includes("Purchase stock conflict — manual review is required."));
+  assert.ok(html.includes("conflict.status=422"));
 });
 
 test("received purchases persist the updated local stock and record the registered actor name", () => {
