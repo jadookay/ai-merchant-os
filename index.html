@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.64 net cash movement summary and cash-flow scope clarification">
+<meta name="app-version" content="V14.4.65 validate active POS reversals and ledger source integrity">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -5982,23 +5982,40 @@ function accLedgerIntegrity(endDate=null){
     if(!linesByEntry.has(key))linesByEntry.set(key,[]);
     linesByEntry.get(key).push(line);
   }
+  const reversalTypes=['sale_void','sale_cogs_void'];
   const reversedEntries=new Set((state.journalEntries||[])
-    .filter(e=>['sale_void','sale_cogs_void'].includes(e.source_type))
+    .filter(e=>!e.voided&&reversalTypes.includes(e.source_type))
     .map(e=>e.source_id));
   const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
+  const hasExactReversal=entry=>{
+    const original=linesByEntry.get(entry.id)||[];
+    return (state.journalEntries||[]).filter(r=>!r.voided&&reversalTypes.includes(r.source_type)&&
+      (r.source_id===entry.id||r.source_id===entry.source_id)).some(r=>{
+        const reversal=linesByEntry.get(r.id)||[];
+        return original.length>=2&&reversal.length===original.length&&original.every(line=>reversal.some(other=>
+          other.account_id===line.account_id&&
+          Math.abs(Number(other.debit||0)-Number(line.credit||0))<=0.005&&
+          Math.abs(Number(other.credit||0)-Number(line.debit||0))<=0.005
+        ));
+      });
+  };
   const invalid=[];
   for(const entry of state.journalEntries||[]){
-    if(entry.voided&&!reversedEntries.has(entry.id))continue;
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
     if(endDate&&date>endDate)continue;
     const v=totals.get(entry.id)||{count:0,debit:0,credit:0};
     const lines=linesByEntry.get(entry.id)||[];
+    const hasReversal=hasExactReversal(entry);
+    if(entry.voided&&!hasReversal){
+      if(['sale','sale_cogs'].includes(entry.source_type))invalid.push({entry,count:v.count,debit:v.debit,credit:v.credit,difference:v.debit-v.credit,reason:'Voided POS journal has no matching active reversal'});
+      continue;
+    }
     let reason=null;
     if(v.count<2||v.debit<=0||Math.abs(v.debit-v.credit)>0.005)reason='Journal entry is missing lines or is not balanced';
     if(!reason&&['sale','sale_cogs'].includes(entry.source_type)){
       const sale=(state.sales||[]).find(s=>s.id===entry.source_id);
-      if(!sale)reason='POS journal has no matching source sale record';
-      else{
+      if(!sale&&!hasReversal)reason='POS journal has no matching source sale record or reversal';
+      else if(sale){
         const expectedAmount=entry.source_type==='sale'
           ?Number(sale.qty||0)*Number(sale.price||0)
           :Number(sale.qty||0)*Number(sale.cost||0);
@@ -6010,7 +6027,8 @@ function accLedgerIntegrity(endDate=null){
           Math.abs(Number(line.debit||0)-want.debit)<=0.005&&
           Math.abs(Number(line.credit||0)-want.credit)<=0.005
         ));
-        if(!reason&&Boolean(sale.voided)!==Boolean(entry.voided))reason='POS sale and journal void statuses do not match';
+        if(!reason&&sale.voided&&!hasReversal)reason='Voided POS sale has no matching active reversal';
+        if(!reason&&!sale.voided&&(entry.voided||hasReversal))reason='Active POS sale has a voided or reversed journal';
         if(!reason&&!exact)reason='POS journal lines do not match the sale quantity, price or cost';
       }
     }
@@ -6025,7 +6043,7 @@ function accReportTotals(startDate=null,endDate=null){
   // Include that original only when its reversal exists, so the two entries
   // net to zero rather than leaving the reversal as a second subtraction.
   const reversedEntries=new Set((state.journalEntries||[])
-    .filter(e=>['sale_void','sale_cogs_void'].includes(e.source_type))
+    .filter(e=>!e.voided&&['sale_void','sale_cogs_void'].includes(e.source_type))
     .map(e=>e.source_id));
   for(const line of state.journalLines||[]){
     const entry=entries.get(line.journal_entry_id);
@@ -6093,7 +6111,7 @@ async function exportStatement(id,title,kind){
 function accCashFlowForPeriod(startDate,endDate){
   const cashIds=new Set((state.accounts||[]).filter(a=>['1000','1010','1020'].includes(String(a.code))||(state.bankAccounts||[]).some(b=>b.account_id===a.id)).map(a=>a.id));
   const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
-  const reversedEntries=new Set((state.journalEntries||[]).filter(e=>['sale_void','sale_cogs_void'].includes(e.source_type)).map(e=>e.source_id));
+  const reversedEntries=new Set((state.journalEntries||[]).filter(e=>!e.voided&&['sale_void','sale_cogs_void'].includes(e.source_type)).map(e=>e.source_id));
   const linesByEntry=new Map();
   for(const line of state.journalLines||[]){
     if(!linesByEntry.has(line.journal_entry_id))linesByEntry.set(line.journal_entry_id,[]);
