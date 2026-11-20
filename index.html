@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.62 classified income tax separately in Profit and Loss">
+<meta name="app-version" content="V14.4.63 POS source reconciliation and stronger ledger integrity checks">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -5817,7 +5817,7 @@ async function accReconcileOperationalLedger(){
   if(!accServerSnapshotAuthoritative)return sheriToast('Refresh the server data before repairing the ledger.','warning');
   const integrity=accLedgerIntegrity();
   if(!integrity.invalidCount)return sheriToast('The ledger is already balanced.');
-  const preview=integrity.invalid.slice(0,8).map(x=>'• '+(x.entry.description||x.entry.source_type||'Journal entry')+' — '+(x.count||0)+' existing line(s)').join('\n');
+  const preview=integrity.invalid.slice(0,8).map(x=>'• '+(x.entry.description||x.entry.source_type||'Journal entry')+' — '+(x.reason||'Review required')+' ('+(x.count||0)+' line(s))').join('\n');
   const promptText='There are '+integrity.invalidCount+' incomplete or unbalanced journal entries. The repair will add only missing lines that match active source records. Entries with conflicting lines or locked dates will be left unchanged.\n\n'+preview+'\n\nContinue with the repair?';
   if(!confirm(promptText))return;
   const button=document.getElementById('accReconcileButton');if(button){button.disabled=true;button.textContent=sheriPendingText('Repairing ledger…');}
@@ -5975,21 +5975,46 @@ function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('re
 function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accLedgerIntegrity(endDate=null){
-  const totals=new Map();
+  const totals=new Map(),linesByEntry=new Map();
   for(const line of state.journalLines||[]){
     const key=line.journal_entry_id,v=totals.get(key)||{count:0,debit:0,credit:0};
     v.count++;v.debit+=Number(line.debit||0);v.credit+=Number(line.credit||0);totals.set(key,v);
+    if(!linesByEntry.has(key))linesByEntry.set(key,[]);
+    linesByEntry.get(key).push(line);
   }
   const reversedEntries=new Set((state.journalEntries||[])
     .filter(e=>['sale_void','sale_cogs_void'].includes(e.source_type))
     .map(e=>e.source_id));
+  const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
   const invalid=[];
   for(const entry of state.journalEntries||[]){
     if(entry.voided&&!reversedEntries.has(entry.id))continue;
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
     if(endDate&&date>endDate)continue;
     const v=totals.get(entry.id)||{count:0,debit:0,credit:0};
-    if(v.count<2||v.debit<=0||Math.abs(v.debit-v.credit)>0.005)invalid.push({entry,count:v.count,debit:v.debit,credit:v.credit,difference:v.debit-v.credit});
+    const lines=linesByEntry.get(entry.id)||[];
+    let reason=null;
+    if(v.count<2||v.debit<=0||Math.abs(v.debit-v.credit)>0.005)reason='Journal entry is missing lines or is not balanced';
+    if(!reason&&['sale','sale_cogs'].includes(entry.source_type)){
+      const sale=(state.sales||[]).find(s=>s.id===entry.source_id);
+      if(!sale)reason='POS journal has no matching source sale record';
+      else{
+        const expectedAmount=entry.source_type==='sale'
+          ?Number(sale.qty||0)*Number(sale.price||0)
+          :Number(sale.qty||0)*Number(sale.cost||0);
+        const expected=entry.source_type==='sale'
+          ?[{code:'1000',debit:expectedAmount,credit:0},{code:'4000',debit:0,credit:expectedAmount}]
+          :[{code:'5000',debit:expectedAmount,credit:0},{code:'1200',debit:0,credit:expectedAmount}];
+        const exact=expectedAmount>0&&lines.length===2&&expected.every(want=>lines.some(line=>
+          accountCodeById.get(line.account_id)===want.code&&
+          Math.abs(Number(line.debit||0)-want.debit)<=0.005&&
+          Math.abs(Number(line.credit||0)-want.credit)<=0.005
+        ));
+        if(!reason&&Boolean(sale.voided)!==Boolean(entry.voided))reason='POS sale and journal void statuses do not match';
+        if(!reason&&!exact)reason='POS journal lines do not match the sale quantity, price or cost';
+      }
+    }
+    if(reason)invalid.push({entry,count:v.count,debit:v.debit,credit:v.credit,difference:v.debit-v.credit,reason});
   }
   return {invalidCount:invalid.length,invalid};
 }
@@ -6111,7 +6136,7 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
   const integrity=accLedgerIntegrity(reportEnd);
   const reconcileButton=document.getElementById('accReconcileButton');
   if(reconcileButton){reconcileButton.style.display=integrity.invalidCount&&accServerSnapshotAuthoritative&&sheriCan('manage_finance')&&sheriCan('view_financial_reports')?'inline-flex':'none';reconcileButton.textContent=sheriPendingText('Review and repair ledger');}
-  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' journal entr'+(integrity.invalidCount===1?'y is':'ies are')+' missing lines or out of balance. Review the General Ledger before relying on these totals.</div>':'';
+  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' journal entr'+(integrity.invalidCount===1?'y has':'ies have')+' missing, duplicated, mismatched or unbalanced postings. Review the General Ledger before relying on these totals.</div>':'';
   const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd);
   const income=accStatementTotal('income',b,'credit');
   const cogs=accStatementTotal('cogs',b,'debit');
