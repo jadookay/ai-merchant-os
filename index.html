@@ -8195,6 +8195,9 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
       const cumulative=accStatementTotal('income',bs,'credit')-accStatementTotal('cogs',bs,'debit')-accStatementTotal('expense',bs,'debit');
       const equity=accStatementTotal('equity',bs,'credit')+cumulative;
       const periodIncome=accStatementTotal('income',period,'credit'),periodCogs=accStatementTotal('cogs',period,'debit');
+      const salesIncomeAccounts=accounts.filter(a=>['4000','4050'].includes(String(a.code)));
+      const otherIncomeAccounts=accounts.filter(a=>a.type==='income'&&!['4000','4050'].includes(String(a.code)));
+      const salesRevenue=totalRows(salesIncomeAccounts,period,'credit'),otherIncome=totalRows(otherIncomeAccounts,period,'credit');
       const expenseAccounts=accounts.filter(a=>a.type==='expense'),operatingAccounts=expenseAccounts.filter(a=>String(a.code)!=='6100'),taxAccounts=expenseAccounts.filter(a=>String(a.code)==='6100');
       const operatingExpenses=totalRows(operatingAccounts,period,'debit'),taxExpense=totalRows(taxAccounts,period,'debit');
       const net=periodIncome-periodCogs-operatingExpenses-taxExpense,pretax=net+taxExpense;
@@ -8222,13 +8225,14 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
           '<div class="sub" style="margin-top:8px">Assets = liabilities + equity. '+(Math.abs(assets-liabilities-equity)<=0.005?'The statement balances.':'Difference: '+money(assets-liabilities-equity)+'. The statement is not reconciled.')+'</div><div class="sub" style="margin-top:8px">IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions and tax.</div>';
       }
       if(plEl){
-        const incomeAccounts=accounts.filter(a=>a.type==='income'),cogsAccounts=accounts.filter(a=>a.type==='cogs');
-        const incomeRows=accountRows(incomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
+        const cogsAccounts=accounts.filter(a=>a.type==='cogs');
+        const incomeRows=accountRows(salesIncomeAccounts,period,'credit'),otherIncomeRows=accountRows(otherIncomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
         const opRows=accountRows(operatingAccounts,period,'debit'),taxRows=accountRows(taxAccounts,period,'debit');
         plEl.innerHTML=prefix(plEl)+'<div class="row statement-section-row"><span>Statement of profit or loss</span><b></b></div>'+periodText+
-          section('Revenue',incomeRows,'Total revenue',periodIncome)+
+          section('Revenue',incomeRows,'Total revenue',salesRevenue)+
           section('Cost of sales',cogsRows,'Total cost of sales',periodCogs)+
-          moneyRow('Gross profit',periodIncome-periodCogs,'statement-total-row')+
+          moneyRow('Gross profit',salesRevenue-periodCogs,'statement-total-row')+
+          section('Other income',otherIncomeRows,'Total other income',otherIncome)+
           section('Operating expenses',opRows,'Total operating expenses',operatingExpenses)+
           moneyRow('Profit before tax',pretax,'statement-total-row')+
           section('Income tax expense',taxRows,'Total income tax expense',taxExpense)+
