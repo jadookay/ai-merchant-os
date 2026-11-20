@@ -232,7 +232,28 @@ test("received purchases persist the updated local stock and record the register
   assert.ok(block.includes("await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}})"));
 });
  
-test("the offline application shell cache is bumped with the V14.4.57 release", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v57"));
-  assert.ok(serviceWorker.includes("const RELEASE='V14.4.57'"));
+test("the offline application shell cache is bumped with the V14.4.70 release", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v70"));
+  assert.ok(serviceWorker.includes("const RELEASE='V14.4.70'"));
+});
+
+ 
+test("large accounting reads paginate beyond the PostgREST row limit", () => {
+  assert.ok(html.includes("async function sheriFetchAllRows"));
+  assert.ok(html.includes(".range(offset,offset+pageSize-1)"));
+  assert.ok(html.includes("sheriFetchAllRows(()=>sb.from('journal_entries')"));
+  assert.ok(html.includes("sheriFetchAllRows(()=>sb.from('journal_lines')"));
+});
+ 
+test("large local snapshots use batched IndexedDB writes", () => {
+  assert.ok(html.includes("async function sheriBulkPut"));
+  assert.ok(html.includes("await Promise.all(jobs)"));
+  assert.ok(html.includes("sheriBulkPut('journalLines'"));
+});
+ 
+test("financial statement verification checks missing source postings and cash reconciliation", () => {
+  assert.ok(html.includes("Source sale has no active revenue journal"));
+  assert.ok(html.includes("Source sale has no active revenue journal"));
+  assert.ok(html.includes("accounting_correction"));
+  assert.ok(html.includes("cashFlow.reconciliationDifference"));
 });
