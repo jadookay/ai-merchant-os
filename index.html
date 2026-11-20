@@ -2354,7 +2354,91 @@ function renderSaleCart(){
 function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script></body></html>');w.document.close();
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script>window.onload=()=>window.print()<\\/script>
+<!-- V14.4.48: language-independent dashboard, remember checkbox and language selector parity -->
+<style id="aibos-cross-language-dashboard-parity-v48">
+/* One dashboard geometry for English, Kinyarwanda and French. Text may wrap, but controls do not resize the layout. */
+#appRoot .main,#appRoot #dashboard{box-sizing:border-box!important;min-width:0!important;max-width:100%!important}
+#appRoot #dashboard{width:100%!important}
+#appRoot #dashboard .top{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;flex-wrap:wrap!important;min-width:0!important}
+#appRoot #dashboard .top h1{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important;line-height:1.2!important}
+#appRoot #dashboard .hero,#appRoot #dashboard .section,#appRoot #dashboard .card,
+#appRoot #dashboard .metrics,#appRoot #dashboard .grid2,#appRoot #dashboard .grid3{
+ box-sizing:border-box!important;min-width:0!important;max-width:100%!important
+}
+#appRoot #dashboard .hero{overflow-wrap:anywhere!important}
+#appRoot #dashboard .section h2{line-height:1.25!important;overflow-wrap:anywhere!important}
+#appRoot #dashboard button,#appRoot #dashboard a,
+#appRoot #dashboard input,#appRoot #dashboard select,#appRoot #dashboard textarea{
+ box-sizing:border-box!important;max-width:100%!important;font-family:inherit!important
+}
+#appRoot #dashboard button{white-space:normal!important;overflow-wrap:anywhere!important;line-height:1.2!important}
+#appRoot #dashboard .metrics{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:10px!important}
+#appRoot #dashboard .metrics>*{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important}
+@media(max-width:760px){
+ #appRoot #dashboard .metrics{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important}
+ #appRoot #dashboard .top{align-items:flex-start!important}
+ #appRoot #dashboard .top>div{min-width:0!important;max-width:100%!important}
+}
+@media(max-width:360px){
+ #appRoot #dashboard .metrics{gap:6px!important}
+}
+/* The login remember option uses the same native checkbox, spacing and label treatment in every language/device. */
+#authScreen .auth-remember-row{
+ box-sizing:border-box!important;display:flex!important;align-items:center!important;
+ justify-content:flex-start!important;gap:9px!important;width:100%!important;
+ min-height:24px!important;margin:4px 0 12px!important;padding:0!important;
+ color:#010080!important;font-family:inherit!important;font-size:13px!important;
+ font-weight:500!important;line-height:1.3!important;text-align:left!important;
+}
+#authScreen .auth-remember-row input{
+ appearance:auto!important;-webkit-appearance:checkbox!important;
+ flex:0 0 17px!important;width:17px!important;min-width:17px!important;
+ height:17px!important;min-height:17px!important;margin:0!important;padding:0!important;
+ accent-color:#010080!important;cursor:pointer!important
+}
+#authScreen .auth-remember-row span{
+ display:block!important;flex:1 1 auto!important;min-width:0!important;
+ margin:0!important;color:#010080!important;font-size:13px!important;
+ line-height:1.3!important;overflow-wrap:anywhere!important
+}
+/* Identical selector surface on login, laptop dashboard and Android dashboard. */
+#aibosLanguageSwitcher,
+#authScreen #aibosLanguageSwitcher,
+#appRoot #aibosLanguageSwitcher{
+ box-sizing:border-box!important;min-width:0!important;
+ border:1px solid #010080!important;border-radius:9px!important;
+ background:#fff!important;color:#010080!important;
+ box-shadow:0 1px 5px rgba(1,0,128,.10)!important;
+ padding:4px 6px!important;gap:0!important
+}
+#aibosLanguageSwitcher select,
+#authScreen #aibosLanguageSwitcher select,
+#appRoot #aibosLanguageSwitcher select{
+ box-sizing:border-box!important;min-width:0!important;max-width:100%!important;
+ padding:6px 8px!important;border:0!important;border-radius:6px!important;
+ background:#fff!important;color:#010080!important;
+ font-family:inherit!important;font-size:12px!important;font-weight:600!important;
+ line-height:1.2!important
+}
+#authScreen .auth-heading-row #aibosLanguageSwitcher{flex:0 0 auto!important;max-width:48%!important}
+@media(min-width:701px){
+ #appRoot .main>#aibosLanguageSwitcher{
+  position:relative!important;inset:auto!important;align-self:flex-end!important;
+  display:flex!important;width:max-content!important;max-width:100%!important;
+  margin:0 0 10px auto!important;z-index:2!important
+ }
+}
+@media(max-width:700px){
+ #appRoot .main>#aibosLanguageSwitcher{
+  position:relative!important;inset:auto!important;display:flex!important;
+  width:max-content!important;max-width:100%!important;margin:0 0 9px auto!important;
+  z-index:2!important
+ }
+}
+</style>
+
+</body></html>');w.document.close();
 }
 async function recordSale(){
   if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
@@ -6180,7 +6264,8 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
     }
   };
   Object.assign(dictionaries.rw,{
-    'welcome back':'Murakaza neza','sign in to access your business workspace.':'Injira kugira ngo ukoreshe ubucuruzi bwawe.',
+    'welcome back':'Murakaza neza',
+      'keep me logged in on this device':'Komeza unciyeho kuri iki gikoresho','sign in to access your business workspace.':'Injira kugira ngo ukoreshe ubucuruzi bwawe.',
     'staff pin':'PIN y’umukozi','create account':'Fungura konti','password':'Ijambo ry’ibanga',
     'forgot password?':'Wibagiwe ijambo ry’ibanga?','forgot email?':'Wibagiwe imeyili?',
     'or continue with':'Cyangwa komeza ukoreshe','business account id':'Nimero ya konti y’ubucuruzi',
@@ -6319,7 +6404,8 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
   Object.assign(dictionaries.rw,{'add more products':'Ongeraho ibindi bicuruzwa','restock':'Kongera ibicuruzwa mu bubiko','expiry attention':'Ibyegereje kurangiza igihe','estimated profit':'Inyungu igereranijwe','estimated loss':'Igihombo kigereranijwe','best revenue product':'Igicuruzwa cyinjije amafaranga menshi','choose another product, then tap add to cart.':'Hitamo ikindi gicuruzwa, hanyuma ukande Shyira mu byo ngiye kugurisha.','sale captured. saving securely…':'Igurisha ryafashwe. Turibika neza…','sale saved. syncing to your account…':'Igurisha ribitswe. Turimo kurihuza na konti yawe…'});
   Object.assign(dictionaries.fr,{'add more products':'Ajouter d’autres produits','restock':'Réapprovisionnement','expiry attention':'Attention aux dates d’expiration','estimated profit':'Bénéfice estimé','estimated loss':'Perte estimée','best revenue product':'Produit générant le plus de chiffre d’affaires','choose another product, then tap add to cart.':'Choisissez un autre produit, puis appuyez sur Ajouter au panier.','sale captured. saving securely…':'Vente enregistrée. Enregistrement sécurisé…','sale saved. syncing to your account…':'Vente enregistrée. Synchronisation avec votre compte…'});
   Object.assign(dictionaries.fr,{
-    'welcome back':'Bon retour','sign in to access your business workspace.':'Connectez-vous pour accéder à votre espace de travail.',
+    'welcome back':'Bon retour',
+      'keep me logged in on this device':'Rester connecté sur cet appareil','sign in to access your business workspace.':'Connectez-vous pour accéder à votre espace de travail.',
     'staff pin':'Code PIN de l’employé','create account':'Créer un compte','password':'Mot de passe',
     'forgot password?':'Mot de passe oublié ?','forgot email?':'E-mail oublié ?',
     'or continue with':'Ou continuer avec','business account id':'Identifiant du compte professionnel',
