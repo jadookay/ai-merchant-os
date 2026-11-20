@@ -2373,7 +2373,6 @@ function printLastReceipt(){
 
 
 
-}
 async function recordSale(){
   if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
   const custId=document.getElementById('saleCustomer').value||null,items=saleCart.length?saleCart:[{productId:document.getElementById('saleProduct').value,qty:Number(document.getElementById('saleQty').value),price:Number(document.getElementById('salePrice').value)}],checked=[];
