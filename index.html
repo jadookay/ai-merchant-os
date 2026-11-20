@@ -1068,7 +1068,7 @@ async function sheriSaveAccountingSnapshot(){
   if(!state.merchant)return;
   const mid=state.merchant.id;
   const groups=[['accounts',state.accounts],['journalEntries',state.journalEntries],['journalLines',state.journalLines],['invoices',state.invoices],['bills',state.bills],['payments',state.payments],['bankAccounts',state.bankAccounts],['taxRates',state.taxRates],['recurringTransactions',state.recurringTransactions],['auditLog',state.auditLog]];
-  const jobs=groups.map(([store,rows])=>sheriBulkPut(store,(rows||[]).map(row=>({key:row.id||row.key,merchant_id:mid,record:{...row}})));
+  const jobs=groups.map(([store,rows])=>sheriBulkPut(store,(rows||[]).map(row=>({key:row.id||row.key,merchant_id:mid,record:{...row}}))));
   if(state.accountingSettings)jobs.push(sheriBulkPut('accountingSettings',[{key:'settings',merchant_id:mid,record:{...state.accountingSettings}}]));
   await Promise.all(jobs);
 }
