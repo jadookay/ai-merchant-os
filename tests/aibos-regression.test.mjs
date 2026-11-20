@@ -259,3 +259,17 @@ test("financial statement verification checks missing source postings and cash r
   assert.ok(html.includes("history_incomplete_count"));
   assert.ok(html.includes("opening_history_complete"));
 });
+
+
+test("offline accounting restores its local snapshot before initializing the ledger", () => {
+  assert.match(html, /if\(!navigator\.onLine\)\{await sheriLoadAccountingSnapshot\(mId\);await accEnsureBase\(\);/);
+  assert.ok(html.includes("async function sheriLoadAccountingSnapshot(merchantId)"));
+});
+
+test("tax-rate setup avoids duplicate default rates and deduplicates equivalent choices", () => {
+  assert.ok(!html.includes("name:'No tax',rate:0,type:'output',active:true"));
+  assert.ok(html.includes("function accUniqueTaxRates(rows=state.taxRates||[])"));
+  assert.ok(html.includes("accUniqueTaxRates().filter(x=>x.active&&x.type===kind)"));
+  assert.ok(html.includes("accUniqueTaxRates().map(x=>"));
+  assert.ok(html.includes("An active tax rate with this name, rate and type already exists."));
+});
