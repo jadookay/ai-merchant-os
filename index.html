@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.57 locale-invariant tables and dependency-safe transaction sync">
+<meta name="app-version" content="V14.4.58 precise decimal financial reporting and dependency-safe transaction sync">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -869,7 +869,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 function merchantCurrency(){return state?.merchant?.currency||'RWF'}
 function merchantCountry(){return state?.merchant?.country||'RW'}
 function merchantLocale(){try{return new Intl.Locale('en-'+merchantCountry().toUpperCase()).toString()}catch(_){return 'en-RW'}}
-function money(n){try{return new Intl.NumberFormat(merchantLocale(),{style:'currency',currency:merchantCurrency(),maximumFractionDigits:0}).format(Number(n)||0)}catch(_){return merchantCurrency()+' '+Math.round(n||0).toLocaleString()}}
+function money(n){try{return new Intl.NumberFormat(merchantLocale(),{style:'currency',currency:merchantCurrency(),maximumFractionDigits:6}).format(Number(n)||0)}catch(_){return merchantCurrency()+' '+Number(n||0).toLocaleString(merchantLocale(),{maximumFractionDigits:6})}}
 
 let session=null;
 let state={merchant:null,products:[],sales:[],expenses:[],memory:[],customers:[],suppliers:[],purchases:[],cashEntries:[],budgets:[],accounts:[],journalEntries:[],journalLines:[],invoices:[],bills:[],payments:[],bankAccounts:[],taxRates:[],recurringTransactions:[],accountingSettings:null,auditLog:[],teamMembers:[],currentMembership:null};
@@ -3216,7 +3216,7 @@ function renderCustomers(){
 function renderForecast(){
   const rev=revenueTrend(),prof=dailyProfitTrend();
   const arrow=d=>d==='up'||d==='improving'?'📈':d==='down'||d==='worsening'?'📉':'➖';
-  const pctText=rev.changePct==null?'':` (${rev.changePct>0?'+':''}${rev.changePct.toFixed(0)}%)`;
+  const pctText=rev.changePct==null?'':` (${rev.changePct>0?'+':''}${rev.changePct.toFixed(2)}%)`;
   document.getElementById('forecastTrends').innerHTML=`
     <div>${arrow(rev.direction)} <b>Revenue:</b> ${money(rev.recentRevenue)} this week vs ${money(rev.priorRevenue)} last week${pctText} — trending <b>${rev.direction}</b></div>
     <div style="margin-top:8px">${arrow(prof.direction)} <b>Profit:</b> ${money(prof.recentProfit)} this week vs ${money(prof.priorProfit)} last week — <b>${prof.direction}</b></div>
@@ -3269,7 +3269,7 @@ function renderTeamAuditTrail(){
    });
   };
   visit(details||{});
-  return [...new Set(found)].map(v=>new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(v)).join(' · ')||'—';
+  return [...new Set(found)].map(v=>new Intl.NumberFormat(undefined,{maximumFractionDigits:6}).format(v)).join(' · ')||'—';
  };
  const rows=(state.auditLog||[]).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||''))).slice(0,30);
  host.innerHTML='<h3>Recent audit trail</h3>'+ (rows.length?'<table class="table" style="min-width:820px"><tr><th>Time</th><th>User</th><th>Action</th><th>Record</th><th>Reason</th><th>Amount</th></tr>'+rows.map(x=>'<tr><td>'+esc(x.created_at?new Date(x.created_at).toLocaleString():'—')+'</td><td>'+esc(x.details?.actor_name||x.actor_user_id||'Owner')+'</td><td>'+esc(x.action)+'</td><td>'+esc(x.entity_type)+' · '+esc(x.entity_id||'—')+'</td><td>'+esc(x.reason||x.details?.reason||'—')+'</td><td>'+esc(numericAmounts(x.details))+'</td></tr>').join('')+'</table>':'<div class="empty">No audited changes have been recorded yet.</div>');
@@ -4874,7 +4874,7 @@ function sheriFastLane(q){
   }
   if(/trending|is my business (growing|doing well)|revenue trend|going up|going down/.test(text)){
     const trend=revenueTrend(); if(trend.priorRevenue===0&&trend.recentRevenue===0)return "Not enough sales yet to spot a trend, darling — record a few more and ask me again.";
-    const pct=trend.changePct==null?'':`, about ${Math.abs(trend.changePct).toFixed(0)}% ${trend.direction==='up'?'up':'down'}`; return `Revenue is trending ${trend.direction}${pct} compared to last week.`;
+    const pct=trend.changePct==null?'':`, about ${Math.abs(trend.changePct).toFixed(2)}% ${trend.direction==='up'?'up':'down'}`; return `Revenue is trending ${trend.direction}${pct} compared to last week.`;
   }
   return null;
 }
