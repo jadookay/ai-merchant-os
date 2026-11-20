@@ -1444,7 +1444,7 @@ async function sheriSyncOutbox(){
     let successCount=0,failedCount=0,firstFailure=null;
     for(const item of items){
       const op=item.op||{};
-      const pendingDependencies=(await sheriGetAll('outbox')).filter(x=>x.key!==item.key&&!x.blocked).map(x=>x.op||{});
+      const pendingDependencies=(await sheriGetAll('outbox')).filter(x=>x.key!==item.key).map(x=>x.op||{});
       const hasPendingProduct=id=>pendingDependencies.some(x=>x.type==='product_upsert'&&x.record?.id===id);
       const hasPendingSupplier=id=>id&&pendingDependencies.some(x=>x.type==='supplier_upsert'&&x.record?.id===id);
       const hasPendingCustomer=id=>id&&pendingDependencies.some(x=>x.type==='customer_upsert'&&x.record?.id===id);
