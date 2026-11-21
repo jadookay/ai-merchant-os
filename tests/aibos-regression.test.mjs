@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const quickService = readFileSync(new URL("../supabase/functions/quick-service/index.ts", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
@@ -233,8 +234,8 @@ test("received purchases persist the updated local stock and record the register
 });
  
 test("the offline application shell cache is bumped with the V14.4.70 release", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v70"));
-  assert.ok(serviceWorker.includes("const RELEASE='V14.4.70'"));
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v71"));
+  assert.ok(serviceWorker.includes("const RELEASE='V14.4.71'"));
 });
 
  
@@ -258,4 +259,104 @@ test("financial statement verification checks missing source postings and cash r
   assert.ok(html.includes("cashFlow.reconciliationDifference"));
   assert.ok(html.includes("history_incomplete_count"));
   assert.ok(html.includes("opening_history_complete"));
+});
+
+
+test("offline accounting restores its local snapshot before initializing the ledger", () => {
+  assert.match(html, /if\(!navigator\.onLine\)\{await sheriLoadAccountingSnapshot\(mId\);await accEnsureBase\(\);/);
+  assert.ok(html.includes("async function sheriLoadAccountingSnapshot(merchantId)"));
+});
+
+test("tax-rate setup avoids duplicate default rates and deduplicates equivalent choices", () => {
+  assert.ok(!html.includes("name:'No tax',rate:0,type:'output',active:true"));
+  assert.ok(html.includes("function accUniqueTaxRates(rows=state.taxRates||[])"));
+  assert.ok(html.includes("accUniqueTaxRates().filter(x=>x.active&&x.type===kind)"));
+  assert.ok(html.includes("accUniqueTaxRates().map(x=>"));
+  assert.ok(html.includes("An active tax rate with this name, rate and type already exists."));
+});
+
+test("ledger integrity verifies invoice, bill, payment and cash source journals", () => {
+  assert.ok(html.includes("Invoice source has no active invoice journal"));
+  assert.ok(html.includes("Bill source has no active bill journal"));
+  assert.ok(html.includes("Payment source has no active payment journal"));
+  assert.ok(html.includes("Cash movement source has no active cash journal"));
+  assert.ok(html.includes("Duplicate active journal postings exist for the same source"));
+  assert.ok(html.includes("Invoice journal does not match its subtotal, discount, tax or accounts"));
+  assert.ok(html.includes("Payment journal does not match its direction, amount or cash/bank account"));
+});
+
+test("expense and cash deletions post exact reversals before deleting source rows", () => {
+  assert.ok(html.includes("sourceType:'expense_delete',sourceId:expense.id"));
+  assert.ok(html.includes("sourceType:'cash_entry_delete',sourceId:cash.id"));
+  assert.ok(html.includes("const hasPendingReversal=(sourceType,sourceId)=>pendingDependencies.some"));
+  assert.ok(html.includes("hasPendingReversal('expense_delete',op.id)"));
+  assert.ok(html.includes("hasPendingReversal('cash_entry_delete',op.id)"));
+  assert.ok(html.includes("The expense was not deleted"));
+  assert.ok(html.includes("The cash record was not deleted"));
+  assert.ok(html.includes("Deleted expense has no exact accounting reversal"));
+  assert.ok(html.includes("Deleted cash movement has no exact accounting reversal"));
+});
+
+test("other income payments are recorded as receipts, not payments", () => {
+  assert.ok(html.includes("direction:type==='customer_receipt'||type==='other_income'?'receipt':'payment'"));
+});
+
+test("cash transfer memo deletions are excluded from ledger reversal requirements", () => {
+  assert.ok(html.includes("a.details?.kind!=='transfer'"));
+  assert.ok(html.includes("if(cash.kind!=='transfer'&&originals.length!==1)"));
+});
+
+
+test("AI Business Insight requests a complete multi-area report in the selected language", () => {
+  const insight = html.slice(html.indexOf("function buildOSBusinessInsightContext()"), html.indexOf("// ── V14.1 Accounting engine"));
+  assert.ok(insight.includes("mode:'business_insight'"));
+  for (const area of ["sales", "customers", "inventory", "suppliers", "expenses", "cashFlow", "profitability", "limitations"])
+    assert.ok(insight.includes(area), `Business review context missing: ${area}`);
+  assert.ok(insight.includes("osLocalBusinessReview(context,language)"));
+  assert.ok(insight.includes("language=window.AIBOS_I18N?.getLanguage?.()||'en'"));
+  assert.ok(insight.includes("lang==='rw'?["));
+  assert.ok(insight.includes(":lang==='fr'?["));
+});
+
+test("business insight endpoint uses a dedicated long-form report mode and detects truncation", () => {
+  assert.ok(quickService.includes('if (mode === "business_insight")'));
+  for (const area of ["sales and sales trends", "customers and repeat business", "inventory levels", "suppliers and purchasing", "expenses and cost control", "cash flow and liquidity", "profitability and margins", "risks", "opportunities"])
+    assert.ok(quickService.toLowerCase().includes(area), `Server report prompt missing: ${area}`);
+  assert.ok(quickService.includes("max_tokens: 2800"));
+  assert.ok(quickService.includes('finish_reason === "length"'));
+  assert.ok(quickService.includes("max_tokens: 3600"));
+  assert.ok(quickService.includes("complete: choice?.finish_reason !== \"length\""));
+});
+
+test("Shericeri navigation opens her dedicated page without automatically starting the microphone", () => {
+  assert.ok(html.includes("function launchShericeri(){show('shericeri')}"));
+  assert.ok(html.includes("if(v==='shericeri'){sheriRestoreTranscript();sheriObserveTranscript()}"));
+});
+
+test("Shericeri full transcript persists locally per signed-in user and merchant", () => {
+  assert.ok(html.includes("function sheriTranscriptStorageKey()"));
+  assert.ok(html.includes("aibos:shericeri:transcript:"));
+  assert.ok(html.includes("function sheriPersistTranscript()"));
+  assert.ok(html.includes("function sheriRestoreTranscript()"));
+  assert.ok(html.includes("localStorage.setItem(key,JSON.stringify(rows))"));
+  assert.ok(html.includes("if(Array.isArray(rows))rows.forEach(row=>"));
+});
+
+test("Shericeri voice diagnostics are available to signed-in users on her dedicated page", () => {
+  assert.ok(html.includes("function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id;}"));
+  assert.ok(html.includes('id="sheriDiagnostic"'));
+  for (const control of ["sheriDiagSpeaker()", "sheriDiagRecord()", "sheriDiagWhisper()", "sheriDiagAudioProbe()"])
+    assert.ok(html.includes(control));
+});
+
+
+test("new business insight and transcript helpers are syntactically valid JavaScript", () => {
+  const insightStart=html.indexOf("function buildOSBusinessInsightContext()");
+  const insightEnd=html.indexOf("// ── V14.1 Accounting engine",insightStart);
+  assert.ok(insightStart>=0&&insightEnd>insightStart);
+  assert.doesNotThrow(()=>new Function(html.slice(insightStart,insightEnd)));
+  const transcriptStart=html.indexOf("// Full Shericeri transcript");
+  const transcriptEnd=html.indexOf("// ── Speaking queue",transcriptStart);
+  assert.ok(transcriptStart>=0&&transcriptEnd>transcriptStart);
+  assert.doesNotThrow(()=>new Function(html.slice(transcriptStart,transcriptEnd)));
 });
