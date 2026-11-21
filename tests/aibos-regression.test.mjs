@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { Script } from "node:vm";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
@@ -245,6 +246,13 @@ test("the preview application shell is bumped to V14.4.74 without changing produ
   assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v74"));
   assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.74'"));
   assert.ok(previewHtml.includes("V14.4.74"));
+});
+
+test("preview inline JavaScript blocks parse without syntax errors", () => {
+  const blocks=[...previewHtml.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)]
+    .filter(([,attrs])=>!/\\bsrc\\s*=|application\\/(?:json|ld\\+json)/i.test(attrs));
+  assert.ok(blocks.length>0);
+  blocks.forEach(([,attrs,source],index)=>new Script(source,{filename:`preview-inline-${index+1}-${attrs||'main'}.js`}));
 });
 
 test("expense payment workflow accrues expenses and settles the payable without duplicating expense", () => {
