@@ -6,6 +6,7 @@ import { execFileSync } from "node:child_process";
 import vm from "node:vm";
 
 const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+const serviceWorker = await readFile(new URL("../shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
 const quickService = await readFile(new URL("../supabase/functions/quick-service/index.ts", import.meta.url), "utf8");
 const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_storage_memory.sql", import.meta.url), "utf8");
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
@@ -311,8 +312,9 @@ test("sales and expenses confirm before saving and post balanced journal entries
   const saleAccountingEnd = html.indexOf("const _v14_1_addOSPurchase", saleAccountingStart);
   assert.ok(saleAccountingStart >= 0 && saleAccountingEnd > saleAccountingStart, "expected the sale accounting wrapper");
   const saleAccounting = html.slice(saleAccountingStart, saleAccountingEnd);
-  assert.match(saleAccounting, /POS sale revenue and COGS are posted atomically by the database sales trigger/);
   assert.ok(saleAccounting.includes("await accAudit('create','sale',s.id"));
+  assert.doesNotMatch(saleAccounting, /accPostEntry\([\s\S]*?sourceType:'sale(?:_cogs)?'/,
+    "the client must not duplicate the authoritative database-triggered POS revenue and COGS journals");
   assert.doesNotMatch(saleAccounting, /accPostEntry\([\s\S]*?sourceType:'sale(?:_cogs)?'/,
     "the client must not duplicate database-triggered POS revenue or COGS journals");
 
