@@ -4910,7 +4910,7 @@ function sheriFastLane(q){
 // turn is also tracked separately so a late/old response can never overwrite
 // or masquerade as a newer user turn.
 let shericeriHistory=[]; // Recent AI context; full transcript is retained locally on this device.
-const SHERI_HISTORY_MAX=20; // last 10 exchanges
+const SHERI_HISTORY_MAX=8; // Preserve the established four-exchange AI context window
 let sheriHistoryTurnId=0;
 
 function sheriPushHistory(role,content,turnId=null){
@@ -8623,7 +8623,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   const nav=document.querySelector('#appRoot .side .nav');if(!nav)return;
   const labels={en:['Home','Sell','Stock','Setting','AIBOS Command Center','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Igenamiterere','Igenzura ry’ubucuruzi','Shericeri'],fr:['Accueil','Vendre','Stock','Paramètres','Centre de commande AIBOS','Shericeri']};
   let sheri=nav.querySelector('[data-nav-shericeri="1"]');
-  if(!sheri){sheri=document.createElement('button');sheri.type='button';sheri.dataset.navShericeri='1';sheri.className='sheri-nav-item';sheri.addEventListener('click',()=>{if(typeof window.launchShericeri==='function')window.launchShericeri()});nav.appendChild(sheri)}
+  if(!sheri){sheri=document.createElement('button');sheri.type='button';sheri.dataset.navShericeri='1';sheri.className='sheri-nav-item';sheri.addEventListener('click',()=>{if(typeof window.launchShericeri==='function')window.launchShericeri()});nav.appendChild(sheri)}sheri.dataset.view='shericeri';
   const portrait=document.querySelector('#dashboard .sheri-launcher .sheri-thumb img');
   function paint(language){
     const names=labels[language]||labels.en;
