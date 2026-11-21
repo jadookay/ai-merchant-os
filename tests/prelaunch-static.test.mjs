@@ -82,8 +82,13 @@ test("cancelled sale void leaves records and accounting untouched", () => {
   assert.doesNotMatch(html, /const _v14_1_voidSale=voidSale/);
 });
 
-test("locally deleted expenses are removed but voided sales remain preserved in IndexedDB", () => {
-  assert.match(html, /state\.expenses=state\.expenses\.filter\(x=>x\.id!==id\);await sheriDelete\('expenses',id\)/);
+test("voided expenses and sales remain preserved for audit in IndexedDB", () => {
+  const deleteStart=html.lastIndexOf("deleteExpense=async function(id){");
+  const deleteEnd=html.indexOf("deleteOSCash=async function(id){",deleteStart);
+  const expenseDelete=html.slice(deleteStart,deleteEnd);
+  assert.ok(expenseDelete.includes("expense.deleted=true"));
+  assert.ok(expenseDelete.includes("await sheriPut('expenses',id"));
+  assert.doesNotMatch(expenseDelete, /sheriDelete\('expenses'/);
   const voidStart=html.indexOf("async function voidSale(id){");
   const voidEnd=html.indexOf("const sheriSearchValues",voidStart);
   const voidCode=html.slice(voidStart,voidEnd);
