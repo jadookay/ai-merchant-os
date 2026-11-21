@@ -4,6 +4,10 @@ import { readFileSync } from "node:fs";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
+const previewHtml = readFileSync(new URL("../preview-live/index.html", import.meta.url), "utf8");
+const previewServiceWorker = readFileSync(new URL("../preview-live/shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
+const expenseAccrualMigration = readFileSync(new URL("../supabase/migrations/20261121230000_expense_payment_accrual_workflow.sql", import.meta.url), "utf8");
+const expenseStatusMigration = readFileSync(new URL("../supabase/migrations/20261121233000_expense_payment_status.sql", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
@@ -232,9 +236,28 @@ test("received purchases persist the updated local stock and record the register
   assert.ok(block.includes("await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}})"));
 });
  
-test("the offline application shell cache is bumped with the V14.4.70 release", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v70"));
-  assert.ok(serviceWorker.includes("const RELEASE='V14.4.70'"));
+test("the production application shell remains isolated at V14.4.71", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v71"));
+  assert.ok(serviceWorker.includes("const RELEASE='V14.4.71'"));
+});
+
+test("the preview application shell is bumped to V14.4.74 without changing production", () => {
+  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v74"));
+  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.74'"));
+  assert.ok(previewHtml.includes("V14.4.74"));
+});
+
+test("expense payment workflow accrues expenses and settles the payable without duplicating expense", () => {
+  assert.ok(previewHtml.includes("payment_status:'unpaid'"));
+  assert.ok(previewHtml.includes("async function accRecordExpensePayment"));
+  assert.ok(previewHtml.includes("source_type:'expense',source_id:expense.id"));
+  assert.ok(previewHtml.includes("{accountId:payable.id,debit:amount}"));
+  assert.ok(previewHtml.includes("expense.payment_status=paidAfter+0.005>=Number(expense.amount||0)?'paid':'partial'"));
+  assert.ok(previewHtml.includes("const credit=String(e.payment_status||'paid')==='paid'&&!hasLinkedPayments?cash:payable"));
+  assert.ok(!previewHtml.includes("_v14_1_addExpense"));
+  assert.ok(expenseAccrualMigration.includes("'2050','Accrued expenses payable','liability','credit','current',true"));
+  assert.ok(expenseStatusMigration.includes("payment_status text not null default 'paid'"));
+  assert.ok(expenseStatusMigration.includes("check (payment_status in ('paid','unpaid','partial'))"));
 });
 
  
