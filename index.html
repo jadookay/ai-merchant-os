@@ -4949,17 +4949,19 @@ function sheriPersistTranscript(){
 }
 function sheriRestoreTranscript(){
   const key=sheriTranscriptStorageKey(),box=document.getElementById('shericeriMessages');
-  if(!key||!box)return;
+  if(!box)return;
+  // Clear the previous account's visible transcript before restoring this account's copy.
+  box.replaceChildren();
+  if(!key)return;
   try{
     const rows=JSON.parse(localStorage.getItem(key)||'[]');
-    if(!Array.isArray(rows)||!rows.length)return;
-    box.replaceChildren();
-    rows.slice(-2000).forEach(row=>{
+    if(Array.isArray(rows))rows.slice(-2000).forEach(row=>{
       if(!row||!['user','assistant'].includes(row.role)||typeof row.content!=='string'||!row.content.trim())return;
       const el=document.createElement('div');el.className='msg '+(row.role==='user'?'me':'ai');el.textContent=row.content;box.appendChild(el);
     });
+    if(!box.children.length){const welcome=document.createElement('div');welcome.className='msg ai';welcome.textContent=sheriTapGreeting();box.appendChild(welcome);}
     box.scrollTop=box.scrollHeight;
-  }catch(err){console.warn('[Shericeri transcript] Could not restore local transcript:',err)}
+  }catch(err){console.warn('[Shericeri transcript] Could not restore local transcript:',err);const welcome=document.createElement('div');welcome.className='msg ai';welcome.textContent=sheriTapGreeting();box.appendChild(welcome);}
 }
 function sheriObserveTranscript(){
   const box=document.getElementById('shericeriMessages');if(!box||sheriTranscriptObserver)return;
@@ -5821,7 +5823,7 @@ function osRenderInsight(title,answer){
 }
 function osLocalBusinessReview(c,lang){
   const fmt=n=>n==null?(lang==='rw'?'ntiboneka':lang==='fr'?'indisponible':'not available'):money(Number(n||0)),s=c.sales||{},u=c.customers||{},i=c.inventory||{},v=c.suppliers||{},e=c.expenses||{},f=c.cashFlow||{},p=c.profitability||{};
-  const low=(i.lowStockItems||[]).map(x=>x.name+' ('+x.quantity+')').join(', ')||'none identified',top=(s.topProducts||[]).slice(0,3).map(x=>x.name).join(', ')||'not enough product-level sales data',best=(v.suppliers||[]).slice().sort((x,y)=>(y.spend||0)-(x.spend||0))[0],supplier=best?best.name+' ('+fmt(best.spend)+')':'no supplier spend attributed';
+  const unavailable=lang==='rw'?'ntiboneka':lang==='fr'?'indisponible':'not available',low=c.inventory?((i.lowStockItems||[]).map(x=>x.name+' ('+x.quantity+')').join(', ')||'none identified'):unavailable,top=c.sales?((s.topProducts||[]).slice(0,3).map(x=>x.name).join(', ')||'not enough product-level sales data'):unavailable,best=(v.suppliers||[]).slice().sort((x,y)=>(y.spend||0)-(x.spend||0))[0],supplier=!c.suppliers?unavailable:best?best.name+' ('+fmt(best.spend)+')':'no supplier spend attributed';
   const pct=s.revenuePrevious30Days?((s.revenueLast30Days-s.revenuePrevious30Days)/s.revenuePrevious30Days*100):null,trend=pct==null?'not enough comparable history':(pct>=0?'up ':'down ')+Math.abs(pct).toFixed(1)+'%';
   const data=lang==='rw'?[
     'Iri suzuma ry’ubucuruzi bwa '+c.merchant.name+' rishingiye ku makuru yanditswe kugeza ku wa '+new Date(c.asOf).toLocaleDateString('rw-RW')+'. Ni incamake y’ibiri mu bubiko bw’amakuru; aho amakuru atuzuye cyangwa uburenganzira bwo kuyabona butariho, turabigaragaza aho gukeka.',
