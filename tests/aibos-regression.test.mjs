@@ -311,7 +311,8 @@ test("AI Business Insight requests a complete multi-area report in the selected 
     assert.ok(insight.includes(area), `Business review context missing: ${area}`);
   assert.ok(insight.includes("osLocalBusinessReview(context,language)"));
   assert.ok(insight.includes("language=window.AIBOS_I18N?.getLanguage?.()||'en'"));
-  for (const lang of ["fr", "rw"]) assert.ok(insight.includes(`if(lang==='${lang}')return [`));
+  assert.ok(insight.includes("lang==='rw'?["));
+  assert.ok(insight.includes(":lang==='fr'?["));
 });
 
 test("business insight endpoint uses a dedicated long-form report mode and detects truncation", () => {
