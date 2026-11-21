@@ -296,3 +296,8 @@ test("expense and cash deletions post exact reversals before deleting source row
 test("other income payments are recorded as receipts, not payments", () => {
   assert.ok(html.includes("direction:type==='customer_receipt'||type==='other_income'?'receipt':'payment'"));
 });
+
+test("cash transfer memo deletions are excluded from ledger reversal requirements", () => {
+  assert.ok(html.includes("a.details?.kind!=='transfer'"));
+  assert.ok(html.includes("Keep cash transfers as non-ledger memo entries")===false || html.includes("cash_entry_delete"));
+});
