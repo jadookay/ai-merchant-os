@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
+const quickService = readFileSync(new URL("../supabase/functions/quick-service/index.ts", import.meta.url), "utf8");
 const serviceWorker = readFileSync(new URL("../shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
@@ -300,4 +301,46 @@ test("other income payments are recorded as receipts, not payments", () => {
 test("cash transfer memo deletions are excluded from ledger reversal requirements", () => {
   assert.ok(html.includes("a.details?.kind!=='transfer'"));
   assert.ok(html.includes("if(cash.kind!=='transfer'&&originals.length!==1)"));
+});
+
+
+test("AI Business Insight requests a complete multi-area report in the selected language", () => {
+  const insight = html.slice(html.indexOf("function buildOSBusinessInsightContext()"), html.indexOf("// ── V14.1 Accounting engine"));
+  assert.ok(insight.includes("mode:'business_insight'"));
+  for (const area of ["sales", "customers", "inventory", "suppliers", "expenses", "cashFlow", "profitability", "dataLimitations"])
+    assert.ok(insight.includes(area), `Business review context missing: ${area}`);
+  assert.ok(insight.includes("osLocalBusinessReview(context,language)"));
+  assert.ok(insight.includes("language=window.AIBOS_I18N?.getLanguage?.()||'en'"));
+  for (const lang of ["fr", "rw"]) assert.ok(insight.includes(`if(lang==='${lang}')return [`));
+});
+
+test("business insight endpoint uses a dedicated long-form report mode and detects truncation", () => {
+  assert.ok(quickService.includes('if (mode === "business_insight")'));
+  for (const area of ["sales and sales trends", "customers and repeat business", "inventory levels", "suppliers and purchasing", "expenses and cost control", "cash flow and liquidity", "profitability and margins", "risks", "opportunities"])
+    assert.ok(quickService.toLowerCase().includes(area), `Server report prompt missing: ${area}`);
+  assert.ok(quickService.includes("max_tokens: 2800"));
+  assert.ok(quickService.includes('finish_reason === "length"'));
+  assert.ok(quickService.includes("max_tokens: 3600"));
+  assert.ok(quickService.includes("complete: choice?.finish_reason !== \"length\""));
+});
+
+test("Shericeri navigation opens her dedicated page without automatically starting the microphone", () => {
+  assert.ok(html.includes("function launchShericeri(){show('shericeri')}"));
+  assert.ok(html.includes("if(v==='shericeri'){sheriRestoreTranscript();sheriObserveTranscript()}"));
+});
+
+test("Shericeri full transcript persists locally per signed-in user and merchant", () => {
+  assert.ok(html.includes("function sheriTranscriptStorageKey()"));
+  assert.ok(html.includes("aibos:shericeri:transcript:"));
+  assert.ok(html.includes("function sheriPersistTranscript()"));
+  assert.ok(html.includes("function sheriRestoreTranscript()"));
+  assert.ok(html.includes("rows.slice(-2000)"));
+  assert.ok(html.includes("localStorage.setItem(key,JSON.stringify(rows.slice(-2000)))"));
+});
+
+test("Shericeri voice diagnostics are available to signed-in users on her dedicated page", () => {
+  assert.ok(html.includes("function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id;}"));
+  assert.ok(html.includes('id="sheriDiagnostic"'));
+  for (const control of ["sheriDiagSpeaker()", "sheriDiagRecord()", "sheriDiagWhisper()", "sheriDiagAudioProbe()"])
+    assert.ok(html.includes(control));
 });
