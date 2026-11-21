@@ -2438,7 +2438,7 @@ function dailyProfitTrend(windowDays=7){
 let sheriViewHistory=[];let sheriCurrentView='dashboard';
 function sheriEnsureViewBack(v){if(v==='dashboard')return;const view=document.getElementById(v),top=view?.querySelector('.top');if(!top||top.querySelector('.view-back'))return;const back=document.createElement('button');back.type='button';back.className='btn small secondary view-back';back.textContent='← Back';back.setAttribute('aria-label','Go back to previous page');back.onclick=sheriGoBack;top.insertBefore(back,top.firstChild);}
 function sheriGoBack(){const previous=sheriViewHistory.pop()||'dashboard';show(previous,true);}
-function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');const commandViews=['customers','suppliersPurchases','expenses','reports','money','advisor','forecast','adjustments','businessInsight'];document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v||(b.dataset.view==='businessOS'&&commandViews.includes(v))));if(v!=='businessOS'){const sn=document.getElementById('aibosCommandSubnav'),cb=document.querySelector('[data-nav-command-center=\"1\"]');sn?.classList.remove('open');cb?.setAttribute('aria-expanded','false')}sheriCurrentView=v;sheriEnsureViewBack(v);render()}
+function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');const commandViews=['customers','suppliersPurchases','expenses','reports','money','advisor','forecast','adjustments','businessInsight'];document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v||(b.dataset.view==='businessOS'&&commandViews.includes(v))));if(v!=='businessOS'){const sn=document.getElementById('aibosCommandSubnav'),cb=document.querySelector('[data-nav-command-center=\"1\"]');sn?.classList.remove('open');cb?.setAttribute('aria-expanded','false')}sheriCurrentView=v;sheriEnsureViewBack(v);render();if(v==='shericeri'){sheriRestoreTranscript();sheriObserveTranscript()}}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
 
 function sheriRecentActivitiesHtml(){
@@ -3763,7 +3763,7 @@ let sheriDiagStartedAt=0;
 let sheriDiagMeterTimer=null;
 let sheriDiagAnalyser=null;
 
-function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id&&SHERI_DEVELOPER_USER_IDS.has(session.user.id);}
+function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id;}
 function sheriUpdateVoiceDiagnosticsAccess(){const b=document.getElementById('sheriVoiceDiagnosticButton');if(b)b.style.display=sheriCanUseVoiceDiagnostics()?'inline-flex':'none';if(!sheriCanUseVoiceDiagnostics()){const p=document.getElementById('sheriDiagnostic');if(p)p.style.display='none';}}
 function toggleShericeriDiagnostic(){
   if(!sheriCanUseVoiceDiagnostics())return;
@@ -4236,7 +4236,7 @@ function hideSheriHero(){
   hero.classList.remove('show-img','listening');
   setTimeout(()=>hero.classList.remove('active'),350);
 }
-function launchShericeri(){toggleShericeri()}
+function launchShericeri(){show('shericeri')}
 function stopShericeriHero(){stopShericeri()}
 function heroShericeriTalk(){
   // The full-screen hero intentionally sits above the page mic button.
@@ -4909,8 +4909,8 @@ function sheriFastLane(q){
 // History is kept as plain role/content pairs for the backend, but every client
 // turn is also tracked separately so a late/old response can never overwrite
 // or masquerade as a newer user turn.
-let shericeriHistory=[]; // [{role:'user'|'assistant',content}], capped, cleared each time the conversation ends
-const SHERI_HISTORY_MAX=8; // last 4 exchanges
+let shericeriHistory=[]; // Recent AI context; full transcript is retained locally on this device.
+const SHERI_HISTORY_MAX=20; // last 10 exchanges
 let sheriHistoryTurnId=0;
 
 function sheriPushHistory(role,content,turnId=null){
@@ -4930,6 +4930,46 @@ function sheriCommitAssistantHistory(turnId,answer){
 }
 function sheriHistorySnapshot(){
   return shericeriHistory.map(m=>({role:m.role,content:m.content}));
+}
+
+// Full Shericeri transcript, separated by signed-in user and merchant.
+// Only text is retained; microphone recordings are never saved.
+let sheriTranscriptObserver=null,sheriTranscriptSaveTimer=null;
+function sheriTranscriptStorageKey(){
+  const merchantId=state?.merchant?.id,userId=session?.user?.id;
+  return merchantId&&userId?`aibos:shericeri:transcript:${merchantId}:${userId}`:null;
+}
+function sheriPersistTranscript(){
+  const key=sheriTranscriptStorageKey(),box=document.getElementById('shericeriMessages');
+  if(!key||!box)return;
+  try{
+    const rows=[...box.children].filter(el=>el.classList.contains('msg')).map(el=>({role:el.classList.contains('me')?'user':'assistant',content:String(el.textContent||'').trim()})).filter(x=>x.content);
+    localStorage.setItem(key,JSON.stringify(rows.slice(-2000)));
+  }catch(err){console.warn('[Shericeri transcript] Local save unavailable:',err)}
+}
+function sheriRestoreTranscript(){
+  const key=sheriTranscriptStorageKey(),box=document.getElementById('shericeriMessages');
+  if(!key||!box)return;
+  try{
+    const rows=JSON.parse(localStorage.getItem(key)||'[]');
+    if(!Array.isArray(rows)||!rows.length)return;
+    box.replaceChildren();
+    rows.slice(-2000).forEach(row=>{
+      if(!row||!['user','assistant'].includes(row.role)||typeof row.content!=='string'||!row.content.trim())return;
+      const el=document.createElement('div');el.className='msg '+(row.role==='user'?'me':'ai');el.textContent=row.content;box.appendChild(el);
+    });
+    box.scrollTop=box.scrollHeight;
+  }catch(err){console.warn('[Shericeri transcript] Could not restore local transcript:',err)}
+}
+function sheriObserveTranscript(){
+  const box=document.getElementById('shericeriMessages');if(!box||sheriTranscriptObserver)return;
+  sheriTranscriptObserver=new MutationObserver(()=>{
+    if(sheriTranscriptSaveTimer)clearTimeout(sheriTranscriptSaveTimer);
+    sheriTranscriptSaveTimer=setTimeout(sheriPersistTranscript,350);
+  });
+  sheriTranscriptObserver.observe(box,{childList:true,subtree:true,characterData:true});
+  window.addEventListener('pagehide',sheriPersistTranscript);
+  sheriPersistTranscript();
 }
 
 // ── Speaking queue: lets her start talking on the first finished sentence
