@@ -307,7 +307,7 @@ test("cash transfer memo deletions are excluded from ledger reversal requirement
 test("AI Business Insight requests a complete multi-area report in the selected language", () => {
   const insight = html.slice(html.indexOf("function buildOSBusinessInsightContext()"), html.indexOf("// ── V14.1 Accounting engine"));
   assert.ok(insight.includes("mode:'business_insight'"));
-  for (const area of ["sales", "customers", "inventory", "suppliers", "expenses", "cashFlow", "profitability", "dataLimitations"])
+  for (const area of ["sales", "customers", "inventory", "suppliers", "expenses", "cashFlow", "profitability", "limitations"])
     assert.ok(insight.includes(area), `Business review context missing: ${area}`);
   assert.ok(insight.includes("osLocalBusinessReview(context,language)"));
   assert.ok(insight.includes("language=window.AIBOS_I18N?.getLanguage?.()||'en'"));
