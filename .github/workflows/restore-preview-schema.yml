@@ -1,0 +1,124 @@
+name: Restore isolated AIBOS preview schema
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: restore-aibos-preview-schema
+  cancel-in-progress: false
+
+jobs:
+  restore-preview:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      PREVIEW_DB_URL: ${{ secrets.PREVIEW_DB_URL }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Validate required connection secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${PREVIEW_DB_URL:-}" ]]; then
+            echo "::error::PREVIEW_DB_URL repository secret is missing."
+            exit 1
+          fi
+          echo "Preview database connection secret is present."
+
+      - name: Download reviewed production schema artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run download 44921545179 --repo jadookay/ai-merchant-os \
+            --name aibos-production-schema-review --dir schema-artifact
+          test -s schema-artifact/schema.sql
+          echo "Reviewed schema artifact downloaded."
+          sha256sum schema-artifact/schema.sql
+          test "$(stat -c%s schema-artifact/schema.sql)" -gt 100000
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+
+      - name: Verify preview is empty before import
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$PREVIEW_DB_URL" --no-psqlrc --tuples-only --no-align \
+            --set ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            app_tables integer;
+          BEGIN
+            SELECT count(*) INTO app_tables
+            FROM information_schema.tables
+            WHERE table_schema IN ('public', 'private')
+              AND table_type = 'BASE TABLE'
+              AND table_name NOT IN ('spatial_ref_sys');
+            IF app_tables <> 0 THEN
+              RAISE EXCEPTION 'Preview safety check failed: expected empty public/private application schemas, found % tables.', app_tables;
+            END IF;
+          END $$;
+          SQL
+          echo "Preview safety check passed: no application tables exist."
+
+      - name: Apply schema atomically to preview only
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$PREVIEW_DB_URL" --no-psqlrc --single-transaction \
+            --set ON_ERROR_STOP=1 --file=schema-artifact/schema.sql
+          echo "Schema import committed successfully."
+
+      - name: Verify restored schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$PREVIEW_DB_URL" --no-psqlrc --set ON_ERROR_STOP=1 <<'SQL'
+          DO $$
+          DECLARE
+            public_tables integer;
+            private_functions integer;
+            public_functions integer;
+            public_policies integer;
+            public_rls_tables integer;
+          BEGIN
+            SELECT count(*) INTO public_tables
+            FROM information_schema.tables
+            WHERE table_schema = 'public' AND table_type = 'BASE TABLE';
+            SELECT count(*) INTO private_functions
+            FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'private';
+            SELECT count(*) INTO public_functions
+            FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public';
+            SELECT count(*) INTO public_policies
+            FROM pg_policies WHERE schemaname = 'public';
+            SELECT count(*) INTO public_rls_tables
+            FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relrowsecurity;
+            IF public_tables <> 27 THEN
+              RAISE EXCEPTION 'Expected 27 public tables, found %.', public_tables;
+            END IF;
+            IF public_policies <> 138 THEN
+              RAISE EXCEPTION 'Expected 138 public RLS policies, found %.', public_policies;
+            END IF;
+            IF public_rls_tables <> 27 THEN
+              RAISE EXCEPTION 'Expected 27 public RLS-enabled tables, found %.', public_rls_tables;
+            END IF;
+            IF private_functions + public_functions <> 43 THEN
+              RAISE EXCEPTION 'Expected 43 total private/public functions, found %.', private_functions + public_functions;
+            END IF;
+            RAISE NOTICE 'Verified: % public tables, % public policies, % RLS tables, % public functions, % private functions.',
+              public_tables, public_policies, public_rls_tables, public_functions, private_functions;
+          END $$;
+          SELECT extname, extversion FROM pg_extension
+          WHERE extname IN ('hypopg','index_advisor','pg_stat_statements','pgcrypto','supabase_vault','uuid-ossp')
+          ORDER BY extname;
+          SQL
