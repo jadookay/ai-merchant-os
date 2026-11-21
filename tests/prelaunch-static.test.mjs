@@ -56,8 +56,16 @@ test("team permission delegation cannot exceed the manager's own permissions", (
   assert.ok(teamAccess.includes('status: "suspended"') || teamAccess.includes('status=suspended'));
 });
 
-test("cancelled expense deletion does not post an accounting reversal", () => {
-  assert.match(html, /await _v14_1_deleteExpense\(id\);if\(state\.expenses\.some\(x=>x\.id===id\)\)return;/);
+test("expense deletion posts an exact reversal before marking the source deleted", () => {
+  const start=html.lastIndexOf("deleteExpense=async function(id){");
+  const end=html.indexOf("};\\ndeleteOSCash=async function(id){",start);
+  const block=html.slice(start,end);
+  assert.ok(start>=0&&end>start,"expected the final guarded expense deletion handler");
+  assert.ok(block.includes("await accPostEntry({date:reversalDate"));
+  assert.ok(block.includes("sourceType:'expense_delete',sourceId:expense.id"));
+  assert.ok(block.indexOf("await accPostEntry")<block.indexOf("expense.deleted=true"));
+  assert.ok(block.includes("originals.length!==1"));
+  assert.ok(block.includes("The expense was not deleted"));
 });
 
 test("sale void reason and transaction references are persisted to the audit trail", () => {
