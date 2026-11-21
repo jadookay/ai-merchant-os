@@ -335,8 +335,8 @@ test("Shericeri full transcript persists locally per signed-in user and merchant
   assert.ok(html.includes("aibos:shericeri:transcript:"));
   assert.ok(html.includes("function sheriPersistTranscript()"));
   assert.ok(html.includes("function sheriRestoreTranscript()"));
-  assert.ok(html.includes("rows.slice(-2000)"));
-  assert.ok(html.includes("localStorage.setItem(key,JSON.stringify(rows.slice(-2000)))"));
+  assert.ok(html.includes("localStorage.setItem(key,JSON.stringify(rows))"));
+  assert.ok(html.includes("if(Array.isArray(rows))rows.forEach(row=>"));
 });
 
 test("Shericeri voice diagnostics are available to signed-in users on her dedicated page", () => {
