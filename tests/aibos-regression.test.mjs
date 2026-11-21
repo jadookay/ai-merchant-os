@@ -299,5 +299,5 @@ test("other income payments are recorded as receipts, not payments", () => {
 
 test("cash transfer memo deletions are excluded from ledger reversal requirements", () => {
   assert.ok(html.includes("a.details?.kind!=='transfer'"));
-  assert.ok(html.includes("Keep cash transfers as non-ledger memo entries")===false || html.includes("cash_entry_delete"));
+  assert.ok(html.includes("if(cash.kind!=='transfer'&&originals.length!==1)"));
 });
