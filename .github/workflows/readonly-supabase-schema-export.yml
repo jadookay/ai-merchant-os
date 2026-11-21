@@ -1,0 +1,53 @@
+name: Read-only Supabase schema export
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readonly-supabase-schema-export
+  cancel-in-progress: false
+
+jobs:
+  export-schema:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      SUPABASE_DB_URL: ${{ secrets.PRODUCTION_DB_URL }}
+    steps:
+      - name: Check required secret
+        shell: bash
+        run: |
+          if [[ -z "$SUPABASE_DB_URL" ]]; then
+            echo "::error::Repository Actions secret PRODUCTION_DB_URL is not configured."
+            exit 1
+          fi
+          echo "Database connection secret is present."
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Export schema only
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db dump --db-url "$SUPABASE_DB_URL" -f schema.sql
+          test -s schema.sql
+          echo "Schema export completed."
+          echo "Export size: $(stat -c%s schema.sql) bytes"
+          echo "SHA-256: $(sha256sum schema.sql | cut -d ' ' -f 1)"
+
+      - name: Upload reviewed-export candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: aibos-production-schema-review
+          path: schema.sql
+          if-no-files-found: error
+          retention-days: 1
