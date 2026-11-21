@@ -252,7 +252,7 @@ test("preview inline JavaScript blocks parse without syntax errors", () => {
   const blocks=[...previewHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
     .filter(([,attrs])=>!/\bsrc\s*=|application\/(?:json|ld\+json)/i.test(attrs));
   assert.ok(blocks.length>0);
-  blocks.forEach(([,attrs,source],index)=>new Script(source,{filename:\`preview-inline-\${index+1}-\${attrs||'main'}.js\`}));
+  blocks.forEach(([,attrs,source],index)=>new Script(source,{filename:"preview-inline-"+(index+1)+".js"}));
 });
 
 test("expense payment workflow accrues expenses and settles the payable without duplicating expense", () => {
