@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.70 date-aware inventory and Trial Balance verification">
+<meta name="app-version" content="V14.4.71 preview inventory deactivation and sync repair">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -1419,6 +1419,7 @@ async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
   // Product status reasons belong in audit_log, never in products columns.
   delete record.status_reason;
+  delete record.updated_by; // Not a products table column; actor attribution is in audit_log.
   if(sheriCan('manage_team')){
     const {data:existing,error:findError}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
     if(findError)throw findError;
