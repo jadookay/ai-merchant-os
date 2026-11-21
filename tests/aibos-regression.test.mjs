@@ -288,6 +288,9 @@ test("ledger integrity verifies invoice, bill, payment and cash source journals"
 test("expense and cash deletions post exact reversals before deleting source rows", () => {
   assert.ok(html.includes("sourceType:'expense_delete',sourceId:expense.id"));
   assert.ok(html.includes("sourceType:'cash_entry_delete',sourceId:cash.id"));
+  assert.ok(html.includes("const hasPendingReversal=(sourceType,sourceId)=>pendingDependencies.some"));
+  assert.ok(html.includes("hasPendingReversal('expense_delete',op.id)"));
+  assert.ok(html.includes("hasPendingReversal('cash_entry_delete',op.id)"));
   assert.ok(html.includes("The expense was not deleted"));
   assert.ok(html.includes("The cash record was not deleted"));
   assert.ok(html.includes("Deleted expense has no exact accounting reversal"));
