@@ -6116,7 +6116,8 @@ function accLedgerIntegrity(endDate=null){
     const originals=entries.filter(e=>e.source_type==='expense'&&e.source_id===expense.id&&!e.voided&&(!endDate||String(e.entry_date||e.created_at||'').slice(0,10)<=endDate)),original=originals[0];
     const deletedAsOf=!!expense.deleted&&(!endDate||String(expense.deleted_at||'').slice(0,10)<=endDate);
     if(deletedAsOf){
-      if(original&&!hasExactReversal(original)){const v=totals.get(original.id)||{count:0,debit:0,credit:0};addInvalid(original,'Deleted expense has no exact accounting reversal',v.count,v.debit,v.credit);}
+      if(!original)addInvalid({id:'deleted-expense-no-journal-'+expense.id,description:'Deleted expense '+(expense.description||''),source_type:'expense',source_id:expense.id,entry_date:date},'Deleted expense has no original source journal');
+      else if(!hasExactReversal(original)){const v=totals.get(original.id)||{count:0,debit:0,credit:0};addInvalid(original,'Deleted expense has no exact accounting reversal',v.count,v.debit,v.credit);}
       continue;
     }
     if(!activeSources.has('expense|'+expense.id)){
@@ -6170,9 +6171,12 @@ function accLedgerIntegrity(endDate=null){
       :[{code:'6000',debit:amount,credit:0},{code:'1000',debit:0,credit:amount}];
     if(entry&&(!matchesExpected(entry,expected)||hasExactReversal(entry))){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Cash movement journal does not match its kind, amount or accounts, or has been reversed',v.count,v.debit,v.credit);}
   }
-  const deletedCashIds=new Set((state.auditLog||[]).filter(a=>a.entity_type==='cash_entry'&&a.action==='delete'&&(!endDate||String(a.created_at||'').slice(0,10)<=endDate)).map(a=>a.entity_id));
-  for(const entry of entries.filter(e=>e.source_type==='cash_entry'&&deletedCashIds.has(e.source_id)&&(!endDate||String(e.entry_date||e.created_at||'').slice(0,10)<=endDate))){
-    if(!hasExactReversal(entry)){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Deleted cash movement has no exact accounting reversal',v.count,v.debit,v.credit);}
+  const deletedCashAudits=(state.auditLog||[]).filter(a=>a.entity_type==='cash_entry'&&a.action==='delete'&&(!endDate||String(a.created_at||'').slice(0,10)<=endDate));
+  const deletedCashIds=new Set(deletedCashAudits.map(a=>a.entity_id));
+  for(const audit of deletedCashAudits){
+    const originals=entries.filter(e=>e.source_type==='cash_entry'&&e.source_id===audit.entity_id&&(!endDate||String(e.entry_date||e.created_at||'').slice(0,10)<=endDate));
+    if(!originals.length)addInvalid({id:'deleted-cash-no-journal-'+audit.entity_id,description:'Deleted cash movement',source_type:'cash_entry',source_id:audit.entity_id},'Deleted cash movement has no original cash journal');
+    for(const entry of originals)if(!hasExactReversal(entry)){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Deleted cash movement has no exact accounting reversal',v.count,v.debit,v.credit);}
   }
   return {invalidCount:invalid.length,invalid};
 }
