@@ -6001,26 +6001,42 @@ function accBillTypeChanged(){
   if(eligible.some(a=>a.id===current))select.value=current;
 }
 async function accCreateBill(){
-  await accEnsureBase();
-  const supplierId=document.getElementById('accBillSupplier').value||null,date=document.getElementById('accBillDate').value||accToday(),due=document.getElementById('accBillDue').value||date,desc=document.getElementById('accBillDesc').value.trim(),qty=Number(document.getElementById('accBillQty').value),cost=Number(document.getElementById('accBillCost').value),tax=accTax(document.getElementById('accBillTax').value),billType=document.getElementById('accBillType')?.value||'inventory';
-  if(!supplierId)return alert('Select the supplier for this bill.');
-  if(!desc||!Number.isFinite(qty)||qty<=0||!Number.isFinite(cost)||cost<=0)return alert('Complete the bill line with a positive quantity and cost.');
-  if(due<date)return alert('Due date cannot be before the bill date.');
-  if(accPeriodLocked(date))return alert('This bill date is inside a locked accounting period.');
-  const mappedAccountCode={inventory:'1200',operating_expense:'6000',service:'6200'}[billType];
-  const debitAccount=billType==='other_purchase'?accAccount(document.getElementById('accBillOtherAccount')?.value):accAccountCode(mappedAccountCode);
-  if(!debitAccount||!debitAccount.active||!['asset','expense','cogs'].includes(debitAccount.type)||debitAccount.code==='2110')return alert('Choose a valid active asset or expense account for this bill.');
-  const ap=accAccountCode('2000'),taxInput=accAccountCode('2110');
-  if(!ap||!taxInput)return alert('The accounts payable or input tax account is missing. Refresh the chart of accounts.');
-  const gross=qty*cost,discount=Math.min(Math.max(0,Number(document.getElementById('accBillDiscount').value)||0),gross),subtotal=gross-discount,taxAmount=subtotal*(Number(tax.rate||0)/100),total=subtotal+taxAmount;
-  if(!Number.isFinite(total)||total<=0)return alert('The bill total must be positive.');
-  const id=sheriUuid(),now=sheriNow(),bill={id,merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),bill_number:'BILL-'+new Date().getFullYear()+'-'+String((state.bills||[]).length+1).padStart(4,'0'),supplier_id:supplierId,issue_date:date,due_date:due,subtotal,tax_amount:taxAmount,total,status:'open',bill_type:billType,debit_account_id:debitAccount.id,notes:document.getElementById('accBillNotes').value.trim()||null,items:[{description,qty,unit_cost:cost,tax_rate:Number(tax.rate||0),discount}],created_at:now};
-  state.bills.push(bill);
-  await sheriPut('bills',id,{merchant_id:state.merchant.id,record:{...bill}});
-  await sheriQueue({type:'accounting_upsert',table:'bills',record:bill});
-  await accPostEntry({date,description:'Bill '+bill.bill_number,sourceType:'bill',sourceId:id,lines:[{accountId:debitAccount.id,debit:subtotal,memo:desc},...(taxAmount?[{accountId:taxInput.id,debit:taxAmount,memo:'Input tax'}]:[]),{accountId:ap.id,credit:total,memo:bill.bill_number}]});
-  await accAudit('create','bill',id,{total,bill_type:billType,debit_account_id:debitAccount.id});
-  document.getElementById('accBillDesc').value='';document.getElementById('accBillCost').value='';document.getElementById('accBillDiscount').value='0';render();alert('Bill created.');
+  let stage='starting',billAddedToState=false,billSavedLocally=false,billQueuedForSync=false;
+  try{
+    stage='refreshing chart of accounts';
+    await accEnsureBase();
+    stage='reading and validating bill form';
+    const supplierId=document.getElementById('accBillSupplier').value||null,date=document.getElementById('accBillDate').value||accToday(),due=document.getElementById('accBillDue').value||date,desc=document.getElementById('accBillDesc').value.trim(),qty=Number(document.getElementById('accBillQty').value),cost=Number(document.getElementById('accBillCost').value),tax=accTax(document.getElementById('accBillTax').value),billType=document.getElementById('accBillType')?.value||'inventory';
+    if(!supplierId)return alert('Select the supplier for this bill.');
+    if(!desc||!Number.isFinite(qty)||qty<=0||!Number.isFinite(cost)||cost<=0)return alert('Complete the bill line with a positive quantity and cost.');
+    if(due<date)return alert('Due date cannot be before the bill date.');
+    if(accPeriodLocked(date))return alert('This bill date is inside a locked accounting period.');
+    const mappedAccountCode={inventory:'1200',operating_expense:'6000',service:'6200'}[billType];
+    const debitAccount=billType==='other_purchase'?accAccount(document.getElementById('accBillOtherAccount')?.value):accAccountCode(mappedAccountCode);
+    if(!debitAccount||!debitAccount.active||!['asset','expense','cogs'].includes(debitAccount.type)||debitAccount.code==='2110')return alert('Choose a valid active asset or expense account for this bill.');
+    const ap=accAccountCode('2000'),taxInput=accAccountCode('2110');
+    if(!ap||!taxInput)return alert('The accounts payable or input tax account is missing. Refresh the chart of accounts.');
+    const gross=qty*cost,discount=Math.min(Math.max(0,Number(document.getElementById('accBillDiscount').value)||0),gross),subtotal=gross-discount,taxAmount=subtotal*(Number(tax.rate||0)/100),total=subtotal+taxAmount;
+    if(!Number.isFinite(total)||total<=0)return alert('The bill total must be positive.');
+    const id=sheriUuid(),now=sheriNow(),bill={id,merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),bill_number:'BILL-'+new Date().getFullYear()+'-'+String((state.bills||[]).length+1).padStart(4,'0'),supplier_id:supplierId,issue_date:date,due_date:due,subtotal,tax_amount:taxAmount,total,status:'open',bill_type:billType,debit_account_id:debitAccount.id,notes:document.getElementById('accBillNotes').value.trim()||null,items:[{description:desc,qty,unit_cost:cost,tax_rate:Number(tax.rate||0),discount}],created_at:now};
+    stage='adding bill to in-memory state';
+    state.bills.push(bill);billAddedToState=true;
+    stage='saving bill to local storage';
+    await sheriPut('bills',id,{merchant_id:state.merchant.id,record:{...bill}});billSavedLocally=true;
+    stage='adding bill to sync queue';
+    await sheriQueue({type:'accounting_upsert',table:'bills',record:bill});billQueuedForSync=true;
+    stage='posting the balanced accounting journal';
+    await accPostEntry({date,description:'Bill '+bill.bill_number,sourceType:'bill',sourceId:id,lines:[{accountId:debitAccount.id,debit:subtotal,memo:desc},...(taxAmount?[{accountId:taxInput.id,debit:taxAmount,memo:'Input tax'}]:[]),{accountId:ap.id,credit:total,memo:bill.bill_number}]});
+    stage='writing the audit record';
+    await accAudit('create','bill',id,{total,bill_type:billType,debit_account_id:debitAccount.id});
+    stage='refreshing the bill register';
+    document.getElementById('accBillDesc').value='';document.getElementById('accBillCost').value='';document.getElementById('accBillDiscount').value='0';render();alert('Bill created.');
+  }catch(error){
+    const detail='[Create Bill stage: '+stage+'; added to app state: '+(billAddedToState?'yes':'no')+'; saved locally: '+(billSavedLocally?'yes':'no')+'; queued for sync: '+(billQueuedForSync?'yes':'no')+']';
+    try{error.message=(error?.message||String(error))+' '+detail;}catch(_){}
+    console.error('Create bill diagnostic:',{stage,billAddedToState,billSavedLocally,billQueuedForSync,error});
+    throw error;
+  }
 }
 function accPaymentSourceOptions(){
   const type=document.getElementById('accPaymentType')?.value,sel=document.getElementById('accPaymentSource');if(!sel)return;
