@@ -1565,6 +1565,16 @@ async function sheriSyncOutbox(){
     for(const item of items){
       const op=item.op||{};
       const pendingDependencies=(await sheriGetAll('outbox')).filter(x=>x.key!==item.key);
+      // A source deletion must wait until its exact accounting reversal has
+      // synchronized successfully. This also protects against equal-timestamp
+      // outbox items being ordered by their random keys, and against a failed
+      // reversal being followed by a successful source deletion in the same pass.
+      const hasPendingReversal=(sourceType,sourceId)=>pendingDependencies.some(x=>{
+        const pending=x.op||{},entry=pending.entry||{};
+        return pending.type==='accounting_journal_batch'&&entry.source_type===sourceType&&entry.source_id===sourceId;
+      });
+      if(op.type==='expense_delete'&&hasPendingReversal('expense_delete',op.id))continue;
+      if(op.type==='cash_delete'&&hasPendingReversal('cash_entry_delete',op.id))continue;
       const isEarlier=(dependency)=>{
         const dateOrder=String(dependency.created_at||'').localeCompare(String(item.created_at||''));
         if(dateOrder!==0)return dateOrder<0;
