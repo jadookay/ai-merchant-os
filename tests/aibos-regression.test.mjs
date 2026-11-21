@@ -233,8 +233,8 @@ test("received purchases persist the updated local stock and record the register
 });
  
 test("the offline application shell cache is bumped with the V14.4.70 release", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v70"));
-  assert.ok(serviceWorker.includes("const RELEASE='V14.4.70'"));
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v71"));
+  assert.ok(serviceWorker.includes("const RELEASE='V14.4.71'"));
 });
 
  
