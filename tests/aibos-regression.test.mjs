@@ -9,6 +9,7 @@ const previewHtml = readFileSync(new URL("../preview-live/index.html", import.me
 const previewServiceWorker = readFileSync(new URL("../preview-live/shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
 const expenseAccrualMigration = readFileSync(new URL("../supabase/migrations/20261121230000_expense_payment_accrual_workflow.sql", import.meta.url), "utf8");
 const expenseStatusMigration = readFileSync(new URL("../supabase/migrations/20261121233000_expense_payment_status.sql", import.meta.url), "utf8");
+const supplierBillMigration = readFileSync(new URL("../supabase/migrations/20261121234500_supplier_bill_account_classification.sql", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
@@ -242,10 +243,25 @@ test("the production application shell remains isolated at V14.4.71", () => {
   assert.ok(serviceWorker.includes("const RELEASE='V14.4.71'"));
 });
 
-test("the preview application shell is bumped to V14.4.74 without changing production", () => {
-  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v74"));
-  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.74'"));
-  assert.ok(previewHtml.includes("V14.4.74"));
+test("the preview application shell is bumped to V14.4.75 without changing production", () => {
+  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v75"));
+  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.75'"));
+  assert.ok(previewHtml.includes("V14.4.75"));
+});
+
+test("supplier bills post to the selected inventory, operating expense, service or other asset account", () => {
+  assert.ok(previewHtml.includes('<option value="inventory">Inventory / stock</option>'));
+  assert.ok(previewHtml.includes('<option value="operating_expense">Operating expense</option>'));
+  assert.ok(previewHtml.includes('<option value="service">Service / professional fees</option>'));
+  assert.ok(previewHtml.includes('<option value="other_purchase">Other asset or purchase</option>'));
+  assert.ok(previewHtml.includes("const mappedAccountCode={inventory:'1200',operating_expense:'6000',service:'6200'}[billType]"));
+  assert.ok(previewHtml.includes("debit_account_id:debitAccount.id"));
+  assert.ok(previewHtml.includes("accountId:debitAccount.id,debit:subtotal"));
+  assert.ok(previewHtml.includes("if(!supplierId)return alert('Select the supplier for this bill.')"));
+  assert.ok(previewHtml.includes("bill_type:'inventory'")===false);
+  assert.ok(supplierBillMigration.includes("add column if not exists bill_type"));
+  assert.ok(supplierBillMigration.includes("add column if not exists debit_account_id"));
+  assert.ok(supplierBillMigration.includes("'6200','Service & professional fees','expense','debit','not_applicable',true"));
 });
 
 test("preview inline JavaScript blocks parse without syntax errors", () => {
