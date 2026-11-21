@@ -243,10 +243,10 @@ test("the production application shell remains isolated at V14.4.71", () => {
   assert.ok(serviceWorker.includes("const RELEASE='V14.4.71'"));
 });
 
-test("the preview application shell is bumped to V14.4.75 without changing production", () => {
-  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v75"));
-  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.75'"));
-  assert.ok(previewHtml.includes("V14.4.75"));
+test("the preview application shell is bumped to V14.4.76 without changing production", () => {
+  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v76"));
+  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.76'"));
+  assert.ok(previewHtml.includes("V14.4.76"));
 });
 
 test("supplier bills post to the selected inventory, operating expense, service or other asset account", () => {
@@ -257,6 +257,8 @@ test("supplier bills post to the selected inventory, operating expense, service 
   assert.ok(previewHtml.includes("const mappedAccountCode={inventory:'1200',operating_expense:'6000',service:'6200'}[billType]"));
   assert.ok(previewHtml.includes("debit_account_id:debitAccount.id"));
   assert.ok(previewHtml.includes("accountId:debitAccount.id,debit:subtotal"));
+  assert.ok(previewHtml.includes("const billDebitAccountId=bill.debit_account_id||accAccountCode('1200')?.id"));
+  assert.ok(previewHtml.includes("accountId:billDebitAccountId,debit:Number(bill.subtotal||0)"));
   assert.ok(previewHtml.includes("if(!supplierId)return alert('Select the supplier for this bill.')"));
   assert.ok(previewHtml.includes("bill_type:'inventory'")===false);
   assert.ok(supplierBillMigration.includes("add column if not exists bill_type"));
