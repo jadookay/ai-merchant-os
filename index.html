@@ -5773,7 +5773,7 @@ function accBalance(accountId){
   let n=0;
   const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
   const activeReversals=new Set((state.journalEntries||[])
-    .filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction'].includes(e.source_type))
+    .filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','expense_delete','cash_entry_delete'].includes(e.source_type))
     .map(e=>e.source_id));
   for(const line of state.journalLines||[]){
     if(line.account_id!==accountId)continue;
@@ -5932,7 +5932,7 @@ async function accCreateBill(){
 }
 function accPaymentSourceOptions(){const type=document.getElementById('accPaymentType')?.value;const sel=document.getElementById('accPaymentSource');if(!sel)return;const rows=type==='supplier_payment'?state.bills.filter(x=>accBillStatus(x)!=='paid'):type==='customer_receipt'?state.invoices.filter(x=>accInvoiceStatus(x)!=='paid'):[];sel.innerHTML='<option value="">— No linked document —</option>'+rows.map(x=>`<option value="${x.id}">${esc(x.invoice_number||x.bill_number)} — ${money((x.total||0)-(type==='supplier_payment'?accBillPaid(x):accInvoicePaid(x)))}</option>`).join('')}
 async function accCreatePayment(){
-  await accEnsureBase();const type=document.getElementById('accPaymentType').value,sourceId=document.getElementById('accPaymentSource').value||null,amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,date=document.getElementById('accPaymentDate').value||accToday();if(amount<=0||!accountId)return alert('Enter an amount and choose a cash/bank account.');if(accPeriodLocked(date))return alert('This payment date is inside a locked accounting period.');if(sourceId){const doc=type==='supplier_payment'?state.bills.find(x=>x.id===sourceId):type==='customer_receipt'?state.invoices.find(x=>x.id===sourceId):null;if(doc){const outstanding=Math.max(0,Number(doc.total||0)-(type==='supplier_payment'?accBillPaid(doc):accInvoicePaid(doc)));if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding balance of '+money(outstanding)+'.')}}let debitId,creditId,sourceType=null; if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100').id;sourceType='invoice'}else if(type==='supplier_payment'){debitId=accAccountCode('2000').id;creditId=accountId;sourceType='bill'}else if(type==='other_income'){debitId=accountId;creditId=accAccountCode('4100').id}else{debitId=accAccountCode('6000').id;creditId=accountId}const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),direction:type==='customer_receipt'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,amount,payment_date:date,reference:document.getElementById('accPaymentRef').value.trim()||null,created_at:sheriNow()};state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'payments',record:row});await accPostEntry({date,description:(type==='customer_receipt'?'Customer receipt':type==='supplier_payment'?'Supplier payment':type==='other_income'?'Other income':'Expense payment'),sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});await accAudit('create','payment',row.id,{amount,type});document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';render();alert('Payment recorded.');
+  await accEnsureBase();const type=document.getElementById('accPaymentType').value,sourceId=document.getElementById('accPaymentSource').value||null,amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,date=document.getElementById('accPaymentDate').value||accToday();if(amount<=0||!accountId)return alert('Enter an amount and choose a cash/bank account.');if(accPeriodLocked(date))return alert('This payment date is inside a locked accounting period.');if(sourceId){const doc=type==='supplier_payment'?state.bills.find(x=>x.id===sourceId):type==='customer_receipt'?state.invoices.find(x=>x.id===sourceId):null;if(doc){const outstanding=Math.max(0,Number(doc.total||0)-(type==='supplier_payment'?accBillPaid(doc):accInvoicePaid(doc)));if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding balance of '+money(outstanding)+'.')}}let debitId,creditId,sourceType=null; if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100').id;sourceType='invoice'}else if(type==='supplier_payment'){debitId=accAccountCode('2000').id;creditId=accountId;sourceType='bill'}else if(type==='other_income'){debitId=accountId;creditId=accAccountCode('4100').id}else{debitId=accAccountCode('6000').id;creditId=accountId}const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),direction:type==='customer_receipt'||type==='other_income'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,amount,payment_date:date,reference:document.getElementById('accPaymentRef').value.trim()||null,created_at:sheriNow()};state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'payments',record:row});await accPostEntry({date,description:(type==='customer_receipt'?'Customer receipt':type==='supplier_payment'?'Supplier payment':type==='other_income'?'Other income':'Expense payment'),sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});await accAudit('create','payment',row.id,{amount,type});document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';render();alert('Payment recorded.');
 }
 async function accCreateBankAccount(){await accEnsureBase();const name=document.getElementById('accBankName').value.trim(),type=document.getElementById('accBankType').value,opening=Number(document.getElementById('accBankOpening').value)||0;if(!name)return alert('Enter an account name.');const baseCode={cash:'1000',bank:'1010',mobile_money:'1020'}[type];let acct=accAccountCode(baseCode);if(acct&&state.bankAccounts.some(x=>x.account_id===acct.id)){let n=2;while(accAccountCode(baseCode+'-'+n))n++;acct={id:sheriUuid(),merchant_id:state.merchant.id,code:baseCode+'-'+n,name:name,type:'asset',normal_balance:'debit',balance_sheet_class:'current',active:true,created_at:sheriNow()};await accUpsert('chart_of_accounts',acct)}if(!acct)return alert('Could not create the ledger account for this cash/bank account.');const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),name,type,opening_balance:opening,account_id:acct.id,current_balance:opening,last_reconciled_at:null,reconciled_balance:null,reconciled_difference:null,created_at:sheriNow()};state.bankAccounts.push(row);await sheriPut('bankAccounts',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'bank_accounts',record:row});if(opening>0){const eq=accAccountCode('3000');await accPostEntry({date:accToday(),description:'Opening balance — '+name,sourceType:'bank_opening',sourceId:row.id,lines:[{accountId:acct.id,debit:opening},{accountId:eq.id,credit:opening}]})}document.getElementById('accBankName').value='';document.getElementById('accBankOpening').value='0';render();}
 async function accReconcileBank(id){const b=state.bankAccounts.find(x=>x.id===id);if(!b)return;const d=prompt('Reconciled through date (YYYY-MM-DD):',accToday());if(!d||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d))return alert('Use YYYY-MM-DD.');const statement=Number(prompt('Statement balance:',String(accNormalAmount(accAccount(b.account_id))||0)));if(!Number.isFinite(statement))return;const ledger=accNormalAmount(accAccount(b.account_id));b.last_reconciled_at=d;b.reconciled_balance=statement;b.reconciled_difference=statement-ledger;await accUpdate('bank_accounts',b);await accAudit('reconcile','bank_account',b.id,{statement,ledger,difference:b.reconciled_difference});render();}
@@ -6022,9 +6022,9 @@ function accLedgerIntegrity(endDate=null){
   const totals=new Map(),linesByEntry=new Map(),entryById=new Map(entries.map(e=>[e.id,e]));
   const saleById=new Map(sales.map(s=>[s.id,s]));
   const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
-  const activeSources=new Set(),reversalsBySource=new Map();
+  const activeSources=new Map(),reversalsBySource=new Map();
   for(const e of entries){
-    const entryDate=String(e.entry_date||e.created_at||'').slice(0,10);if(!e.voided&&e.source_type&&e.source_id&&(!endDate||entryDate<=endDate))activeSources.add(e.source_type+'|'+e.source_id);
+    const entryDate=String(e.entry_date||e.created_at||'').slice(0,10);if(!e.voided&&e.source_type&&e.source_id&&(!endDate||entryDate<=endDate)){const key=e.source_type+'|'+e.source_id;activeSources.set(key,(activeSources.get(key)||0)+1);}
     if(!e.voided&&['sale_void','sale_cogs_void','accounting_correction'].includes(e.source_type)&&e.source_id){
       if(!reversalsBySource.has(e.source_id))reversalsBySource.set(e.source_id,[]);
       reversalsBySource.get(e.source_id).push(e);
@@ -6052,6 +6052,23 @@ function accLedgerIntegrity(endDate=null){
   };
   const invalid=[];
   const addInvalid=(entry,reason,count=0,debit=0,credit=0)=>invalid.push({entry,count,debit,credit,difference:debit-credit,reason});
+  const matchesExpected=(entry,expected)=>{
+    const rows=linesByEntry.get(entry.id)||[];if(rows.length!==expected.length)return false;const used=new Set();
+    return expected.every(want=>{const i=rows.findIndex((line,index)=>!used.has(index)&&
+      (want.accountId?line.account_id===want.accountId:accountCodeById.get(line.account_id)===want.code)&&
+      Math.abs(Number(line.debit||0)-Number(want.debit||0))<=0.005&&
+      Math.abs(Number(line.credit||0)-Number(want.credit||0))<=0.005);
+      if(i<0)return false;used.add(i);return true;});
+  };
+  const reportedDuplicates=new Set();
+  for(const entry of entries){
+    if(entry.voided||!entry.source_type||!entry.source_id)continue;
+    const key=entry.source_type+'|'+entry.source_id;
+    if((activeSources.get(key)||0)>1&&!reportedDuplicates.has(key)){
+      reportedDuplicates.add(key);const v=totals.get(entry.id)||{count:0,debit:0,credit:0};
+      addInvalid(entry,'Duplicate active journal postings exist for the same source',v.count,v.debit,v.credit);
+    }
+  }
   for(const entry of entries){
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
     if(endDate&&date>endDate)continue;
@@ -6095,16 +6112,66 @@ function accLedgerIntegrity(endDate=null){
       addInvalid({id:'missing-cogs-'+sale.id,description:'COGS '+(sale.product_name_snapshot||''),source_type:'sale_cogs',source_id:sale.id,entry_date:date},'Stock-applied sale has no active COGS journal');
   }
   for(const expense of state.expenses||[]){
-    const date=String(expense.created_at||'').slice(0,10);
-    if(expense.deleted||(endDate&&date>endDate)||Number(expense.amount||0)<=0)continue;
-    if(!activeSources.has('expense|'+expense.id))
-      addInvalid({id:'missing-expense-'+expense.id,description:'Expense '+(expense.description||''),source_type:'expense',source_id:expense.id,entry_date:date},'Active expense has no active expense journal');
+    const date=String(expense.created_at||'').slice(0,10);if((endDate&&date>endDate)||Number(expense.amount||0)<=0)continue;
+    const originals=entries.filter(e=>e.source_type==='expense'&&e.source_id===expense.id&&!e.voided),original=originals[0];
+    if(expense.deleted){
+      if(original&&!hasExactReversal(original)){const v=totals.get(original.id)||{count:0,debit:0,credit:0};addInvalid(original,'Deleted expense has no exact accounting reversal',v.count,v.debit,v.credit);}
+      continue;
+    }
+    if(!activeSources.has('expense|'+expense.id)){
+      addInvalid({id:'missing-expense-'+expense.id,description:'Expense '+(expense.description||''),source_type:'expense',source_id:expense.id,entry_date:date},'Active expense has no active expense journal');continue;
+    }
+    if(original&&(!matchesExpected(original,[{code:'6000',debit:Number(expense.amount),credit:0},{code:'1000',debit:0,credit:Number(expense.amount)}])||hasExactReversal(original))){
+      const v=totals.get(original.id)||{count:0,debit:0,credit:0};addInvalid(original,'Expense journal does not match its amount/accounts or has already been reversed',v.count,v.debit,v.credit);
+    }
   }
   for(const purchase of state.purchases||[]){
     const date=String(purchase.purchased_at||purchase.created_at||'').slice(0,10);
     if(purchase.status!=='received'||(endDate&&date>endDate)||Number(purchase.total||0)<=0)continue;
     if(!activeSources.has('purchase|'+purchase.id))
       addInvalid({id:'missing-purchase-'+purchase.id,description:'Purchase '+(purchase.product_name_snapshot||''),source_type:'purchase',source_id:purchase.id,entry_date:date},'Received purchase has no active purchase journal');
+  }
+  for(const invoice of state.invoices||[]){
+    const date=String(invoice.issue_date||invoice.created_at||'').slice(0,10);if((endDate&&date>endDate)||Number(invoice.total||0)<=0)continue;
+    const entry=entries.find(e=>e.source_type==='invoice'&&e.source_id===invoice.id&&!e.voided);
+    if(!activeSources.has('invoice|'+invoice.id)){addInvalid({id:'missing-invoice-'+invoice.id,description:'Invoice '+(invoice.invoice_number||''),source_type:'invoice',source_id:invoice.id,entry_date:date},'Invoice source has no active invoice journal');continue;}
+    const items=Array.isArray(invoice.items)?invoice.items:[],discount=items.reduce((sum,item)=>sum+Number(item.discount||0),0);
+    const gross=items.length?items.reduce((sum,item)=>sum+Number(item.qty||0)*Number(item.unit_price||0),0):Number(invoice.subtotal||0)+discount;
+    const expected=[{code:'1100',debit:Number(invoice.total),credit:0},{code:'4000',debit:0,credit:gross},...(discount?[{code:'4050',debit:discount,credit:0}]:[]),...(Number(invoice.tax_amount||0)?[{code:'2100',debit:0,credit:Number(invoice.tax_amount)}]:[])];
+    if(entry&&!matchesExpected(entry,expected)){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Invoice journal does not match its subtotal, discount, tax or accounts',v.count,v.debit,v.credit);}
+  }
+  for(const bill of state.bills||[]){
+    const date=String(bill.issue_date||bill.created_at||'').slice(0,10);if((endDate&&date>endDate)||Number(bill.total||0)<=0)continue;
+    const entry=entries.find(e=>e.source_type==='bill'&&e.source_id===bill.id&&!e.voided);
+    if(!activeSources.has('bill|'+bill.id)){addInvalid({id:'missing-bill-'+bill.id,description:'Bill '+(bill.bill_number||''),source_type:'bill',source_id:bill.id,entry_date:date},'Bill source has no active bill journal');continue;}
+    const expected=[{code:'1200',debit:Number(bill.subtotal||0),credit:0},...(Number(bill.tax_amount||0)?[{code:'2110',debit:Number(bill.tax_amount),credit:0}]:[]),{code:'2000',debit:0,credit:Number(bill.total)}];
+    if(entry&&!matchesExpected(entry,expected)){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Bill journal does not match its subtotal, input tax or payable accounts',v.count,v.debit,v.credit);}
+  }
+  for(const payment of state.payments||[]){
+    const date=String(payment.payment_date||payment.created_at||'').slice(0,10);if((endDate&&date>endDate)||Number(payment.amount||0)<=0)continue;
+    const entry=entries.find(e=>e.source_type==='payment'&&e.source_id===payment.id&&!e.voided);
+    if(!activeSources.has('payment|'+payment.id)){addInvalid({id:'missing-payment-'+payment.id,description:'Payment '+(payment.reference||''),source_type:'payment',source_id:payment.id,entry_date:date},'Payment source has no active payment journal');continue;}
+    const amount=Number(payment.amount),expected=payment.source_type==='invoice'
+      ?[{accountId:payment.account_id,debit:amount,credit:0},{code:'1100',debit:0,credit:amount}]
+      :payment.source_type==='bill'
+        ?[{code:'2000',debit:amount,credit:0},{accountId:payment.account_id,debit:0,credit:amount}]
+        :payment.direction==='receipt'
+          ?[{accountId:payment.account_id,debit:amount,credit:0},{code:'4100',debit:0,credit:amount}]
+          :[{code:'6000',debit:amount,credit:0},{accountId:payment.account_id,debit:0,credit:amount}];
+    if(entry&&!matchesExpected(entry,expected)){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Payment journal does not match its direction, amount or cash/bank account',v.count,v.debit,v.credit);}
+  }
+  for(const cash of state.cashEntries||[]){
+    const date=String(cash.occurred_at||cash.created_at||'').slice(0,10);if((endDate&&date>endDate)||cash.kind==='transfer'||Number(cash.amount||0)<=0)continue;
+    const entry=entries.find(e=>e.source_type==='cash_entry'&&e.source_id===cash.id&&!e.voided);
+    if(!activeSources.has('cash_entry|'+cash.id)){addInvalid({id:'missing-cash-'+cash.id,description:'Cash movement '+(cash.description||''),source_type:'cash_entry',source_id:cash.id,entry_date:date},'Cash movement source has no active cash journal');continue;}
+    const amount=Number(cash.amount),expected=cash.kind==='income'
+      ?[{code:'1000',debit:amount,credit:0},{code:'4100',debit:0,credit:amount}]
+      :[{code:'6000',debit:amount,credit:0},{code:'1000',debit:0,credit:amount}];
+    if(entry&&(!matchesExpected(entry,expected)||hasExactReversal(entry))){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Cash movement journal does not match its kind, amount or accounts, or has been reversed',v.count,v.debit,v.credit);}
+  }
+  const deletedCashIds=new Set((state.auditLog||[]).filter(a=>a.entity_type==='cash_entry'&&a.action==='delete').map(a=>a.entity_id));
+  for(const entry of entries.filter(e=>e.source_type==='cash_entry'&&deletedCashIds.has(e.source_id)&&(!endDate||String(e.entry_date||e.created_at||'').slice(0,10)<=endDate))){
+    if(!hasExactReversal(entry)){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Deleted cash movement has no exact accounting reversal',v.count,v.debit,v.credit);}
   }
   return {invalidCount:invalid.length,invalid};
 }
@@ -6142,6 +6209,46 @@ const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const 
 // Sale void accounting is handled atomically by sh ericeri_void_sale; no second reversal wrapper.
 
 const _v14_1_addOSCashEntry=addOSCashEntry;addOSCashEntry=async function(){const before=state.cashEntries.length;await _v14_1_addOSCashEntry();if(state.cashEntries.length>before){const x=state.cashEntries[state.cashEntries.length-1];try{await accEnsureBase();const cash=accAccountCode('1000'),amount=Number(x.amount||0);if(amount>0&&x.kind==='income')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash income',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:cash.id,debit:amount},{accountId:accAccountCode('4100').id,credit:amount}]});else if(amount>0&&x.kind==='expense')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash expense',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:accAccountCode('6000').id,debit:amount},{accountId:cash.id,credit:amount}]});if(x.kind!=='transfer')await accAudit('create','cash_entry',x.id,{amount,kind:x.kind})}catch(err){console.warn('[Sheri accounting] cash entry failed',err);alert('Cash movement saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
+// Accounting-safe deletion overrides: reverse posted entries before removing source records.
+deleteExpense=async function(id){
+  if(!sheriCan('manage_team')||!sheriCan('manage_expenses'))return sheriToast('Only a Manager, Admin or Owner with expense access can delete expenses.','error');
+  const expense=state.expenses.find(x=>x.id===id);if(!expense||expense.deleted)return;
+  const reason=prompt('Reason for deleting this expense (required):');if(!reason||!reason.trim())return sheriToast('A reason is required to delete this expense.','error');
+  if(!confirm('Delete this expense?\\nReason: '+reason.trim()))return;
+  const reversalDate=accToday();if(accPeriodLocked(reversalDate))return sheriToast('The current accounting period is locked. No deletion was made.','error');
+  try{
+    await accEnsureBase();const originals=(state.journalEntries||[]).filter(e=>e.source_type==='expense'&&e.source_id===expense.id&&!e.voided);
+    if(originals.length!==1)throw new Error('A single active source expense journal was not found. The expense was not deleted; review the ledger first.');
+    const original=originals[0],lines=(state.journalLines||[]).filter(l=>l.journal_entry_id===original.id);
+    if(lines.length<2)throw new Error('The original expense journal is incomplete. The expense was not deleted.');
+    await accPostEntry({date:reversalDate,description:'Reverse deleted expense '+(expense.description||''),sourceType:'expense_delete',sourceId:expense.id,lines:lines.map(l=>({accountId:l.account_id,debit:Number(l.credit||0),credit:Number(l.debit||0),memo:'Reversal: '+(l.memo||expense.description||'expense')}))});
+    expense.deleted=true;expense.deleted_at=sheriNow();expense.deleted_by=session?.user?.id||null;expense.delete_reason=reason.trim();
+    await sheriPut('expenses',id,{merchant_id:state.merchant.id,record:{...expense}});await sheriSaveSnapshot();
+    await sheriQueue({type:'expense_delete',id,merchant_id:state.merchant.id,reason:reason.trim(),deleted_at:expense.deleted_at,deleted_by:expense.deleted_by});
+    await accAudit('delete','expense',id,{reason:reason.trim(),description:expense.description,amount:expense.amount,reversal_date:reversalDate});
+    if(navigator.onLine)await sheriSyncOutbox();render();
+  }catch(err){console.warn('[AIBOS accounting] expense deletion blocked',err);sheriToast(err?.message||'Expense deletion failed; no source record was removed.','error');}
+};
+deleteOSCash=async function(id){
+  if(!sheriCan('manage_team')||!sheriCan('manage_finance'))return sheriToast('Only a Manager, Admin or Owner with finance access can delete cash movements.','error');
+  const cash=state.cashEntries.find(x=>x.id===id);if(!cash)return;
+  const reason=prompt('Reason for deleting this cash movement (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');
+  if(!confirm('Delete this cash movement?\\nReason: '+reason.trim()))return;
+  const reversalDate=accToday();if(accPeriodLocked(reversalDate))return sheriToast('The current accounting period is locked. No deletion was made.','error');
+  try{
+    await accEnsureBase();const originals=(state.journalEntries||[]).filter(e=>e.source_type==='cash_entry'&&e.source_id===cash.id&&!e.voided);
+    if(cash.kind!=='transfer'&&originals.length!==1)throw new Error('A single active cash-movement journal was not found. The cash record was not deleted; review the ledger first.');
+    if(originals.length>1)throw new Error('Duplicate active cash journals exist. The cash record was not deleted.');
+    if(originals.length===1){
+      const original=originals[0],lines=(state.journalLines||[]).filter(l=>l.journal_entry_id===original.id);
+      if(lines.length<2)throw new Error('The original cash journal is incomplete. The cash record was not deleted.');
+      await accPostEntry({date:reversalDate,description:'Reverse deleted cash movement '+(cash.description||''),sourceType:'cash_entry_delete',sourceId:cash.id,lines:lines.map(l=>({accountId:l.account_id,debit:Number(l.credit||0),credit:Number(l.debit||0),memo:'Reversal: '+(l.memo||cash.description||'cash movement')}))});
+    }
+    state.cashEntries=state.cashEntries.filter(x=>x.id!==id);await sheriSaveSnapshot();
+    await sheriQueue({type:'cash_delete',id});await accAudit('delete','cash_entry',id,{reason:reason.trim(),amount:cash.amount,kind:cash.kind,reversal_date:reversalDate});
+    if(navigator.onLine)await sheriSyncOutbox();render();
+  }catch(err){console.warn('[AIBOS accounting] cash deletion blocked',err);sheriToast(err?.message||'Cash deletion failed; no source record was removed.','error');}
+};
 function sheriHideInternalAccountingUi(){
   const hideSelectors=['#money .top .btn[onclick="accRebuildFromOperations()"]','#accAccountingStatus','#reports .top .btn[onclick="accValidateLedger()"]'];
   hideSelectors.forEach(sel=>document.querySelectorAll(sel).forEach(el=>el.style.display='none'));
