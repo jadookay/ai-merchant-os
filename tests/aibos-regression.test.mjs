@@ -273,3 +273,26 @@ test("tax-rate setup avoids duplicate default rates and deduplicates equivalent 
   assert.ok(html.includes("accUniqueTaxRates().map(x=>"));
   assert.ok(html.includes("An active tax rate with this name, rate and type already exists."));
 });
+
+test("ledger integrity verifies invoice, bill, payment and cash source journals", () => {
+  assert.ok(html.includes("Invoice source has no active invoice journal"));
+  assert.ok(html.includes("Bill source has no active bill journal"));
+  assert.ok(html.includes("Payment source has no active payment journal"));
+  assert.ok(html.includes("Cash movement source has no active cash journal"));
+  assert.ok(html.includes("Duplicate active journal postings exist for the same source"));
+  assert.ok(html.includes("Invoice journal does not match its subtotal, discount, tax or accounts"));
+  assert.ok(html.includes("Payment journal does not match its direction, amount or cash/bank account"));
+});
+
+test("expense and cash deletions post exact reversals before deleting source rows", () => {
+  assert.ok(html.includes("sourceType:'expense_delete',sourceId:expense.id"));
+  assert.ok(html.includes("sourceType:'cash_entry_delete',sourceId:cash.id"));
+  assert.ok(html.includes("The expense was not deleted"));
+  assert.ok(html.includes("The cash record was not deleted"));
+  assert.ok(html.includes("Deleted expense has no exact accounting reversal"));
+  assert.ok(html.includes("Deleted cash movement has no exact accounting reversal"));
+});
+
+test("other income payments are recorded as receipts, not payments", () => {
+  assert.ok(html.includes("direction:type==='customer_receipt'||type==='other_income'?'receipt':'payment'"));
+});
