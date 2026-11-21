@@ -345,3 +345,15 @@ test("Shericeri voice diagnostics are available to signed-in users on her dedica
   for (const control of ["sheriDiagSpeaker()", "sheriDiagRecord()", "sheriDiagWhisper()", "sheriDiagAudioProbe()"])
     assert.ok(html.includes(control));
 });
+
+
+test("new business insight and transcript helpers are syntactically valid JavaScript", () => {
+  const insightStart=html.indexOf("function buildOSBusinessInsightContext()");
+  const insightEnd=html.indexOf("// ── V14.1 Accounting engine",insightStart);
+  assert.ok(insightStart>=0&&insightEnd>insightStart);
+  assert.doesNotThrow(()=>new Function(html.slice(insightStart,insightEnd)));
+  const transcriptStart=html.indexOf("// Full Shericeri transcript");
+  const transcriptEnd=html.indexOf("// ── Speaking queue",transcriptStart);
+  assert.ok(transcriptStart>=0&&transcriptEnd>transcriptStart);
+  assert.doesNotThrow(()=>new Function(html.slice(transcriptStart,transcriptEnd)));
+});
