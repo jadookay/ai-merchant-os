@@ -1417,6 +1417,8 @@ async function sheriSyncVoidSale(op){
 }
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
+  // Product status reasons belong in audit_log, never in products columns.
+  delete record.status_reason;
   if(sheriCan('manage_team')){
     const {data:existing,error:findError}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
     if(findError)throw findError;
@@ -1437,14 +1439,16 @@ async function sheriSyncProductOperation(op){
 async function sheriEnsurePurchaseDependencies(op){
   const record=sheriServerRecord(op.record),merchantId=record.merchant_id;
   const productId=op.productId||record.product_id;
-  let {data:serverProduct,error:productError}=await sb.from('products').select('id,merchant_id').eq('id',productId).maybeSingle();
+  let {data:serverProduct,error:productError}=await sb.from('products').select('id,merchant_id,deleted').eq('id',productId).maybeSingle();
   if(productError)throw productError;
   if(serverProduct&&serverProduct.merchant_id!==merchantId)throw new Error('The selected product belongs to another business. The purchase was not posted.');
+  if(serverProduct?.deleted)throw new Error('This product is inactive. Reactivate it before recording a purchase.');
   if(!serverProduct){
     const queued=await sheriGetAll('outbox');
     const pending=queued.find(x=>x.op?.type==='product_upsert'&&x.op.record?.id===productId);
     const local=product(productId),source=pending?.op?.record||local;
     if(!source)throw new Error('Purchase is waiting for its product to sync. No purchase or stock change was posted.');
+    if(source.deleted)throw new Error('This product is inactive. Reactivate it before recording a purchase.');
     const serverStock=Number(pending?.op?.record?.stock??op.expectedServerStock??local?.stock??0);
     await sheriSyncProductOperation({record:{...source,merchant_id:merchantId,stock:serverStock}});
     const verify=await sb.from('products').select('id').eq('id',productId).eq('merchant_id',merchantId).maybeSingle();
@@ -2514,6 +2518,7 @@ if(document.getElementById('osPurchaseProduct'))document.getElementById('osPurch
 let saleCart=[];
 function addSaleToCart(){
   const id=document.getElementById('saleProduct').value,qty=Number(document.getElementById('saleQty').value),price=Number(document.getElementById('salePrice').value),p=product(id);
+  if(p?.deleted){sheriToast('This product is inactive. Reactivate it before adding it to a sale.','error');return}
   if(!p||!Number.isInteger(qty)||qty<1||!Number.isFinite(price)||price<0){sheriToast('Choose a product and enter a valid quantity and price.','error');return}
   const already=saleCart.filter(x=>x.productId===id).reduce((n,x)=>n+x.qty,0);if(already+qty>p.stock){sheriToast('Cart quantity exceeds available stock for '+p.name+'.','error');return}
   const existing=saleCart.find(x=>x.productId===id&&Number(x.price)===price);if(existing)existing.qty+=qty;else saleCart.push({productId:id,qty,price});renderSaleCart();sheriToast(p.name+' added to cart.');
@@ -2539,7 +2544,7 @@ function printLastReceipt(){
 async function recordSale(){
   if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
   const custId=document.getElementById('saleCustomer').value||null,items=saleCart.length?saleCart:[{productId:document.getElementById('saleProduct').value,qty:Number(document.getElementById('saleQty').value),price:Number(document.getElementById('salePrice').value)}],checked=[];
-  for(const item of items){const p=product(item.productId);if(!p||!Number.isInteger(item.qty)||item.qty<1||!Number.isFinite(item.price)||item.price<0)return sheriToast('Check each product, quantity and selling price.','error');const used=checked.filter(x=>x.productId===p.id).reduce((n,x)=>n+x.qty,0);if(used+item.qty>p.stock)return sheriToast('Not enough stock for '+p.name+'.','error');checked.push({...item,product:p})}
+  for(const item of items){const p=product(item.productId);if(p?.deleted)return sheriToast('A product in this sale is inactive. Remove it or reactivate the product before recording the sale.','error');if(!p||!Number.isInteger(item.qty)||item.qty<1||!Number.isFinite(item.price)||item.price<0)return sheriToast('Check each product, quantity and selling price.','error');const used=checked.filter(x=>x.productId===p.id).reduce((n,x)=>n+x.qty,0);if(used+item.qty>p.stock)return sheriToast('Not enough stock for '+p.name+'.','error');checked.push({...item,product:p})}
   const total=checked.reduce((n,x)=>n+x.qty*x.price,0),transactionId=sheriUuid(),createdAt=sheriNow(),invoice='INV-'+String(state.merchant.shericeri_id||'AIBOS')+'-'+Date.now();
   if(!confirm('Confirm sale?\\n'+checked.map(x=>x.qty+' × '+x.product.name+' — '+money(x.qty*x.price)).join('\\n')+'\\nTotal: '+money(total)))return;
   const rows=checked.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,product_id:x.product.id,product_name_snapshot:x.product.name,customer_id:custId,qty:x.qty,price:x.price,cost:x.product.cost,created_at:createdAt,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()}));
@@ -2623,7 +2628,23 @@ function osPurchaseSupplierChanged(){const id=document.getElementById('osPurchas
 async function editCustomer(id){if(!sheriCan('manage_team')||!sheriCan('manage_customers'))return sheriToast('You do not have permission to edit customers.','error');const c=customer(id);if(!c)return;const reason=prompt('Reason for editing this customer (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');const name=prompt('Customer name:',c.name);if(name===null||!name.trim())return;const phone=prompt('Phone:',c.phone||'');if(phone===null)return;const credit=prompt('Credit limit:',String(c.credit_limit||0));if(credit===null||!Number.isFinite(Number(credit))||Number(credit)<0)return sheriToast('Enter a valid non-negative credit limit.','error');Object.assign(c,{name:name.trim(),phone:phone.trim()||null,credit_limit:Number(credit),updated_at:sheriNow(),updated_by:session?.user?.id||null,edit_reason:reason.trim()});await sheriPut('customers',id,{merchant_id:state.merchant.id,record:{...c}});await sheriQueue({type:'customer_upsert',record:{...c}});await accAudit('edit','customer',id,{reason:reason.trim(),name:c.name});if(navigator.onLine)await sheriSyncOutbox();render();}
 async function editOSSupplier(id){if(!sheriCan('manage_team')||!sheriCan('manage_suppliers'))return sheriToast('You do not have permission to edit suppliers.','error');const x=(state.suppliers||[]).find(s=>s.id===id);if(!x)return;const reason=prompt('Reason for editing this supplier (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');const name=prompt('Supplier name:',x.name);if(name===null||!name.trim())return;const phone=prompt('Phone:',x.phone||'');if(phone===null)return;const email=prompt('Email:',x.email||'');if(email===null)return;const terms=prompt('Payment terms:',x.payment_terms||'');if(terms===null)return;Object.assign(x,{name:name.trim(),phone:phone.trim()||null,email:email.trim()||null,payment_terms:terms.trim()||null,updated_at:sheriNow(),updated_by:session?.user?.id||null,edit_reason:reason.trim()});await sheriPut('suppliers',id,{merchant_id:state.merchant.id,record:{...x}});await sheriQueue({type:'supplier_upsert',record:{...x}});await accAudit('edit','supplier',id,{reason:reason.trim(),name:x.name});if(navigator.onLine)await sheriSyncOutbox();render();}
 async function toggleOSSupplier(id){if(!sheriCan('manage_team')||!sheriCan('manage_suppliers'))return sheriToast('You do not have permission to change supplier status.','error');const x=(state.suppliers||[]).find(s=>s.id===id);if(!x)return;const action=x.deleted?'activate':'cancel',reason=prompt('Reason to '+action+' supplier '+x.name+' (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');x.deleted=!x.deleted;x.status=x.deleted?'inactive':'active';x.updated_at=sheriNow();x.updated_by=session?.user?.id||null;x.status_reason=reason.trim();await sheriPut('suppliers',id,{merchant_id:state.merchant.id,record:{...x}});await sheriQueue({type:'supplier_upsert',record:{...x}});await accAudit(action,'supplier',id,{reason:reason.trim(),name:x.name});if(navigator.onLine)await sheriSyncOutbox();render();}
-async function toggleProductStatus(id){if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('You do not have permission to change product status.','error');const p=state.products.find(x=>x.id===id);if(!p)return;const action=p.deleted?'activate':'cancel',reason=prompt('Reason to '+action+' product '+p.name+' (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');p.deleted=!p.deleted;p.updated_at=sheriNow();p.updated_by=session?.user?.id||null;p.status_reason=reason.trim();await sheriPut('products',id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}});await accAudit(action,'product',id,{reason:reason.trim(),name:p.name});if(navigator.onLine)await sheriSyncOutbox();render();}
+async function toggleProductStatus(id){
+  if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('You do not have permission to change product status.','error');
+  const p=state.products.find(x=>x.id===id);if(!p)return;
+  const deactivating=!p.deleted,action=deactivating?'deactivate':'reactivate';
+  const reason=prompt('Reason to '+action+' product '+p.name+' (required):');
+  if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');
+  const stock=Number(p.stock||0),stockValue=stock*Number(p.cost||0);
+  if(deactivating&&!confirm('Deactivate '+p.name+'?\\n\\nThis prevents new sales and purchases. It does NOT delete the product, remove stock, write off inventory or change its value.\\n\\nStock retained: '+stock+' units\\nInventory value retained: '+money(stockValue)+'\\n\\nReason: '+reason.trim()))return;
+  p.deleted=deactivating;p.updated_at=sheriNow();p.updated_by=session?.user?.id||null;
+  // Keep the reason in the audit log only; products.status_reason is not a database column.
+  await sheriPut('products',id,{merchant_id:state.merchant.id,record:{...p}});
+  await sheriQueue({type:'product_upsert',record:{...p}});
+  await accAudit(action,'product',id,{reason:reason.trim(),name:p.name,stock_retained:stock,inventory_value_retained:stockValue});
+  if(navigator.onLine)await sheriSyncOutbox();
+  render();
+  sheriToast(deactivating?'Product deactivated. Stock and inventory value are unchanged.':'Product reactivated. No stock movement or accounting entry was created.');
+}
 function renderSales(){
   const salesSearch=document.getElementById('salesSearchHost');if(salesSearch)salesSearch.innerHTML=sheriSearchControl('sales','salesTable','Search sales by product, customer, amount, date or user',[...state.products.map(p=>p.name),...state.customers.map(c=>c.name),...state.sales.map(sheriRecordActor)]);
   const rows=state.sales.filter(s=>sheriDateInReportRange(s.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
@@ -2950,7 +2971,7 @@ function renderInventoryMovementReport(report){
 }
 function renderInventory(){
   const list=(state.products||[]).slice();renderInventoryMovementEntry();const search=document.getElementById('inventorySearchHost');if(search)search.innerHTML=sheriSearchControl('inventory','inventoryTable','Search products by name, category, barcode or user',list.flatMap(p=>[p.name,p.cat,p.barcode,sheriRecordActor(p)]));
-  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>User</th><th>Status</th><th>Actions</th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${esc(sheriRecordActor(p))}</td><td>${p.deleted?'<span class="pill">Inactive</span>':p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions">${sheriCan('manage_team')&&sheriCan('manage_inventory')?(!p.deleted?'<button class="btn small secondary" onclick="toggleProductFavorite(\''+p.id+'\')">'+(p.favorite?'★ Favorite':'☆ Favorite')+'</button>':'')+'<button class="btn small secondary" onclick="editProduct(\''+p.id+'\')">Edit</button><button class="btn small '+(p.deleted?'secondary':'danger')+'" onclick="toggleProductStatus(\''+p.id+'\')">'+(p.deleted?'Activate':'Cancel')+'</button>':''}</div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
+  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>User</th><th>Status</th><th>Actions</th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${esc(sheriRecordActor(p))}</td><td>${p.deleted?'<span class="pill">Inactive</span>':p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions">${sheriCan('manage_team')&&sheriCan('manage_inventory')?(!p.deleted?'<button class="btn small secondary" onclick="toggleProductFavorite(\''+p.id+'\')">'+(p.favorite?'★ Favorite':'☆ Favorite')+'</button>':'')+'<button class="btn small secondary" onclick="editProduct(\''+p.id+'\')">Edit</button><button class="btn small '+(p.deleted?'secondary':'danger')+'" onclick="toggleProductStatus(\''+p.id+'\')">'+(p.deleted?'Reactivate':'Deactivate')+'</button>':''}</div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
   renderCategory();
 }
 async function toggleProductFavorite(id){if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can change sales favorites.','error');const p=product(id);if(!p)return;p.favorite=!p.favorite;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}});render();sheriToast(p.favorite?'Added to sales favorites.':'Removed from sales favorites.')}
