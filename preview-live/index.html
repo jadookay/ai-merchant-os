@@ -1528,7 +1528,7 @@ function sheriOutboxPriority(op){return ({merchant_upsert:0,product_upsert:1,sup
 async function sheriUnblockSchemaRepairedOperations(){
   const queued=await sheriGetAll('outbox');
   const candidates=queued.filter(item=>item.blocked&&(
-    (/created_by/i.test(String(item.last_error||''))&&/schema cache|column/i.test(String(item.last_error||''))&&['product_upsert','supplier_upsert'].includes(item.op?.type))||
+    (/created_by|status_reason/i.test(String(item.last_error||''))&&/schema cache|column/i.test(String(item.last_error||''))&&['product_upsert','supplier_upsert'].includes(item.op?.type))||
     (item.op?.type==='inventory_adjustment'&&/product not found/i.test(String(item.last_error||''))&&(state.products||[]).some(p=>p.id===item.op.product_id))||
     (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(String(item.last_error||'')))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)))
   ));
