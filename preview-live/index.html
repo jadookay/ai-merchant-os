@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.75 preview inventory deactivation and sync repair">
+<meta name="app-version" content="V14.4.76 preview inventory deactivation and sync repair">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -6293,7 +6293,8 @@ function accLedgerIntegrity(endDate=null){
     const date=String(bill.issue_date||bill.created_at||'').slice(0,10);if((endDate&&date>endDate)||Number(bill.total||0)<=0)continue;
     const entry=entries.find(e=>e.source_type==='bill'&&e.source_id===bill.id&&!e.voided);
     if(!activeSources.has('bill|'+bill.id)){addInvalid({id:'missing-bill-'+bill.id,description:'Bill '+(bill.bill_number||''),source_type:'bill',source_id:bill.id,entry_date:date},'Bill source has no active bill journal');continue;}
-    const expected=[{code:'1200',debit:Number(bill.subtotal||0),credit:0},...(Number(bill.tax_amount||0)?[{code:'2110',debit:Number(bill.tax_amount),credit:0}]:[]),{code:'2000',debit:0,credit:Number(bill.total)}];
+    const billDebitAccountId=bill.debit_account_id||accAccountCode('1200')?.id;
+    const expected=[{accountId:billDebitAccountId,debit:Number(bill.subtotal||0),credit:0},...(Number(bill.tax_amount||0)?[{code:'2110',debit:Number(bill.tax_amount),credit:0}]:[]),{code:'2000',debit:0,credit:Number(bill.total)}];
     if(entry&&!matchesExpected(entry,expected)){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Bill journal does not match its subtotal, input tax or payable accounts',v.count,v.debit,v.credit);}
   }
   for(const payment of state.payments||[]){
