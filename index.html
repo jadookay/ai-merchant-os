@@ -4944,7 +4944,7 @@ function sheriPersistTranscript(){
   if(!key||!box)return;
   try{
     const rows=[...box.children].filter(el=>el.classList.contains('msg')).map(el=>({role:el.classList.contains('me')?'user':'assistant',content:String(el.textContent||'').trim()})).filter(x=>x.content);
-    localStorage.setItem(key,JSON.stringify(rows.slice(-2000)));
+    localStorage.setItem(key,JSON.stringify(rows));
   }catch(err){console.warn('[Shericeri transcript] Local save unavailable:',err)}
 }
 function sheriRestoreTranscript(){
@@ -4955,7 +4955,7 @@ function sheriRestoreTranscript(){
   if(!key)return;
   try{
     const rows=JSON.parse(localStorage.getItem(key)||'[]');
-    if(Array.isArray(rows))rows.slice(-2000).forEach(row=>{
+    if(Array.isArray(rows))rows.forEach(row=>{
       if(!row||!['user','assistant'].includes(row.role)||typeof row.content!=='string'||!row.content.trim())return;
       const el=document.createElement('div');el.className='msg '+(row.role==='user'?'me':'ai');el.textContent=row.content;box.appendChild(el);
     });
