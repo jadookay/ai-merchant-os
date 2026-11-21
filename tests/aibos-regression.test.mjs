@@ -249,10 +249,10 @@ test("the preview application shell is bumped to V14.4.74 without changing produ
 });
 
 test("preview inline JavaScript blocks parse without syntax errors", () => {
-  const blocks=[...previewHtml.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script>/gi)]
-    .filter(([,attrs])=>!/\\bsrc\\s*=|application\\/(?:json|ld\\+json)/i.test(attrs));
+  const blocks=[...previewHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
+    .filter(([,attrs])=>!/\bsrc\s*=|application\/(?:json|ld\+json)/i.test(attrs));
   assert.ok(blocks.length>0);
-  blocks.forEach(([,attrs,source],index)=>new Script(source,{filename:`preview-inline-${index+1}-${attrs||'main'}.js`}));
+  blocks.forEach(([,attrs,source],index)=>new Script(source,{filename:\`preview-inline-\${index+1}-\${attrs||'main'}.js\`}));
 });
 
 test("expense payment workflow accrues expenses and settles the payable without duplicating expense", () => {
