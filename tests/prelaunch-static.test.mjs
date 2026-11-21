@@ -137,7 +137,9 @@ test("browser TTS fallback is used when the compatibility bridge is only a place
   const browserSpeak = html.indexOf("speechSynthesis.speak(utt);", browserFallback);
   assert.ok(browserFallback >= 0 && browserSpeak > browserFallback && browserSpeak - browserFallback < 800,
     "without a native bridge, Kinyarwanda must fail explicitly and browser TTS must remain reachable for supported languages");
-  assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{sheriDiagSet\('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE'\)/);
+  assert.ok(serviceWorker.includes("const localTtsReady=!!(window.SHERICERI_VOICE_BRIDGE?.capabilities?.tts || window.SHERICERI_VOICE_BRIDGE?.isReady&&await window.SHERICERI_VOICE_BRIDGE.isReady(lang))"));
+  assert.ok(serviceWorker.includes("if(localTtsReady){sheriDiagSet('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE')"));
+  assert.ok(serviceWorker.includes("finish('local-bridge-fallback');return;"));
 });
 
 
@@ -238,7 +240,7 @@ test("recent Shericeri history survives sleep and is sent with validated memory 
     "session sleep must not erase the last exchanges");
   assert.match(html, /memory:sheriMemoryPayload/);
   assert.match(quickService, /history, memory \} = await req\.json\(\)/);
-  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 10\)/);
+  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 5\)/);
   assert.match(quickService, /grounding \+ memoryContext/);
 });
 
@@ -309,8 +311,10 @@ test("sales and expenses confirm before saving and post balanced journal entries
   const saleAccountingEnd = html.indexOf("const _v14_1_addOSPurchase", saleAccountingStart);
   assert.ok(saleAccountingStart >= 0 && saleAccountingEnd > saleAccountingStart, "expected the sale accounting wrapper");
   const saleAccounting = html.slice(saleAccountingStart, saleAccountingEnd);
-  assert.ok(saleAccounting.includes("sourceType:'sale',sourceId:s.id"));
-  assert.ok(saleAccounting.includes("sourceType:'sale_cogs',sourceId:s.id"));
+  assert.match(saleAccounting, /POS sale revenue and COGS are posted atomically by the database sales trigger/);
+  assert.ok(saleAccounting.includes("await accAudit('create','sale',s.id"));
+  assert.doesNotMatch(saleAccounting, /accPostEntry\([\s\S]*?sourceType:'sale(?:_cogs)?'/,
+    "the client must not duplicate database-triggered POS revenue or COGS journals");
 
   const expenseStart = html.indexOf("function addExpense()");
   const expenseEnd = html.indexOf("\nasync function deleteExpense", expenseStart);
@@ -557,7 +561,10 @@ test("team status changes preserve omitted email, phone and username login ident
 
 test("team account creation validates email, phone, username and PIN formats", () => {
   assert.ok(teamAccess.includes('if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
-  assert.ok(teamAccess.includes('if (phone && !/^\\+?\\d{7,15}$/.test(phone))'));
+  assert.match(teamAccess, /function normalizePhoneForAuth\(value: string \| null, country: string \| null\): string \| null/);
+  assert.ok(teamAccess.includes('return /^\\+[1-9]\\d{7,14}$/.test(normalized) ? normalized : null;'));
+  assert.equal((teamAccess.match(/phone = normalizePhoneForAuth\(phone, merchant\.country\);/g)||[]).length, 2,
+    "create and update must both normalize and validate phone numbers using the merchant country");
   assert.ok(teamAccess.includes('if (username && !/^[a-z0-9._-]{3,40}$/.test(username))'));
   assert.ok(teamAccess.includes('!/^\\d{6,8}$/.test(pin)'));
 });
@@ -579,10 +586,10 @@ test("merchant navigation preserves the approved Home/Sell/Stock, Money/More and
   assert.match(html, /data-view="dashboard">⌂ Home/);
   assert.match(html, /data-view="sales">＋ Sell/);
   assert.match(html, /data-view="inventory">▦ Stock/);
-  assert.match(html, /data-view="money">💰 Money/);
-  assert.match(html, /data-view="businessOS" data-nav-command-center="1"[^>]*>⋯ More/);
-  assert.match(html, /onclick="show\('settings'\)">Settings/);
-  assert.match(html, /const labels=\{en:\['Home','Sell','Stock','Money','More','Shericeri'\]/);
+  assert.match(html, /data-view="settings">⚙ Setting/);
+  assert.match(html, /data-view="businessOS" data-nav-command-center="1" aria-expanded="false">◈ AIBOS Command Center/);
+  assert.match(html, /id="aibosCommandSubnav"[^>]*>[\s\S]*onclick="show\('suppliersPurchases'\)">Suppliers &amp; Purchases[\s\S]*onclick="show\('money'\)">Money/);
+  assert.match(html, /const labels=\{en:\['Home','Sell','Stock','Setting','AIBOS Command Center','Shericeri'\]/);
   assert.ok(html.includes('data-nav-shericeri'));
   assert.ok(html.includes('sheri-nav-thumb'));
   assert.ok(html.includes("'suppliers':'Abaranguza'"));
