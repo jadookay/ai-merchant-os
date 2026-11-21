@@ -6171,7 +6171,7 @@ function accLedgerIntegrity(endDate=null){
       :[{code:'6000',debit:amount,credit:0},{code:'1000',debit:0,credit:amount}];
     if(entry&&(!matchesExpected(entry,expected)||hasExactReversal(entry))){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Cash movement journal does not match its kind, amount or accounts, or has been reversed',v.count,v.debit,v.credit);}
   }
-  const deletedCashAudits=(state.auditLog||[]).filter(a=>a.entity_type==='cash_entry'&&a.action==='delete'&&(!endDate||String(a.created_at||'').slice(0,10)<=endDate));
+  const deletedCashAudits=(state.auditLog||[]).filter(a=>a.entity_type==='cash_entry'&&a.action==='delete'&&a.details?.kind!=='transfer'&&(!endDate||String(a.created_at||'').slice(0,10)<=endDate));
   const deletedCashIds=new Set(deletedCashAudits.map(a=>a.entity_id));
   for(const audit of deletedCashAudits){
     const originals=entries.filter(e=>e.source_type==='cash_entry'&&e.source_id===audit.entity_id&&(!endDate||String(e.entry_date||e.created_at||'').slice(0,10)<=endDate));
