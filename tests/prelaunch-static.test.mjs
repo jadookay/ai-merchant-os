@@ -58,7 +58,7 @@ test("team permission delegation cannot exceed the manager's own permissions", (
 
 test("expense deletion posts an exact reversal before marking the source deleted", () => {
   const start=html.lastIndexOf("deleteExpense=async function(id){");
-  const end=html.indexOf("};\\ndeleteOSCash=async function(id){",start);
+  const end=html.indexOf("deleteOSCash=async function(id){",start);
   const block=html.slice(start,end);
   assert.ok(start>=0&&end>start,"expected the final guarded expense deletion handler");
   assert.ok(block.includes("await accPostEntry({date:reversalDate"));
