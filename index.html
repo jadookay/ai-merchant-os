@@ -114,6 +114,20 @@ window.ensurePdfJs=async function(){
 .auth-card{max-width:430px}.auth-card .brand{margin-left:0}.auth-title{font-size:25px;font-weight:800;margin:0 0 6px}.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:18px 0 14px;background:#f3f4f6;padding:5px;border-radius:10px}.auth-tabs button{border:0;background:transparent;padding:9px;border-radius:8px;font-weight:700;color:#6b7280;cursor:pointer}.auth-tabs button.active{background:white;color:#1d4ed8;box-shadow:0 1px 3px #0001}.auth-panel{display:none}.auth-panel.active{display:block}.auth-field{position:relative}.auth-field input{padding-right:44px}.pw-toggle{position:absolute;right:8px;top:27px;border:0;background:transparent;cursor:pointer;color:#6b7280;padding:6px}.oauth-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}.oauth-btn{display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 12px;border-radius:9px;font-weight:700;cursor:pointer}.oauth-btn:hover{background:#f9fafb}.auth-divider{display:flex;align-items:center;gap:9px;color:#9ca3af;font-size:11px;margin:16px 0}.auth-divider:before,.auth-divider:after{content:"";height:1px;background:var(--line);flex:1}.auth-links{display:flex;justify-content:space-between;gap:8px;margin-top:12px}.text-btn{border:0;background:none;color:#2563eb;cursor:pointer;padding:4px;font-size:12px}.auth-status{min-height:20px;margin-top:12px} .auth-status.bad{color:var(--bad);font-weight:600}.onboard-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg)}.onboard-card{width:100%;max-width:620px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:28px;box-shadow:0 8px 30px #0000000c}.onboard-card h1{margin:0 0 5px;font-size:25px}.onboard-card .formgrid{margin-top:18px}.required-mark{color:var(--bad)}.onboard-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}.field-help{font-size:11px;color:var(--muted);margin-top:4px}.profile-badge{display:inline-flex;gap:6px;align-items:center;padding:5px 9px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:11px;font-weight:700}
 
 .report-head{display:flex;justify-content:space-between;align-items:center;gap:8px}.report-head h2{margin:0}.export-wrap{position:relative}.icon-btn{border:1px solid var(--line);background:white;border-radius:8px;padding:6px 9px;cursor:pointer}.export-menu{display:none;position:absolute;right:0;top:34px;background:white;border:1px solid var(--line);border-radius:9px;box-shadow:0 8px 24px #0002;z-index:30;min-width:120px;overflow:hidden}.export-wrap.open .export-menu{display:block}.export-menu button{display:block;width:100%;border:0;background:white;text-align:left;padding:9px 11px;cursor:pointer}.export-menu button:hover,.menu-file:hover{background:#f3f4f6}.menu-file{display:block;padding:9px 11px;cursor:pointer;font-size:12px}.menu-file input{display:none}
+
+/* Multilingual table readability: keep translated column headings visible. */
+[id$="Table"],[id$="table"],[id$="Ledger"],[id$="ledger"]{
+ display:block;max-width:100%;overflow-x:auto;overflow-y:visible;
+ -webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;
+}
+.table{width:max-content;min-width:100%;table-layout:auto}
+.table th{white-space:nowrap;min-width:max-content;overflow-wrap:normal;word-break:normal;vertical-align:bottom}
+.table td{min-width:5.5rem;overflow-wrap:anywhere;word-break:normal}
+@media(max-width:650px){
+ .table{width:max-content;min-width:100%;table-layout:auto}
+ .table th{white-space:nowrap;min-width:max-content}
+ .table td{min-width:5rem}
+}
 </style>
 
 <!-- V5 Whisper diagnostic patch: server now returns provider_status,
@@ -493,7 +507,7 @@ window.ensurePdfJs=async function(){
   <div class="card">
     <div class="formgrid">
       <div><label>Product</label><select id="saleProduct"></select></div>
-      <div><label>Quantity</label><input id="saleQty" type="number" min="1" value="1"></div>
+      <div><label>Quantity</label><input id="saleQty" type="number" min="0.01" step="0.01" value="1"></div>
       <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="salePrice" type="number" min="0" step="0.01"></div>
       <div><label>Customer (optional)</label><select id="saleCustomer"><option value="">— Anonymous —</option></select></div>
     </div>
@@ -512,8 +526,8 @@ window.ensurePdfJs=async function(){
       <div><label>Category</label><select id="pCat"><option>Food & Grocery</option><option>Cosmetics & Beauty</option><option>Clothing & Shoes</option><option>Phone Accessories</option><option>Other</option></select></div>
       <div><label>Cost / unit (<span data-currency-label>RWF</span>)</label><input id="pCost" type="number" min="0" step="0.01"></div>
       <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="pSell" type="number" min="0" step="0.01"></div>
-      <div><label>Current stock</label><input id="pStock" type="number"></div>
-      <div><label>Reorder level</label><input id="pReorder" type="number"></div>
+      <div><label>Current stock</label><input id="pStock" type="number" min="0" step="0.01"></div>
+      <div><label>Reorder level</label><input id="pReorder" type="number" min="0" step="0.01"></div>
       <div><label>Barcode (optional)</label><input id="pBarcode" placeholder="Scanned automatically, or type manually"></div>
       <div><label>Expiration date (optional)</label><input id="pExpiry" type="date"></div>
     </div>
@@ -566,7 +580,7 @@ window.ensurePdfJs=async function(){
         <div><label>Product</label><select id="inventoryMovementProduct"></select></div>
         <div><label>Movement type</label><select id="inventoryMovementType"><option value="customer_return">Customer return (stock in)</option><option value="supplier_return">Supplier return (stock out)</option><option value="writeoff">Write-off / damaged stock</option><option value="adjustment">Manual adjustment</option></select></div>
         <div><label>Adjustment direction</label><select id="inventoryMovementDirection"><option value="decrease">Decrease stock</option><option value="increase">Increase stock</option></select></div>
-        <div><label>Quantity</label><input type="number" min="1" step="1" id="inventoryMovementQty"></div>
+        <div><label>Quantity</label><input type="number" min="0.01" step="0.01" id="inventoryMovementQty"></div>
         <div style="grid-column:1/-1"><label>Reason (required)</label><input id="inventoryMovementReason" placeholder="Explain the return, damage or stock count difference"></div>
       </div>
       <div class="actions" style="margin-top:10px"><button class="btn" onclick="recordInventoryMovement()">Record movement</button></div>
@@ -737,7 +751,7 @@ window.ensurePdfJs=async function(){
 <div class="card"><h2>Record Purchase / Restock</h2><div class="formgrid">
       <div><label>Supplier</label><select id="osPurchaseSupplier" onchange="osPurchaseSupplierChanged()"></select><div id="osPurchaseSupplierInfo" class="sub"></div></div>
       <div><label>Product</label><select id="osPurchaseProduct"></select></div>
-      <div><label>Quantity</label><input id="osPurchaseQty" type="number" min="1" value="1"></div>
+      <div><label>Quantity</label><input id="osPurchaseQty" type="number" min="0.01" step="0.01" value="1"></div>
       <div><label>Unit cost (<span data-currency-label>RWF</span>)</label><input id="osPurchaseCost" type="number" min="0" step="0.01"></div>
       <div><label>Due date (optional)</label><input id="osPurchaseDue" type="date"></div>
       <div><label>Status</label><select id="osPurchaseStatus"><option value="received">Received</option><option value="ordered">Ordered</option></select></div>
@@ -2513,7 +2527,7 @@ if(document.getElementById('osPurchaseProduct'))document.getElementById('osPurch
 let saleCart=[];
 function addSaleToCart(){
   const id=document.getElementById('saleProduct').value,qty=Number(document.getElementById('saleQty').value),price=Number(document.getElementById('salePrice').value),p=product(id);
-  if(!p||!Number.isInteger(qty)||qty<1||!Number.isFinite(price)||price<0){sheriToast('Choose a product and enter a valid quantity and price.','error');return}
+  if(!p||!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0){sheriToast('Choose a product and enter a valid quantity and price.','error');return}
   const already=saleCart.filter(x=>x.productId===id).reduce((n,x)=>n+x.qty,0);if(already+qty>p.stock){sheriToast('Cart quantity exceeds available stock for '+p.name+'.','error');return}
   const existing=saleCart.find(x=>x.productId===id&&Number(x.price)===price);if(existing)existing.qty+=qty;else saleCart.push({productId:id,qty,price});renderSaleCart();sheriToast(p.name+' added to cart.');
 }
@@ -2538,7 +2552,7 @@ function printLastReceipt(){
 async function recordSale(){
   if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
   const custId=document.getElementById('saleCustomer').value||null,items=saleCart.length?saleCart:[{productId:document.getElementById('saleProduct').value,qty:Number(document.getElementById('saleQty').value),price:Number(document.getElementById('salePrice').value)}],checked=[];
-  for(const item of items){const p=product(item.productId);if(!p||!Number.isInteger(item.qty)||item.qty<1||!Number.isFinite(item.price)||item.price<0)return sheriToast('Check each product, quantity and selling price.','error');const used=checked.filter(x=>x.productId===p.id).reduce((n,x)=>n+x.qty,0);if(used+item.qty>p.stock)return sheriToast('Not enough stock for '+p.name+'.','error');checked.push({...item,product:p})}
+  for(const item of items){const p=product(item.productId);if(!p||!Number.isFinite(item.qty)||item.qty<=0||!Number.isFinite(item.price)||item.price<0)return sheriToast('Check each product, quantity and selling price.','error');const used=checked.filter(x=>x.productId===p.id).reduce((n,x)=>n+x.qty,0);if(used+item.qty>p.stock)return sheriToast('Not enough stock for '+p.name+'.','error');checked.push({...item,product:p})}
   const total=checked.reduce((n,x)=>n+x.qty*x.price,0),transactionId=sheriUuid(),createdAt=sheriNow(),invoice='INV-'+String(state.merchant.shericeri_id||'AIBOS')+'-'+Date.now();
   if(!confirm('Confirm sale?\\n'+checked.map(x=>x.qty+' × '+x.product.name+' — '+money(x.qty*x.price)).join('\\n')+'\\nTotal: '+money(total)))return;
   const rows=checked.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,product_id:x.product.id,product_name_snapshot:x.product.name,customer_id:custId,qty:x.qty,price:x.price,cost:x.product.cost,created_at:createdAt,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()}));
@@ -2861,7 +2875,7 @@ async function recordInventoryMovement(){
   const direction=document.getElementById('inventoryMovementDirection').value;
   const qty=Number(document.getElementById('inventoryMovementQty').value);
   const reason=document.getElementById('inventoryMovementReason').value.trim();
-  if(!p||!Number.isInteger(qty)||qty<1||reason.length<3)return sheriToast('Choose a product, enter a quantity and provide a clear reason.','error');
+  if(!p||!Number.isFinite(qty)||qty<=0||reason.length<3)return sheriToast('Choose a product, enter a quantity and provide a clear reason.','error');
   const delta=type==='customer_return'?qty:(type==='supplier_return'||type==='writeoff'?-qty:(direction==='increase'?qty:-qty));
   if(Number(p.stock||0)+delta<0)return sheriToast('The movement would make stock negative.','error');
   const expected=Number(p.stock||0);
@@ -5708,7 +5722,7 @@ async function deleteOSSupplier(id){if(!sheriCan('manage_team')||!sheriCan('mana
 async function addOSPurchase(){
   if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to record purchases.','error');
   const supplierId=document.getElementById('osPurchaseSupplier').value||null,productId=document.getElementById('osPurchaseProduct').value,qty=Number(document.getElementById('osPurchaseQty').value),unitCost=Number(document.getElementById('osPurchaseCost').value),status=document.getElementById('osPurchaseStatus').value;
-  const p=product(productId);if(!p||!Number.isInteger(qty)||qty<1||!Number.isInteger(unitCost)||unitCost<0)return alert('Choose a product and enter a whole-number quantity and valid unit cost.');
+  const p=product(productId);if(!p||!Number.isFinite(qty)||qty<=0||!Number.isFinite(unitCost)||unitCost<0)return alert('Choose a product and enter a positive quantity and a valid unit cost (decimals are accepted).');
   const now=sheriNow(),oldStock=Number(p.stock)||0,oldCost=Number(p.cost)||0;
   const data={id:sheriUuid(),merchant_id:state.merchant.id,supplier_id:supplierId,product_id:p.id,product_name_snapshot:p.name,qty,unit_cost:unitCost,total:qty*unitCost,status,purchased_at:now,due_date:document.getElementById('osPurchaseDue').value||null,created_at:now,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
   let localStock=null,localCost=null;
@@ -5957,7 +5971,7 @@ async function accCreateAdjustment(){
   if(accPeriodLocked(date))return alert('This adjustment date is inside a locked accounting period.');
   const salesRet=accAccountCode('4050'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');let amount=Number(document.getElementById('accAdjAmount').value),lines=[],p=null,stockDelta=0,movementType=null,stockBefore=null;
   if(type==='stock_writeoff'||type==='stock_gain'){
-    p=product(productId);if(!p||qty<=0||!Number.isInteger(qty))return alert('Choose a product and enter a whole-number quantity for a stock adjustment.');
+    p=product(productId);if(!p||qty<=0||!Number.isFinite(qty))return alert('Choose a product and enter a whole-number quantity for a stock adjustment.');
     stockBefore=Number(p.stock||0);if(type==='stock_writeoff'&&qty>stockBefore)return alert('The write-off quantity cannot exceed the current stock.');
     amount=qty*Number(p.cost||0);if(!Number.isFinite(amount)||amount<=0)return alert('The product must have a positive unit cost before its stock value can be adjusted.');
     if(type==='stock_writeoff'){lines=[{accountId:accAccountCode('6000').id,debit:amount},{accountId:inv.id,credit:amount}];stockDelta=-qty;movementType='writeoff';}
