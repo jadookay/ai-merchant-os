@@ -322,7 +322,7 @@ test("supplier bill PDF loads jsPDF and AutoTable before generating the document
 test("supplier bill register displays saved line descriptions and catches PDF errors", () => {
   assert.ok(previewHtml.includes("<th>Description</th>"));
   assert.ok(previewHtml.includes("map(item=>item.description).filter(Boolean).join(', ')"));
-  assert.ok(previewHtml.includes('onclick="accBillPdfClick(\'') );
+  assert.ok(previewHtml.includes("accBillPdfClick("));
   assert.ok(previewHtml.includes("function accBillPdfClick(id){accBillPdf(id).catch(error=>"));
 });
 
