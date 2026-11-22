@@ -2637,7 +2637,9 @@ function printLastReceipt(){
   const shericeri=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(shericeri)desired.push(shericeri);
   const current=Array.from(nav.children).filter(el=>el.matches('button'));
   if(desired.some((button,index)=>current[index]!==button))desired.forEach(button=>nav.appendChild(button));
-  if(picker){const subnav=document.getElementById('aibosCommandSubnav');if(picker.parentElement!==side||picker.nextElementSibling!==subnav)side.insertBefore(picker,subnav||null)}
+  const auth=document.getElementById('authScreen');
+  const appVisible=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none');
+  if(picker&&appVisible){const subnav=document.getElementById('aibosCommandSubnav');if(picker.parentElement!==side||picker.nextElementSibling!==subnav)side.insertBefore(picker,subnav||null)}
   const language=picker?.querySelector('select')?.value||window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en';
   paint(language);
   if(window.innerWidth<=650&&main)main.style.setProperty('margin-top',(side.getBoundingClientRect().height+10)+'px','important');
@@ -2663,6 +2665,9 @@ function printLastReceipt(){
  const observer=new MutationObserver(()=>{if(picker&&picker.parentElement!==side)arrange();else if(window.innerWidth<=650&&main)main.style.setProperty('margin-top',(side.getBoundingClientRect().height+10)+'px','important')});
  observer.observe(main||app,{childList:true});
  observer.observe(side,{childList:true});
+ const auth=document.getElementById('authScreen');
+ observer.observe(app,{attributes:true,attributeFilter:['style']});
+ if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
  arrange();
 })();
 </script>
