@@ -826,3 +826,16 @@ test("Shericeri generation explicitly requires idiomatic spoken Kinyarwanda rath
   assert.ok(quickService.includes("never like English or French translated into Kinyarwanda"));
   assert.ok(quickService.includes("would a fluent person in Rwanda actually say this aloud"));
 });
+
+
+test("inventory accounting guards enforce exact purchase receipts and source-linked opening journals", async () => {
+  const migration = await readFile(new URL("../supabase/migrations/20261122150000_accounting_inventory_integrity_guards.sql", import.meta.url), "utf8");
+  assert.match(migration, /abs\(v_receipt_qty-v_purchase_qty\)>0\.0001/);
+  assert.match(migration, /abs\(v_receipt_value-\(v_purchase_qty\*v_purchase_unit_cost\)\)>0\.005/);
+  assert.match(migration, /old\.status='received'/);
+  assert.match(migration, /new\.qty is distinct from old\.qty/);
+  assert.match(migration, /supplier return or adjustment instead/);
+  assert.match(migration, /new\.source_type='inventory_migration_reconciliation'/);
+  assert.match(migration, /one source-linked opening-stock journal per product/);
+  assert.match(migration, /before insert on public\.journal_entries/i);
+});
