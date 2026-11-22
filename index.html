@@ -1388,10 +1388,10 @@ async function sheriEnsureProductBeforeStockChange(op){
 }
 async function sheriSyncInventoryAdjustmentOperation(op){
   await sheriEnsureProductBeforeStockChange(op);
-  const {data,error}=await sb.rpc('shericeri_adjust_product_stock',{
+  const {data,error}=await sb.rpc('shericeri_adjust_product_stock_v2',{
     p_merchant_id:op.merchant_id,p_product_id:op.product_id,p_expected_stock:op.expected_stock,
     p_quantity_delta:op.quantity_delta,p_reason:op.reason,p_movement_type:op.movement_type||'adjustment',
-    p_source_id:op.source_id
+    p_source_id:op.source_id,p_entry_date:op.entry_date||new Date().toISOString().slice(0,10)
   });
   if(error)throw error;
   if(data?.stock_conflict){
@@ -2821,7 +2821,7 @@ async function saveProduct(){
     // Create the product at zero stock on the server, then apply opening stock
     // through the audited RPC so inventory_movements records the opening balance.
     await sheriQueue({type:'product_upsert',record:{...p,stock:0}});
-    if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:0,quantity_delta:initialStock,reason:'Initial stock entry',movement_type:'opening_balance',source_id:sheriUuid()});
+    if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:0,quantity_delta:initialStock,reason:'Initial stock entry',movement_type:'opening_balance',source_id:sheriUuid(),entry_date:now.slice(0,10)});
   }
   // The opening-balance inventory RPC now creates the matching Inventory / Owner Equity journal in the same database transaction as the stock movement.
   if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name});
@@ -2868,7 +2868,7 @@ async function recordInventoryMovement(){
   const expected=Number(p.stock||0);
   p.stock=expected+delta;
   await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
-  await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:expected,quantity_delta:delta,reason,movement_type:type,source_id:sheriUuid()});
+  await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:expected,quantity_delta:delta,reason,movement_type:type,source_id:sheriUuid(),entry_date:sheriNow().slice(0,10)});
   document.getElementById('inventoryMovementQty').value='';
   document.getElementById('inventoryMovementReason').value='';
   render();if(navigator.onLine)await sheriSyncOutbox();
@@ -3141,7 +3141,7 @@ async function mergeImportedProducts(items,status){
       Object.assign(existing,patch,{updated_at:sheriNow()});
       await sheriPut('products',existing.id,{merchant_id:state.merchant.id,record:{...existing}});
       await sheriQueue({type:'product_upsert',record:{...existing,stock:previousStock}});
-      if(incomingStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:existing.id,expected_stock:previousStock,quantity_delta:incomingStock,reason:'Imported stock addition',movement_type:'adjustment',source_id:sheriUuid()});
+      if(incomingStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:existing.id,expected_stock:previousStock,quantity_delta:incomingStock,reason:'Imported stock addition',movement_type:'adjustment',source_id:sheriUuid(),entry_date:sheriNow().slice(0,10)});
       merged++;
     }else{
       const data={id:sheriUuid(),merchant_id:state.merchant.id,name,
@@ -3153,7 +3153,7 @@ async function mergeImportedProducts(items,status){
       state.products.push(data);
       await sheriPut('products',data.id,{merchant_id:state.merchant.id,record:{...data}});
       await sheriQueue({type:'product_upsert',record:{...data,stock:0}});
-      if(incomingStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:data.id,expected_stock:0,quantity_delta:incomingStock,reason:'Imported opening stock',movement_type:'opening_balance',source_id:sheriUuid()});
+      if(incomingStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:data.id,expected_stock:0,quantity_delta:incomingStock,reason:'Imported opening stock',movement_type:'opening_balance',source_id:sheriUuid(),entry_date:sheriNow().slice(0,10)});
       added++;
     }
   }
@@ -3436,7 +3436,7 @@ async function seedDemoData(){
     state.products.push(data);
     await sheriPut('products',data.id,{merchant_id:state.merchant.id,record:{...data}});
     await sheriQueue({type:'product_upsert',record:{...data,stock:0}});
-    if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:data.id,expected_stock:0,quantity_delta:initialStock,reason:'Demo opening stock',movement_type:'opening_balance',source_id:sheriUuid()});
+    if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:data.id,expected_stock:0,quantity_delta:initialStock,reason:'Demo opening stock',movement_type:'opening_balance',source_id:sheriUuid(),entry_date:sheriNow().slice(0,10)});
   }
   if(navigator.onLine)await sheriSyncOutbox();
   render();
@@ -6011,29 +6011,39 @@ async function accCreateAdjustment(){
   const type=document.getElementById('accAdjType').value,accountId=document.getElementById('accAdjAccount').value,date=document.getElementById('accAdjDate').value||accToday(),desc=document.getElementById('accAdjDesc').value.trim()||type,qty=Number(document.getElementById('accAdjQty').value)||0,productId=document.getElementById('accAdjProduct').value||null;
   if(qty<0||(productId&&qty>0&&!Number.isInteger(qty)))return sheriToast(sheriLocalized('Return and adjustment quantities must be whole numbers.','Les quantités de retour et d’ajustement doivent être des nombres entiers.','Umubare w’ibicuruzwa bigarurwa cyangwa bihindurwa mu bubiko ugomba kuba ari umubare wuzuye.'),'error');
   if(accPeriodLocked(date))return alert('This adjustment date is inside a locked accounting period.');
-  const salesRet=accAccountCode('4050'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');let amount=Number(document.getElementById('accAdjAmount').value),lines=[],p=null,stockDelta=0,movementType=null,stockBefore=null;
+  const salesRet=accAccountCode('4050'),inv=accAccountCode('1200'),cogs=accAccountCode('5000');let amount=Number(document.getElementById('accAdjAmount').value),lines=[],p=null,stockDelta=0,movementType=null,stockBefore=null,serverPostsStockJournal=false;
   if(type==='stock_writeoff'||type==='stock_gain'){
     p=product(productId);if(!p||qty<=0||!Number.isInteger(qty))return alert('Choose a product and enter a whole-number quantity for a stock adjustment.');
     stockBefore=Number(p.stock||0);if(type==='stock_writeoff'&&qty>stockBefore)return alert('The write-off quantity cannot exceed the current stock.');
     amount=qty*Number(p.cost||0);if(!Number.isFinite(amount)||amount<=0)return alert('The product must have a positive unit cost before its stock value can be adjusted.');
-    if(type==='stock_writeoff'){lines=[{accountId:accAccountCode('6000').id,debit:amount},{accountId:inv.id,credit:amount}];stockDelta=-qty;movementType='writeoff';}
-    else{lines=[{accountId:inv.id,debit:amount},{accountId:accAccountCode('3000').id,credit:amount}];stockDelta=qty;movementType='adjustment';}
+    if(type==='stock_writeoff'){stockDelta=-qty;movementType='writeoff';}
+    else{stockDelta=qty;movementType='adjustment';}
+    serverPostsStockJournal=true;
   }else{
     if(!Number.isFinite(amount)||amount<=0||!accountId)return alert('Enter a positive amount and choose a cash/bank account.');
     if(type==='sales_return'){
       lines=[{accountId:salesRet.id,debit:amount},{accountId:accountId,credit:amount}];
-      if(qty>0&&productId){p=product(productId);if(!p)return alert('The selected return product could not be found.');stockBefore=Number(p.stock||0);const cost=Number(p.cost||0)*qty;if(cost>0)lines.push({accountId:inv.id,debit:cost},{accountId:cogs.id,credit:cost});stockDelta=qty;movementType='customer_return';}
+      if(qty>0&&productId){
+        p=product(productId);if(!p)return alert('The selected return product could not be found.');
+        stockBefore=Number(p.stock||0);stockDelta=qty;movementType='customer_return';serverPostsStockJournal=true;
+      }
     }else if(type==='sales_discount'){lines=[{accountId:salesRet.id,debit:amount},{accountId:accountId,credit:amount}];}
     else{
       lines=[{accountId:accAccountCode('2000').id,debit:amount},{accountId:inv.id,credit:amount}];
-      if(qty>0&&productId){p=product(productId);if(!p)return alert('The selected purchase-return product could not be found.');stockBefore=Number(p.stock||0);if(qty>stockBefore)return alert('The return quantity cannot exceed the current stock.');stockDelta=-qty;movementType='supplier_return';}
+      if(qty>0&&productId){
+        p=product(productId);if(!p)return alert('The selected purchase-return product could not be found.');
+        stockBefore=Number(p.stock||0);if(qty>stockBefore)return alert('The return quantity cannot exceed the current stock.');
+        const stockValue=qty*Number(p.cost||0);
+        if(!Number.isFinite(stockValue)||Math.abs(amount-stockValue)>0.005)return sheriToast(sheriLocalized('For a stock-linked supplier return, the credit amount must match the returned stock value at current weighted-average cost.','Pour un retour fournisseur lié au stock, le montant de l’avoir doit correspondre à la valeur du stock retourné au coût moyen pondéré actuel.','Ku igarura ibicuruzwa ku muhereza bifitanye isano n’ububiko, amafaranga y’inguzanyo agomba kungana n’agaciro k’ububiko bugaruwe hakurikijwe ikiguzi mpuzandengo kiriho.'),'error');
+        stockDelta=-qty;movementType='supplier_return';serverPostsStockJournal=true;lines=[];
+      }
     }
   }
   const adjustmentId=sheriUuid();
   const confirmText='Record '+type.replace(/_/g,' ')+'?\n'+desc+'\nQuantity: '+(qty||'—')+'\nValue: '+money(amount);if(!confirm(confirmText))return;
-  if(p&&stockDelta){p.stock=stockBefore+stockDelta;p.updated_at=sheriNow();await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p,stock:stockBefore}});await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:stockBefore,quantity_delta:stockDelta,reason:desc,movement_type:movementType,source_id:adjustmentId});}
-  await accPostEntry({date,description:desc,sourceType:type,sourceId:adjustmentId,lines});
-  await accAudit('create','adjustment',null,{type,amount,quantity:qty,product_id:productId});
+  if(p&&stockDelta){p.stock=stockBefore+stockDelta;p.updated_at=sheriNow();await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p,stock:stockBefore}});await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:stockBefore,quantity_delta:stockDelta,reason:desc,movement_type:movementType,source_id:adjustmentId,entry_date:date});}
+  if(lines.length>=2)await accPostEntry({date,description:desc,sourceType:type,sourceId:adjustmentId,lines});
+  await accAudit('create','adjustment',null,{type,amount,quantity:qty,product_id:productId,stock_journal_posted_by_server:serverPostsStockJournal});
   document.getElementById('accAdjAmount').value='';document.getElementById('accAdjDesc').value='';document.getElementById('accAdjQty').value='0';render();sheriToast('Adjustment recorded.');
 }
 function accInvoicePdf(id){const i=state.invoices.find(x=>x.id===id);if(!i||!window.jspdf)return alert('PDF engine is not available.');const {jsPDF}=window.jspdf;const d=new jsPDF();d.text(state.merchant.name||'Business',20,20);d.text(i.invoice_number,150,20);d.text('Customer: '+(accCustomer(i.customer_id)?.name||'Walk-in'),20,32);d.text('Issue: '+i.issue_date+'  Due: '+i.due_date,20,40);if(d.autoTable)d.autoTable({startY:50,head:[['Description','Qty','Unit','Total']],body:(i.items||[]).map(x=>[x.description,x.qty,money(x.unit_price),money(x.qty*x.unit_price)]).concat([['','','Subtotal',money(i.subtotal)],['','','Tax',money(i.tax_amount)],['','','Total',money(i.total)]] )});d.save(i.invoice_number+'.pdf')}
