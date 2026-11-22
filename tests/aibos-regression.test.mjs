@@ -10,6 +10,7 @@ const previewServiceWorker = readFileSync(new URL("../preview-live/shericeri_v14
 const expenseAccrualMigration = readFileSync(new URL("../supabase/migrations/20261121230000_expense_payment_accrual_workflow.sql", import.meta.url), "utf8");
 const expenseStatusMigration = readFileSync(new URL("../supabase/migrations/20261121233000_expense_payment_status.sql", import.meta.url), "utf8");
 const supplierBillMigration = readFileSync(new URL("../supabase/migrations/20261121234500_supplier_bill_account_classification.sql", import.meta.url), "utf8");
+const purchaseLinkMigration = readFileSync(new URL("../supabase/migrations/20261122090000_link_supplier_bills_to_stock_purchases.sql", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
@@ -363,4 +364,45 @@ test("preview localization retains English, French and Kinyarwanda and exposes a
 test("invoice and payment receipt PDFs also load the PDF engine before use", () => {
   assert.match(previewHtml, /async function accInvoicePdf\(id\)[\s\S]*?await sheriEnsurePdf\(\)/);
   assert.match(previewHtml, /async function accReceiptPdf\(id\)[\s\S]*?await sheriEnsurePdf\(\)/);
+});
+
+test("received purchases can be matched to supplier bills without duplicate inventory or payable journals", () => {
+  assert.ok(previewHtml.includes('id="accBillPurchase"'));
+  assert.ok(previewHtml.includes("function accBillPurchaseOptions()"));
+  assert.ok(previewHtml.includes("purchase_id:purchaseId"));
+  assert.ok(previewHtml.includes("if(!linkedPurchase){stage='posting the balanced accounting journal'"));
+  assert.ok(previewHtml.includes("Matched bill must not create a second inventory/payable journal"));
+  assert.ok(previewHtml.includes("function accPurchaseLinkedBill(p)"));
+  assert.ok(previewHtml.includes("function accPurchasePaid(p)"));
+  assert.ok(previewHtml.includes("source_type==='purchase'"));
+});
+
+test("supplier payments can settle bills or received purchases and are checked against outstanding balances", () => {
+  assert.ok(previewHtml.includes("— Select a supplier bill or received purchase —"));
+  assert.ok(previewHtml.includes("kind:'purchase'"));
+  assert.ok(previewHtml.includes("sourceKind==='purchase'?accPurchaseOutstanding(doc)"));
+  assert.ok(previewHtml.includes("sourceType=sourceKind||'bill'"));
+  assert.ok(previewHtml.includes("['bill','purchase'].includes(payment.source_type)"));
+});
+
+test("purchase-to-bill link migration enforces one-to-one, same-merchant, supplier, status and amount matching", () => {
+  assert.ok(purchaseLinkMigration.includes("add column if not exists purchase_id uuid"));
+  assert.ok(purchaseLinkMigration.includes("create unique index if not exists bills_purchase_id_unique"));
+  assert.ok(purchaseLinkMigration.includes("references public.purchases(id)"));
+  assert.ok(purchaseLinkMigration.includes("and merchant_id = new.merchant_id"));
+  assert.ok(purchaseLinkMigration.includes("purchase_row.status is distinct from 'received'"));
+  assert.ok(purchaseLinkMigration.includes("new.supplier_id is distinct from purchase_row.supplier_id"));
+  assert.ok(purchaseLinkMigration.includes("abs(coalesce(new.total, 0) - coalesce(purchase_row.total, 0)) > 0.005"));
+});
+
+test("language switching translates dynamically rendered nodes, form attributes and native dialogs", () => {
+  assert.ok(previewHtml.includes("new MutationObserver(records=>"));
+  assert.ok(previewHtml.includes("observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true"));
+  assert.ok(previewHtml.includes("window.alert=message=>nativeAlert(translateString"));
+  assert.ok(previewHtml.includes("window.confirm=message=>nativeConfirm(translateString"));
+  assert.ok(previewHtml.includes("window.prompt=(message,defaultValue)=>nativePrompt(translateString"));
+  assert.ok(previewHtml.includes("function renderReports()"));
+  assert.ok(previewHtml.includes("sheriLocalized('Historical inventory valuation is not available"));
+  assert.ok(previewHtml.includes("function sheriSyncLangSelectors(source)"));
+  assert.ok(previewHtml.includes("window.AIBOS_I18N?.setLanguage?.(appLang)"));
 });
