@@ -11,6 +11,7 @@ const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_sto
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
+const previewLiveHtml = await readFile(new URL("../preview-live/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
 
@@ -839,7 +840,7 @@ test("Shericeri generation explicitly requires idiomatic spoken Kinyarwanda rath
 
 
 test("owner sign-up requires and securely stores a full name; staff PIN login accepts a full name identifier in all locales", () => {
-  for (const source of [html, previewHtml]) {
+  for (const source of [html, previewLiveHtml]) {
     assert.ok(source.includes('id="signupFullName"'));
     assert.ok(source.includes('autocomplete="name"'));
     assert.ok(source.includes("Enter your full name (2–120 characters)."));
