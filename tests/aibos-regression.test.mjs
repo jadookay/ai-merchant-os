@@ -337,6 +337,29 @@ test("supplier bill PDF labels and bill register have French and Kinyarwanda tra
   ]) assert.ok(previewHtml.includes(value), "Missing bill translation: "+value);
 });
 
+test("preview localization covers recently identified navigation, payments and supplier-bill UI gaps", () => {
+  for (const value of [
+    "'activity & report period':'Ibikorwa n’igihe cya raporo'",
+    "'payment status':'Imiterere y’ubwishyu'",
+    "'paid now':'Yishyuwe ubu'",
+    "'product / service':'Igicuruzwa / Serivisi'",
+    "'what is this bill for?':'Iyi fagitire ni iyo iki?'",
+    "'debit account for this purchase':'Konti igomba kwandikwaho ikiguzi cy’icyaguzwe'",
+    "'activity & report period':'Activité et période du rapport'",
+    "'payment status':'Statut du paiement'",
+    "'paid now':'Payé maintenant'",
+    "'product / service':'Produit / Service'",
+    "'what is this bill for?':'Quel est l’objet de cette facture ?'",
+    "'debit account for this purchase':'Compte à débiter pour cet achat'"
+  ]) assert.ok(previewHtml.includes(value), "Missing preview translation: "+value);
+});
+
+test("preview localization retains English, French and Kinyarwanda and exposes a runtime language switch", () => {
+  assert.match(previewHtml, /<option value="en">English<\/option><option value="rw">Ikinyarwanda<\/option><option value="fr">Français<\/option>/);
+  assert.match(previewHtml, /window\.AIBOS_I18N=\{version:'1',getLanguage:.*?setLanguage:applyLanguage/s);
+  assert.match(previewHtml, /window\.dispatchEvent\(new CustomEvent\('aibos:languagechange'/);
+});
+
 test("invoice and payment receipt PDFs also load the PDF engine before use", () => {
   assert.match(previewHtml, /async function accInvoicePdf\(id\)[\s\S]*?await sheriEnsurePdf\(\)/);
   assert.match(previewHtml, /async function accReceiptPdf\(id\)[\s\S]*?await sheriEnsurePdf\(\)/);
