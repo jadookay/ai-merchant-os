@@ -9956,7 +9956,7 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
  const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),nav=side?.querySelector('.nav'),main=app?.querySelector('.main'),picker=document.getElementById('aibosLanguageSwitcher'),auth=document.getElementById('authScreen');
  if(!side||!nav)return;
  const order=['dashboard','sales','inventory','businessOS','settings'];
- const labels={en:['Home','Sell','Stock','AIBOS','Settings','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','AIBOS','Igenamiterere','Shericeri'],fr:['Accueil','Vendre','Stock','AIBOS','Paramètres','Shericeri']},icons=['⌂','＋','▦','◈','⚙',''];
+ const labels={en:['Home','Sell','Stock','AIBOS Command Center','Settings','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Igenzura ry’ubucuruzi','Igenamiterere','Shericeri'],fr:['Accueil','Vendre','Stock','Centre de gestion AIBOS','Paramètres','Shericeri']},icons=['⌂','＋','▦','◈','⚙',''];
  function paint(lang){
   const names=labels[lang]||labels.en;
   order.forEach((id,i)=>{const b=nav.querySelector(':scope > button[data-view="'+id+'"]');if(b){const label=icons[i]+' '+names[i];if(b.textContent!==label)b.textContent=label;b.setAttribute('aria-label',names[i])}});
