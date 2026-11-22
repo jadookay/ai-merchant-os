@@ -594,6 +594,9 @@ test("merchant navigation preserves the approved 3-2-1 Home/Sell/Stock, AIBOS/Se
   assert.ok(html.includes("rw:['Ahabanza','Gurisha','Ibicuruzwa','AIBOS','Igenamiterere','Shericeri']"));
   assert.ok(html.includes("fr:['Accueil','Vendre','Stock','AIBOS','Paramètres','Shericeri']"));
   assert.ok(html.includes("side.insertBefore(picker,sub||null)"));
+  assert.ok(html.includes("if(b.textContent!==label)b.textContent=label"), "navigation painting must be idempotent to avoid MutationObserver loops");
+  assert.ok(html.includes("if(labelNode.nodeValue!==names[5])labelNode.nodeValue=names[5]"), "Shericeri label updates must preserve its thumbnail and avoid repeated DOM mutations");
+  assert.ok(!html.includes("s.replaceChildren()"), "Shericeri thumbnail must not be removed while translating navigation");
   assert.ok(html.includes("grid-column:3 / span 2!important;grid-row:3!important"));
   assert.ok(html.includes("sheri-nav-thumb"));
   assert.ok(html.includes("'suppliers':'Abaranguza'"));
