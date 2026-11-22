@@ -870,3 +870,13 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
   }
   assert.ok(html.includes("if(!full_name||full_name.length<2||full_name.length>120)"));
 });
+
+test("sync status bar uses one locale-invariant horizontal layout with readable, non-squashed controls", () => {
+  for (const source of [html, previewLiveHtml]) {
+    assert.ok(source.includes('id="aibos-unified-sync-layout-v58"'));
+    assert.match(source, /#appRoot #sheriOfflineBar>div:last-child\s*\{[\s\S]*?flex-direction:row!important;[\s\S]*?flex-wrap:nowrap!important/);
+    assert.match(source, /#appRoot #sheriOfflineBar>div:last-child \.btn\s*\{[\s\S]*?flex:0 0 auto!important;[\s\S]*?font-size:12\.5px!important/);
+    assert.match(source, /@media\(max-width:380px\)[\s\S]*?#appRoot #sheriOfflineBar>div:last-child \.btn\s*\{[\s\S]*?font-size:11\.5px!important/);
+    assert.doesNotMatch(source, /(?:html\[lang="(?:en|rw|fr)"\]|:lang\((?:en|rw|fr)\))[^{}]*#sheriOfflineBar/);
+  }
+});
