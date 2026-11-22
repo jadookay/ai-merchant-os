@@ -2615,8 +2615,10 @@ function printLastReceipt(){
  if(!side||!nav)return;
  const ordered=['dashboard','sales','inventory','businessOS','settings'];
  function arrange(){
-  ordered.forEach(id=>{const button=nav.querySelector(':scope > button[data-view="'+id+'"]');if(button)nav.appendChild(button)});
-  const shericeri=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(shericeri)nav.appendChild(shericeri);
+  const desired=ordered.map(id=>nav.querySelector(':scope > button[data-view="'+id+'"]')).filter(Boolean);
+  const shericeri=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(shericeri)desired.push(shericeri);
+  const current=Array.from(nav.children).filter(el=>el.matches('button'));
+  if(desired.some((button,index)=>current[index]!==button))desired.forEach(button=>nav.appendChild(button));
   if(picker){const subnav=document.getElementById('aibosCommandSubnav');if(picker.parentElement!==side||picker.nextElementSibling!==subnav)side.insertBefore(picker,subnav||null)}
   const language=picker?.querySelector('select')?.value||window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en';
   paint(language);
@@ -2641,8 +2643,8 @@ function printLastReceipt(){
  window.addEventListener('aibos:languagechange',e=>paint(e.detail?.language||languagePicker?.value||'en'));
  window.addEventListener('resize',syncLayout,{passive:true});
  const observer=new MutationObserver(()=>{if(picker&&picker.parentElement!==side)arrange();else if(window.innerWidth<=650&&main)main.style.setProperty('margin-top',(side.getBoundingClientRect().height+10)+'px','important')});
- observer.observe(main||app,{childList:true,subtree:true});
- observer.observe(side,{childList:true,subtree:true});
+ observer.observe(main||app,{childList:true});
+ observer.observe(side,{childList:true});
  arrange();
 })();
 </script>
