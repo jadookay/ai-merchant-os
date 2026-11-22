@@ -6402,7 +6402,7 @@ function sheriTranslateFinancialReportText(){
     'Details':['Details','Détails','Ibisobanuro birambuye'],
     'No audit events yet.':['No audit events yet.','Aucun événement d’audit pour le moment.','Nta bikorwa byo kugenzura biraboneka.']
   };
-  const languageIndex=(()=>{const lang=String(document.documentElement.lang||localStorage.getItem('sheri_lang')||localStorage.getItem('language')||'en').toLowerCase();return lang.startsWith('fr')?1:lang.startsWith('rw')||lang.startsWith('ki')?2:0})();
+  const languageIndex=(()=>{const lang=String((typeof sheriLangCode==='function'?sheriLangCode():document.documentElement.lang)||'en').toLowerCase();return lang.startsWith('fr')?1:lang.startsWith('rw')||lang.startsWith('ki')?2:0})();
   for(const root of roots){
     const walker=document.createTreeWalker(root,4);let node;
     while((node=walker.nextNode())){
