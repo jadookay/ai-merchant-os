@@ -14,6 +14,7 @@ const purchaseLinkMigration = readFileSync(new URL("../supabase/migrations/20261
 const inventoryIntegrityMigration = readFileSync(new URL("../supabase/migrations/20261122150000_accounting_inventory_integrity_guards.sql", import.meta.url), "utf8");
 const purchaseVoidBaseMigration = readFileSync(new URL("../supabase/migrations/20261122180000_audited_received_purchase_void.sql", import.meta.url), "utf8");
 const purchaseVoidFinalMigration = readFileSync(new URL("../supabase/migrations/20261122183000_purchase_void_document_preflight.sql", import.meta.url), "utf8");
+const purchaseVoidReversalMigration = readFileSync(new URL("../supabase/migrations/20261122184000_purchase_void_exact_reversal_and_ledger_awareness.sql", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
@@ -493,4 +494,27 @@ test("voided purchases are excluded from supplier spend, rebuilds, bill matching
 test("purchase voiding does not modify the fixed online sync worker", () => {
   assert.ok(!serviceWorker.includes("void_received_purchase"));
   assert.ok(!previewServiceWorker.includes("void_received_purchase"));
+});
+
+
+test("purchase void creates one exact inverse and offsets the supplier-return movement journal", () => {
+  for (const value of [
+    "void_movement_offset_journal_entry_id",
+    "'purchase_void',v_purchase.id",
+    "v_payable,v_purchase.total,0",
+    "v_inventory,0,v_purchase.total",
+    "'supplier_return',v_purchase.id",
+    "'purchase_void_movement_offset',v_purchase.id",
+    "v_inventory,v_receipt_value,0",
+    "v_payable,0,v_receipt_value"
+  ]) assert.ok(purchaseVoidReversalMigration.includes(value), "Missing exact purchase reversal detail: "+value);
+});
+
+test("accounting balances and integrity checks recognize purchase_void as the exact reversal source", () => {
+  for (const app of [html,previewHtml]) {
+    const reversalLists=app.split("\n").filter(line=>line.includes("accounting_correction")&&line.includes("sale_void"));
+    assert.ok(reversalLists.length>=2);
+    assert.ok(reversalLists.every(line=>line.includes("purchase_void")));
+    assert.ok(app.includes("['sale','sale_cogs','purchase'].includes(entry.source_type)"));
+  }
 });
