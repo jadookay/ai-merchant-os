@@ -460,6 +460,24 @@ test("opening stock and every inventory movement use atomic server-side accounti
   assert.match(html, /function accAdjustTypeChanged\(\)/);
 });
 
+test("reorder tracking separates on-order stock from available stock and supports receiving orders", () => {
+  assert.match(html, /function pendingPurchaseQty\(productId\)/);
+  assert.match(html, /x\.status==='ordered'/);
+  assert.match(html, /projected=Number\(p\.stock\|\|0\)\+onOrder/);
+  assert.match(html, /Partial order pending/);
+  assert.match(html, /async function receiveOSPurchase\(id\)/);
+  assert.match(html, /status:'received',purchased_at:now/);
+  assert.match(html, /expectedServerStock:oldStock/);
+});
+
+test("supplier bills can document received purchases without duplicating inventory journals", () => {
+  assert.match(html, /id="accBillPurchase"/);
+  assert.match(html, /purchase\.supplier_id/);
+  assert.match(html, /Math\.abs\(total-Number\(purchase\.total\|\|0\)\)>0\.005/);
+  assert.match(html, /bill_type:'inventory',debit_account_id:inv\.id,purchase_id:purchaseId\|\|null/);
+  assert.match(html, /if\(purchase\)\{/);
+});
+
 test("customer records support shared voice entry and confirmation before saving", () => {
   assert.match(html, /sheriStartFormVoice\('customerVoiceStatus',parseVoiceCustomer/);
   assert.match(html, /function parseVoiceCustomer\(transcript\)/);
