@@ -144,6 +144,86 @@ test("Kinyarwanda TTS never silently falls back to an unverified browser voice",
   assert.match(html, /sheriDiagSet\('Kinyarwanda TTS fallback','NONE — text-only; no unverified voice substitution'\)/);
 });
 
+test("stale TTS onstart callbacks never cancel a newer turn's global speech queue", () => {
+  const start = html.indexOf("  utt.onstart=()=>{");
+  const end = html.indexOf("\n  utt.onend=", start);
+  assert.ok(start >= 0 && end > start, "expected utterance onstart handler");
+  const onstart = html.slice(start, end);
+  assert.match(onstart, /if\(turnId!==sheriTurnId\)\{[\s\S]*?return;/);
+  assert.doesNotMatch(onstart, /speechSynthesis\.cancel\(\)/,
+    "stale callbacks must not cancel newer utterances");
+});
+
+test("normal Android TTS waits for voices and does not cancel its fresh utterance", () => {
+  const start = html.indexOf("  const speakNow=async()=>{");
+  const end = html.indexOf("\n  // Explicit lifecycle:", start);
+  assert.ok(start >= 0 && end > start, "expected normal speakNow implementation");
+  const speakNow = html.slice(start, end);
+  assert.match(speakNow, /await ensureVoicesLoaded\(500\)/);
+  assert.match(speakNow, /speechSynthesis\.resume\(\);\s*speechSynthesis\.speak\(utt\)/);
+  assert.match(speakNow, /const startTimeoutMs=isAndroid\?20000:5000/);
+  assert.match(speakNow, /retrySpeech\('no onstart within '\+startTimeoutMs\+' ms'\)/);
+  assert.doesNotMatch(speakNow, /speechSynthesis\.cancel\(\)/,
+    "do not cancel the new utterance immediately before speaking");
+  assert.match(html, /if\(isAndroid\)setTimeout\(\(\)=>\{if\(turnId===sheriTurnId\)speakNow\(\)\},90\)/);
+});
+
+test("product image picker matches the storage MIME allowlist", () => {
+  assert.match(html, /!\['image\/jpeg','image\/png','image\/webp','image\/gif'\]\.includes\(file\.type\)/);
+});
+
+test("cloud memory and product image access are represented by a reviewed SQL patch", () => {
+  assert.match(schemaPatch, /create table if not exists public\.shericeri_memory/i);
+  assert.match(schemaPatch, /enable row level security/i);
+  assert.match(schemaPatch, /product_images_owner_insert/i);
+  assert.match(schemaPatch, /file_size_limit = 4194304/i);
+  assert.match(schemaPatch, /revoke execute on function public\.shericeri_sync_journal_batch/i);
+});
+
+test("all inline application scripts parse without syntax errors", () => {
+  const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
+  assert.ok(scripts.length >= 1, "expected inline application scripts");
+  for (const [index, source] of scripts.entries()) {
+    assert.doesNotThrow(() => new vm.Script(source, { filename: `index.html:inline-script-${index + 1}` }));
+  }
+});
+
+
+test("Shericeri greets before opening the first recording and starts listening after playback", () => {
+  const start = html.indexOf("async function startShericeriLoop()");
+  const end = html.indexOf("\nfunction sheriSleepAfterGoodbye", start);
+  assert.ok(start >= 0 && end > start, "expected session start function");
+  const flow = html.slice(start, end);
+  assert.match(flow, /sheriEnqueueSpeech\(sheriTapGreeting\(\),sheriTurnId\)/);
+  assert.doesNotMatch(flow, /shericeriListenOnce\(\)/,
+    "the mic must not record while the initial greeting is playing");
+  assert.match(html, /function sheriTapGreeting\(\)[\s\S]*?Hello! I’m Shericeri\. What can I help you with today\?/);
+  assert.match(html, /function sheriDrainSpeakQueue\(\)[\s\S]*?sheriScheduleNextListen\(sheriTurnId\)/);
+});
+
+test("only an explicit farewell in the selected language ends the voice session", () => {
+  const start = html.indexOf("function sheriIsGoodbyePhrase(q)");
+  const end = html.indexOf("\nfunction sheriLanguageKey", start);
+  assert.ok(start >= 0 && end > start);
+  const goodbye = html.slice(start, end);
+  assert.match(goodbye, /Only an explicit farewell in the currently selected language/);
+  assert.match(goodbye, /murabeho/);
+  assert.match(goodbye, /ndagusezeye/);
+  assert.match(goodbye, /au revoir/);
+  assert.match(goodbye, /goodbye/);
+  assert.doesNotMatch(goodbye, /that's it/);
+  assert.doesNotMatch(goodbye, /c'est tout/);
+  assert.doesNotMatch(goodbye, /birarangiye/);
+});
+
+test("voice sessions keep listening through silence instead of ending after the short greeting pause", () => {
+  assert.ok(html.includes("const noSpeechTimeoutMs=15000;"));
+  assert.ok(html.includes("stopReason='no speech — keep session open'"));
+  assert.ok(html.includes("NO SPEECH — microphone session remains active"));
+  assert.ok(html.includes("if(shericeriActive)setTimeout(()=>{if(shericeriActive&&!sheriIsSpeaking&&!sheriStreamActive)shericeriListenOnce();},180)"));
+  assert.ok(html.includes("const silenceStopMs=isAndroid?Math.max(SHERI_ANDROID_SILENCE_STOP_MS,1400):1200"));
+});
+
 test("Kinyarwanda speech preserves punctuation and measures voice latency per selected language", () => {
   assert.ok(html.includes("Keep sentence punctuation: Kinyarwanda TTS needs natural pauses and"));
   assert.ok(html.includes("question intonation. Only remove decorative quotation marks."));
