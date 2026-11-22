@@ -413,3 +413,18 @@ test("received purchases require a supplier and linked purchase payments roll in
   assert.ok(previewHtml.includes("return bill?accBillPaid(bill):"));
   assert.ok(previewHtml.includes("x.status==='received'&&x.supplier_id&&!accPurchaseLinkedBill(x)"));
 });
+
+
+test("transaction histories and generated accounting documents show localized record date and time", () => {
+  assert.match(html, /function formatRecordDateTime\\(value,recordedAt\\)/);
+  assert.ok(html.includes("formatRecordDateTime(c.lastPurchase)"));
+  assert.ok(html.includes("formatRecordDateTime(x.purchased_at||x.created_at,x.created_at)"));
+  assert.ok(html.includes("formatRecordDateTime(x.occurred_at,x.created_at)"));
+  assert.ok(html.includes("formatRecordDateTime(x.payment_date,x.created_at)"));
+  assert.ok(html.includes("formatRecordDateTime(x.issue_date,x.created_at)"));
+  assert.ok(html.includes("formatRecordDateTime(i.issue_date,i.created_at)"));
+  assert.ok(html.includes("formatRecordDateTime(b.issue_date,b.created_at)"));
+  assert.ok(html.includes("'date & time':'Itariki n’igihe'"));
+  assert.ok(html.includes("'date & time':'Date et heure'"));
+  assert.ok(html.includes("Purchase saved. Sync status is shown above."));
+});
