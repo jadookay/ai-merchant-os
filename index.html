@@ -2553,7 +2553,78 @@ function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.onload=()=>w.print();
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(formatRecordDateTime(r.createdAt))+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p></body></html>');
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(formatRecordDateTime(r.createdAt))+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p>
+
+<!-- AIBOS brand system v1: consistent dark-blue and gold styling across every locale. -->
+<style id="aibos-global-brand-and-chart-layout-v1">
+:root{
+ --aibos-navy:#010080;
+ --aibos-navy-deep:#00005c;
+ --aibos-navy-soft:#e9eaff;
+ --aibos-gold:#f7eb5b;
+ --aibos-gold-deep:#c6a900;
+ --accent:var(--aibos-navy);
+ --line:#d9dcef;
+ --ink:#171a36;
+ --bg:#f5f6ff;
+}
+#appRoot .side{background:var(--aibos-navy)!important;border-right:3px solid var(--aibos-gold)!important}
+#appRoot .side .brand,#appRoot .side .brand span{color:var(--aibos-gold)!important}
+#appRoot .side .nav button{color:#f4f4ff!important;border:1px solid transparent!important}
+#appRoot .side .nav button.active,
+#appRoot .side .nav button:hover,
+#appRoot .side .nav button:focus-visible{background:var(--aibos-navy-deep)!important;color:var(--aibos-gold)!important;border-color:var(--aibos-gold)!important}
+#appRoot .main{color:var(--ink)}
+#appRoot .main :is(h1,h2,h3,.section-title,.report-head h2){color:var(--aibos-navy)!important}
+#appRoot .main .card,
+#appRoot .main .hub-card,
+#appRoot .main .metric-card{border-color:var(--line)}
+#appRoot .main .card:focus-within,
+#appRoot .main .hub-card:hover,
+#appRoot .main .metric-card:hover{border-color:var(--aibos-gold-deep)!important;box-shadow:0 3px 14px rgba(1,0,128,.09)}
+#appRoot .main :is(.btn,button.primary,.primary-btn,[type="submit"]){
+ background:var(--aibos-navy)!important;color:#fff!important;border:1px solid var(--aibos-navy)!important;
+}
+#appRoot .main :is(.btn,button.primary,.primary-btn,[type="submit"]):hover,
+#appRoot .main :is(.btn,button.primary,.primary-btn,[type="submit"]):focus-visible{
+ background:var(--aibos-navy-deep)!important;border-color:var(--aibos-gold)!important;
+ box-shadow:0 0 0 2px rgba(247,235,91,.35)!important;
+}
+#appRoot .main :is(.btn.secondary,.icon-btn,.text-btn){color:var(--aibos-navy)!important}
+#appRoot .main :is(.btn.secondary,.icon-btn){background:#fff!important;border:1px solid var(--aibos-navy)!important}
+#appRoot .main :is(.btn.danger,[data-action*="delete"],[data-action*="void"]){background:#fee2e2!important;color:#991b1b!important;border-color:#fecaca!important}
+#appRoot .main :is(input,select,textarea){accent-color:var(--aibos-navy)}
+#appRoot .main :is(input,select,textarea):focus{outline:2px solid rgba(1,0,128,.2)!important;border-color:var(--aibos-navy)!important}
+#appRoot .main .table th{background:#eeeeff!important;color:var(--aibos-navy)!important;border-bottom:2px solid var(--aibos-gold-deep)!important}
+#appRoot .main .table tr:hover td{background:#fffde4}
+#appRoot .main :is(.pill,.profile-badge){background:#fffbd0!important;color:var(--aibos-navy)!important;border:1px solid rgba(198,169,0,.45)!important}
+#appRoot .main .hero{background:linear-gradient(125deg,var(--aibos-navy-deep),var(--aibos-navy))!important;border:1px solid var(--aibos-gold)!important}
+#appRoot .main .hero :is(h2,p){color:#fff!important}
+#appRoot .main .hero :is(strong,.highlight,.accent){color:var(--aibos-gold)!important}
+#appRoot .main .notice{background:#f0f0ff!important;border-color:#c7c9f5!important;color:var(--aibos-navy)!important}
+#appRoot .main :is(.auth-tabs button.active,.tab.active,[aria-selected="true"]){background:var(--aibos-navy)!important;color:var(--aibos-gold)!important;border-color:var(--aibos-gold)!important}
+
+/* Chart/report canvases and SVG plots scroll horizontally instead of squeezing
+   Kinyarwanda/French labels. This is locale-neutral and keeps labels readable. */
+#appRoot .main :is(.chart,.charts,.chart-container,.chart-wrap,.chart-wrapper,.report-chart,[id*="Chart"],[id*="chart"]){
+ box-sizing:border-box!important;max-width:100%!important;min-width:0!important;
+ overflow-x:auto!important;overflow-y:hidden!important;
+ overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+}
+#appRoot .main :is(.chart,.charts,.chart-container,.chart-wrap,.chart-wrapper,.report-chart,[id*="Chart"],[id*="chart"]) :is(canvas,svg){
+ display:block!important;max-width:none!important;min-width:760px!important;
+}
+#appRoot .main :is(.chart-title,.chart-heading,[class*="chart-title"],[class*="chart-label"]){
+ white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;
+}
+#appRoot .main :is(.chart-legend,[class*="legend"]){min-width:max-content}
+@media(max-width:650px){
+ #appRoot .main :is(.chart,.charts,.chart-container,.chart-wrap,.chart-wrapper,.report-chart,[id*="Chart"],[id*="chart"]){margin-right:-2px}
+ #appRoot .main :is(.chart,.charts,.chart-container,.chart-wrap,.chart-wrapper,.report-chart,[id*="Chart"],[id*="chart"]) :is(canvas,svg){min-width:680px!important}
+}
+</style>
+
+</body></html>');
    w.document.close();
 }
 
