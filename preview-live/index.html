@@ -757,11 +757,11 @@ window.ensurePdfJs=async function(){
   <div class="grid2 section">
     <div class="card"><h2>Cash & Budget Control</h2><div class="formgrid">
       <div><label>Movement</label><select id="osCashKind"><option value="income">Cash in</option><option value="expense">Cash out</option><option value="transfer">Transfer</option></select></div>
-      <div><label>Amount (<span data-currency-label>RWF</span>)</label><input id="osCashAmount" type="number" min="0"></div>
+      <div><label>Amount (<span data-currency-label>RWF</span>)</label><input id="osCashAmount" type="number" min="0" step="0.01"></div>
       <div><label>Category</label><input id="osCashCategory" placeholder="Bank deposit, rent, supplier payment..."></div>
       <div><label>Description</label><input id="osCashDescription" placeholder="What was this movement for?"></div>
     </div><div class="actions" style="margin-top:12px"><button class="btn" onclick="addOSCashEntry()">Record cash movement</button></div>
-    <div class="formgrid" style="margin-top:18px"><div><label>Budget month</label><input id="osBudgetMonth" type="month"></div><div><label>Category</label><input id="osBudgetCategory" placeholder="Rent, marketing..."></div><div><label>Budget (<span data-currency-label>RWF</span>)</label><input id="osBudgetAmount" type="number" min="0"></div></div><div class="actions" style="margin-top:10px"><button class="btn secondary" onclick="addOSBudget()">Set budget</button></div>
+    <div class="formgrid" style="margin-top:18px"><div><label>Budget month</label><input id="osBudgetMonth" type="month"></div><div><label>Category</label><input id="osBudgetCategory" placeholder="Rent, marketing..."></div><div><label>Budget (<span data-currency-label>RWF</span>)</label><input id="osBudgetAmount" type="number" min="0" step="0.01"></div></div><div class="actions" style="margin-top:10px"><button class="btn secondary" onclick="addOSBudget()">Set budget</button></div>
     <div id="osCashTable" style="margin-top:12px"></div><div id="osBudgetTable" style="margin-top:12px"></div></div>
     <div class="card"><h2>Accounting & Financial Intelligence</h2><div id="osFinanceReport"></div></div>
   </div>
@@ -5767,7 +5767,7 @@ async function deleteOSSupplier(id){if(!sheriCan('manage_team')||!sheriCan('mana
 async function addOSPurchase(){
   if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to record purchases.','error');
   const supplierId=document.getElementById('osPurchaseSupplier').value||null,productId=document.getElementById('osPurchaseProduct').value,qty=Number(document.getElementById('osPurchaseQty').value),unitCost=Number(document.getElementById('osPurchaseCost').value),status=document.getElementById('osPurchaseStatus').value;
-  if(!supplierId)return alert('Select a supplier so this purchase can be tracked and settled through Accounts Payable.');const p=product(productId);if(!p||!Number.isInteger(qty)||qty<1||!Number.isInteger(unitCost)||unitCost<0)return alert('Choose a product and enter a whole-number quantity and valid unit cost.');
+  if(!supplierId)return alert('Select a supplier so this purchase can be tracked and settled through Accounts Payable.');const p=product(productId);if(!p||!Number.isInteger(qty)||qty<1||!Number.isFinite(unitCost)||unitCost<0)return alert('Choose a product and enter a whole-number quantity and a valid unit cost (decimals allowed).');
   const now=sheriNow(),oldStock=Number(p.stock)||0,oldCost=Number(p.cost)||0;
   const data={id:sheriUuid(),merchant_id:state.merchant.id,supplier_id:supplierId,product_id:p.id,product_name_snapshot:p.name,qty,unit_cost:unitCost,total:qty*unitCost,status,purchased_at:now,due_date:document.getElementById('osPurchaseDue').value||null,created_at:now,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
   let localStock=null,localCost=null;
@@ -7645,7 +7645,7 @@ const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const be
     'that file does not look like a valid ai business os backup, or the database migration is not installed yet.':'Iyi dosiye ntigaragara nka kopi yemewe ya AI Business OS, cyangwa ivugurura rya database ntirashyirwaho.',
     'type a question first, then tap 🔍 to search the web for it.':'Banza wandike ikibazo, hanyuma ukande 🔍 kugira ngo ushakishe kuri internet.',
     'enter a supplier name.':'Andika izina ry’ugemura ibicuruzwa.',
-    'choose a product and enter a whole-number quantity and valid unit cost.':'Hitamo igicuruzwa, wandike umubare wuzuye n’ikiguzi cya kimwe cyemewe.',
+    'choose a product and enter a whole-number quantity and a valid unit cost (decimals allowed).':'Hitamo igicuruzwa, wandike ingano y’ibice byuzuye n’ikiguzi cya kimwe, harimo n’imibare y’uduce.',
     'received purchases cannot be deleted because they affect inventory and accounting. record a purchase return/adjustment instead.':'Ibyaguzwe byamaze kwakirwa ntibishobora gusibwa kuko bihindura ububiko n’ibaruramari. Andika ko wabigaruje cyangwa ukosore umubare.',
     'enter an amount and description.':'Andika amafaranga n’ibisobanuro byayo.',
     'complete the budget details.':'Uzuza amakuru yose ya bije.',
@@ -7708,7 +7708,7 @@ const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const be
     'that file does not look like a valid ai business os backup, or the database migration is not installed yet.':'Ce fichier ne semble pas être une sauvegarde valide d’AI Business OS (AIBOS), ou la migration de base de données n’est pas encore installée.',
     'type a question first, then tap 🔍 to search the web for it.':'Saisissez d’abord une question, puis appuyez sur 🔍 pour lancer une recherche sur le Web.',
     'enter a supplier name.':'Saisissez le nom du fournisseur.',
-    'choose a product and enter a whole-number quantity and valid unit cost.':'Choisissez un produit et saisissez une quantité entière ainsi qu’un coût unitaire valide.',
+    'choose a product and enter a whole-number quantity and a valid unit cost (decimals allowed).':'Choisissez un produit, saisissez une quantité entière et un coût unitaire valide, décimales comprises.',
     'received purchases cannot be deleted because they affect inventory and accounting. record a purchase return/adjustment instead.':'Les achats réceptionnés ne peuvent pas être supprimés car ils affectent le stock et la comptabilité. Enregistrez plutôt un retour ou un ajustement d’achat.',
     'enter an amount and description.':'Saisissez un montant et une description.',
     'complete the budget details.':'Complétez les informations du budget.',
