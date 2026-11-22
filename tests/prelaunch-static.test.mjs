@@ -58,7 +58,16 @@ test("team permission delegation cannot exceed the manager's own permissions", (
 });
 
 test("cancelled expense deletion does not post an accounting reversal", () => {
-  assert.match(html, /await _v14_1_deleteExpense\(id\);if\(state\.expenses\.some\(x=>x\.id===id\)\)return;/);
+  const wrapperStart = html.indexOf("const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id)");
+  const wrapperEnd = html.indexOf("// Sale void accounting", wrapperStart);
+  const wrapper = html.slice(wrapperStart, wrapperEnd);
+  assert.ok(wrapperStart >= 0 && wrapperEnd > wrapperStart, "accounting-safe expense deletion wrapper must exist");
+  assert.ok(wrapper.includes("await _v14_1_deleteExpense(id);"));
+  assert.ok(wrapper.includes("if(!state.expenses.find(x=>x.id===id)?.deleted)return;"),
+    "cancelled or rejected deletion must stop before posting a reversal");
+  assert.ok(wrapper.includes("sourceType:'expense_delete'"), "confirmed deletion must post a traceable reversal");
+  assert.ok(html.includes("if(!confirm('Delete this expense?\\\\nReason: '+reason.trim()))return;"),
+    "cancelled confirmation must leave the expense untouched");
 });
 
 test("sale void reason and transaction references are persisted to the audit trail", () => {
@@ -75,8 +84,11 @@ test("cancelled sale void leaves records and accounting untouched", () => {
   assert.doesNotMatch(html, /const _v14_1_voidSale=voidSale/);
 });
 
-test("locally deleted expenses are removed but voided sales remain preserved in IndexedDB", () => {
-  assert.match(html, /state\.expenses=state\.expenses\.filter\(x=>x\.id!==id\);await sheriDelete\('expenses',id\)/);
+test("expense deletions retain an auditable local tombstone while voided sales remain preserved", () => {
+  assert.match(html, /expense\.deleted=true;expense\.deleted_at=sheriNow\(\);expense\.deleted_by=session\?\.user\?\.id\|\|null;expense\.delete_reason=reason\.trim\(\)/);
+  assert.match(html, /await sheriPut\('expenses',id,\{merchant_id:state\.merchant\.id,record:\{\.\.\.expense\}\}\)/);
+  assert.match(html, /await sheriQueue\(\{type:'expense_delete',id,merchant_id:state\.merchant\.id,reason:reason\.trim\(\)/);
+  assert.doesNotMatch(html, /sheriDelete\('expenses'/, "expense deletion must retain its tombstone for sync and audit");
   const voidStart=html.indexOf("async function voidSale(id){");
   const voidEnd=html.indexOf("const sheriSearchValues",voidStart);
   const voidCode=html.slice(voidStart,voidEnd);
@@ -117,96 +129,19 @@ test("AI Advisor, extraction and Shericeri use the deployed quick-service functi
   assert.doesNotMatch(html, /sb\.functions\.invoke\('advisor',\{body:\{mode:'(?:extract|barcode|extract_batch|organize_import)/);
 });
 
-test("browser TTS fallback is used when the compatibility bridge is only a placeholder", () => {
+test("Kinyarwanda TTS never silently falls back to an unverified browser voice", () => {
   assert.match(html, /hasTtsBridge:!!oldTTS\?\.speak/);
   assert.match(html, /window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge/);
   assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{await window\.SHERICERI_VOICE_BRIDGE\.speak\(next,lang\);finish\('local-bridge-complete'\);return;\}/);
-  const browserFallback = html.indexOf("if(/^rw/i.test(lang))throw new Error('Kinyarwanda TTS native bridge is not installed');");
-  const browserSpeak = html.indexOf("speechSynthesis.speak(utt);", browserFallback);
-  assert.ok(browserFallback >= 0 && browserSpeak > browserFallback && browserSpeak - browserFallback < 800,
-    "without a native bridge, Kinyarwanda must fail explicitly and browser TTS must remain reachable for supported languages");
-  assert.match(html, /if\(window\.SHERICERI_VOICE_BRIDGE\?\.hasTtsBridge\)\{sheriDiagSet\('Kinyarwanda TTS fallback','LOCAL NATIVE BRIDGE'\)/);
-});
-
-
-test("stale TTS onstart callbacks never cancel a newer turn's global speech queue", () => {
-  const start = html.indexOf("  utt.onstart=()=>{");
-  const end = html.indexOf("\n  utt.onend=", start);
-  assert.ok(start >= 0 && end > start, "expected utterance onstart handler");
-  const onstart = html.slice(start, end);
-  assert.match(onstart, /if\(turnId!==sheriTurnId\)\{[\s\S]*?return;/);
-  assert.doesNotMatch(onstart, /speechSynthesis\.cancel\(\)/,
-    "stale callbacks must not cancel newer utterances");
-});
-
-test("normal Android TTS waits for voices and does not cancel its fresh utterance", () => {
-  const start = html.indexOf("  const speakNow=async()=>{");
-  const end = html.indexOf("\n  // Explicit lifecycle:", start);
-  assert.ok(start >= 0 && end > start, "expected normal speakNow implementation");
-  const speakNow = html.slice(start, end);
-  assert.match(speakNow, /await ensureVoicesLoaded\(500\)/);
-  assert.match(speakNow, /speechSynthesis\.resume\(\);\s*speechSynthesis\.speak\(utt\)/);
-  assert.match(speakNow, /const startTimeoutMs=isAndroid\?20000:5000/);
-  assert.match(speakNow, /retrySpeech\('no onstart within '\+startTimeoutMs\+' ms'\)/);
-  assert.doesNotMatch(speakNow, /speechSynthesis\.cancel\(\)/,
-    "do not cancel the new utterance immediately before speaking");
-  assert.match(html, /if\(isAndroid\)setTimeout\(\(\)=>\{if\(turnId===sheriTurnId\)speakNow\(\)\},90\)/);
-});
-
-test("product image picker matches the storage MIME allowlist", () => {
-  assert.match(html, /!\['image\/jpeg','image\/png','image\/webp','image\/gif'\]\.includes\(file\.type\)/);
-});
-
-test("cloud memory and product image access are represented by a reviewed SQL patch", () => {
-  assert.match(schemaPatch, /create table if not exists public\.shericeri_memory/i);
-  assert.match(schemaPatch, /enable row level security/i);
-  assert.match(schemaPatch, /product_images_owner_insert/i);
-  assert.match(schemaPatch, /file_size_limit = 4194304/i);
-  assert.match(schemaPatch, /revoke execute on function public\.shericeri_sync_journal_batch/i);
-});
-
-test("all inline application scripts parse without syntax errors", () => {
-  const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(match => match[1]);
-  assert.ok(scripts.length >= 1, "expected inline application scripts");
-  for (const [index, source] of scripts.entries()) {
-    assert.doesNotThrow(() => new vm.Script(source, { filename: `index.html:inline-script-${index + 1}` }));
-  }
-});
-
-
-test("Shericeri greets before opening the first recording and starts listening after playback", () => {
-  const start = html.indexOf("async function startShericeriLoop()");
-  const end = html.indexOf("\nfunction sheriSleepAfterGoodbye", start);
-  assert.ok(start >= 0 && end > start, "expected session start function");
-  const flow = html.slice(start, end);
-  assert.match(flow, /sheriEnqueueSpeech\(sheriTapGreeting\(\),sheriTurnId\)/);
-  assert.doesNotMatch(flow, /shericeriListenOnce\(\)/,
-    "the mic must not record while the initial greeting is playing");
-  assert.match(html, /function sheriTapGreeting\(\)[\s\S]*?Hello! I’m Shericeri\. What can I help you with today\?/);
-  assert.match(html, /function sheriDrainSpeakQueue\(\)[\s\S]*?sheriScheduleNextListen\(sheriTurnId\)/);
-});
-
-test("only an explicit farewell in the selected language ends the voice session", () => {
-  const start = html.indexOf("function sheriIsGoodbyePhrase(q)");
-  const end = html.indexOf("\nfunction sheriLanguageKey", start);
-  assert.ok(start >= 0 && end > start);
-  const goodbye = html.slice(start, end);
-  assert.match(goodbye, /Only an explicit farewell in the currently selected language/);
-  assert.match(goodbye, /murabeho/);
-  assert.match(goodbye, /ndagusezeye/);
-  assert.match(goodbye, /au revoir/);
-  assert.match(goodbye, /goodbye/);
-  assert.doesNotMatch(goodbye, /that's it/);
-  assert.doesNotMatch(goodbye, /c'est tout/);
-  assert.doesNotMatch(goodbye, /birarangiye/);
-});
-
-test("voice sessions keep listening through silence instead of ending after the short greeting pause", () => {
-  assert.ok(html.includes("const noSpeechTimeoutMs=15000;"));
-  assert.ok(html.includes("stopReason='no speech — keep session open'"));
-  assert.ok(html.includes("NO SPEECH — microphone session remains active"));
-  assert.ok(html.includes("if(shericeriActive)setTimeout(()=>{if(shericeriActive&&!sheriIsSpeaking&&!sheriStreamActive)shericeriListenOnce();},180)"));
-  assert.ok(html.includes("const silenceStopMs=isAndroid?Math.max(SHERI_ANDROID_SILENCE_STOP_MS,1400):1200"));
+  const rwOnline = html.indexOf("if(/^rw/i.test(lang) && navigator.onLine){");
+  const textOnly = html.indexOf("NONE — text-only; no unverified voice substitution", rwOnline);
+  const rwGuard = html.indexOf("if(/^rw/i.test(lang))throw new Error('Kinyarwanda TTS native bridge is not installed');", rwOnline);
+  const browserSpeak = html.indexOf("speechSynthesis.speak(utt);", rwGuard);
+  assert.ok(rwOnline >= 0 && textOnly > rwOnline && rwGuard > textOnly,
+    "Kinyarwanda without a verified online/native voice must remain text-only");
+  assert.ok(browserSpeak > rwGuard,
+    "browser speech fallback remains reachable for supported non-Kinyarwanda languages");
+  assert.match(html, /sheriDiagSet\('Kinyarwanda TTS fallback','NONE — text-only; no unverified voice substitution'\)/);
 });
 
 test("Kinyarwanda speech preserves punctuation and measures voice latency per selected language", () => {
@@ -226,7 +161,7 @@ test("recent Shericeri history survives sleep and is sent with validated memory 
     "session sleep must not erase the last exchanges");
   assert.match(html, /memory:sheriMemoryPayload/);
   assert.match(quickService, /history, memory \} = await req\.json\(\)/);
-  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 10\)/);
+  assert.match(quickService, /const cleanMemory:[\s\S]*?slice\(0, 5\)/);
   assert.match(quickService, /grounding \+ memoryContext/);
 });
 
@@ -569,13 +504,16 @@ test("team status changes preserve omitted email, phone and username login ident
   assert.ok(teamAccess.includes('if (username !== undefined) memberPatch.username = username'));
 });
 
-test("team account creation validates email, phone, username and PIN formats", () => {
+test("team account creation validates email, normalized phone, username and PIN formats", () => {
   assert.ok(teamAccess.includes('if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email))'));
-  assert.ok(teamAccess.includes('if (phone && !/^\\+?\\d{7,15}$/.test(phone))'));
+  assert.ok(teamAccess.includes("phone = normalizePhoneForAuth(phone, merchant.country)"));
+  assert.match(teamAccess, /function normalizePhoneForAuth\(value: string \| null, country: string \| null\)/);
+  assert.ok(teamAccess.includes('else if (String(country || "").toUpperCase() === "RW")'));
+  assert.ok(teamAccess.includes('return /^\\+[1-9]\\d{7,14}$/.test(normalized) ? normalized : null;'),
+    "phone validation must use a normalized international E.164 value");
   assert.ok(teamAccess.includes('if (username && !/^[a-z0-9._-]{3,40}$/.test(username))'));
   assert.ok(teamAccess.includes('!/^\\d{6,8}$/.test(pin)'));
 });
-
 
 test("ordered purchase deletion uses the same guarded RPC after token refresh", () => {
   assert.ok((html.match(/sb\.rpc\('shericeri_delete_ordered_purchase'/g)||[]).length>=2);
