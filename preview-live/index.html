@@ -8401,6 +8401,24 @@ const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const be
     'linked purchase':'Achat associé','not linked':'Non associé',
     '— select a supplier bill or received purchase —':'— Sélectionnez une facture fournisseur ou un achat reçu —'
   });
+  Object.assign(dictionaries.rw,{
+    'link the supplier bill to a purchase already recorded in stock. this prevents a second inventory and payable journal.':'Huza fagitire y’utanga ibicuruzwa n’igurwa ryanditswe mbere mu bubiko. Ibi birinda kongera kwandika ububiko n’umwenda w’utanga ibicuruzwa.',
+    'bill created and matched to the existing purchase. no duplicate inventory/payable journal was posted.':'Fagitire yarakozwe kandi ihuzwa n’igurwa risanzwe rihari. Nta nyandiko y’ububiko cyangwa umwenda yikubiyemo yongeye gushyirwaho.',
+    'bill created.':'Fagitire yarakozwe.',
+    'this purchase is already linked to another supplier bill.':'Iri gurwa risanzwe rifitanye isano n’indi fagitire y’utanga ibicuruzwa.',
+    'the selected purchase does not belong to this supplier or is not received.':'Iri gurwa wahisemo si iry’uyu mutanga ibicuruzwa cyangwa ntirirakirwa.',
+    'the bill total must match the recorded purchase total of':'Igiteranyo cya fagitire kigomba kungana n’igiteranyo cy’igurwa ryanditswe kingana na',
+    'paid':'Yishyuwe','bill match':'Ihuriro rya fagitire'
+  });
+  Object.assign(dictionaries.fr,{
+    'link the supplier bill to a purchase already recorded in stock. this prevents a second inventory and payable journal.':'Associez la facture fournisseur à un achat déjà enregistré en stock. Cela évite de comptabiliser deux fois le stock et la dette fournisseur.',
+    'bill created and matched to the existing purchase. no duplicate inventory/payable journal was posted.':'La facture a été créée et associée à l’achat existant. Aucune seconde écriture de stock ou de dette fournisseur n’a été comptabilisée.',
+    'bill created.':'Facture créée.',
+    'this purchase is already linked to another supplier bill.':'Cet achat est déjà associé à une autre facture fournisseur.',
+    'the selected purchase does not belong to this supplier or is not received.':'Cet achat ne correspond pas à ce fournisseur ou n’a pas encore été reçu.',
+    'the bill total must match the recorded purchase total of':'Le total de la facture doit correspondre au total de l’achat enregistré de',
+    'paid':'Payé','bill match':'Association de facture'
+  });
   const normalize=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
   function translateString(original,lang){
     if(lang==='en')return original;
