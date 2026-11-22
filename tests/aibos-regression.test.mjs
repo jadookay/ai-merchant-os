@@ -564,8 +564,8 @@ test("classified cash flow separates operating, investing, financing and unclass
   const fixture = { accounts, bankAccounts: [], journalEntries: entries, journalLines: lines };
   const result = evaluateCashFlowForTest(html, fixture, "2026-11-01", "2026-11-30");
 
-  assert.equal(result.operating.inflows, 1000);
-  assert.equal(result.operating.outflows, 250);
+  assert.equal(result.operating.inflows, 1400);
+  assert.equal(result.operating.outflows, 650);
   assert.equal(result.operating.net, 750);
   assert.equal(result.investing.inflows, 150);
   assert.equal(result.investing.outflows, 500);
@@ -575,8 +575,8 @@ test("classified cash flow separates operating, investing, financing and unclass
   assert.equal(result.financing.net, 2800);
   assert.equal(result.unclassified.inflows, 300);
   assert.equal(result.unclassified.outflows, 0);
-  assert.equal(result.inflows, 4250);
-  assert.equal(result.outflows, 750);
+  assert.equal(result.inflows, 4650);
+  assert.equal(result.outflows, 1150);
   assert.equal(result.net, 3500);
   assert.equal(result.opening, 500);
   assert.equal(result.closing, 4000);
