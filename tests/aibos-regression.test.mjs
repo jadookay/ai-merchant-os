@@ -11,6 +11,7 @@ const expenseAccrualMigration = readFileSync(new URL("../supabase/migrations/202
 const expenseStatusMigration = readFileSync(new URL("../supabase/migrations/20261121233000_expense_payment_status.sql", import.meta.url), "utf8");
 const supplierBillMigration = readFileSync(new URL("../supabase/migrations/20261121234500_supplier_bill_account_classification.sql", import.meta.url), "utf8");
 const purchaseLinkMigration = readFileSync(new URL("../supabase/migrations/20261122090000_link_supplier_bills_to_stock_purchases.sql", import.meta.url), "utf8");
+const inventoryIntegrityMigration = readFileSync(new URL("../supabase/migrations/20261122150000_accounting_inventory_integrity_guards.sql", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
@@ -412,4 +413,25 @@ test("received purchases require a supplier and linked purchase payments roll in
   assert.ok(previewHtml.includes("purchasePayments=purchase?"));
   assert.ok(previewHtml.includes("return bill?accBillPaid(bill):"));
   assert.ok(previewHtml.includes("x.status==='received'&&x.supplier_id&&!accPurchaseLinkedBill(x)"));
+});
+
+
+test("received purchase quantities and values must exactly match one stock receipt", () => {
+  assert.match(inventoryIntegrityMigration, /abs\(v_receipt_qty-v_purchase_qty\)>0\.0001/);
+  assert.match(inventoryIntegrityMigration, /abs\(v_receipt_value-\(v_purchase_qty\*v_purchase_unit_cost\)\)>0\.005/);
+  assert.match(inventoryIntegrityMigration, /exactly one receipt movement/);
+});
+
+test("received purchase accounting fields cannot be edited after posting", () => {
+  assert.match(inventoryIntegrityMigration, /old\.status='received'/);
+  assert.match(inventoryIntegrityMigration, /new\.qty is distinct from old\.qty/);
+  assert.match(inventoryIntegrityMigration, /new\.unit_cost is distinct from old\.unit_cost/);
+  assert.match(inventoryIntegrityMigration, /supplier return or adjustment instead/);
+  assert.match(inventoryIntegrityMigration, /before update on public\.purchases/i);
+});
+
+test("new opening-stock migrations require traceable product-level journals", () => {
+  assert.match(inventoryIntegrityMigration, /new\.source_type='inventory_migration_reconciliation'/);
+  assert.match(inventoryIntegrityMigration, /one source-linked opening-stock journal per product/);
+  assert.match(inventoryIntegrityMigration, /before insert on public\.journal_entries/i);
 });
