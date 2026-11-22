@@ -448,14 +448,15 @@ test("recent activity combines business transactions and sorts them by occurrenc
   assert.match(html, /sort\(\(a,b\)=>String\(b\.when/);
 });
 
-test("new product opening inventory and explicit stock gain/write-off adjustments post balanced journal entries", () => {
+test("opening stock and every inventory movement use atomic server-side accounting journals", () => {
   assert.match(html, /movement_type:'opening_balance'/);
   assert.match(html, /opening-balance inventory RPC now creates the matching Inventory \/ Owner Equity journal in the same database transaction/);
   assert.doesNotMatch(html, /sourceType:'product_opening_stock',sourceId:openingStockProduct\.id/);
   assert.match(html, /option value="stock_writeoff"/);
   assert.match(html, /option value="stock_gain"/);
-  assert.match(html, /type==='stock_writeoff'\)\{lines=\[\{accountId:accAccountCode\('6000'\)\.id,debit:amount\}/);
-  assert.match(html, /else\{lines=\[\{accountId:inv\.id,debit:amount\},\{accountId:accAccountCode\('3000'\)\.id,credit:amount\}/);
+  assert.match(html, /sb\.rpc\('shericeri_adjust_product_stock_v2'/);
+  assert.match(html, /serverPostsStockJournal=true/);
+  assert.match(html, /if\(lines\.length>=2\)await accPostEntry/);
   assert.match(html, /function accAdjustTypeChanged\(\)/);
 });
 
