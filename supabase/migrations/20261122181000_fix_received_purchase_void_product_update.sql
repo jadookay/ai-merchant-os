@@ -93,7 +93,7 @@ begin
     raise exception 'Active Inventory (1200), Accounts Payable (2000), and Owner Equity (3000) accounts are required';
   end if;
 
-  select count(*)::integer,min(je.id)
+  select count(*)::integer,(array_agg(je.id order by je.created_at))[1]
     into v_purchase_journal_count,v_purchase_journal_id
   from public.journal_entries je
   where je.merchant_id=v_purchase.merchant_id
@@ -114,7 +114,7 @@ begin
     raise exception 'Purchase journal does not match Dr Inventory / Cr Accounts Payable for the full purchase total';
   end if;
 
-  select count(*)::integer,min(je.id)
+  select count(*)::integer,(array_agg(je.id order by je.created_at))[1]
     into v_opening_journal_count,v_opening_journal_id
   from public.journal_entries je
   where je.merchant_id=v_purchase.merchant_id
@@ -147,7 +147,7 @@ begin
     raise exception 'Opening-stock journal does not reconcile to the product opening movement; manual review is required';
   end if;
 
-  select count(*)::integer,min(je.id)
+  select count(*)::integer,(array_agg(je.id order by je.created_at))[1]
     into v_reconciliation_count,v_reconciliation_journal_id
   from public.journal_entries je
   where je.merchant_id=v_purchase.merchant_id
