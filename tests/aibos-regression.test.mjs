@@ -512,7 +512,9 @@ test("purchase void creates one exact inverse and offsets the supplier-return mo
 
 test("accounting balances and integrity checks recognize purchase_void as the exact reversal source", () => {
   for (const app of [html,previewHtml]) {
-    assert.ok(app.includes("['sale_void','sale_cogs_void','accounting_correction','purchase_void']"));
+    const reversalLists=app.split("\\n").filter(line=>line.includes("accounting_correction")&&line.includes("sale_void"));
+    assert.ok(reversalLists.length>=2);
+    assert.ok(reversalLists.every(line=>line.includes("purchase_void")));
     assert.ok(app.includes("['sale','sale_cogs','purchase'].includes(entry.source_type)"));
   }
 });
