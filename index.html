@@ -9959,8 +9959,8 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
  const labels={en:['Home','Sell','Stock','AIBOS','Settings','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','AIBOS','Igenamiterere','Shericeri'],fr:['Accueil','Vendre','Stock','AIBOS','Paramètres','Shericeri']},icons=['⌂','＋','▦','◈','⚙',''];
  function paint(lang){
   const names=labels[lang]||labels.en;
-  order.forEach((id,i)=>{const b=nav.querySelector(':scope > button[data-view="'+id+'"]');if(b){b.textContent=icons[i]+' '+names[i];b.setAttribute('aria-label',names[i])}});
-  const s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(s){const img=s.querySelector('img');s.replaceChildren();if(img)s.appendChild(img);s.appendChild(document.createTextNode(names[5]));s.setAttribute('aria-label',names[5]);s.title=names[5]}
+  order.forEach((id,i)=>{const b=nav.querySelector(':scope > button[data-view="'+id+'"]');if(b){const label=icons[i]+' '+names[i];if(b.textContent!==label)b.textContent=label;b.setAttribute('aria-label',names[i])}});
+  const s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(s){const labelNode=Array.from(s.childNodes).find(n=>n.nodeType===Node.TEXT_NODE);if(labelNode){if(labelNode.nodeValue!==names[5])labelNode.nodeValue=names[5]}else s.appendChild(document.createTextNode(names[5]));s.setAttribute('aria-label',names[5]);s.title=names[5]}
  }
  function arrange(){
   const wanted=order.map(id=>nav.querySelector(':scope > button[data-view="'+id+'"]')).filter(Boolean),s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(s)wanted.push(s);
