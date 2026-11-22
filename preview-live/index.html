@@ -5860,7 +5860,7 @@ function accBalance(accountId){
   let n=0;
   const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
   const activeReversals=new Set((state.journalEntries||[])
-    .filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','expense_delete','cash_entry_delete'].includes(e.source_type))
+    .filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','expense_delete','cash_entry_delete','purchase_void'].includes(e.source_type))
     .map(e=>e.source_id));
   for(const line of state.journalLines||[]){
     if(line.account_id!==accountId)continue;
@@ -6276,7 +6276,7 @@ function accLedgerIntegrity(endDate=null){
   const activeSources=new Map(),reversalsBySource=new Map();
   for(const e of entries){
     const entryDate=String(e.entry_date||e.created_at||'').slice(0,10);if(!e.voided&&e.source_type&&e.source_id&&(!endDate||entryDate<=endDate)){const key=e.source_type+'|'+e.source_id;activeSources.set(key,(activeSources.get(key)||0)+1);}
-    if(!e.voided&&(!endDate||entryDate<=endDate)&&['sale_void','sale_cogs_void','accounting_correction','expense_delete','cash_entry_delete'].includes(e.source_type)&&e.source_id){
+    if(!e.voided&&(!endDate||entryDate<=endDate)&&['sale_void','sale_cogs_void','accounting_correction','expense_delete','cash_entry_delete','purchase_void'].includes(e.source_type)&&e.source_id){
       if(!reversalsBySource.has(e.source_id))reversalsBySource.set(e.source_id,[]);
       reversalsBySource.get(e.source_id).push(e);
     }
