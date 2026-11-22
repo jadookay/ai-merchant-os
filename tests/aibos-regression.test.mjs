@@ -414,7 +414,7 @@ test("received purchases require a supplier and linked purchase payments roll in
   assert.ok(previewHtml.includes("Select a supplier so this purchase can be tracked and settled through Accounts Payable."));
   assert.ok(previewHtml.includes("purchasePayments=purchase?"));
   assert.ok(previewHtml.includes("return bill?accBillPaid(bill):"));
-  assert.ok(previewHtml.includes("x.status==='received'&&x.supplier_id&&!accPurchaseLinkedBill(x)"));
+  assert.ok(previewHtml.includes("x.status==='received'&&!x.voided_at&&x.supplier_id&&!accPurchaseLinkedBill(x)"));
 });
 
 
