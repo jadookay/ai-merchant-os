@@ -2344,7 +2344,16 @@ function repeatCustomerCount(){return customerStats().filter(c=>c.visits>1).leng
 function revenue(){return state.sales.filter(x=>!x.voided).reduce((s,x)=>s+x.qty*x.price,0)}
 function cogs(){return state.sales.filter(x=>!x.voided).reduce((s,x)=>s+x.qty*(x.cost??0),0)}
 function totalExpenses(){return state.expenses.filter(x=>!x.deleted).reduce((s,x)=>s+Number(x.amount||0),0)}
-function profit(){return revenue()-cogs()-totalExpenses()}
+function osAccountingProfitSnapshot(){
+  if(!Array.isArray(state.accounts)||!state.accounts.length||!Array.isArray(state.journalEntries)||typeof accReportTotals!=='function'||typeof accStatementTotal!=='function')return null;
+  const balances=accReportTotals(null,sheriLocalDateKey(new Date()));
+  const salesRevenue=Number(balances['4000']||0)-Number(balances['4050']||0);
+  const totalIncome=accStatementTotal('income',balances,'credit');
+  const costOfSales=accStatementTotal('cogs',balances,'debit');
+  const expenses=accStatementTotal('expense',balances,'debit');
+  return {salesRevenue,totalIncome,costOfSales,expenses,grossProfit:salesRevenue-costOfSales,netProfit:totalIncome-costOfSales-expenses};
+}
+function profit(){const ledger=osAccountingProfitSnapshot();return ledger?ledger.netProfit:revenue()-cogs()-totalExpenses()}
 function categoryBreakdown(){
   let map={};
   state.sales.filter(s=>!s.voided).forEach(s=>{const p=product(s.product_id);const cat=p?p.cat:(s.product_name_snapshot?'Other':null);if(!cat)return;map[cat]=map[cat]||{revenue:0,profit:0};map[cat].revenue+=s.qty*s.price;map[cat].profit+=s.qty*(s.price-(s.cost??0))});
@@ -5734,7 +5743,7 @@ function osMonthKey(d=new Date()){return new Date(d).toISOString().slice(0,7)}
 function osPurchasesTotal(){return (state.purchases||[]).filter(x=>x.status!=='ordered').reduce((s,x)=>s+Number(x.total||x.qty*x.unit_cost||0),0)}
 function osCashNet(){return (state.cashEntries||[]).reduce((s,x)=>{const a=Number(x.amount)||0;return s+(x.kind==='income'?a:x.kind==='expense'?-a:0)},0)}
 function osInventoryValue(){return activeProducts().reduce((s,p)=>s+(Number(p.stock)||0)*(Number(p.cost)||0),0)}
-function osGrossProfit(){return revenue()-cogs()}
+function osGrossProfit(){const ledger=osAccountingProfitSnapshot();return ledger?ledger.grossProfit:revenue()-cogs()}
 function osSupplierSpend(id){return (state.purchases||[]).filter(x=>x.supplier_id===id).reduce((s,x)=>s+Number(x.total||x.qty*x.unit_cost||0),0)}
 function osAvgDaily(days=30, field='revenue'){
   const cutoff=Date.now()-days*86400000;
