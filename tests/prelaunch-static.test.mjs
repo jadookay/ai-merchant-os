@@ -11,6 +11,7 @@ const schemaPatch = await readFile(new URL("../supabase/patches/priority_one_sto
 const teamAccess = await readFile(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const teamMigration = await readFile(new URL("../supabase/migrations/20261112183000_aibos_merchant_team_access.sql", import.meta.url), "utf8");
 const previewHtml = await readFile(new URL("../preview/index.html", import.meta.url), "utf8");
+const previewLiveHtml = await readFile(new URL("../preview-live/index.html", import.meta.url), "utf8");
 const previewScript = previewHtml.slice(previewHtml.indexOf("<script>") + 8, previewHtml.lastIndexOf("</script>"));
 new vm.Script(previewScript, { filename: "preview/index.html" });
 
@@ -835,4 +836,19 @@ test("Shericeri generation explicitly requires idiomatic spoken Kinyarwanda rath
   assert.ok(quickService.includes("native Rwandan speaking spontaneously"));
   assert.ok(quickService.includes("never like English or French translated into Kinyarwanda"));
   assert.ok(quickService.includes("would a fluent person in Rwanda actually say this aloud"));
+});
+
+
+test("owner sign-up requires and securely stores a full name; staff PIN login accepts a full name identifier in all locales", () => {
+  for (const source of [html, previewLiveHtml]) {
+    assert.ok(source.includes('id="signupFullName"'));
+    assert.ok(source.includes('autocomplete="name"'));
+    assert.ok(source.includes("Enter your full name (2–120 characters)."));
+    assert.ok(source.includes("data:{full_name}"));
+    assert.ok(source.includes("Full name, phone or email"));
+    assert.ok(source.includes("Your full name, phone or email"));
+    assert.ok(source.includes("'full name':'Nom complet'"));
+    assert.ok(source.includes("'full name':'Amazina yose'"));
+  }
+  assert.ok(html.includes("if(!full_name||full_name.length<2||full_name.length>120)"));
 });
