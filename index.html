@@ -2823,10 +2823,10 @@ async function saveProduct(){
     await sheriQueue({type:'product_upsert',record:{...p,stock:0}});
     if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:0,quantity_delta:initialStock,reason:'Initial stock entry',movement_type:'opening_balance',source_id:sheriUuid()});
   }
-  let openingWarning='';if(openingStockProduct&&openingStockProduct.stock>0&&openingStockProduct.cost>0){if(sheriCan('manage_finance')){try{await accEnsureBase();const inv=accAccountCode('1200'),equity=accAccountCode('3000'),value=openingStockProduct.stock*openingStockProduct.cost;await accPostEntry({date:now.slice(0,10),description:'Opening inventory '+name,sourceType:'product_opening_stock',sourceId:openingStockProduct.id,lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]});}catch(err){openingWarning=' Opening stock was saved but its accounting entry needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] opening inventory posting failed',err);}}else openingWarning=' Inventory quantity is recorded; a finance manager must post the opening stock value.';}
+  // The opening-balance inventory RPC now creates the matching Inventory / Owner Equity journal in the same database transaction as the stock movement.
   if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name});
   if(navigator.onLine)sherriSyncKick();
-  document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast((isEditing?'Product updated.':'Product saved.')+openingWarning,openingWarning?'warning':'success');
+  document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast(isEditing?'Product updated.':'Product saved.','success');
 }
 async function deleteProduct(id){
   if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('Only a Manager, Admin or Owner with inventory access can delete products.','error');
