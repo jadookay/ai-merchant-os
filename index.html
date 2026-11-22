@@ -10191,7 +10191,7 @@ function layout(){
 scheduled=false;
 const mobile=window.innerWidth<=650,active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none');
 if(!mobile||!active){main.style.removeProperty('margin-top');return}
-const height=Math.ceil(Math.max(side.getBoundingClientRect().height,side.scrollHeight));
+const height=Math.ceil(side.getBoundingClientRect().height);
 main.style.setProperty('margin-top',(height+2)+'px','important');
 side.scrollTop=0;const nav=side.querySelector('.nav');if(nav)nav.scrollTop=0;
 }
