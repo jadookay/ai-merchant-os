@@ -245,7 +245,7 @@ test("the production application shell remains isolated at V14.4.71", () => {
 });
 
 test("the preview application shell is bumped to V14.4.78 without changing production", () => {
-  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v77"));
+  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v78"));
   assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.77'"));
   assert.ok(previewHtml.includes("V14.4.78"));
 });
