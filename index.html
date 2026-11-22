@@ -6023,7 +6023,7 @@ async function accCreateAdjustment(){
     else{stockDelta=qty;movementType='adjustment';}
     serverPostsStockJournal=true;
   }else{
-    if(!Number.isFinite(amount)||amount<=0||!accountId)return alert('Enter a positive amount and choose a cash/bank account.');
+    if(!Number.isFinite(amount)||amount<=0||(!accountId&&!(type==='purchase_return'&&qty>0&&productId)))return alert('Enter a positive amount and choose a cash/bank account unless the return is linked to stock and will reduce Accounts Payable automatically.');
     if(type==='sales_return'){
       lines=[{accountId:salesRet.id,debit:amount},{accountId:accountId,credit:amount}];
       if(qty>0&&productId){
