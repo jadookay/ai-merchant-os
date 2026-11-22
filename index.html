@@ -2810,7 +2810,7 @@ async function saveProduct(){
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
     if(stockDelta!==0){
-      await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:previousStock,quantity_delta:stockDelta,reason:editReason.trim(),movement_type:'adjustment',source_id:sheriUuid()});
+      await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:previousStock,quantity_delta:stockDelta,reason:editReason.trim(),movement_type:'adjustment',source_id:sheriUuid(),entry_date:sheriNow().slice(0,10)});
       p.stock=stock||0;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     }
   }else{
@@ -3125,6 +3125,8 @@ function cancelImportPreview(){
   pendingImportItems=null;pendingImportStatusEl=null;
 }
 async function mergeImportedProducts(items,status){
+  const hasNewOpeningStock=items.some(raw=>Number(raw.stock||0)>0&&!activeProducts().some(p=>p.name.trim().toLowerCase()===(raw.name||'').trim().toLowerCase()));
+  if(hasNewOpeningStock&&!sheriCan('manage_finance')){status.textContent=sheriLocalized('Importing new products with opening stock requires finance permission. Import them with zero stock or ask a finance manager to complete the opening balance.','L’importation de nouveaux produits avec un stock initial nécessite une autorisation financière. Importez-les avec un stock nul ou demandez à un responsable financier de compléter le stock initial.','Kwinjiza ibicuruzwa bishya bifite ububiko bw’ibanze bisaba uburenganzira bw’imari. Bishyiremo bifite ububiko bwa zeru cyangwa usabe ushinzwe imari kuzuza ububiko bw’ibanze.');return;}
   let added=0,merged=0,skipped=0;
   for(const raw of items){
     const name=(raw.name||'').trim();
@@ -3422,6 +3424,7 @@ async function createTeamMember(){const status=document.getElementById('teamStat
 async function signInWithTeamPin(){try{if(!sb)await sheriInitSupabase();const merchant_code=document.getElementById('staffMerchantCode').value.trim(),identifier=document.getElementById('staffIdentifier').value.trim(),pin=document.getElementById('staffPin').value.trim();if(!/^\d{1,6}$/.test(merchant_code)||!identifier||pin.length<6||pin.length>8||!/^[0-9]+$/.test(pin))return setAuthStatus('Enter your 1–6 digit business ID, name, phone or email, and a 6–8 digit PIN.',true);setAuthStatus('Verifying team access…');const {data,error}=await sb.functions.invoke('team-access',{body:{action:'login_with_pin',merchant_code,identifier,pin}});if(error||!data?.token_hash)throw error||new Error(data?.error||'Sign-in failed');const credentials={token_hash:data.token_hash,type:'email'};const {data:authData,error:authError}=await sb.auth.verifyOtp(credentials);if(authError)throw authError;if(!authData?.session)throw new Error('Secure session could not be established.');window.__teamLoginMerchantId=data.merchant_id;setAuthStatus('Signed in. Loading your workspace…');await onAuthed(authData.session)}catch(e){setAuthStatus(e?.message||'Team sign-in failed.',true)}}
 async function saveSettings(){const name=document.getElementById('setName').value.trim()||'Merchant',category=document.getElementById('setCat').value,tin=document.getElementById('setTin').value.trim()||null,fiscalYear=document.getElementById('setFiscalYear').value||null,country=document.getElementById('setCountry').value,currency=document.getElementById('setCurrency').value;if(!country||!currency)return alert('Country and currency are required.');const oldCurrency=state.merchant.currency||'RWF';Object.assign(state.merchant,{name,category,tin,fiscal_year:fiscalYear?Number(fiscalYear):null,country,currency,updated_at:sheriNow()});await sheriSaveSnapshot();await sheriQueue({type:'merchant_upsert',record:{...state.merchant}});if(navigator.onLine)await sheriSyncOutbox();render();alert(oldCurrency!==currency?'Settings saved. Existing numeric amounts were not converted; the new currency is now used for display and new transactions.':(navigator.onLine?'Settings saved.':'Settings saved offline — they will sync automatically.'));}
 async function seedDemoData(){
+  if(!sheriCan('manage_finance'))return sheriToast(sheriLocalized('Demo products include opening stock and require finance permission.','Les produits de démonstration comprennent un stock initial et nécessitent une autorisation financière.','Ibicuruzwa by’igerageza birimo ububiko bw’ibanze kandi bisaba uburenganzira bw’imari.'),'error');
   if(!confirm('Add sample products so you can test the app? This will not remove existing data.'))return;
   const items=[
     {name:'Vaseline 250ml',cat:'Cosmetics & Beauty',cost:1800,sell:2500,stock:18,reorder:8},
