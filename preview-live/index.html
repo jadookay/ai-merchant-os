@@ -5767,7 +5767,7 @@ async function deleteOSSupplier(id){if(!sheriCan('manage_team')||!sheriCan('mana
 async function addOSPurchase(){
   if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to record purchases.','error');
   const supplierId=document.getElementById('osPurchaseSupplier').value||null,productId=document.getElementById('osPurchaseProduct').value,qty=Number(document.getElementById('osPurchaseQty').value),unitCost=Number(document.getElementById('osPurchaseCost').value),status=document.getElementById('osPurchaseStatus').value;
-  const p=product(productId);if(!p||!Number.isInteger(qty)||qty<1||!Number.isInteger(unitCost)||unitCost<0)return alert('Choose a product and enter a whole-number quantity and valid unit cost.');
+  if(!supplierId)return alert('Select a supplier so this purchase can be tracked and settled through Accounts Payable.');const p=product(productId);if(!p||!Number.isInteger(qty)||qty<1||!Number.isInteger(unitCost)||unitCost<0)return alert('Choose a product and enter a whole-number quantity and valid unit cost.');
   const now=sheriNow(),oldStock=Number(p.stock)||0,oldCost=Number(p.cost)||0;
   const data={id:sheriUuid(),merchant_id:state.merchant.id,supplier_id:supplierId,product_id:p.id,product_name_snapshot:p.name,qty,unit_cost:unitCost,total:qty*unitCost,status,purchased_at:now,due_date:document.getElementById('osPurchaseDue').value||null,created_at:now,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
   let localStock=null,localCost=null;
@@ -5983,9 +5983,9 @@ async function accAudit(action,entityType,entityId,details){
 function accInvoiceTotal(i){return Number(i.total||0)}
 function accBillTotal(b){return Number(b.total||0)}
 function accInvoicePaid(i){return (state.payments||[]).filter(p=>p.source_type==='invoice'&&p.source_id===i.id&&p.direction==='receipt').reduce((s,p)=>s+Number(p.amount||0),0)}
-function accBillPaid(b){return (state.payments||[]).filter(p=>p.source_type==='bill'&&p.source_id===b.id&&p.direction==='payment').reduce((s,p)=>s+Number(p.amount||0),0)}
+function accBillPaid(b){const billPayments=(state.payments||[]).filter(p=>p.source_type==='bill'&&p.source_id===b.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0),purchase=b.purchase_id?(state.purchases||[]).find(p=>p.id===b.purchase_id):null,purchasePayments=purchase?(state.payments||[]).filter(p=>p.source_type==='purchase'&&p.source_id===purchase.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0):0;return billPayments+purchasePayments}
 function accPurchaseLinkedBill(p){return (state.bills||[]).find(b=>b.purchase_id===p.id)||null}
-function accPurchasePaid(p){const direct=(state.payments||[]).filter(x=>x.source_type==='purchase'&&x.source_id===p.id&&x.direction==='payment').reduce((sum,x)=>sum+Number(x.amount||0),0),bill=accPurchaseLinkedBill(p);return direct+(bill?accBillPaid(bill):0)}
+function accPurchasePaid(p){const bill=accPurchaseLinkedBill(p);return bill?accBillPaid(bill):(state.payments||[]).filter(x=>x.source_type==='purchase'&&x.source_id===p.id&&x.direction==='payment').reduce((sum,x)=>sum+Number(x.amount||0),0)}
 function accPurchaseOutstanding(p){return Math.max(0,Number(p.total||0)-accPurchasePaid(p))}
 function accPurchaseStatus(p){const paid=accPurchasePaid(p),total=Number(p.total||0);return paid<=0.005?'unpaid':paid+0.005>=total?'paid':'part-paid'}
 function accExpensePaid(e){
@@ -6060,7 +6060,7 @@ function accPaymentSourceOptions(){
   const current=sel.value;let rows=[];
   if(type==='supplier_payment'){
     const bills=(state.bills||[]).filter(x=>accBillStatus(x)!=='paid').map(x=>({kind:'bill',id:x.id,name:x.bill_number,outstanding:Math.max(0,Number(x.total||0)-accBillPaid(x))}));
-    const purchases=(state.purchases||[]).filter(x=>x.status==='received'&&!accPurchaseLinkedBill(x)&&accPurchaseOutstanding(x)>0.005).map(x=>({kind:'purchase',id:x.id,name:(x.product_name_snapshot||'Purchase')+' · '+String(x.purchased_at||x.created_at||'').slice(0,10),outstanding:accPurchaseOutstanding(x)}));
+    const purchases=(state.purchases||[]).filter(x=>x.status==='received'&&x.supplier_id&&!accPurchaseLinkedBill(x)&&accPurchaseOutstanding(x)>0.005).map(x=>({kind:'purchase',id:x.id,name:(x.product_name_snapshot||'Purchase')+' · '+String(x.purchased_at||x.created_at||'').slice(0,10),outstanding:accPurchaseOutstanding(x)}));
     rows=[...bills,...purchases];
   }else if(type==='customer_receipt')rows=(state.invoices||[]).filter(x=>accInvoiceStatus(x)!=='paid').map(x=>({kind:'invoice',id:x.id,name:x.invoice_number,outstanding:Math.max(0,Number(x.total||0)-accInvoicePaid(x))}));
   else if(type==='expense_payment')rows=(state.expenses||[]).filter(x=>!x.deleted&&accExpenseOutstanding(x)>0.005).map(x=>({kind:'expense',id:x.id,name:x.description,outstanding:accExpenseOutstanding(x)}));
@@ -8418,6 +8418,12 @@ const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const be
     'the selected purchase does not belong to this supplier or is not received.':'Cet achat ne correspond pas à ce fournisseur ou n’a pas encore été reçu.',
     'the bill total must match the recorded purchase total of':'Le total de la facture doit correspondre au total de l’achat enregistré de',
     'paid':'Payé','bill match':'Association de facture'
+  });
+  Object.assign(dictionaries.rw,{
+    'select a supplier so this purchase can be tracked and settled through accounts payable.':'Hitamo utanga ibicuruzwa kugira ngo igurwa rikurikiranwe kandi umwenda wishyurwe muri Konti z’Abishyuzwa.'
+  });
+  Object.assign(dictionaries.fr,{
+    'select a supplier so this purchase can be tracked and settled through accounts payable.':'Sélectionnez un fournisseur afin de suivre cet achat et de régler la dette dans les comptes fournisseurs.'
   });
   const normalize=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
   function translateString(original,lang){
