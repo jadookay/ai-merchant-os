@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.76 preview inventory deactivation and sync repair">
+<meta name="app-version" content="V14.4.77 preview supplier bill PDF and multilingual bill details">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -3001,8 +3001,22 @@ async function sheriEnsureXlsx(){
   await sheriLoadExportScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',()=>!!window.XLSX?.utils);
 }
 async function sheriEnsurePdf(){
-  await sheriLoadExportScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF);
-  await sheriLoadExportScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',()=>typeof window.jspdf?.jsPDF?.API?.autoTable==='function');
+  const loadFirst=async(urls,ready)=>{
+    if(ready())return;
+    let lastError=null;
+    for(const url of urls){try{await sheriLoadExportScript(url,ready);if(ready())return;}catch(error){lastError=error;}}
+    throw lastError||new Error('Could not load the PDF export library. Check your connection and try again.');
+  };
+  await loadFirst([
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
+  ],()=>!!window.jspdf?.jsPDF);
+  await loadFirst([
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
+    'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js',
+    'https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'
+  ],()=>typeof window.jspdf?.jsPDF?.API?.autoTable==='function');
 }
 function downloadBlob(blob,filename){
   const url=URL.createObjectURL(blob),a=document.createElement('a');
