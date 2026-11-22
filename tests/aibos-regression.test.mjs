@@ -243,10 +243,10 @@ test("the production application shell remains isolated at V14.4.71", () => {
   assert.ok(serviceWorker.includes("const RELEASE='V14.4.71'"));
 });
 
-test("the preview application shell is bumped to V14.4.76 without changing production", () => {
-  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v76"));
-  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.76'"));
-  assert.ok(previewHtml.includes("V14.4.76"));
+test("the preview application shell is bumped to V14.4.77 without changing production", () => {
+  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v77"));
+  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.77'"));
+  assert.ok(previewHtml.includes("V14.4.77"));
 });
 
 test("supplier bills post to the selected inventory, operating expense, service or other asset account", () => {
@@ -307,4 +307,36 @@ test("financial statement verification checks missing source postings and cash r
   assert.ok(html.includes("cashFlow.reconciliationDifference"));
   assert.ok(html.includes("history_incomplete_count"));
   assert.ok(html.includes("opening_history_complete"));
+});
+
+
+test("supplier bill PDF loads jsPDF and AutoTable before generating the document", () => {
+  assert.match(previewHtml, /async function accBillPdf\(id\)[\s\S]*?await sheriEnsurePdf\(\)/);
+  assert.match(previewHtml, /function sheriEnsurePdf\(\)[\s\S]*?jspdf-autotable@3\.8\.2/);
+  assert.match(previewHtml, /d\.autoTable\(\{startY:68/);
+  assert.ok(previewHtml.includes("accBillPaid(b)"));
+  assert.ok(previewHtml.includes("accBillStatus(b)"));
+  assert.ok(previewHtml.includes("safeName+'.pdf'"));
+});
+
+test("supplier bill register displays saved line descriptions and catches PDF errors", () => {
+  assert.ok(previewHtml.includes("<th>Description</th>"));
+  assert.ok(previewHtml.includes("map(item=>item.description).filter(Boolean).join(', ')"));
+  assert.ok(previewHtml.includes("accBillPdf('${x.id}').catch(error=>"));
+});
+
+test("supplier bill PDF labels and bill register have French and Kinyarwanda translations", () => {
+  for (const value of [
+    "'description':'Ibisobanuro'",
+    "'bill type':'Ubwoko bwa fagitire'",
+    "'payment summary':'Incamake y’ubwishyu'",
+    "'description':'Description'",
+    "'bill type':'Type de facture'",
+    "'payment summary':'Résumé du paiement'"
+  ]) assert.ok(previewHtml.includes(value), "Missing bill translation: "+value);
+});
+
+test("invoice and payment receipt PDFs also load the PDF engine before use", () => {
+  assert.match(previewHtml, /async function accInvoicePdf\(id\)[\s\S]*?await sheriEnsurePdf\(\)/);
+  assert.match(previewHtml, /async function accReceiptPdf\(id\)[\s\S]*?await sheriEnsurePdf\(\)/);
 });
