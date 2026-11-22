@@ -588,17 +588,24 @@ test("reports, sales, expenses, Home and stock movements include calendar-year f
   assert.ok(html.includes("else if(period==='yearly'){start.value=sheriLocalDateInput(new Date(now.getFullYear(),0,1));end.value=today;}"));
 });
 
-test("merchant navigation preserves the approved Home/Sell/Stock, Money/More and Shericeri structure", () => {
-  assert.match(html, /data-view="dashboard">⌂ Home/);
-  assert.match(html, /data-view="sales">＋ Sell/);
-  assert.match(html, /data-view="inventory">▦ Stock/);
-  assert.match(html, /data-view="money">💰 Money/);
-  assert.match(html, /data-view="businessOS" data-nav-command-center="1"[^>]*>⋯ More/);
-  assert.match(html, /onclick="show\('settings'\)">Settings/);
-  assert.match(html, /const labels=\{en:\['Home','Sell','Stock','Money','More','Shericeri'\]/);
-  assert.ok(html.includes('data-nav-shericeri'));
-  assert.ok(html.includes('sheri-nav-thumb'));
+test("merchant navigation preserves the approved 3-2-1 Home/Sell/Stock, AIBOS/Settings, Shericeri structure in all languages", () => {
+  assert.ok(html.includes("const ordered=['dashboard','sales','inventory','businessOS','settings']"));
+  assert.ok(html.includes("en:['Home','Sell','Stock','AIBOS','Settings','Shericeri']"));
+  assert.ok(html.includes("rw:['Ahabanza','Gurisha','Ibicuruzwa','AIBOS','Igenamiterere','Shericeri']"));
+  assert.ok(html.includes("fr:['Accueil','Vendre','Stock','AIBOS','Paramètres','Shericeri']"));
+  assert.ok(html.includes("side.insertBefore(picker,subnav||null)"));
+  assert.ok(html.includes("grid-column:3 / span 2!important;grid-row:3!important"));
+  assert.ok(html.includes("sheri-nav-thumb"));
   assert.ok(html.includes("'suppliers':'Abaranguza'"));
+});
+
+test("language selector is centred after navigation and sync controls remain horizontally arranged on mobile", () => {
+  assert.ok(html.includes("#appRoot .side #aibosLanguageSwitcher"));
+  assert.ok(html.includes("align-self:center!important"));
+  assert.ok(html.includes("#sheriOfflineBar>div:last-child"));
+  assert.ok(html.includes("flex-direction:row!important"));
+  assert.ok(html.includes("flex-wrap:nowrap!important"));
+  assert.ok(html.includes("overflow-x:auto!important"));
 });
 
 test("Home date controls and Home shortcuts route to relevant business screens", () => {
