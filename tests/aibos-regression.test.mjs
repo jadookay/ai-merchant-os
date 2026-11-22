@@ -522,7 +522,7 @@ test("accounting balances and integrity checks recognize purchase_void as the ex
 
 function evaluateCashFlowForTest(app, fixture, startDate, endDate) {
   const start = app.indexOf("function accCashFlowForPeriod(");
-  const end = app.indexOf("\\nfunction renderReports()", start);
+  const end = app.indexOf("\nfunction renderReports()", start);
   assert.ok(start >= 0 && end > start, "Cash flow function must exist");
   const source = app.slice(start, end).trim();
   const calculate = new Script("(" + source + ")").runInNewContext({ state: fixture });
