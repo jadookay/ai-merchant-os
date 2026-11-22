@@ -428,3 +428,13 @@ test("transaction histories and generated accounting documents show localized re
   assert.ok(html.includes("'date & time':'Date et heure'"));
   assert.ok(html.includes("Purchase saved. Sync status is shown above."));
 });
+
+
+test("global brand tokens and locale-neutral chart sizing use navy/gold and preserve long translated labels", () => {
+  assert.ok(html.includes('id="aibos-global-brand-and-chart-layout-v1"'));
+  assert.ok(html.includes('--aibos-navy:#010080'));
+  assert.ok(html.includes('--aibos-gold:#f7eb5b'));
+  assert.ok(html.includes('min-width:760px!important'));
+  assert.ok(html.includes('overflow-x:auto!important'));
+  assert.ok(html.includes('white-space:nowrap!important;overflow-wrap:normal!important;word-break:normal!important'));
+});
