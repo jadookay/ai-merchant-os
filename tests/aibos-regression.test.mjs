@@ -440,47 +440,53 @@ test("new opening-stock migrations require traceable product-level journals", ()
 
 
 test("received purchase voiding is atomic, permission-scoped, and preserves its audit trail", () => {
-  assert.match(purchaseVoidFinalMigration, /create or replace function public\\.void_received_purchase/);
-  assert.match(purchaseVoidFinalMigration, /for update/);
-  assert.match(purchaseVoidFinalMigration, /private\\.user_can_access_merchant\\(v_purchase\\.merchant_id,'manage_inventory'\\)/);
-  assert.match(purchaseVoidFinalMigration, /private\\.user_can_access_merchant\\(v_purchase\\.merchant_id,'manage_team'\\)/);
-  assert.match(purchaseVoidFinalMigration, /linked to a supplier bill/);
-  assert.match(purchaseVoidFinalMigration, /payment is linked directly/);
-  assert.match(purchaseVoidFinalMigration, /product_opening_stock/);
-  assert.match(purchaseVoidFinalMigration, /inventory_reconciliation/);
-  assert.match(purchaseVoidFinalMigration, /set_config\\('aibos\\.stock_movement_type','supplier_return'/);
-  assert.match(purchaseVoidFinalMigration, /shericeri_write_audit/);
-  assert.match(purchaseVoidFinalMigration, /voided_at=now\\(\\)/);
-  assert.match(purchaseVoidFinalMigration, /no records changed/i);
+  for (const value of [
+    "create or replace function public.void_received_purchase",
+    "for update",
+    "private.user_can_access_merchant(v_purchase.merchant_id,'manage_inventory')",
+    "private.user_can_access_merchant(v_purchase.merchant_id,'manage_team')",
+    "linked to a supplier bill",
+    "payment is linked directly",
+    "product_opening_stock",
+    "inventory_reconciliation",
+    "set_config('aibos.stock_movement_type','supplier_return'",
+    "shericeri_write_audit",
+    "voided_at=now()",
+    "No records changed"
+  ]) assert.ok(purchaseVoidFinalMigration.includes(value), "Missing purchase void safeguard: "+value);
 });
 
 test("voided legacy partial receipts are permitted only after a controlled void", () => {
-  assert.match(purchaseVoidBaseMigration, /v_voided_at timestamptz/);
-  assert.match(purchaseVoidBaseMigration, /if v_voided_at is not null then/);
-  assert.match(purchaseVoidBaseMigration, /Normal, non-voided purchases still require exact receipts/);
-  assert.match(purchaseVoidBaseMigration, /abs\\(v_receipt_qty-v_purchase_qty\\)>0\\.0001/);
+  for (const value of [
+    "v_voided_at timestamptz",
+    "if v_voided_at is not null then",
+    "Normal, non-voided purchases still require exact receipts",
+    "abs(v_receipt_qty-v_purchase_qty)>0.0001"
+  ]) assert.ok(purchaseVoidBaseMigration.includes(value), "Missing legacy receipt guard: "+value);
 });
 
 test("received purchase void action is online-only, reason-required, confirmed, and localized", () => {
   for (const app of [html, previewHtml]) {
-    assert.match(app, /async function voidOSPurchase\\(id\\)/);
-    assert.match(app, /sb\\.rpc\\('void_received_purchase'/);
-    assert.match(app, /reason\\.trim\\(\\)\\.length<3/);
-    assert.match(app, /if\\(!confirm\\(confirmText\\)\\)return/);
-    assert.match(app, /Purchase voiding requires an online connection/);
-    assert.match(app, /Hagarika ibyaguzwe/);
-    assert.match(app, /Achat annulé/);
-    assert.match(app, /await loadAll\\(true\\);render\\(\\)/);
+    for (const value of [
+      "async function voidOSPurchase(id)",
+      "sb.rpc('void_received_purchase'",
+      "reason.trim().length<3",
+      "if(!confirm(confirmText))return",
+      "Purchase voiding requires an online connection",
+      "Hagarika ibyaguzwe",
+      "Achat annulé",
+      "await loadAll(true);render();"
+    ]) assert.ok(app.includes(value), "Missing purchase void UI safeguard: "+value);
   }
 });
 
 test("voided purchases are excluded from supplier spend, rebuilds, bill matching and ledger completeness", () => {
   for (const app of [html, previewHtml]) {
-    assert.match(app, /function osPurchasesTotal\\(\\)[^\\n]*!x\\.voided_at/);
-    assert.match(app, /function osSupplierSpend\\(id\\)[^\\n]*!x\\.voided_at/);
-    assert.ok(app.includes("!x.voided_at"));
+    assert.ok(app.includes("function osPurchasesTotal(){return (state.purchases||[]).filter(x=>x.status!=='ordered'&&!x.voided_at)"));
+    assert.ok(app.includes("function osSupplierSpend(id){return (state.purchases||[]).filter(x=>x.supplier_id===id&&!x.voided_at)"));
     assert.ok(app.includes("purchase.voided_at||purchase.status!=='received'"));
     assert.ok(app.includes("type:'Voided purchase'"));
+    assert.ok(app.includes("state.purchases.filter(x=>x.status!=='ordered'&&!x.voided_at)"));
   }
 });
 
