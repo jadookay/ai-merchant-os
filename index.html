@@ -2494,7 +2494,7 @@ function render(){
   if(typeof renderTeamAuditTrail==='function')renderTeamAuditTrail();
   document.getElementById('merchantName').textContent=state.merchant.name;
   document.querySelectorAll('[data-currency-label]').forEach(el=>el.textContent=merchantCurrency());
-  document.getElementById('today').textContent=new Date().toLocaleDateString('en-RW',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('today').textContent=formatRecordDateTime(new Date().toISOString());
   let low=activeProducts().filter(p=>p.stock<=p.reorder).length;
   const todayKey=new Date().toISOString().slice(0,10),expiryAlerts=activeProducts().filter(p=>p.expiry_date).map(p=>({p,days:Math.ceil((new Date(p.expiry_date+'T00:00:00')-new Date(todayKey+'T00:00:00'))/86400000)})).filter(x=>x.days<=30).sort((a,b)=>a.days-b.days);
   document.getElementById('metrics').innerHTML=[
@@ -6475,7 +6475,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
       'cost of goods sold':'Ikiguzi cy’ibicuruzwa byagurishijwe','cogs':'Ikiguzi cy’ibyagurishijwe',
       'expenses':'Amafaranga yakoreshejwe','quantity':'Umubare','qty':'Umubare',
       'price':'Igiciro','selling price':'Igiciro cyo kugurisha','cost':'Ikiguzi',
-      'unit cost':'Ikiguzi cya kimwe','total':'Igiteranyo','date':'Itariki',
+      'unit cost':'Ikiguzi cya kimwe','total':'Igiteranyo','date':'Itariki','date & time':'Itariki n’igihe',
       'today':'Uyu munsi','this week':'Iki cyumweru','this month':'Uku kwezi',
       'this year':'Uyu mwaka','custom range':'Igihe wahisemo','yearly':'Umwaka wose',
       'daily':'Buri munsi','weekly':'Buri cyumweru','monthly':'Buri kwezi',
@@ -6572,7 +6572,7 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
       'net profit':'Bénéfice net','gross profit':'Marge brute','loss':'Perte',
       'cost of goods sold':'Coût des marchandises vendues','cogs':'Coût des ventes',
       'quantity':'Quantité','qty':'Qté','price':'Prix','selling price':'Prix de vente',
-      'cost':'Coût','unit cost':'Coût unitaire','total':'Total','date':'Date',
+      'cost':'Coût','unit cost':'Coût unitaire','total':'Total','date':'Date','date & time':'Date et heure',
       'today':'Aujourd’hui','this week':'Cette semaine','this month':'Ce mois-ci',
       'this year':'Cette année','custom range':'Période personnalisée','yearly':'Annuel',
       'daily':'Quotidien','weekly':'Hebdomadaire','monthly':'Mensuel',
