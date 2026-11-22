@@ -416,7 +416,7 @@ test("received purchases require a supplier and linked purchase payments roll in
 
 
 test("transaction histories and generated accounting documents show localized record date and time", () => {
-  assert.match(html, /function formatRecordDateTime\\(value,recordedAt\\)/);
+  assert.ok(html.includes("function formatRecordDateTime(value,recordedAt)"));
   assert.ok(html.includes("formatRecordDateTime(c.lastPurchase)"));
   assert.ok(html.includes("formatRecordDateTime(x.purchased_at||x.created_at,x.created_at)"));
   assert.ok(html.includes("formatRecordDateTime(x.occurred_at,x.created_at)"));
