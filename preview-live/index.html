@@ -10423,5 +10423,123 @@ if(document.fonts?.ready)document.fonts.ready.then(schedule);schedule();
  schedule();
 })();
 </script>
+
+<!-- V14.4.61: single-source mobile header clearance and wrapping sync controls -->
+<style id="aibos-locale-invariant-navigation-sync-v61">
+/* All three locales share one geometry. The only locale-dependent content is text. */
+@media(max-width:650px){
+  #appRoot .side{
+    position:fixed!important;inset:0 0 auto 0!important;height:auto!important;
+    min-height:0!important;max-height:none!important;overflow:visible!important;
+    display:flex!important;flex-direction:column!important;align-items:stretch!important;
+    box-sizing:border-box!important;padding:8px 10px 9px!important;
+    background:#010080!important;border-bottom:2px solid #F7EB5B!important;
+  }
+  #appRoot .side .nav{
+    display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;
+    grid-template-rows:repeat(3,minmax(44px,auto))!important;
+    grid-auto-rows:minmax(44px,auto)!important;grid-auto-flow:row!important;
+    gap:5px!important;padding:5px!important;margin:0!important;
+    width:100%!important;min-width:0!important;box-sizing:border-box!important;
+  }
+  #appRoot .side .nav>button{
+    min-width:0!important;width:100%!important;min-height:44px!important;
+    height:auto!important;max-height:none!important;margin:0!important;padding:5px 3px!important;
+    box-sizing:border-box!important;display:flex!important;align-items:center!important;
+    justify-content:center!important;white-space:normal!important;overflow-wrap:anywhere!important;
+    word-break:normal!important;line-height:1.15!important;font-size:clamp(11px,3.4vw,13px)!important;
+  }
+  #appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
+  #appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
+  #appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
+  #appRoot .side .nav>button[data-view="businessOS"]{grid-column:1/span 3!important;grid-row:2!important}
+  #appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
+  #appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important}
+  #appRoot .side #aibosLanguageSwitcher{
+    position:static!important;inset:auto!important;transform:none!important;align-self:center!important;
+    display:flex!important;flex-direction:row!important;justify-content:center!important;align-items:center!important;
+    width:max-content!important;max-width:100%!important;margin:6px auto 0!important;padding:3px 7px!important;
+    background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;
+    border-radius:9px!important;box-sizing:border-box!important;
+  }
+  #appRoot .side #aibosLanguageSwitcher select{
+    min-width:0!important;width:auto!important;max-width:calc(100vw - 48px)!important;
+    background:#010080!important;color:#F7EB5B!important;border:0!important;
+    font-size:13px!important;text-align:center!important;
+  }
+  /* Replace conflicting legacy 190–260px offsets with one measured header clearance. */
+  #appRoot .main{
+    margin:0!important;margin-top:0!important;
+    padding:calc(var(--aibos-mobile-header-height, 0px) + 10px) 12px 18px!important;
+    width:100%!important;max-width:100%!important;min-width:0!important;
+    box-sizing:border-box!important;overflow-x:hidden!important;
+  }
+  #appRoot #sheriOfflineBar{
+    position:relative!important;top:auto!important;inset:auto!important;
+    display:flex!important;flex-flow:row wrap!important;align-items:center!important;
+    justify-content:flex-start!important;gap:6px 8px!important;width:100%!important;
+    min-width:0!important;max-width:100%!important;box-sizing:border-box!important;
+    margin:0 0 10px!important;padding:8px!important;overflow:visible!important;
+  }
+  #appRoot #sheriOfflineBar>div:first-child{
+    display:flex!important;flex:1 1 100%!important;flex-flow:row wrap!important;
+    align-items:center!important;gap:4px 7px!important;width:100%!important;
+    min-width:0!important;max-width:100%!important;font-size:13px!important;line-height:1.3!important;
+  }
+  #appRoot #sheriOfflineBar>div:last-child{
+    display:flex!important;flex:1 1 100%!important;flex-flow:row wrap!important;
+    align-items:stretch!important;justify-content:flex-start!important;gap:5px!important;
+    width:100%!important;min-width:0!important;max-width:100%!important;
+    overflow:visible!important;white-space:normal!important;
+  }
+  #appRoot #sheriOfflineBar>div:last-child .btn{
+    display:inline-flex!important;flex:1 1 92px!important;align-items:center!important;
+    justify-content:center!important;width:auto!important;min-width:0!important;max-width:100%!important;
+    min-height:36px!important;height:auto!important;box-sizing:border-box!important;
+    padding:7px 6px!important;font-size:12px!important;line-height:1.2!important;
+    white-space:normal!important;overflow-wrap:anywhere!important;text-align:center!important;
+  }
+}
+@media(max-width:380px){
+  #appRoot .side{padding-left:7px!important;padding-right:7px!important}
+  #appRoot .side .nav{gap:4px!important;padding:4px!important}
+  #appRoot #sheriOfflineBar>div:last-child .btn{font-size:11.5px!important;padding:6px 4px!important}
+}
+</style>
+<script id="aibos-locale-invariant-navigation-sync-v61">
+(function(){
+ 'use strict';
+ const app=document.getElementById('appRoot'),side=app?.querySelector('.side');
+ const main=app?.querySelector('.main'),auth=document.getElementById('authScreen');
+ if(!app||!side||!main)return;
+ let raf=0,lastHeight=-1;
+ function measure(){
+  raf=0;
+  const active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none');
+  if(window.innerWidth>650||!active){
+   app.style.removeProperty('--aibos-mobile-header-height');
+   main.style.removeProperty('margin-top');return;
+  }
+  const height=Math.ceil(side.getBoundingClientRect().height);
+  if(height>0&&height!==lastHeight){
+   lastHeight=height;app.style.setProperty('--aibos-mobile-header-height',height+'px');
+  }
+  main.style.setProperty('margin-top','0px','important');
+ }
+ function schedule(){if(!raf)raf=requestAnimationFrame(measure)}
+ if('ResizeObserver' in window){const ro=new ResizeObserver(schedule);ro.observe(side)}
+ window.addEventListener('resize',schedule,{passive:true});
+ window.addEventListener('orientationchange',schedule,{passive:true});
+ window.addEventListener('aibos:languagechange',schedule);
+ const observer=new MutationObserver(schedule);
+ observer.observe(side,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
+ observer.observe(app,{attributes:true,attributeFilter:['style']});
+ if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
+ if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});
+ schedule();
+})();
+</script>
+
 </body>
 </html>
