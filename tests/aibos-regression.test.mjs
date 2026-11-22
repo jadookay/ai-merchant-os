@@ -12,6 +12,8 @@ const expenseStatusMigration = readFileSync(new URL("../supabase/migrations/2026
 const supplierBillMigration = readFileSync(new URL("../supabase/migrations/20261121234500_supplier_bill_account_classification.sql", import.meta.url), "utf8");
 const purchaseLinkMigration = readFileSync(new URL("../supabase/migrations/20261122090000_link_supplier_bills_to_stock_purchases.sql", import.meta.url), "utf8");
 const inventoryIntegrityMigration = readFileSync(new URL("../supabase/migrations/20261122150000_accounting_inventory_integrity_guards.sql", import.meta.url), "utf8");
+const purchaseVoidBaseMigration = readFileSync(new URL("../supabase/migrations/20261122180000_audited_received_purchase_void.sql", import.meta.url), "utf8");
+const purchaseVoidFinalMigration = readFileSync(new URL("../supabase/migrations/20261122183000_purchase_void_document_preflight.sql", import.meta.url), "utf8");
 const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index.ts", import.meta.url), "utf8");
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
@@ -412,7 +414,7 @@ test("received purchases require a supplier and linked purchase payments roll in
   assert.ok(previewHtml.includes("Select a supplier so this purchase can be tracked and settled through Accounts Payable."));
   assert.ok(previewHtml.includes("purchasePayments=purchase?"));
   assert.ok(previewHtml.includes("return bill?accBillPaid(bill):"));
-  assert.ok(previewHtml.includes("x.status==='received'&&x.supplier_id&&!accPurchaseLinkedBill(x)"));
+  assert.ok(previewHtml.includes("x.status==='received'&&!x.voided_at&&x.supplier_id&&!accPurchaseLinkedBill(x)"));
 });
 
 
@@ -434,4 +436,61 @@ test("new opening-stock migrations require traceable product-level journals", ()
   assert.match(inventoryIntegrityMigration, /new\.source_type='inventory_migration_reconciliation'/);
   assert.match(inventoryIntegrityMigration, /one source-linked opening-stock journal per product/);
   assert.match(inventoryIntegrityMigration, /before insert on public\.journal_entries/i);
+});
+
+
+test("received purchase voiding is atomic, permission-scoped, and preserves its audit trail", () => {
+  for (const value of [
+    "create or replace function public.void_received_purchase",
+    "for update",
+    "private.user_can_access_merchant(v_purchase.merchant_id,'manage_inventory')",
+    "private.user_can_access_merchant(v_purchase.merchant_id,'manage_team')",
+    "linked to a supplier bill",
+    "payment is linked directly",
+    "product_opening_stock",
+    "inventory_reconciliation",
+    "set_config('aibos.stock_movement_type','supplier_return'",
+    "shericeri_write_audit",
+    "voided_at=now()",
+    "No records changed"
+  ]) assert.ok(purchaseVoidFinalMigration.includes(value), "Missing purchase void safeguard: "+value);
+});
+
+test("voided legacy partial receipts are permitted only after a controlled void", () => {
+  for (const value of [
+    "v_voided_at timestamptz",
+    "if v_voided_at is not null then",
+    "Normal, non-voided purchases still require exact receipts",
+    "abs(v_receipt_qty-v_purchase_qty)>0.0001"
+  ]) assert.ok(purchaseVoidBaseMigration.includes(value), "Missing legacy receipt guard: "+value);
+});
+
+test("received purchase void action is online-only, reason-required, confirmed, and localized", () => {
+  for (const app of [html, previewHtml]) {
+    for (const value of [
+      "async function voidOSPurchase(id)",
+      "sb.rpc('void_received_purchase'",
+      "reason.trim().length<3",
+      "if(!confirm(confirmText))return",
+      "Purchase voiding requires an online connection",
+      "Hagarika ibyaguzwe",
+      "Achat annulé",
+      "await loadAll(true);render();"
+    ]) assert.ok(app.includes(value), "Missing purchase void UI safeguard: "+value);
+  }
+});
+
+test("voided purchases are excluded from supplier spend, rebuilds, bill matching and ledger completeness", () => {
+  for (const app of [html, previewHtml]) {
+    assert.ok(app.includes("function osPurchasesTotal(){return (state.purchases||[]).filter(x=>x.status!=='ordered'&&!x.voided_at)"));
+    assert.ok(app.includes("function osSupplierSpend(id){return (state.purchases||[]).filter(x=>x.supplier_id===id&&!x.voided_at)"));
+    assert.ok(app.includes("purchase.voided_at||purchase.status!=='received'"));
+    assert.ok(app.includes("type:'Voided purchase'"));
+    assert.ok(app.includes("state.purchases.filter(x=>x.status!=='ordered'&&!x.voided_at)"));
+  }
+});
+
+test("purchase voiding does not modify the fixed online sync worker", () => {
+  assert.ok(!serviceWorker.includes("void_received_purchase"));
+  assert.ok(!previewServiceWorker.includes("void_received_purchase"));
 });
