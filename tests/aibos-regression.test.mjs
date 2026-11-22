@@ -406,3 +406,10 @@ test("language switching translates dynamically rendered nodes, form attributes 
   assert.ok(previewHtml.includes("function sheriSyncLangSelectors(source)"));
   assert.ok(previewHtml.includes("window.AIBOS_I18N?.setLanguage?.(appLang)"));
 });
+
+test("received purchases require a supplier and linked purchase payments roll into the matched bill balance", () => {
+  assert.ok(previewHtml.includes("Select a supplier so this purchase can be tracked and settled through Accounts Payable."));
+  assert.ok(previewHtml.includes("purchasePayments=purchase?"));
+  assert.ok(previewHtml.includes("return bill?accBillPaid(bill):"));
+  assert.ok(previewHtml.includes("x.status==='received'&&x.supplier_id&&!accPurchaseLinkedBill(x)"));
+});
