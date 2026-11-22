@@ -57,7 +57,7 @@ begin
   end if;
   return null;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.assert_aibos_inventory_movement_journal_source(p_merchant_id uuid, p_source_id uuid, p_source_type text)
@@ -161,7 +161,7 @@ begin
     raise exception 'AIBOS integrity: inventory movement journal % must post exactly Dr % / Cr % for RWF value %',p_source_id,v_debit_code,v_credit_code,v_amount;
   end if;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.assert_aibos_opening_journal_source(p_merchant_id uuid, p_product_id uuid)
@@ -230,7 +230,7 @@ begin
     raise exception 'AIBOS integrity: opening inventory journal for product % must equal its opening movement value (%) and post Dr Inventory / Cr Owner Equity',p_product_id,v_opening_value;
   end if;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.ensure_aibos_inventory_movement_journal(p_merchant_id uuid, p_source_id uuid, p_movement_type text, p_quantity_delta integer, p_unit_cost numeric, p_reason text, p_entry_date date)
@@ -312,7 +312,7 @@ begin
 
   return v_entry_id;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.ensure_aibos_opening_stock_journal(p_merchant_id uuid, p_product_id uuid, p_entry_date date DEFAULT CURRENT_DATE)
@@ -411,7 +411,7 @@ begin
 
   return v_entry_id;
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION private.sheri_adjust_product_stock_internal(p_merchant_id uuid, p_product_id uuid, p_expected_stock integer, p_quantity_delta integer, p_reason text, p_movement_type text, p_source_id uuid, p_entry_date date)
@@ -501,7 +501,7 @@ begin
 
   return jsonb_build_object('ok',true,'stock',v_next,'movement_type',p_movement_type);
 end;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.shericeri_adjust_product_stock(p_merchant_id uuid, p_product_id uuid, p_expected_stock integer, p_quantity_delta integer, p_reason text, p_movement_type text DEFAULT 'adjustment'::text, p_source_id uuid DEFAULT gen_random_uuid())
@@ -514,7 +514,7 @@ AS $function$
     p_merchant_id,p_product_id,p_expected_stock,p_quantity_delta,p_reason,
     p_movement_type,p_source_id,current_date
   );
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.shericeri_adjust_product_stock_v2(p_merchant_id uuid, p_product_id uuid, p_expected_stock integer, p_quantity_delta integer, p_reason text, p_movement_type text, p_source_id uuid, p_entry_date date)
@@ -527,7 +527,7 @@ AS $function$
     p_merchant_id,p_product_id,p_expected_stock,p_quantity_delta,p_reason,
     p_movement_type,p_source_id,p_entry_date
   );
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.shericeri_sync_purchase_stock(p_purchase jsonb, p_product_id uuid, p_expected_server_stock integer, p_expected_server_cost numeric, p_local_stock integer, p_local_cost numeric)
@@ -689,7 +689,7 @@ begin
   return jsonb_build_object('ok',true,'stock_conflict',false,'server_stock',p_local_stock,
     'server_cost',p_local_cost,'received_from_order',v_purchase_exists);
 end;
-$function$
+$function$;
 
 
 drop trigger if exists aibos_inventory_movement_journal_deferred on public.inventory_movements;
