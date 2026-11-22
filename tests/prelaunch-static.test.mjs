@@ -296,8 +296,13 @@ test("sales and expenses confirm before saving and post balanced journal entries
   const saleAccountingEnd = html.indexOf("const _v14_1_addOSPurchase", saleAccountingStart);
   assert.ok(saleAccountingStart >= 0 && saleAccountingEnd > saleAccountingStart, "expected the sale accounting wrapper");
   const saleAccounting = html.slice(saleAccountingStart, saleAccountingEnd);
-  assert.ok(saleAccounting.includes("sourceType:'sale',sourceId:s.id"));
-  assert.ok(saleAccounting.includes("sourceType:'sale_cogs',sourceId:s.id"));
+  assert.ok(saleAccounting.includes('database trigger posts revenue and COGS atomically with the stock transaction'));
+  assert.ok(saleAccounting.includes("accAudit('create','sale',s.id"));
+  assert.ok(!saleAccounting.includes('accPostEntry('), 'client must not duplicate the server-posted POS journals');
+  const saleSyncStart = html.indexOf('async function sheriSyncSaleCartOperation');
+  const saleSyncEnd = html.indexOf('\nfunction sheriSyncPurchaseOperation', saleSyncStart);
+  assert.ok(saleSyncStart >= 0 && saleSyncEnd > saleSyncStart, 'expected the atomic sale-cart sync operation');
+  assert.ok(html.slice(saleSyncStart, saleSyncEnd).includes("sb.rpc('shericeri_sync_sale_cart'"));
 
   const expenseStart = html.indexOf("function addExpense()");
   const expenseEnd = html.indexOf("\nasync function deleteExpense", expenseStart);
