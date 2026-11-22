@@ -296,8 +296,13 @@ test("sales and expenses confirm before saving and post balanced journal entries
   const saleAccountingEnd = html.indexOf("const _v14_1_addOSPurchase", saleAccountingStart);
   assert.ok(saleAccountingStart >= 0 && saleAccountingEnd > saleAccountingStart, "expected the sale accounting wrapper");
   const saleAccounting = html.slice(saleAccountingStart, saleAccountingEnd);
-  assert.ok(saleAccounting.includes("sourceType:'sale',sourceId:s.id"));
-  assert.ok(saleAccounting.includes("sourceType:'sale_cogs',sourceId:s.id"));
+  assert.ok(saleAccounting.includes('database trigger posts revenue and COGS atomically with the stock transaction'));
+  assert.ok(saleAccounting.includes("accAudit('create','sale',s.id"));
+  assert.ok(!saleAccounting.includes('accPostEntry('), 'client must not duplicate the server-posted POS journals');
+  const saleSyncStart = html.indexOf('async function sheriSyncSaleCartOperation');
+  const saleSyncEnd = html.indexOf('\nasync function sheriSyncPurchaseOperation', saleSyncStart);
+  assert.ok(saleSyncStart >= 0 && saleSyncEnd > saleSyncStart, 'expected the atomic sale-cart sync operation');
+  assert.ok(html.slice(saleSyncStart, saleSyncEnd).includes("sb.rpc('shericeri_sync_sale_cart'"));
 
   const expenseStart = html.indexOf("function addExpense()");
   const expenseEnd = html.indexOf("\nasync function deleteExpense", expenseStart);
@@ -443,13 +448,34 @@ test("recent activity combines business transactions and sorts them by occurrenc
   assert.match(html, /sort\(\(a,b\)=>String\(b\.when/);
 });
 
-test("new product opening inventory and explicit stock gain/write-off adjustments post balanced journal entries", () => {
-  assert.match(html, /sourceType:'product_opening_stock',sourceId:openingStockProduct\.id/);
+test("opening stock and every inventory movement use atomic server-side accounting journals", () => {
+  assert.match(html, /movement_type:'opening_balance'/);
+  assert.match(html, /opening-balance inventory RPC now creates the matching Inventory \/ Owner Equity journal in the same database transaction/);
+  assert.doesNotMatch(html, /sourceType:'product_opening_stock',sourceId:openingStockProduct\.id/);
   assert.match(html, /option value="stock_writeoff"/);
   assert.match(html, /option value="stock_gain"/);
-  assert.match(html, /type==='stock_writeoff'\)\{lines=\[\{accountId:accAccountCode\('6000'\)\.id,debit:amount\}/);
-  assert.match(html, /else\{lines=\[\{accountId:inv\.id,debit:amount\},\{accountId:accAccountCode\('3000'\)\.id,credit:amount\}/);
+  assert.match(html, /sb\.rpc\('shericeri_adjust_product_stock_v2'/);
+  assert.match(html, /serverPostsStockJournal=true/);
+  assert.match(html, /if\(lines\.length>=2\)await accPostEntry/);
   assert.match(html, /function accAdjustTypeChanged\(\)/);
+});
+
+test("reorder tracking separates on-order stock from available stock and supports receiving orders", () => {
+  assert.match(html, /function pendingPurchaseQty\(productId\)/);
+  assert.match(html, /x\.status==='ordered'/);
+  assert.match(html, /projected=Number\(p\.stock\|\|0\)\+onOrder/);
+  assert.match(html, /Partial order pending/);
+  assert.match(html, /async function receiveOSPurchase\(id\)/);
+  assert.match(html, /status:'received',purchased_at:now/);
+  assert.match(html, /expectedServerStock:oldStock/);
+});
+
+test("supplier bills can document received purchases without duplicating inventory journals", () => {
+  assert.match(html, /id="accBillPurchase"/);
+  assert.match(html, /purchase\.supplier_id/);
+  assert.match(html, /Math\.abs\(total-Number\(purchase\.total\|\|0\)\)>0\.005/);
+  assert.match(html, /bill_type:'inventory',debit_account_id:inv\.id,purchase_id:purchaseId\|\|null/);
+  assert.match(html, /if\(purchase\)\{/);
 });
 
 test("customer records support shared voice entry and confirmation before saving", () => {
