@@ -270,7 +270,7 @@ test("preview inline JavaScript blocks parse without syntax errors", () => {
   const blocks=[...previewHtml.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)]
     .filter(([,attrs])=>!/\bsrc\s*=|application\/(?:json|ld\+json)/i.test(attrs));
   assert.ok(blocks.length>0);
-  blocks.forEach(([,attrs,source],index)=>new Script(source,{filename:"preview-inline-"+(index+1)+".js"}));
+  blocks.forEach(([,attrs,source],index)=>{try{new Script(source,{filename:"preview-inline-"+(index+1)+".js"});}catch(error){const line=Number(String(error.stack||'').match(/preview-inline-\\d+\\.js:(\\d+)/)?.[1]||0);throw new Error("Inline script "+(index+1)+" failed: "+error.message+" at line "+line+"; excerpt: "+source.split("\\n").slice(Math.max(0,line-3),line+2).join("\\n"));}});
 });
 
 test("expense payment workflow accrues expenses and settles the payable without duplicating expense", () => {
