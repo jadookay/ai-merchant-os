@@ -6028,7 +6028,7 @@ function accBillTypeChanged(){
   if(wrap&&select){wrap.hidden=type!=='other_purchase';const eligible=(state.accounts||[]).filter(a=>a.active&&['asset','expense','cogs'].includes(a.type)&&a.code!=='2110').sort((a,b)=>String(a.code).localeCompare(String(b.code)));const current=select.value;select.innerHTML='<option value="">— Select debit account —</option>'+eligible.map(a=>'<option value="'+a.id+'">'+esc(a.code)+' — '+esc(a.name)+'</option>').join('');if(eligible.some(a=>a.id===current))select.value=current;}
   accBillPurchaseOptions();
 }
-async async function accCreateBill(){
+async function accCreateBill(){
   let stage='starting',billAddedToState=false,billSavedLocally=false,billQueuedForSync=false;
   try{
     stage='refreshing chart of accounts';await accEnsureBase();
