@@ -2948,9 +2948,10 @@ function renderInventoryMovementReport(report){
   details.innerHTML='<h3>Movement details</h3>'+(moves.length?'<table class="table" style="min-width:1100px"><tr><th>Date</th><th>Product</th><th>Movement</th><th>Change</th><th>Before</th><th>After</th><th>Source</th><th>Reason</th><th>User</th>'+(costs?'<th>Unit cost</th>':'')+'</tr>'+
     moves.map(m=>'<tr><td>'+esc(m.created_at?new Date(m.created_at).toLocaleString():'—')+'</td><td>'+esc(m.product_name||'')+'</td><td>'+esc(m.movement_type||'')+'</td><td>'+Number(m.quantity_delta||0)+'</td><td>'+Number(m.quantity_before||0)+'</td><td>'+Number(m.quantity_after||0)+'</td><td>'+esc(m.source_type||'')+'</td><td>'+esc(m.reason||'')+'</td><td>'+esc(m.actor_name||sheriActorNameForId(m.actor_user_id))+'</td>'+(costs?'<td>'+money(m.unit_cost||0)+'</td>':'')+'</tr>').join('')+'</table>':'<div class="empty">No movements match the selected direction in this period.</div>');
 }
+function pendingPurchaseQty(productId){return (state.purchases||[]).filter(x=>x.product_id===productId&&x.status==='ordered').reduce((sum,x)=>sum+Number(x.qty||0),0)}
 function renderInventory(){
   const list=(state.products||[]).slice();renderInventoryMovementEntry();const search=document.getElementById('inventorySearchHost');if(search)search.innerHTML=sheriSearchControl('inventory','inventoryTable','Search products by name, category, barcode or user',list.flatMap(p=>[p.name,p.cat,p.barcode,sheriRecordActor(p)]));
-  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>User</th><th>Status</th><th>Actions</th></tr>${list.map(p=>`<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${esc(sheriRecordActor(p))}</td><td>${p.deleted?'<span class="pill">Inactive</span>':p.stock<=p.reorder?'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions">${sheriCan('manage_team')&&sheriCan('manage_inventory')?(!p.deleted?'<button class="btn small secondary" onclick="toggleProductFavorite(\''+p.id+'\')">'+(p.favorite?'★ Favorite':'☆ Favorite')+'</button>':'')+'<button class="btn small secondary" onclick="editProduct(\''+p.id+'\')">Edit</button><button class="btn small '+(p.deleted?'secondary':'danger')+'" onclick="toggleProductStatus(\''+p.id+'\')">'+(p.deleted?'Activate':'Cancel')+'</button>':''}</div></td></tr>`).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
+  document.getElementById('inventoryTable').innerHTML=list.length?`<table class="table"><tr><th></th><th>Product</th><th>Category</th><th>Cost</th><th>Price</th><th>Stock</th><th>On order</th><th>After receipts</th><th>User</th><th>Status</th><th>Actions</th></tr>${list.map(p=>{const onOrder=pendingPurchaseQty(p.id),projected=Number(p.stock||0)+onOrder;return `<tr><td>${p.image_url?`<img src="${esc(p.image_url)}" style="width:36px;height:36px;object-fit:cover;border-radius:6px">`:''}</td><td><b>${esc(p.name)}</b>${expiryPill(p)}</td><td>${esc(p.cat)}</td><td>${money(p.cost)}</td><td>${money(p.sell)}</td><td>${p.stock}</td><td>${onOrder||'—'}</td><td>${onOrder?projected:'—'}</td><td>${esc(sheriRecordActor(p))}</td><td>${p.deleted?'<span class="pill">Inactive</span>':p.stock<=p.reorder?(onOrder>0?'<span class="pill">Restock ordered</span>':'<span class="pill" style="background:#fff7ed;color:#c2410c">Restock</span>'):onOrder>0?'<span class="pill">Order pending</span>':'<span class="pill">Healthy</span>'}</td><td><div class="actions">${sheriCan('manage_team')&&sheriCan('manage_inventory')?(!p.deleted?'<button class="btn small secondary" onclick="toggleProductFavorite(\''+p.id+'\')">'+(p.favorite?'★ Favorite':'☆ Favorite')+'</button>':'')+'<button class="btn small secondary" onclick="editProduct(\''+p.id+'\')">Edit</button><button class="btn small '+(p.deleted?'secondary':'danger')+'" onclick="toggleProductStatus(\''+p.id+'\')">'+(p.deleted?'Activate':'Cancel')+'</button>':''}</div></td></tr>`}).join('')}</table>`:'<div class="empty">No products yet. Add your first product above.</div>';
   renderCategory();
 }
 async function toggleProductFavorite(id){if(!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can change sales favorites.','error');const p=product(id);if(!p)return;p.favorite=!p.favorite;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});await sheriQueue({type:'product_upsert',record:{...p}});render();sheriToast(p.favorite?'Added to sales favorites.':'Removed from sales favorites.')}
@@ -6664,6 +6665,22 @@ const _v14_1_addExpense=addExpense;addExpense=async function(){const before=stat
       'only an owner, admin or authorized manager can void sales.':'Seul le propriétaire, un administrateur ou un gestionnaire autorisé peut annuler une vente.'
     }
   };
+  Object.assign(dictionaries.rw,{
+    'on order':'Byatumijwe',
+    'after receipts':'Nyuma yo kwakira',
+    'restock ordered':'Kongera ububiko byatumijwe',
+    'order pending':'Ibyaguzwe birategerejwe',
+    'restock':'Ongera ububiko',
+    'healthy':'Bimeze neza'
+  });
+  Object.assign(dictionaries.fr,{
+    'on order':'En commande',
+    'after receipts':'Après réception',
+    'restock ordered':'Réapprovisionnement commandé',
+    'order pending':'Commande en attente',
+    'restock':'Réapprovisionner',
+    'healthy':'Normal'
+  });
   Object.assign(dictionaries.rw,{
     'receive':'Akira',
     'purchase received. stock and accounts payable have been updated.':'Ibyaguzwe byakiriwe. Ububiko n’imyenda y’abagemura byavuguruwe.',
