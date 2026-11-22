@@ -9280,7 +9280,7 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
   let last=-1,frame=0;
   function measure(){
     if(window.innerWidth>650){root.style.removeProperty('--aibos-side-height');last=-1;return}
-    const height=Math.ceil(Math.max(side.getBoundingClientRect().height,side.scrollHeight));
+    const height=Math.ceil(side.getBoundingClientRect().height);
     if(height>0&&height!==last){last=height;root.style.setProperty('--aibos-side-height',height+'px')}
   }
   function schedule(){if(frame)return;frame=requestAnimationFrame(()=>{frame=0;measure()})}
