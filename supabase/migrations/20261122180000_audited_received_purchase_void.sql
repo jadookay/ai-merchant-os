@@ -361,7 +361,7 @@ begin
     perform set_config('aibos.stock_movement_source_id',v_purchase.id::text,true);
     perform set_config('aibos.stock_movement_unit_cost',v_purchase.unit_cost::text,true);
     update public.products
-    set stock=v_stock_after,updated_at=now()
+    set stock=v_stock_after
     where id=v_purchase.product_id and merchant_id=v_purchase.merchant_id;
     select m.id into v_stock_movement_id
     from public.inventory_movements m
