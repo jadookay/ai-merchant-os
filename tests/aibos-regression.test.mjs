@@ -587,7 +587,7 @@ test("classified cash flow is present and fully labelled in English, French and 
   const requiredLabels = [
     "Operating activities", "Activités opérationnelles", "Ibikorwa bisanzwe",
     "Investing activities", "Activités d’investissement", "Ibikorwa by’ishoramari",
-    "Financing activities", "Activités de financement", "Ibikorwa byo gushaka igishoro",
+    "Financing activities", "Activités de financement", "Ibikorwa byo kubona no kwishyura inkunga n’imyenda",
     "Unclassified cash flows", "Flux de trésorerie non classés", "Amafaranga atarashyirwa mu byiciro",
     "Net change in cash and cash equivalents", "Variation nette de la trésorerie et des équivalents",
     "Impinduka rusange mu mafaranga n’ibihwanye na yo"
