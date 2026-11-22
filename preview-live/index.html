@@ -8384,6 +8384,22 @@ const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const be
     '▤ reports':'▤ Rapports','✦ ai business advisor':'✦ Conseiller commercial IA','🎙 shericeri':'🎙 Shericeri',
     '☺ customer':'☺ Client','↩ return':'↩ Retour','↻ refresh insight':'↻ Actualiser l’analyse'
   });
+  Object.assign(dictionaries.rw,{
+    "optional — track individual customers when it's useful. most sales can stay anonymous.":'Si ngombwa — andika umukiriya ku giti cye igihe bikenewe. Ibyinshi mu bicuruzwa bishobora kugurishwa utanditse umukiriya.',
+    "hello! i'm your business advisor. ask me:":'Muraho! Ndi umujyanama wawe mu bucuruzi. Mbaza uti:',
+    "sherry-cherry, at your service — finance, accounting, business intelligence, and the occasional bad pun. tap the mic and let's talk.":'Sherry-Cherry yiteguye kugufasha mu by’imari, ibaruramari n’isesengura ry’ubucuruzi. Kanda kuri mikoro tuganire.',
+    'match an existing received purchase (optional)':'Huza na raporo y’igura yamaze kwakirwa (si ngombwa)',
+    'linked purchase':'Igurwa ryahujwe','not linked':'Ntirahuzwa',
+    '— select a supplier bill or received purchase —':'— Hitamo fagitire y’utanga ibicuruzwa cyangwa igurwa ryakiriwe —'
+  });
+  Object.assign(dictionaries.fr,{
+    "optional — track individual customers when it's useful. most sales can stay anonymous.":'Facultatif — identifiez chaque client lorsque cela est utile. La plupart des ventes peuvent rester anonymes.',
+    "hello! i'm your business advisor. ask me:":'Bonjour ! Je suis votre conseiller commercial. Demandez-moi :',
+    "sherry-cherry, at your service — finance, accounting, business intelligence, and the occasional bad pun. tap the mic and let's talk.":'Sherry-Cherry est à votre service pour la finance, la comptabilité et l’analyse commerciale. Touchez le micro pour commencer.',
+    'match an existing received purchase (optional)':'Associer à un achat reçu existant (facultatif)',
+    'linked purchase':'Achat associé','not linked':'Non associé',
+    '— select a supplier bill or received purchase —':'— Sélectionnez une facture fournisseur ou un achat reçu —'
+  });
   const normalize=s=>String(s||'').replace(/\s+/g,' ').trim().toLocaleLowerCase();
   function translateString(original,lang){
     if(lang==='en')return original;
