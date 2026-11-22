@@ -887,7 +887,7 @@ function money(n){try{return new Intl.NumberFormat(merchantLocale(),{style:'curr
 function aibosDateLocale(){const lang=window.AIBOS_I18N?.getLanguage?.()||'en';return lang==='rw'?'rw-RW':lang==='fr'?'fr-RW':'en-RW'}
 function formatRecordDateTime(value,recordedAt){
   const raw=String(value??'');if(!raw&&!recordedAt)return '—';let d;
-  if(/^\\d{4}-\\d{2}-\\d{2}$/.test(raw)){
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw)){
     const [y,m,day]=raw.split('-').map(Number),clock=recordedAt?new Date(recordedAt):null;
     d=new Date(y,m-1,day,clock&&!Number.isNaN(clock.getTime())?clock.getHours():0,clock&&!Number.isNaN(clock.getTime())?clock.getMinutes():0,clock&&!Number.isNaN(clock.getTime())?clock.getSeconds():0);
   }else d=new Date(raw||recordedAt);
