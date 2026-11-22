@@ -9885,6 +9885,7 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
   const observer=new MutationObserver(pinLaptopPickerToItsOwnRow);
   observer.observe(auth,{attributes:true,attributeFilter:['style']});
   observer.observe(app,{attributes:true,attributeFilter:['style']});
+ observer.observe(main,{attributes:true,attributeFilter:['style']});
   pinLaptopPickerToItsOwnRow();
 })();
 </script>
@@ -10232,7 +10233,7 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
   if(height>0&&height!==lastHeight){
    lastHeight=height;app.style.setProperty('--aibos-mobile-header-height',height+'px');
   }
-  main.style.setProperty('margin-top','0px','important');
+  if(main.style.getPropertyValue('margin-top')!=='0px'||main.style.getPropertyPriority('margin-top')!=='important')main.style.setProperty('margin-top','0px','important');
  }
  function schedule(){if(!raf)raf=requestAnimationFrame(measure)}
  if('ResizeObserver' in window){const ro=new ResizeObserver(schedule);ro.observe(side)}
