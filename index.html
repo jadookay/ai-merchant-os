@@ -2398,7 +2398,17 @@ function repeatCustomerCount(){return customerStats().filter(c=>c.visits>1).leng
 function revenue(){return state.sales.filter(x=>!x.voided).reduce((s,x)=>s+x.qty*x.price,0)}
 function cogs(){return state.sales.filter(x=>!x.voided).reduce((s,x)=>s+x.qty*(x.cost??0),0)}
 function totalExpenses(){return state.expenses.filter(x=>!x.deleted).reduce((s,x)=>s+Number(x.amount||0),0)}
-function profit(){return revenue()-cogs()-totalExpenses()}
+function osAccountingProfitSnapshot(){
+  if(!Array.isArray(state.accounts)||!state.accounts.length||!Array.isArray(state.journalEntries)||typeof accReportTotals!=='function'||typeof accStatementTotal!=='function')return null;
+  const balances=accReportTotals(null,sheriLocalDateKey(new Date()));
+  const salesRevenue=Number(balances['4000']||0)-Number(balances['4050']||0);
+  const totalIncome=accStatementTotal('income',balances,'credit');
+  const costOfSales=accStatementTotal('cogs',balances,'debit');
+  const expenses=accStatementTotal('expense',balances,'debit');
+  return {salesRevenue,totalIncome,costOfSales,expenses,grossProfit:salesRevenue-costOfSales,netProfit:totalIncome-costOfSales-expenses};
+}
+function profit(){const ledger=osAccountingProfitSnapshot();return ledger?ledger.netProfit:revenue()-cogs()-totalExpenses()}
+
 function categoryBreakdown(){
   let map={};
   state.sales.filter(s=>!s.voided).forEach(s=>{const p=product(s.product_id);const cat=p?p.cat:(s.product_name_snapshot?'Other':null);if(!cat)return;map[cat]=map[cat]||{revenue:0,profit:0};map[cat].revenue+=s.qty*s.price;map[cat].profit+=s.qty*(s.price-(s.cost??0))});
@@ -2679,7 +2689,21 @@ function sheriActorNameForId(id){if(!id)return 'System';if(id===session?.user?.i
 function sheriRecordActor(row){if(!row)return 'Not recorded';if(row.created_by_name)return row.created_by_name;if(row.actor_name)return row.actor_name;if(row.details?.actor_name)return row.details.actor_name;const id=row.created_by||row.created_by_user_id||row.actor_user_id||row.user_id||row.deleted_by;if(id)return sheriActorNameForId(id);return row.created_at?'Not recorded':'—';}
 function printSaleTransaction(transactionId){const rows=state.sales.filter(x=>(x.transaction_id||x.id)===transactionId);if(!rows.length)return sheriToast('Sale receipt not found.','warning');const first=rows[0],receipt={business:state.merchant?.name||'Business',invoice:first.invoice_number||transactionId,createdAt:first.created_at,total:rows.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0),items:rows.map(x=>({name:x.product_name_snapshot||product(x.product_id)?.name||'Product',qty:x.qty,price:x.price}))};const previous=window.__lastReceipt;window.__lastReceipt=receipt;printLastReceipt();window.__lastReceipt=previous;}
 function accInvoiceProductChanged(){const id=document.getElementById('accInvoiceProduct')?.value,p=id?product(id):null;if(!p)return;document.getElementById('accInvoiceDesc').value=p.name;document.getElementById('accInvoicePrice').value=Number(p.sell||0);}
-function accBillSupplierChanged(){const id=document.getElementById('accBillSupplier')?.value,s=(state.suppliers||[]).find(x=>x.id===id),purchaseSelect=document.getElementById('accBillPurchase'),linked=purchaseSelect?.value?(state.purchases||[]).find(x=>x.id===purchaseSelect.value):null;if(linked&&linked.supplier_id!==id)purchaseSelect.value='';const host=document.getElementById('accBillSupplierInfo');if(host)host.textContent=s?[s.phone,s.email,s.payment_terms].filter(Boolean).join(' · ')||'Supplier selected; no saved contact details.':'Select a supplier to view saved contact details.';}
+function accBillPurchaseOptions(){
+  const wrap=document.getElementById('accBillPurchaseWrap'),select=document.getElementById('accBillPurchase');if(!wrap||!select)return;
+  const inventory=(document.getElementById('accBillType')?.value||'inventory')==='inventory';wrap.hidden=!inventory;if(!inventory){select.value='';return;}
+  const supplierId=document.getElementById('accBillSupplier')?.value||'';
+  const eligible=(state.purchases||[]).filter(p=>p.status==='received'&&!p.voided_at&&p.supplier_id&&p.supplier_id===supplierId&&!(state.bills||[]).some(b=>b.purchase_id===p.id));
+  const current=select.value;select.innerHTML='<option value="">— No existing purchase / standalone bill —</option>'+eligible.map(p=>'<option value="'+p.id+'">'+esc(p.product_name_snapshot||'Purchase')+' · '+Number(p.qty||0)+' × '+money(p.unit_cost)+' · '+money(p.total)+'</option>').join('');
+  if(eligible.some(p=>p.id===current))select.value=current;else if(current)select.value='';
+}
+function accBillTypeChanged(){
+  const type=document.getElementById('accBillType')?.value||'inventory',wrap=document.getElementById('accBillOtherAccountWrap'),select=document.getElementById('accBillOtherAccount');
+  if(wrap&&select){wrap.hidden=type!=='other_purchase';const eligible=(state.accounts||[]).filter(a=>a.active&&['asset','expense','cogs'].includes(a.type)&&a.code!=='2110').sort((a,b)=>String(a.code).localeCompare(String(b.code)));const current=select.value;select.innerHTML='<option value="">— Select debit account —</option>'+eligible.map(a=>'<option value="'+a.id+'">'+esc(a.code)+' — '+esc(a.name)+'</option>').join('');if(eligible.some(a=>a.id===current))select.value=current;}
+  accBillPurchaseOptions();
+}
+function accBillSupplierChanged(){const id=document.getElementById('accBillSupplier')?.value,s=(state.suppliers||[]).find(x=>x.id===id),purchaseSelect=document.getElementById('accBillPurchase'),linked=purchaseSelect?.value?(state.purchases||[]).find(x=>x.id===purchaseSelect.value):null;if(linked&&linked.supplier_id!==id)purchaseSelect.value='';accBillPurchaseOptions();const host=document.getElementById('accBillSupplierInfo');if(host)host.textContent=s?[s.phone,s.email,s.payment_terms].filter(Boolean).join(' · ')||'Supplier selected; no saved contact details.':'Select a supplier to view saved contact details.';}
+
 function accBillPurchaseChanged(){const id=document.getElementById('accBillPurchase')?.value,p=(state.purchases||[]).find(x=>x.id===id);if(!p)return;const supplier=document.getElementById('accBillSupplier');if(supplier)supplier.value=p.supplier_id||'';accBillSupplierChanged();const productName=p.product_name_snapshot||product(p.product_id)?.name||'Inventory purchase';document.getElementById('accBillDesc').value=productName;document.getElementById('accBillQty').value=Number(p.qty||0);document.getElementById('accBillCost').value=Number(p.unit_cost||0);document.getElementById('accBillTax').value='';document.getElementById('accBillDiscount').value='0';}
 function osPurchaseSupplierChanged(){const id=document.getElementById('osPurchaseSupplier')?.value,s=(state.suppliers||[]).find(x=>x.id===id);const host=document.getElementById('osPurchaseSupplierInfo');if(host)host.textContent=s?[s.phone,s.email,s.payment_terms].filter(Boolean).join(' · ')||'Supplier selected; no saved contact details.':'';}
 async function editCustomer(id){if(!sheriCan('manage_team')||!sheriCan('manage_customers'))return sheriToast('You do not have permission to edit customers.','error');const c=customer(id);if(!c)return;const reason=prompt('Reason for editing this customer (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');const name=prompt('Customer name:',c.name);if(name===null||!name.trim())return;const phone=prompt('Phone:',c.phone||'');if(phone===null)return;const credit=prompt('Credit limit:',String(c.credit_limit||0));if(credit===null||!Number.isFinite(Number(credit))||Number(credit)<0)return sheriToast('Enter a valid non-negative credit limit.','error');Object.assign(c,{name:name.trim(),phone:phone.trim()||null,credit_limit:Number(credit),updated_at:sheriNow(),updated_by:session?.user?.id||null,edit_reason:reason.trim()});await sheriPut('customers',id,{merchant_id:state.merchant.id,record:{...c}});await sheriQueue({type:'customer_upsert',record:{...c}});await accAudit('edit','customer',id,{reason:reason.trim(),name:c.name});if(navigator.onLine)await sheriSyncOutbox();render();}
@@ -3040,9 +3064,66 @@ async function sheriEnsureXlsx(){
   await sheriLoadExportScript('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',()=>!!window.XLSX?.utils);
 }
 async function sheriEnsurePdf(){
-  await sheriLoadExportScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',()=>!!window.jspdf?.jsPDF);
-  await sheriLoadExportScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',()=>typeof window.jspdf?.jsPDF?.API?.autoTable==='function');
+  const loadFirst=async(urls,ready)=>{
+    if(ready())return;
+    let lastError=null;
+    for(const url of urls){try{await sheriLoadExportScript(url,ready);if(ready())return;}catch(error){lastError=error;}}
+    throw lastError||new Error('Could not load the PDF export library. Check your connection and try again.');
+  };
+  await loadFirst([
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
+    'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js'
+  ],()=>!!window.jspdf?.jsPDF);
+  await loadFirst([
+    'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js',
+    'https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js',
+    'https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js'
+  ],()=>typeof window.jspdf?.jsPDF?.API?.autoTable==='function');
 }
+
+async function accBillPdf(id){
+  const b=(state.bills||[]).find(x=>x.id===id);
+  if(!b){alert(sheriLocalized('This bill could not be found. Refresh the bills list and try again.','Cette facture fournisseur est introuvable. Actualisez la liste et réessayez.','Iyi fagitire y’utanga ibicuruzwa ntibonetse. Ongera uvugurure urutonde ugerageze nanone.'));return false;}
+  await sheriEnsurePdf();
+  const {jsPDF}=window.jspdf||{};
+  if(typeof jsPDF!=='function')throw new Error(sheriLocalized('The PDF library did not initialize correctly. Please try again.','La bibliothèque PDF ne s’est pas initialisée correctement. Veuillez réessayer.','Porogaramu ikora PDF ntiyatangije neza. Ongera ugerageze.'));
+  const d=new jsPDF({unit:'mm',format:'a4'}),tr=(en,fr,rw)=>sheriLocalized(en,fr,rw);
+  const supplier=accSupplier(b.supplier_id)?.name||tr('Supplier','Fournisseur','Utanga ibicuruzwa');
+  const items=Array.isArray(b.items)?b.items:[];
+  const paid=Number(accBillPaid(b)||0),outstanding=Math.max(0,Number(b.total||0)-paid);
+  const typeLabel=({inventory:tr('Inventory / stock','Stock / marchandises','Ibicuruzwa byo mu bubiko'),operating_expense:tr('Operating expense','Charge d’exploitation','Ikiguzi cy’imikorere'),service:tr('Service / professional fees','Services / honoraires','Serivisi / amafaranga y’abanyamwuga'),other_purchase:tr('Other purchase','Autre achat','Ikindi cyaguzwe')})[b.bill_type]||tr('Supplier bill','Facture fournisseur','Inyemezabuguzi y’utanga ibicuruzwa');
+  d.setFont('helvetica','bold');d.setFontSize(16);d.text(String(state.merchant?.name||tr('Business','Entreprise','Ubucuruzi')),14,18);
+  d.setFontSize(13);d.text(tr('SUPPLIER BILL','FACTURE FOURNISSEUR','INYEMEZABUGUZI Y’UTANGA IBICURUZWA'),14,29);
+  d.setFontSize(10);d.setFont('helvetica','normal');
+  d.text(tr('Bill number','Numéro de facture','Nimero ya fagitire')+': '+String(b.bill_number||''),14,39);
+  d.text(tr('Supplier','Fournisseur','Utanga ibicuruzwa')+': '+String(supplier),14,46);
+  d.text(tr('Bill type','Type de facture','Ubwoko bwa fagitire')+': '+typeLabel,14,53);
+  d.text(tr('Issue date','Date de facture','Itariki ya fagitire')+': '+String(b.issue_date||'—'),14,60);
+  d.text(tr('Due date','Date d’échéance','Itariki ntarengwa')+': '+String(b.due_date||'—'),110,60);
+  const body=items.map(x=>[String(x.description||'—'),String(Number(x.qty||0)),money(x.unit_cost),money(x.discount||0),money(Math.max(0,Number(x.qty||0)*Number(x.unit_cost||0)-Number(x.discount||0)))]);
+  body.push(['','','',tr('Subtotal','Sous-total','Igiteranyo mbere y’imisoro'),money(b.subtotal)]);
+  body.push(['','','',tr('Tax','Taxe','Umusoro'),money(b.tax_amount)]);
+  body.push(['','','',tr('Total','Total','Igiteranyo'),money(b.total)]);
+  d.autoTable({startY:68,head:[[tr('Description','Description','Ibisobanuro'),tr('Qty','Qté','Umubare'),tr('Unit cost','Coût unitaire','Igiciro kuri kimwe'),tr('Discount','Remise','Igabanyirizwa'),tr('Line total','Total ligne','Igiteranyo cy’umurongo')]],body,theme:'grid',styles:{font:'helvetica',fontSize:8,cellPadding:2.5,overflow:'linebreak'},headStyles:{fontStyle:'bold'},columnStyles:{0:{cellWidth:65},1:{cellWidth:15},2:{cellWidth:27},3:{cellWidth:25},4:{cellWidth:35}},margin:{left:14,right:14}});
+  let y=(d.lastAutoTable?.finalY||100)+9;
+  if(y>260){d.addPage();y=20;}
+  d.setFont('helvetica','bold');d.text(tr('Payment summary','Résumé du paiement','Incamake y’ubwishyu'),14,y);
+  d.setFont('helvetica','normal');
+  d.text(tr('Status','Statut','Imiterere')+': '+String(accBillStatus(b)),14,y+7);
+  d.text(tr('Paid','Payé','Yishyuwe')+': '+money(paid),14,y+14);
+  d.text(tr('Outstanding','Solde dû','Asigaye kwishyurwa')+': '+money(outstanding),14,y+21);
+  if(b.notes){const noteY=y+30;if(noteY>270){d.addPage();d.text(tr('Notes','Notes','Icyitonderwa')+': '+String(b.notes),14,20,{maxWidth:180});}else d.text(tr('Notes','Notes','Icyitonderwa')+': '+String(b.notes),14,noteY,{maxWidth:180});}
+  const pages=d.internal.getNumberOfPages();
+  for(let page=1;page<=pages;page++){d.setPage(page);d.setFontSize(8);d.setTextColor(110);d.text(tr('Generated by AI Business OS','Généré par AI Business OS','Byakozwe na AI Business OS'),14,287);d.text(page+'/'+pages,196,287,{align:'right'});}
+  const safeName=String(b.bill_number||'supplier-bill').replace(/[^a-z0-9._-]+/gi,'-');
+  d.save(safeName+'.pdf');return true;
+}
+async function accInvoicePdf(id){const i=(state.invoices||[]).find(x=>x.id===id);if(!i){alert(sheriLocalized('This invoice could not be found. Refresh and try again.','Cette facture est introuvable. Actualisez et réessayez.','Iyi fagitire ntibonetse. Ongera uvugurure ugerageze nanone.'));return false;}await sheriEnsurePdf();const {jsPDF}=window.jspdf||{};if(typeof jsPDF!=='function')throw new Error('The PDF library did not initialize correctly.');const d=new jsPDF();d.text(state.merchant.name||'Business',20,20);d.text(i.invoice_number,150,20);d.text('Customer: '+(accCustomer(i.customer_id)?.name||'Walk-in'),20,32);d.text('Issue: '+i.issue_date+'  Due: '+i.due_date,20,40);d.autoTable({startY:50,head:[['Description','Qty','Unit','Total']],body:(i.items||[]).map(x=>[x.description,x.qty,money(x.unit_price),money(x.qty*x.unit_price)]).concat([['','','Subtotal',money(i.subtotal)],['','','Tax',money(i.tax_amount)],['','','Total',money(i.total)]] )});d.save(i.invoice_number+'.pdf');return true;}
+async function accReceiptPdf(id){const p=(state.payments||[]).find(x=>x.id===id);if(!p){alert(sheriLocalized('This payment could not be found. Refresh and try again.','Ce paiement est introuvable. Actualisez et réessayez.','Ubu bwishyu ntibubonetse. Ongera uvugurure ugerageze nanone.'));return false;}await sheriEnsurePdf();const {jsPDF}=window.jspdf||{};if(typeof jsPDF!=='function')throw new Error('The PDF library did not initialize correctly.');const d=new jsPDF();d.text(state.merchant.name||'Business',20,20);d.text('PAYMENT RECEIPT',20,32);d.text('Date: '+p.payment_date,20,42);d.text('Amount: '+money(p.amount),20,52);d.text('Type: '+p.direction,20,62);d.text('Reference: '+(p.reference||'—'),20,72);d.save('receipt-'+p.id+'.pdf');return true;}
+function accBillPdfClick(id){accBillPdf(id).catch(error=>{console.error('[AIBOS PDF] supplier bill export failed',error);alert(error?.message||'Supplier bill PDF export failed.');});}
+function accInvoicePdfClick(id){accInvoicePdf(id).catch(error=>{console.error('[AIBOS PDF] invoice export failed',error);alert(error?.message||'Invoice PDF export failed.');});}
+function accReceiptPdfClick(id){accReceiptPdf(id).catch(error=>{console.error('[AIBOS PDF] receipt export failed',error);alert(error?.message||'Payment receipt PDF export failed.');});}
 function downloadBlob(blob,filename){
   const url=URL.createObjectURL(blob),a=document.createElement('a');
   a.href=url;a.download=filename;a.style.display='none';
@@ -3236,19 +3317,50 @@ function parseVoiceExpense(transcript){
   const description=m?t.slice(0,m.index).trim():t;
   if(description)document.getElementById('eDesc').value=description.replace(/^(expense|spent|paid for)\s+/i,'');
 }
-function clearExpenseForm(){eDesc.value=eAmt.value='';const status=document.getElementById('expenseVoiceStatus');if(status)status.textContent='';}
+function toggleExpensePaymentFields(){
+  const paid=document.getElementById('ePaymentStatus')?.value!=='unpaid';
+  const wrap=document.getElementById('ePaymentAccountWrap'),select=document.getElementById('ePaymentAccount');
+  if(wrap)wrap.style.display=paid?'':'none';
+  if(select)select.disabled=!paid;
+}
+function clearExpenseForm(){eDesc.value=eAmt.value='';const mode=document.getElementById('ePaymentStatus');if(mode)mode.value='paid';toggleExpensePaymentFields();const status=document.getElementById('expenseVoiceStatus');if(status)status.textContent='';}
+
+async function accRecordExpensePayment(expense,amount,accountId,date,reference=null){
+  const payable=accAccountCode('2050'),cash=accAccount(accountId);
+  if(!payable||!cash||cash.type!=='asset')throw new Error('A valid accrued-expense payable and cash/bank account are required.');
+  if(amount<=0||amount>accExpenseOutstanding(expense)+0.005)throw new Error('Expense payment exceeds its outstanding balance.');
+  const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),direction:'payment',source_type:'expense',source_id:expense.id,account_id:accountId,amount,payment_date:date,reference:reference||null,created_at:sheriNow()};
+  await accPostEntry({date,description:'Expense payment — '+(expense.description||''),sourceType:'payment',sourceId:row.id,lines:[{accountId:payable.id,debit:amount},{accountId:accountId,credit:amount}]});
+  state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'payments',record:row});
+  const paidAfter=accExpensePaid(expense);expense.payment_status=paidAfter+0.005>=Number(expense.amount||0)?'paid':'partial';
+  await sheriPut('expenses',expense.id,{merchant_id:state.merchant.id,record:{...expense}});await sheriQueue({type:'expense_upsert',record:expense});
+  return row;
+}
 async function addExpense(){
   if(!sheriCan('manage_expenses'))return sheriToast('You do not have permission to record expenses.','error');
   const description=eDesc.value.trim(),amount=+eAmt.value,cat=eCat.value;
+  const paymentMode=document.getElementById('ePaymentStatus')?.value||'paid';
+  const accountId=document.getElementById('ePaymentAccount')?.value||null;
   if(!description||!Number.isFinite(amount)||amount<=0)return alert('Enter an expense description and a positive amount.');
-  if(!confirm('Record this expense?\n'+description+' — '+money(amount)+'\nCategory: '+cat))return;
+  if(paymentMode==='paid'&&!accountId)return alert('Choose the cash or bank account used to pay this expense.');
+  const paymentAccount=accountId?accAccount(accountId):null;
+  if(paymentMode==='paid'&&(!paymentAccount||paymentAccount.type!=='asset'))return alert('Choose a valid cash or bank asset account.');
+  if(accPeriodLocked(accToday()))return alert('Today is inside a locked accounting period. Unlock the period before recording this expense.');
+  if(!confirm('Record this '+(paymentMode==='paid'?'paid':'unpaid')+' expense?\\n'+description+' — '+money(amount)+'\\nCategory: '+cat))return;
   const data={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,cat,payment_status:'unpaid',created_at:sheriNow(),created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
   state.expenses.push(data);await sheriSaveSnapshot();await sheriQueue({type:'expense_upsert',record:data});
   let warning='';
-  try{await accEnsureBase();const ex=accAccountCode('6000'),payable=accAccountCode('2050');if(!ex||!payable)throw new Error('Operating Expenses (6000) and Accrued Expenses Payable (2050) must be active.');data.payment_status='unpaid';await sheriPut('expenses',data.id,{merchant_id:state.merchant.id,record:{...data}});await accPostEntry({date:data.created_at.slice(0,10),description:'Expense '+description,sourceType:'expense',sourceId:data.id,lines:[{accountId:ex.id,debit:amount},{accountId:payable.id,credit:amount}]});}
-  catch(err){warning=' Saved, but ledger posting needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] expense posting failed',err);}
+  try{
+    await accEnsureBase();
+    const ex=accAccountCode('6000'),payable=accAccountCode('2050');
+    if(!ex||!payable)throw new Error('Expense or accrued-expense ledger account is missing.');
+    await accPostEntry({date:data.created_at.slice(0,10),description:'Expense '+description,sourceType:'expense',sourceId:data.id,lines:[{accountId:ex.id,debit:amount},{accountId:payable.id,credit:amount}]});
+    if(paymentMode==='paid')await accRecordExpensePayment(data,amount,accountId,data.created_at.slice(0,10),null);
+    await accAudit('create','expense',data.id,{amount,payment_status:paymentMode});
+  }catch(err){warning=' Saved, but accounting needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] expense posting failed',err);}
   if(navigator.onLine)sherriSyncKick();clearExpenseForm();render();sheriToast('Expense recorded.'+warning,warning?'warning':'success');
 }
+
 async function deleteExpense(id){
   if(!sheriCan('manage_team')||!sheriCan('manage_expenses'))return sheriToast('Only a Manager, Admin or Owner with expense access can delete expenses.','error');
   const expense=state.expenses.find(x=>x.id===id);if(!expense)return;const reason=prompt('Reason for deleting this expense (required):');if(!reason||!reason.trim())return sheriToast('A reason is required to delete an expense.','error');
@@ -3259,13 +3371,21 @@ async function deleteExpense(id){
   if(navigator.onLine)await sheriSyncOutbox();
   render();
 }
+function accCashAccountOptions(){
+  const registered=(state.bankAccounts||[]).filter(x=>x.account_id&&accAccount(x.account_id)).map(x=>`<option value="${x.account_id}">${esc(x.name)} — ${money(accBalance(x.account_id))}</option>`).join('');
+  if(registered)return registered;
+  const cash=accAccountCode('1000');
+  return cash?`<option value="${cash.id}">Cash on hand — ${money(accBalance(cash.id))}</option>`:'<option value="">Connect and refresh the chart of accounts first</option>';
+}
+function accExpenseStatus(e){const paid=accExpensePaid(e),amount=Number(e.amount||0);return paid<=0.005?'unpaid':paid+0.005>=amount?'paid':'part-paid'}
 function renderExpenses(){
   const search=document.getElementById('expenseSearchHost');if(search)search.innerHTML=sheriSearchControl('expenses','expenseTable','Search expenses by description, category, amount, date or user',state.expenses.flatMap(e=>[e.description,e.cat,sheriRecordActor(e)]));
+  const paymentSelect=document.getElementById('ePaymentAccount');if(paymentSelect)paymentSelect.innerHTML=accCashAccountOptions();
+  toggleExpensePaymentFields();
   const rows=state.expenses.filter(e=>sheriDateInReportRange(e.created_at)).slice().sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));
-  document.getElementById('expenseTable').innerHTML=rows.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>User</th><th>Reason / actions</th></tr>${rows.map(e=>`<tr style="${e.deleted?'opacity:.65;text-decoration:line-through':''}"><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}${e.deleted?`<div class="sub">Voided: ${esc(e.delete_reason||'No reason recorded')}</div>`:''}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td>${esc(sheriRecordActor(e))}</td><td>${e.deleted?'Voided':(sheriCan('manage_team')&&sheriCan('manage_expenses')?`<button class="btn small danger" onclick="deleteExpense('${e.id}')">Void</button>`:'')}</td></tr>`).join('')}</table>`:'<div class="empty">No expenses in the selected date range.</div>';
+  document.getElementById('expenseTable').innerHTML=rows.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Payment status</th><th>User</th><th>Reason / actions</th></tr>${rows.map(e=>`<tr style="${e.deleted?'opacity:.65;text-decoration:line-through':''}"><td>${new Date(e.created_at).toLocaleString()}</td><td>${esc(e.description)}${e.deleted?`<div class="sub">Voided: ${esc(e.delete_reason||'No reason recorded')}</div>`:''}</td><td>${esc(e.cat)}</td><td>${money(e.amount)}</td><td>${e.deleted?'—':esc(accExpenseStatus(e))}</td><td>${esc(sheriRecordActor(e))}</td><td>${e.deleted?'Voided':(sheriCan('manage_team')&&sheriCan('manage_expenses')?`<button class="btn small danger" onclick="deleteExpense('${e.id}')">Void</button>`:'')}</td></tr>`).join('')}</table>`:'<div class="empty">No expenses in the selected date range.</div>';
 }
 
-// ── Customers ────────────────────────────────────────────────────────────
 function parseVoiceCustomer(transcript){
   const t=String(transcript||'').trim(),phone=t.match(/(?:\+?250\s*7\d{8}|0?7\d{8})/);
   if(phone)document.getElementById('cPhone').value=phone[0].replace(/\s+/g,'');
@@ -5742,7 +5862,8 @@ function osMonthKey(d=new Date()){return new Date(d).toISOString().slice(0,7)}
 function osPurchasesTotal(){return (state.purchases||[]).filter(x=>x.status!=='ordered'&&!x.voided_at).reduce((s,x)=>s+Number(x.total||x.qty*x.unit_cost||0),0)}
 function osCashNet(){return (state.cashEntries||[]).reduce((s,x)=>{const a=Number(x.amount)||0;return s+(x.kind==='income'?a:x.kind==='expense'?-a:0)},0)}
 function osInventoryValue(){return activeProducts().reduce((s,p)=>s+(Number(p.stock)||0)*(Number(p.cost)||0),0)}
-function osGrossProfit(){return revenue()-cogs()}
+function osGrossProfit(){const ledger=osAccountingProfitSnapshot();return ledger?ledger.grossProfit:revenue()-cogs()}
+
 function osSupplierSpend(id){return (state.purchases||[]).filter(x=>x.supplier_id===id&&!x.voided_at).reduce((s,x)=>s+Number(x.total||x.qty*x.unit_cost||0),0)}
 function osAvgDaily(days=30, field='revenue'){
   const cutoff=Date.now()-days*86400000;
@@ -6115,7 +6236,12 @@ async function accAudit(action,entityType,entityId,details){
 function accInvoiceTotal(i){return Number(i.total||0)}
 function accBillTotal(b){return Number(b.total||0)}
 function accInvoicePaid(i){return (state.payments||[]).filter(p=>p.source_type==='invoice'&&p.source_id===i.id&&p.direction==='receipt').reduce((s,p)=>s+Number(p.amount||0),0)}
-function accBillPaid(b){return (state.payments||[]).filter(p=>p.source_type==='bill'&&p.source_id===b.id&&p.direction==='payment').reduce((s,p)=>s+Number(p.amount||0),0)}
+function accBillPaid(b){const billPayments=(state.payments||[]).filter(p=>p.source_type==='bill'&&p.source_id===b.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0),purchase=b.purchase_id?(state.purchases||[]).find(p=>p.id===b.purchase_id):null,purchasePayments=purchase?(state.payments||[]).filter(p=>p.source_type==='purchase'&&p.source_id===purchase.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0):0;return billPayments+purchasePayments}
+
+function accPurchaseLinkedBill(p){return (state.bills||[]).find(b=>b.purchase_id===p.id)||null}
+function accPurchasePaid(p){const bill=accPurchaseLinkedBill(p);return bill?accBillPaid(bill):(state.payments||[]).filter(x=>x.source_type==='purchase'&&x.source_id===p.id&&x.direction==='payment').reduce((sum,x)=>sum+Number(x.amount||0),0)}
+function accPurchaseOutstanding(p){return p.voided_at?0:Math.max(0,Number(p.total||0)-accPurchasePaid(p))}
+function accPurchaseStatus(p){const paid=accPurchasePaid(p),total=Number(p.total||0);return paid<=0.005?'unpaid':paid+0.005>=total?'paid':'part-paid'}
 function accInvoiceStatus(i){const p=accInvoicePaid(i);return p<=0?'open':p+0.005>=i.total?'paid':'partial'}
 function accBillStatus(b){const p=accBillPaid(b);return p<=0?'open':p+0.005>=b.total?'paid':'partial'}
 function accTax(tid){return (state.taxRates||[]).find(t=>t.id===tid)||{rate:0}}
@@ -6125,92 +6251,85 @@ async function accCreateInvoice(){
   await accEnsureBase();const customerId=document.getElementById('accInvoiceCustomer').value||null,date=document.getElementById('accInvoiceDate').value||accToday(),due=document.getElementById('accInvoiceDue').value||date,desc=document.getElementById('accInvoiceDesc').value.trim(),qty=Number(document.getElementById('accInvoiceQty').value),price=Number(document.getElementById('accInvoicePrice').value),tax=accTax(document.getElementById('accInvoiceTax').value);if(!desc||qty<=0||price<=0)return alert('Complete the invoice line with a positive price.');if(due<date)return alert('Due date cannot be before the invoice date.');if(accPeriodLocked(date))return alert('This invoice date is inside a locked accounting period.');const gross=qty*price,discount=Math.min(Math.max(0,Number(document.getElementById('accInvoiceDiscount').value)||0),gross),subtotal=gross-discount,taxAmount=subtotal*(Number(tax.rate||0)/100),total=subtotal+taxAmount,id=sheriUuid(),now=sheriNow();if(customerId){const c=accCustomer(customerId),limit=Number(c?.credit_limit||0),outstanding=(state.invoices||[]).filter(x=>x.customer_id===customerId&&accInvoiceStatus(x)!=='paid').reduce((sum,x)=>sum+(x.total-accInvoicePaid(x)),0);if(limit>0&&outstanding+total>limit&&!confirm('This invoice will exceed the customer credit limit of '+money(limit)+'. Continue?'))return;}const inv={id,merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),invoice_number:'INV-'+new Date().getFullYear()+'-'+String((state.invoices||[]).length+1).padStart(4,'0'),customer_id:customerId,issue_date:date,due_date:due,subtotal,tax_amount:taxAmount,total,status:'open',notes:document.getElementById('accInvoiceNotes').value.trim()||null,items:[{description,qty,unit_price:price,tax_rate:Number(tax.rate||0),discount}],created_at:now};state.invoices.push(inv);await sheriPut('invoices',id,{merchant_id:state.merchant.id,record:{...inv}});await sheriQueue({type:'accounting_upsert',table:'invoices',record:inv});const ar=accAccountCode('1100'),sales=accAccountCode('4000'),taxPay=accAccountCode('2100');await accPostEntry({date,description:'Invoice '+inv.invoice_number,sourceType:'invoice',sourceId:id,lines:[{accountId:ar.id,debit:total,memo:inv.invoice_number},{accountId:sales.id,credit:gross,memo:desc},...(discount?[{accountId:accAccountCode('4050').id,debit:discount,memo:'Sales discount'}]:[]),...(taxAmount?[{accountId:taxPay.id,credit:taxAmount,memo:'Output tax'}]:[])]});await accAudit('create','invoice',id,{total});document.getElementById('accInvoiceDesc').value='';document.getElementById('accInvoicePrice').value='';render();alert('Invoice created.');
 }
 async function accCreateBill(){
-  await accEnsureBase();
-  const supplierId=document.getElementById('accBillSupplier').value||null,purchaseId=document.getElementById('accBillPurchase')?.value||null,purchase=purchaseId?(state.purchases||[]).find(x=>x.id===purchaseId):null;
-  const date=document.getElementById('accBillDate').value||accToday(),due=document.getElementById('accBillDue').value||date,desc=document.getElementById('accBillDesc').value.trim(),qty=Number(document.getElementById('accBillQty').value),cost=Number(document.getElementById('accBillCost').value),tax=accTax(document.getElementById('accBillTax').value),discountInput=Number(document.getElementById('accBillDiscount').value)||0;
-  if(!desc||!Number.isFinite(qty)||qty<=0||!Number.isFinite(cost)||cost<=0)return sheriToast(sheriLocalized('Complete the bill line with a positive quantity and unit cost.','Complétez la ligne de facture avec une quantité et un coût unitaire positifs.','Uzuza umurongo wa fagitire wandika umubare n’ikiguzi cya kimwe birenze zeru.'),'error');
-  if(due<date)return alert('Due date cannot be before the bill date.');
-  if(accPeriodLocked(date))return alert('This bill date is inside a locked accounting period.');
-  const gross=qty*cost,discount=Math.min(Math.max(0,discountInput),gross),subtotal=gross-discount,taxAmount=subtotal*(Number(tax.rate||0)/100),total=subtotal+taxAmount;
-  if(purchaseId){
-    if(!purchase||purchase.status!=='received')return sheriToast('Only a received purchase can be linked to a supplier bill.','error');
-    if(!purchase.supplier_id||supplierId!==purchase.supplier_id)return sheriToast('The bill supplier must match the supplier recorded on the purchase.','error');
-    if((state.bills||[]).some(x=>x.purchase_id===purchaseId))return sheriToast('This purchase already has a linked supplier bill.','error');
-    if(discount>0||taxAmount>0||Math.abs(total-Number(purchase.total||0))>0.005||Math.abs(qty-Number(purchase.qty||0))>0.000001||Math.abs(cost-Number(purchase.unit_cost||0))>0.000001)return sheriToast('A linked bill must match the received purchase quantity, unit cost and total. Tax or discount changes require a separate bill review.','error');
-  }
-  const id=sheriUuid(),now=sheriNow(),inv=accAccountCode('1200'),ap=accAccountCode('2000'),taxInput=accAccountCode('2110');
-  if(!inv||!ap)return sheriToast('Inventory and Accounts Payable accounts must be active before creating a supplier bill.','error');
-  const bill={id,merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),bill_number:'BILL-'+new Date().getFullYear()+'-'+String((state.bills||[]).length+1).padStart(4,'0'),supplier_id:supplierId,issue_date:date,due_date:due,subtotal,tax_amount:taxAmount,total,status:'open',notes:document.getElementById('accBillNotes').value.trim()||null,items:[{description:desc,qty,unit_cost:cost,tax_rate:Number(tax.rate||0),discount}],created_at:now,bill_type:'inventory',debit_account_id:inv.id,purchase_id:purchaseId||null};
-  state.bills.push(bill);await sheriPut('bills',id,{merchant_id:state.merchant.id,record:{...bill}});await sheriQueue({type:'accounting_upsert',table:'bills',record:bill});
-  if(purchase){
-    const purchaseTotal=Number(purchase.total||0);
-    await accPostEntry({date:String(purchase.purchased_at||purchase.created_at||date).slice(0,10),description:'Purchase '+(purchase.product_name_snapshot||desc),sourceType:'purchase',sourceId:purchase.id,lines:[{accountId:inv.id,debit:purchaseTotal},{accountId:ap.id,credit:purchaseTotal}]});
-  }else{
-    await accPostEntry({date,description:'Bill '+bill.bill_number,sourceType:'bill',sourceId:id,lines:[{accountId:inv.id,debit:subtotal,memo:desc},{accountId:ap.id,credit:total,memo:bill.bill_number},...(taxAmount?[{accountId:taxInput.id,debit:taxAmount,memo:'Input tax'}]:[])]});
-  }
-  await accAudit('create','bill',id,{total,purchase_id:purchaseId||null});
-  document.getElementById('accBillDesc').value='';document.getElementById('accBillCost').value='';document.getElementById('accBillDiscount').value='0';document.getElementById('accBillPurchase').value='';render();sheriToast('Bill created and linked to the purchase without duplicating inventory.','success');
+  if(!sheriCan('manage_finance'))return sheriToast('You do not have permission to create supplier bills.','error');
+  let stage='starting',billAddedToState=false,billSavedLocally=false,billQueuedForSync=false;
+  try{
+    stage='refreshing chart of accounts';await accEnsureBase();
+    stage='reading and validating bill form';
+    const supplierId=document.getElementById('accBillSupplier').value||null,date=document.getElementById('accBillDate').value||accToday(),due=document.getElementById('accBillDue').value||date,desc=document.getElementById('accBillDesc').value.trim(),qty=Number(document.getElementById('accBillQty').value),cost=Number(document.getElementById('accBillCost').value),tax=accTax(document.getElementById('accBillTax').value),billType=document.getElementById('accBillType')?.value||'inventory',purchaseId=billType==='inventory'?(document.getElementById('accBillPurchase')?.value||null):null;
+    if(!supplierId)return alert('Select the supplier for this bill.');
+    if(!['inventory','operating_expense','service','other_purchase'].includes(billType))return alert('Select a valid bill type.');
+    if(!desc||!Number.isFinite(qty)||qty<=0||!Number.isFinite(cost)||cost<=0)return alert('Complete the bill line with a positive quantity and cost.');
+    if(due<date)return alert('Due date cannot be before the bill date.');
+    if(accPeriodLocked(date))return alert('This bill date is inside a locked accounting period.');
+    const mappedAccountCode={inventory:'1200',operating_expense:'6000',service:'6200'}[billType];
+    const debitAccount=billType==='other_purchase'?accAccount(document.getElementById('accBillOtherAccount')?.value):accAccountCode(mappedAccountCode);
+    if(!debitAccount||!debitAccount.active||!['asset','expense','cogs'].includes(debitAccount.type)||debitAccount.code==='2110')return alert('Choose a valid active asset or expense account for this bill.');
+    const ap=accAccountCode('2000'),taxInput=accAccountCode('2110');if(!ap||!taxInput)return alert('The accounts payable or input tax account is missing. Refresh the chart of accounts.');
+    const gross=qty*cost,discount=Math.min(Math.max(0,Number(document.getElementById('accBillDiscount').value)||0),gross),subtotal=gross-discount,taxAmount=subtotal*(Number(tax.rate||0)/100),total=subtotal+taxAmount;
+    if(!Number.isFinite(total)||total<=0)return alert('The bill total must be positive.');
+    let linkedPurchase=null;
+    if(purchaseId){linkedPurchase=(state.purchases||[]).find(p=>p.id===purchaseId&&p.status==='received');if(!linkedPurchase||linkedPurchase.status!=='received'||linkedPurchase.voided_at||linkedPurchase.supplier_id!==supplierId)return alert('The selected purchase does not belong to this supplier, is voided, or is not received.');if((state.bills||[]).some(b=>b.purchase_id===purchaseId))return alert('This purchase is already linked to another supplier bill.');const linkedQty=Number(linkedPurchase.qty||0),linkedCost=Number(linkedPurchase.unit_cost||0),linkedTotal=Number(linkedPurchase.total||linkedQty*linkedCost);if(discount>0.005||taxAmount>0.005||Math.abs(linkedQty-qty)>0.000001||Math.abs(linkedCost-cost)>0.000001||Math.abs(linkedTotal-total)>0.005)return alert('A linked bill must match the received purchase quantity, unit cost and total exactly. Tax or discount changes require a separate bill review.');}
+    const id=sheriUuid(),now=sheriNow(),bill={id,merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),bill_number:'BILL-'+new Date().getFullYear()+'-'+String((state.bills||[]).length+1).padStart(4,'0'),supplier_id:supplierId,issue_date:date,due_date:due,subtotal,tax_amount:taxAmount,total,status:'open',bill_type:billType,debit_account_id:debitAccount.id,purchase_id:purchaseId,notes:document.getElementById('accBillNotes').value.trim()||null,items:[{description:desc,qty,unit_cost:cost,tax_rate:Number(tax.rate||0),discount}],created_at:now};
+    stage='adding bill to in-memory state';state.bills.push(bill);billAddedToState=true;
+    stage='saving bill to local storage';await sheriPut('bills',id,{merchant_id:state.merchant.id,record:{...bill}});billSavedLocally=true;
+    stage='adding bill to sync queue';await sheriQueue({type:'accounting_upsert',table:'bills',record:bill});billQueuedForSync=true;
+    if(!linkedPurchase){stage='posting the balanced accounting journal';await accPostEntry({date,description:'Bill '+bill.bill_number,sourceType:'bill',sourceId:id,lines:[{accountId:debitAccount.id,debit:subtotal,memo:desc},...(taxAmount?[{accountId:taxInput.id,debit:taxAmount,memo:'Input tax'}]:[]),{accountId:ap.id,credit:total,memo:bill.bill_number}]});}
+    stage='writing the audit record';await accAudit('create','bill',id,{total,bill_type:billType,debit_account_id:debitAccount.id,purchase_id:purchaseId,linked_to_existing_purchase:!!linkedPurchase});
+    stage='refreshing the bill register';document.getElementById('accBillDesc').value='';document.getElementById('accBillCost').value='';document.getElementById('accBillDiscount').value='0';if(document.getElementById('accBillPurchase'))document.getElementById('accBillPurchase').value='';render();alert(linkedPurchase?'Bill created and matched to the existing purchase. No duplicate inventory/payable journal was posted.':'Bill created.');
+  }catch(error){const detail='[Create Bill stage: '+stage+'; added to app state: '+(billAddedToState?'yes':'no')+'; saved locally: '+(billSavedLocally?'yes':'no')+'; queued for sync: '+(billQueuedForSync?'yes':'no')+']';try{error.message=(error?.message||String(error))+' '+detail;}catch(_){}console.error('Create Bill diagnostic:',{stage,billAddedToState,billSavedLocally,billQueuedForSync,error});throw error;}
 }
+
 function accExpensePaid(expense){return (state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===expense.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0)}
 function accExpenseOutstanding(expense){return Math.max(0,Number(expense.amount||0)-accExpensePaid(expense))}
 function accPaymentSourceOptions(){
   const type=document.getElementById('accPaymentType')?.value,sel=document.getElementById('accPaymentSource');if(!sel)return;
-  const rows=type==='supplier_payment'?state.bills.filter(x=>accBillStatus(x)!=='paid'):
-    type==='customer_receipt'?state.invoices.filter(x=>accInvoiceStatus(x)!=='paid'):
-    type==='expense_payment'?state.expenses.filter(x=>!x.deleted&&accExpenseOutstanding(x)>0.005):[];
-  const label=x=>type==='supplier_payment'?(x.bill_number||'Supplier bill')+' · '+(accSupplier(x.supplier_id)?.name||'Unassigned supplier'):
-    type==='customer_receipt'?(x.invoice_number||'Customer invoice'):
-    (x.description||'Expense');
-  const balance=x=>type==='supplier_payment'?Number(x.total||0)-accBillPaid(x):
-    type==='customer_receipt'?Number(x.total||0)-accInvoicePaid(x):accExpenseOutstanding(x);
-  sel.innerHTML='<option value="">— '+(type==='expense_payment'?'Choose an expense': 'No linked document')+' —</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(label(x))+' — '+money(balance(x))+'</option>').join('');
+  const current=sel.value;let rows=[];
+  if(type==='supplier_payment'){
+    const bills=(state.bills||[]).filter(x=>accBillStatus(x)!=='paid').map(x=>({kind:'bill',id:x.id,name:x.bill_number,outstanding:Math.max(0,Number(x.total||0)-accBillPaid(x))}));
+    const purchases=(state.purchases||[]).filter(x=>x.status==='received'&&!x.voided_at&&x.supplier_id&&!accPurchaseLinkedBill(x)&&accPurchaseOutstanding(x)>0.005).map(x=>({kind:'purchase',id:x.id,name:(x.product_name_snapshot||'Purchase')+' · '+String(x.purchased_at||x.created_at||'').slice(0,10),outstanding:accPurchaseOutstanding(x)}));
+    rows=[...bills,...purchases];
+  }else if(type==='customer_receipt')rows=(state.invoices||[]).filter(x=>accInvoiceStatus(x)!=='paid').map(x=>({kind:'invoice',id:x.id,name:x.invoice_number,outstanding:Math.max(0,Number(x.total||0)-accInvoicePaid(x))}));
+  else if(type==='expense_payment')rows=(state.expenses||[]).filter(x=>!x.deleted&&accExpenseOutstanding(x)>0.005).map(x=>({kind:'expense',id:x.id,name:x.description,outstanding:accExpenseOutstanding(x)}));
+  const label=type==='expense_payment'?'— Select an unpaid expense —':type==='supplier_payment'?'— Select a supplier bill or received purchase —':'— No linked document —';
+  sel.innerHTML='<option value="">'+label+'</option>'+rows.map(x=>{const value=type==='supplier_payment'?x.kind+':'+x.id:x.id;return `<option value="${value}">${esc(x.name||'Document')} — outstanding ${money(x.outstanding)}</option>`;}).join('');
+  if(rows.some(x=>(type==='supplier_payment'?x.kind+':'+x.id:x.id)===current))sel.value=current;
 }
+
 async function accCreatePayment(){
+  if(!sheriCan('manage_finance'))return sheriToast('You do not have permission to record payments.','error');
   await accEnsureBase();
-  const type=document.getElementById('accPaymentType').value,sourceId=document.getElementById('accPaymentSource').value||null,
-    amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,
-    date=document.getElementById('accPaymentDate').value||accToday();
+  const type=document.getElementById('accPaymentType').value,rawSource=document.getElementById('accPaymentSource').value||null,amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,date=document.getElementById('accPaymentDate').value||accToday(),reference=document.getElementById('accPaymentRef').value.trim()||null;
+  let sourceId=rawSource,sourceKind=null;if(type==='supplier_payment'&&rawSource){const parts=rawSource.split(':');sourceKind=parts.length>1?parts[0]:'bill';sourceId=parts.length>1?parts.slice(1).join(':'):rawSource;}
   if(amount<=0||!accountId)return alert('Enter an amount and choose a cash/bank account.');
   if(accPeriodLocked(date))return alert('This payment date is inside a locked accounting period.');
-  let debitId=null,creditId=null,sourceType=null,linkedExpense=null;
-  if(type==='customer_receipt'||type==='supplier_payment'){
-    if(!sourceId)return alert('Choose the invoice or supplier bill this payment belongs to.');
-    const doc=type==='supplier_payment'?state.bills.find(x=>x.id===sourceId):state.invoices.find(x=>x.id===sourceId);
-    if(!doc)return alert('The selected invoice or supplier bill could not be found.');
-    const outstanding=Math.max(0,Number(doc.total||0)-(type==='supplier_payment'?accBillPaid(doc):accInvoicePaid(doc)));
-    if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding balance of '+money(outstanding)+'.');
-    if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100')?.id;sourceType='invoice';}
-    else{debitId=accAccountCode('2000')?.id;creditId=accountId;sourceType='bill';}
-  }else if(type==='expense_payment'){
-    if(!sourceId)return alert('Choose the existing expense being paid. This prevents recording the same expense twice.');
-    linkedExpense=state.expenses.find(x=>x.id===sourceId&&!x.deleted);
-    if(!linkedExpense)return alert('The selected expense could not be found or has been deleted.');
-    const outstanding=accExpenseOutstanding(linkedExpense);
-    if(outstanding<=0.005)return alert('This expense is already fully paid.');
-    if(amount>outstanding+0.005)return alert('Payment exceeds the expense balance of '+money(outstanding)+'.');
-    debitId=accAccountCode('2050')?.id;creditId=accountId;sourceType='expense';
-  }else if(type==='other_income'){
-    debitId=accountId;creditId=accAccountCode('4100')?.id;
-  }else if(type==='other_expense'){
-    debitId=accAccountCode('6000')?.id;creditId=accountId;
-  }else return alert('Choose a valid payment type.');
-  if(!debitId||!creditId)return alert('The required ledger account is missing. Refresh the chart of accounts before recording this payment.');
-  const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),
-    direction:type==='customer_receipt'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,
-    amount,payment_date:date,reference:document.getElementById('accPaymentRef').value.trim()||null,created_at:sheriNow()};
-  await accPostEntry({date,description:(type==='customer_receipt'?'Customer receipt':type==='supplier_payment'?'Supplier payment':type==='other_income'?'Other income':type==='expense_payment'?'Expense payment — '+(linkedExpense.description||''):'Other expense'),
-    sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});
-  state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});
-  await sheriQueue({type:'accounting_upsert',table:'payments',record:row});
-  if(linkedExpense){
-    linkedExpense.payment_status=accExpenseOutstanding(linkedExpense)<=0.005?'paid':'partial';
-    await sheriPut('expenses',linkedExpense.id,{merchant_id:state.merchant.id,record:{...linkedExpense}});
-    await sheriQueue({type:'expense_upsert',record:{...linkedExpense}});
+  if(type==='supplier_payment'&&!sourceId)return alert('Select the supplier bill or received purchase this payment belongs to.');
+  if(type==='expense_payment'){
+    if(!sourceId)return alert('Select the expense this payment is settling.');
+    const expense=state.expenses.find(x=>x.id===sourceId&&!x.deleted);if(!expense)return alert('The selected expense could not be found.');
+    const outstanding=accExpenseOutstanding(expense);if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding expense balance of '+money(outstanding)+'.');
+    const row=await accRecordExpensePayment(expense,amount,accountId,date,reference);await accAudit('create','payment',row.id,{amount,type,expense_id:expense.id});
+    document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';render();alert('Expense payment recorded.');return;
   }
-  await accAudit('create','payment',row.id,{amount,type,source_id:sourceId});
-  document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';
-  accPaymentSourceOptions();render();sheriToast('Payment recorded and posted to the correct ledger accounts.','success');
+  let debitId,creditId,sourceType=null,description='';
+  if(type==='supplier_payment'&&sourceId){
+    const doc=sourceKind==='purchase'?(state.purchases||[]).find(x=>x.id===sourceId):(state.bills||[]).find(x=>x.id===sourceId);if(!doc)return alert('The selected supplier document could not be found.');
+    if(sourceKind==='purchase'&&(doc.status!=='received'||doc.voided_at||accPurchaseLinkedBill(doc)))return alert('This purchase is no longer eligible for a direct supplier payment. Select its linked bill instead.');
+    const outstanding=sourceKind==='purchase'?accPurchaseOutstanding(doc):Math.max(0,Number(doc.total||0)-accBillPaid(doc));if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding supplier balance of '+money(outstanding)+'.');sourceType=sourceKind||'bill';
+  }else if(type==='customer_receipt'&&sourceId){
+    const doc=(state.invoices||[]).find(x=>x.id===sourceId);if(doc&&amount>Math.max(0,Number(doc.total||0)-accInvoicePaid(doc))+0.005)return alert('Payment exceeds the outstanding balance of '+money(Math.max(0,Number(doc.total||0)-accInvoicePaid(doc)))+'.');sourceType='invoice';
+  }
+  if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100')?.id;description='Customer receipt';}
+  else if(type==='supplier_payment'){debitId=accAccountCode('2000')?.id;creditId=accountId;description='Supplier payment';}
+  else if(type==='other_income'){debitId=accountId;creditId=accAccountCode('4100')?.id;description='Other income';}
+  else{debitId=accAccountCode('6000')?.id;creditId=accountId;description='Other expense';}
+  if(!debitId||!creditId)return alert('The required accounting account is missing. Refresh the chart of accounts.');
+  const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),direction:type==='customer_receipt'||type==='other_income'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,amount,payment_date:date,reference,created_at:sheriNow()};
+  state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'payments',record:row});
+  await accPostEntry({date,description,sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});
+  await accAudit('create','payment',row.id,{amount,type,source_type:sourceType,source_id:sourceId});document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';render();alert('Payment recorded.');
 }
+
 async function accCreateBankAccount(){await accEnsureBase();const name=document.getElementById('accBankName').value.trim(),type=document.getElementById('accBankType').value,opening=Number(document.getElementById('accBankOpening').value)||0;if(!name)return alert('Enter an account name.');const baseCode={cash:'1000',bank:'1010',mobile_money:'1020'}[type];let acct=accAccountCode(baseCode);if(acct&&state.bankAccounts.some(x=>x.account_id===acct.id)){let n=2;while(accAccountCode(baseCode+'-'+n))n++;acct={id:sheriUuid(),merchant_id:state.merchant.id,code:baseCode+'-'+n,name:name,type:'asset',normal_balance:'debit',balance_sheet_class:'current',active:true,created_at:sheriNow()};await accUpsert('chart_of_accounts',acct)}if(!acct)return alert('Could not create the ledger account for this cash/bank account.');const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),name,type,opening_balance:opening,account_id:acct.id,current_balance:opening,last_reconciled_at:null,reconciled_balance:null,reconciled_difference:null,created_at:sheriNow()};state.bankAccounts.push(row);await sheriPut('bankAccounts',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'bank_accounts',record:row});if(opening>0){const eq=accAccountCode('3000');await accPostEntry({date:accToday(),description:'Opening balance — '+name,sourceType:'bank_opening',sourceId:row.id,lines:[{accountId:acct.id,debit:opening},{accountId:eq.id,credit:opening}]})}document.getElementById('accBankName').value='';document.getElementById('accBankOpening').value='0';render();}
 async function accReconcileBank(id){const b=state.bankAccounts.find(x=>x.id===id);if(!b)return;const d=prompt('Reconciled through date (YYYY-MM-DD):',accToday());if(!d||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d))return alert('Use YYYY-MM-DD.');const statement=Number(prompt('Statement balance:',String(accNormalAmount(accAccount(b.account_id))||0)));if(!Number.isFinite(statement))return;const ledger=accNormalAmount(accAccount(b.account_id));b.last_reconciled_at=d;b.reconciled_balance=statement;b.reconciled_difference=statement-ledger;await accUpdate('bank_accounts',b);await accAudit('reconcile','bank_account',b.id,{statement,ledger,difference:b.reconciled_difference});render();}
 async function accCreateTaxRate(){const name=document.getElementById('accTaxName').value.trim(),rate=Number(document.getElementById('accTaxRate').value),type=document.getElementById('accTaxType').value;if(!name||rate<0)return alert('Enter a tax name and rate.');const row={id:sheriUuid(),merchant_id:state.merchant.id,name,rate,type,active:true,created_at:sheriNow(),created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};state.taxRates.push(row);await sheriPut('taxRates',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'tax_rates',record:row});document.getElementById('accTaxName').value='';document.getElementById('accTaxRate').value='';render();}
@@ -6274,7 +6393,7 @@ function accPopulateSelects(){
   const ip=document.getElementById('accInvoiceProduct');if(ip){const keep=ip.value;ip.innerHTML='<option value="">— Select product or enter service —</option>'+activeProducts().map(x=>`<option value="${x.id}">${esc(x.name)} — ${money(x.sell)}</option>`).join('');if(keep&&product(keep))ip.value=keep;}const c=document.getElementById('accInvoiceCustomer');if(c)c.innerHTML='<option value="">— Walk-in / no customer —</option>'+activeCustomers().map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');
   const s=document.getElementById('accBillSupplier');if(s){const keep=s.value;s.innerHTML='<option value="">— Supplier —</option>'+osActiveSuppliers().map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');if(keep&&osActiveSuppliers().some(x=>x.id===keep))s.value=keep;}
   const bp=document.getElementById('accBillPurchase');if(bp){const keep=bp.value,eligible=(state.purchases||[]).filter(p=>p.status==='received'&&!p.voided_at&&p.supplier_id&&!(state.bills||[]).some(b=>b.purchase_id===p.id));bp.innerHTML='<option value="">— Standalone supplier bill —</option>'+eligible.map(p=>`<option value="${p.id}">${esc(p.product_name_snapshot||product(p.product_id)?.name||'Purchase')} · ${esc(osActiveSuppliers().find(x=>x.id===p.supplier_id)?.name||'Supplier')} · ${money(p.total)}</option>`).join('');if(keep&&eligible.some(p=>p.id===keep))bp.value=keep;}
-  accBillSupplierChanged();
+  accBillSupplierChanged();accBillTypeChanged();
   const taxOptions=(kind)=>'<option value="">No tax</option>'+(state.taxRates||[]).filter(x=>x.active&&x.type===kind).map(x=>`<option value="${x.id}">${esc(x.name)} (${x.rate}%)</option>`).join('');
   const it=document.getElementById('accInvoiceTax');if(it)it.innerHTML=taxOptions('output');
   const bt=document.getElementById('accBillTax');if(bt)bt.innerHTML=taxOptions('input');
@@ -6282,6 +6401,7 @@ function accPopulateSelects(){
   const aa=document.getElementById('accAdjAccount');if(aa)aa.innerHTML=cash||'<option value="">Add a cash/bank account first</option>';const apd=document.getElementById('accAdjProduct');if(apd)apd.innerHTML='<option value="">— Product optional —</option>'+activeProducts().map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');const oa=document.getElementById('accOpeningAccount');if(oa)oa.innerHTML=(state.accounts||[]).filter(x=>x.active).map(x=>`<option value="${x.id}">${esc(x.code)} — ${esc(x.name)}</option>`).join('');
   accPaymentSourceOptions();
 }
+
 function renderMoney(){if(!state.merchant)return;accPopulateSelects();accAdjustTypeChanged();const ih=document.getElementById('accInvoiceSearchHost'),bh=document.getElementById('accBillSearchHost'),ph=document.getElementById('accPaymentSearchHost');if(ih)ih.innerHTML=sheriSearchControl('invoices','accInvoiceTable','Search invoices by number or customer',(state.invoices||[]).flatMap(x=>[x.invoice_number,accCustomer(x.customer_id)?.name]));if(bh)bh.innerHTML=sheriSearchControl('bills','accBillTable','Search bills by number or supplier',(state.bills||[]).flatMap(x=>[x.bill_number,accSupplier(x.supplier_id)?.name]));if(ph)ph.innerHTML=sheriSearchControl('payments','accPaymentTable','Search payments by date, type or reference',(state.payments||[]).map(x=>x.reference));const ar=accAccountCode('1100'),ap=accAccountCode('2000'),cash=accAccountCode('1000');const receivable=(ar?accNormalAmount(ar):0),payable=(ap?accNormalAmount(ap):0),bankTotal=(state.bankAccounts||[]).reduce((s,x)=>s+(accAccount(x.account_id)?accNormalAmount(accAccount(x.account_id)):0),0),cashTotal=(cash?accNormalAmount(cash):0)+bankTotal;document.getElementById('accMetrics').innerHTML=[['Receivables',money(receivable),''],['Payables',money(payable),''],['Cash & bank',money(cashTotal),cashTotal>=0?'good':'bad'],['Unpaid invoices',(state.invoices||[]).filter(x=>accInvoiceStatus(x)!=='paid').length,'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');
   document.getElementById('accInvoiceTable').innerHTML=state.invoices.length?`<table class="table"><tr><th>Invoice</th><th>Customer</th><th>Total</th><th>Paid</th><th>User</th><th>Status</th></tr>${state.invoices.slice().sort((a,b)=>String(b.issue_date||b.created_at).localeCompare(String(a.issue_date||a.created_at))).slice(0,20).map(x=>`<tr><td>${esc(x.invoice_number)}</td><td>${esc(accCustomer(x.customer_id)?.name||'Walk-in')}</td><td>${money(x.total)}</td><td>${money(accInvoicePaid(x))}</td><td>${esc(sheriRecordActor(x))}</td><td>${accInvoiceStatus(x)} <button class="btn small secondary" onclick="accInvoicePdf('${x.id}')">PDF</button></td></tr>`).join('')}</table>`:'<div class="empty">No invoices yet.</div>';
   document.getElementById('accBillTable').innerHTML=state.bills.length?`<table class="table"><tr><th>Bill</th><th>Supplier</th><th>Purchase link</th><th>Total</th><th>Paid</th><th>User</th><th>Status</th></tr>${state.bills.slice().sort((a,b)=>String(b.issue_date||b.created_at).localeCompare(String(a.issue_date||a.created_at))).slice(0,20).map(x=>`<tr><td>${esc(x.bill_number)}</td><td>${esc(accSupplier(x.supplier_id)?.name||'Unassigned supplier')}</td><td>${x.purchase_id?'Purchase '+esc((state.purchases||[]).find(p=>p.id===x.purchase_id)?.product_name_snapshot||'linked'):'Standalone'}</td><td>${money(x.total)}</td><td>${money(accBillPaid(x))}</td><td>${esc(sheriRecordActor(x))}</td><td>${accBillStatus(x)} <button class="btn small secondary" onclick="accBillPdf('${x.id}')">PDF</button></td></tr>`).join('')}</table>`:'<div class="empty">No bills yet.</div>';
