@@ -6155,7 +6155,7 @@ function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('re
 function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accLedgerIntegrity(endDate=null){
-  const entries=state.journalEntries||[],lines=state.journalLines||[],sales=state.sales||[];
+  const entries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed!==false),lines=state.journalLines||[],sales=state.sales||[];
   const totals=new Map(),linesByEntry=new Map(),entryById=new Map(entries.map(e=>[e.id,e]));
   const saleById=new Map(sales.map(s=>[s.id,s]));
   const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
@@ -6360,9 +6360,11 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
     document.getElementById('accTB').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accGL').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accAudit').innerHTML='<div class="empty">Audit trail will appear after accounting setup.</div>';return;
   }
   const integrity=accLedgerIntegrity(reportEnd);
+  const pendingLedgerEntries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed===false&&!entry.voided&&sheriDateInReportRange(entry.entry_date||entry.created_at));
   const reconcileButton=document.getElementById('accReconcileButton');
   if(reconcileButton){reconcileButton.style.display=integrity.invalidCount&&accServerSnapshotAuthoritative&&sheriCan('manage_finance')&&sheriCan('view_financial_reports')?'inline-flex':'none';reconcileButton.textContent=sheriPendingText('Review and repair ledger');}
-  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' journal entr'+(integrity.invalidCount===1?'y has':'ies have')+' missing, duplicated, mismatched or unbalanced postings. Review the General Ledger before relying on these totals.</div>':'';
+  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' server-confirmed journal entr'+(integrity.invalidCount===1?'y has':'ies have')+' missing, duplicated, mismatched or unbalanced postings. Review the General Ledger before relying on these totals.</div>':'';
+  const pendingLedgerNotice=pendingLedgerEntries.length?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+pendingLedgerEntries.length+' journal entr'+(pendingLedgerEntries.length===1?'y is':'ies are')+' saved on this device but not yet confirmed by the server. They are excluded from the server-ledger integrity count and the statements remain unverified until synchronization completes.</div>':'';
   const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd);
   const income=accStatementTotal('income',b,'credit');const salesRevenue=Number(b['4000']||0)-Number(b['4050']||0);const otherIncome=income-salesRevenue;
   const cogs=accStatementTotal('cogs',b,'debit');
