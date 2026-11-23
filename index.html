@@ -10360,6 +10360,49 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
  if('ResizeObserver' in window){const ro=new ResizeObserver(()=>{if(window.innerWidth<=650)enforce()});ro.observe(side)}
 })();
 </script>
+<!-- V14.4.63: place sync controls directly below the shared language selector -->
+<style id="aibos-locale-invariant-navigation-sync-v63">
+/* One shared presentation layer for EN, FR and RW. Locale changes text only. */
+@media(max-width:650px){
+ html[lang] #appRoot .side{position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:8px 10px 8px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important;color:#F7EB5B!important;border:0!important;border-bottom:2px solid #F7EB5B!important;border-radius:0!important;box-shadow:none!important;transform:none!important}
+ html[lang] #appRoot .side>.brand{color:#F7EB5B!important;background:transparent!important;text-align:center!important;margin:0 0 5px!important;padding:0 0 5px!important;border:0!important}
+ html[lang] #appRoot .side .nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(44px,auto))!important;grid-auto-flow:row!important;align-items:stretch!important;gap:5px!important;width:100%!important;min-width:0!important;margin:0!important;padding:5px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:11px!important;box-shadow:none!important}
+ html[lang] #appRoot .side .nav>button{display:flex!important;grid-column:span 2!important;align-items:center!important;justify-content:center!important;width:100%!important;min-width:0!important;min-height:44px!important;height:auto!important;max-height:none!important;margin:0!important;padding:5px 3px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid rgba(247,235,91,.8)!important;border-radius:9px!important;font-family:inherit!important;font-size:clamp(11px,3.3vw,13px)!important;font-weight:650!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;box-shadow:none!important}
+ html[lang] #appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
+ html[lang] #appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
+ html[lang] #appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
+ html[lang] #appRoot .side .nav>button[data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}
+ html[lang] #appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
+ html[lang] #appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important}
+ html[lang] #appRoot .side .nav>button.active,html[lang] #appRoot .side .nav>button[aria-current="page"]{color:#010080!important;background:#F7EB5B!important;border-color:#F7EB5B!important}
+ html[lang] #appRoot .side .nav .sheri-nav-thumb{border:1.5px solid #F7EB5B!important;flex:0 0 22px!important;width:22px!important;height:22px!important}
+ html[lang] #appRoot .side #aibosLanguageSwitcher{position:static!important;inset:auto!important;transform:none!important;align-self:center!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:max-content!important;max-width:calc(100% - 12px)!important;height:auto!important;margin:6px auto 0!important;padding:3px 7px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;box-shadow:none!important}
+ html[lang] #appRoot .side #aibosLanguageSwitcher select,html[lang] #appRoot .side #aibosLanguageSwitcher select option{min-width:0!important;width:auto!important;max-width:calc(100vw - 40px)!important;color:#F7EB5B!important;background:#010080!important;border:0!important;font-family:inherit!important;font-size:13px!important;font-weight:650!important;text-align:center!important}
+ html[lang] #appRoot #sheriOfflineBar{position:static!important;inset:auto!important;top:auto!important;z-index:auto!important;display:flex!important;flex-flow:row wrap!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:6px 8px!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:6px 0 0!important;padding:7px 8px!important;box-sizing:border-box!important;color:#010080!important;background:#F8FAFC!important;border:1px solid #F7EB5B!important;border-radius:10px!important;box-shadow:none!important;overflow:visible!important}
+ html[lang] #appRoot #sheriOfflineBar>div:first-child{display:flex!important;flex:1 1 130px!important;flex-flow:row wrap!important;flex-direction:row!important;align-items:center!important;gap:3px 6px!important;width:auto!important;min-width:0!important;max-width:100%!important;color:#010080!important;font-size:12px!important;line-height:1.25!important}
+ html[lang] #appRoot #sheriOfflineBar>div:last-child{display:flex!important;flex:0 1 auto!important;flex-flow:row wrap!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:5px!important;width:auto!important;min-width:0!important;max-width:100%!important;overflow:visible!important;white-space:normal!important}
+ html[lang] #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] #appRoot #sheriOfflineBar>div:last-child>button{display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;align-self:center!important;width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:32px!important;margin:0!important;padding:6px 8px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:8px!important;font-family:inherit!important;font-size:11.5px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important}
+ html[lang] #appRoot .main{position:relative!important;top:auto!important;inset:auto!important;margin:0!important;margin-top:0!important;padding:8px 12px 18px!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:0!important;box-sizing:border-box!important;overflow-x:hidden!important}
+}
+@media(max-width:380px){html[lang] #appRoot .side{padding-left:7px!important;padding-right:7px!important}html[lang] #appRoot .side .nav{gap:4px!important;padding:4px!important}html[lang] #appRoot #sheriOfflineBar{gap:5px!important;padding:6px!important}html[lang] #appRoot #sheriOfflineBar>div:last-child{gap:4px!important}html[lang] #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] #appRoot #sheriOfflineBar>div:last-child>button{font-size:10.5px!important;padding:5px 6px!important}}
+</style>
+<script id="aibos-locale-invariant-navigation-sync-v63">
+(function(){'use strict';
+ const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),main=app?.querySelector('.main');
+ const picker=document.getElementById('aibosLanguageSwitcher'),sync=document.getElementById('sheriOfflineBar');
+ if(!app||!side||!main||!picker||!sync)return;
+ function place(){
+  if(window.innerWidth<=650){
+   if(picker.parentElement!==side)side.insertBefore(picker,side.querySelector('#aibosCommandSubnav')||null);
+   if(sync.parentElement!==side||sync.previousElementSibling!==picker)side.insertBefore(sync,picker.nextSibling);
+  }else{
+   if(picker.parentElement===side)document.body.appendChild(picker);
+   if(sync.parentElement===side)main.insertBefore(sync,main.firstChild);
+  }
+ }
+ place();window.addEventListener('resize',place,{passive:true});window.addEventListener('orientationchange',place,{passive:true});window.addEventListener('aibos:languagechange',place);
+})();
+</script>
 
 </body>
 </html>
