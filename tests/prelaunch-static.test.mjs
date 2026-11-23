@@ -871,12 +871,13 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
   assert.ok(html.includes("if(!full_name||full_name.length<2||full_name.length>120)"));
 });
 
-test("sync status bar uses the same responsive horizontal layout and navy-gold branding in all locales", () => {
+test("sync status bar keeps status and action groups horizontal with shared navy-gold branding", () => {
   for (const source of [html, previewLiveHtml]) {
-    assert.ok(source.includes('id="aibos-locale-invariant-navigation-sync-v64"'));
-    assert.match(source, /html\[lang="en"\] #appRoot #sheriOfflineBar,html\[lang="rw"\] #appRoot #sheriOfflineBar,html\[lang="fr"\] #appRoot #sheriOfflineBar\s*\{[\s\S]*?flex-flow:row wrap!important/);
-    assert.match(source, /html\[lang="en"\] #appRoot #sheriOfflineBar>div:last-child,html\[lang="rw"\] #appRoot #sheriOfflineBar>div:last-child,html\[lang="fr"\] #appRoot #sheriOfflineBar>div:last-child\s*\{[\s\S]*?flex-direction:row!important/);
-    assert.match(source, /html\[lang="en"\] #appRoot #sheriOfflineBar>div:last-child>button,html\[lang="rw"\] #appRoot #sheriOfflineBar>div:last-child>button,html\[lang="fr"\] #appRoot #sheriOfflineBar>div:last-child>button\s*\{[\s\S]*?display:inline-flex!important;[\s\S]*?width:auto!important;[\s\S]*?background:#010080!important/);
-    assert.match(source, /html\[lang="en"\] #appRoot \.side,html\[lang="rw"\] #appRoot \.side,html\[lang="fr"\] #appRoot \.side\s*\{[\s\S]*?background:#010080!important;[\s\S]*?color:#F7EB5B!important/);
+    assert.ok(source.includes('id="aibos-sync-horizontal-shared-v65"'));
+    assert.match(source, /html\[lang\] #appRoot #sheriOfflineBar\s*\{[\s\S]*?display:flex!important;flex-flow:row wrap!important;flex-direction:row!important/);
+    assert.match(source, /html\[lang\] #appRoot #sheriOfflineBar>div:first-child\s*\{[\s\S]*?flex:1 1 130px!important/);
+    assert.match(source, /html\[lang\] #appRoot #sheriOfflineBar>div:last-child\s*\{[\s\S]*?flex:1 1 190px!important;[\s\S]*?width:auto!important/);
+    assert.match(source, /html\[lang\] #appRoot #sheriOfflineBar>div:last-child>button,[\s\S]*?display:inline-flex!important;[\s\S]*?width:auto!important;[\s\S]*?background:#010080!important/);
+    assert.match(source, /color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important/);
   }
 });
