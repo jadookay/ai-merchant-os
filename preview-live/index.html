@@ -1307,6 +1307,14 @@ function sheriSyncErrorInfo(err){
 function sheriSyncDelayMs(attempts){return Math.min(60000,Math.max(5000,5000*Math.pow(2,Math.min(Number(attempts)||0,4))))}
 async function sheriSyncJournalBatch(op){
   const entry=op.entry||{};
+  if(entry.source_type==='purchase'){
+    const {data:purchase,error:purchaseError}=await sb.from('purchases').select('id,status,stock_applied')
+      .eq('id',entry.source_id).eq('merchant_id',entry.merchant_id).maybeSingle();
+    if(purchaseError)throw purchaseError;
+    if(!purchase||purchase.status!=='received'||purchase.stock_applied!==true)
+      throw new Error('Purchase journal is waiting for the matching received purchase and stock movement to be confirmed on the server.');
+  }
+
   let lines=Array.isArray(op.lines)?op.lines:[];
   // Old offline batches can carry locally-generated/stale account UUIDs.
   // Resolve them by the merchant's account code before the server validates
@@ -1535,6 +1543,12 @@ async function sheriUnblockSchemaRepairedOperations(){
     (item.op?.type==='inventory_adjustment'&&/product not found/i.test(String(item.last_error||''))&&(state.products||[]).some(p=>p.id===item.op.product_id))||
     (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(String(item.last_error||'')))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)))
   ));
+  const settingsRetries=queued.filter(item=>item.blocked&&item.op?.type==='accounting_settings_upsert'&&
+    item.op.record?.merchant_id===state.merchant?.id&&!item.accounting_settings_rls_retry&&
+    /row-level security|permission denied/i.test(String(item.last_error||'')));
+  for(const item of settingsRetries){
+    await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,accounting_settings_rls_retry:true,recovered_at:sheriNow()});
+  }
   if(!candidates.length)return;
   const [products,suppliers]=await Promise.all([
     sb.from('products').select('created_by,created_by_name').limit(0),
@@ -1655,13 +1669,6 @@ async function sheriSyncOutbox(){
         }
         else if(op.type==='accounting_settings_upsert'){await sheriSyncAccountingSettingsOperation(op)}
         else if(op.type==='accounting_delete'){const {error}=await sb.from(op.table).delete().eq('id',op.id);if(error)throw error}
-        if(op.type==='accounting_journal_batch'&&op.entry?.source_type==='purchase'){
-          const {data:purchase,error:purchaseError}=await sb.from('purchases').select('id,status,stock_applied')
-            .eq('id',op.entry.source_id).eq('merchant_id',op.entry.merchant_id).maybeSingle();
-          if(purchaseError)throw purchaseError;
-          if(!purchase||purchase.status!=='received'||purchase.stock_applied!==true)
-            throw new Error('Purchase journal is waiting for the matching received purchase and stock movement to be confirmed on the server.');
-        }
         else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
         else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='customer_upsert'){const {error}=await sb.from('customers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
