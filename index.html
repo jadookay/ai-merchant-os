@@ -6294,9 +6294,9 @@ function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('re
 function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accLedgerIntegrity(endDate=null){
-  const entries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed!==false),lines=state.journalLines||[],sales=state.sales||[];
+  const entries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed!==false),lines=state.journalLines||[],sales=state.sales||[],expenses=state.expenses||[],payments=state.payments||[];
   const totals=new Map(),linesByEntry=new Map(),entryById=new Map(entries.map(e=>[e.id,e]));
-  const saleById=new Map(sales.map(s=>[s.id,s]));
+  const saleById=new Map(sales.map(s=>[s.id,s])),expenseById=new Map(expenses.map(e=>[e.id,e])),paymentById=new Map(payments.map(p=>[p.id,p]));
   const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
   const activeSources=new Set(),reversalsBySource=new Map();
   for(const e of entries){
@@ -6358,13 +6358,40 @@ function accLedgerIntegrity(endDate=null){
         if(!reason&&!exact)reason='POS journal lines do not match the sale quantity, price or cost';
       }
     }
+    if(!reason&&entry.source_type==='expense'){
+      const expense=expenseById.get(entry.source_id);
+      if(!expense&&!hasReversal)reason='Expense journal has no matching expense source record';
+      else if(expense){
+        const paid=(payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===expense.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0);
+        const usePayable=paid>0||['unpaid','partial'].includes(String(expense.payment_status||'').toLowerCase());
+        const expected=usePayable
+          ?[{code:'6000',debit:Number(expense.amount||0),credit:0},{code:'2050',debit:0,credit:Number(expense.amount||0)}]
+          :[{code:'6000',debit:Number(expense.amount||0),credit:0},{code:'1000',debit:0,credit:Number(expense.amount||0)}];
+        const exact=Number(expense.amount||0)>0&&linesForEntry.length===2&&expected.every(want=>linesForEntry.some(line=>accountCodeById.get(line.account_id)===want.code&&Math.abs(Number(line.debit||0)-want.debit)<=0.005&&Math.abs(Number(line.credit||0)-want.credit)<=0.005));
+        if(!exact)reason='Expense journal does not match the expense amount or payment-liability treatment';
+      }
+    }
+    if(!reason&&entry.source_type==='payment'){
+      const payment=paymentById.get(entry.source_id);
+      if(!payment)reason='Payment journal has no matching payment source record';
+      else{
+        let expected=null;
+        if(payment.source_type==='expense'&&payment.direction==='payment')expected=[{account: '2050',debit:Number(payment.amount||0),credit:0},{accountId:payment.account_id,debit:0,credit:Number(payment.amount||0)}];
+        else if(payment.source_type==='bill'&&payment.direction==='payment')expected=[{account:'2000',debit:Number(payment.amount||0),credit:0},{accountId:payment.account_id,debit:0,credit:Number(payment.amount||0)}];
+        else if(payment.source_type==='invoice'&&payment.direction==='receipt')expected=[{accountId:payment.account_id,debit:Number(payment.amount||0),credit:0},{account:'1100',debit:0,credit:Number(payment.amount||0)}];
+        if(expected){
+          const exact=Number(payment.amount||0)>0&&linesForEntry.length===2&&expected.every(want=>linesForEntry.some(line=>(want.account?accountCodeById.get(line.account_id)===want.account:line.account_id===want.accountId)&&Math.abs(Number(line.debit||0)-want.debit)<=0.005&&Math.abs(Number(line.credit||0)-want.credit)<=0.005));
+          if(!exact)reason='Payment journal does not match its linked source, amount or cash/bank account';
+        }
+      }
+    }
     if(reason)addInvalid(entry,reason,v.count,v.debit,v.credit);
   }
   // A balanced ledger can still omit an entire source posting. Check operational
   // source records independently so missing journals cannot disappear from the audit.
   for(const sale of sales){
     const date=String(sale.created_at||'').slice(0,10);
-    if(sale.voided||(endDate&&date>endDate))continue;
+    if(sale._serverConfirmed===false||sale.voided||(endDate&&date>endDate))continue;
     if(Number(sale.qty||0)*Number(sale.price||0)>0&&!activeSources.has('sale|'+sale.id))
       addInvalid({id:'missing-sale-'+sale.id,description:'Sale '+(sale.product_name_snapshot||''),source_type:'sale',source_id:sale.id,entry_date:date},'Source sale has no active revenue journal');
     if(sale.stock_applied&&Number(sale.qty||0)*Number(sale.cost||0)>0&&!activeSources.has('sale_cogs|'+sale.id))
@@ -6372,13 +6399,13 @@ function accLedgerIntegrity(endDate=null){
   }
   for(const expense of state.expenses||[]){
     const date=String(expense.created_at||'').slice(0,10);
-    if(expense.deleted||(endDate&&date>endDate)||Number(expense.amount||0)<=0)continue;
+    if(expense._serverConfirmed===false||expense.deleted||(endDate&&date>endDate)||Number(expense.amount||0)<=0)continue;
     if(!activeSources.has('expense|'+expense.id))
       addInvalid({id:'missing-expense-'+expense.id,description:'Expense '+(expense.description||''),source_type:'expense',source_id:expense.id,entry_date:date},'Active expense has no active expense journal');
   }
   for(const purchase of state.purchases||[]){
     const date=String(purchase.purchased_at||purchase.created_at||'').slice(0,10);
-    if(purchase.voided_at||purchase.status!=='received'||(endDate&&date>endDate)||Number(purchase.total||0)<=0)continue;
+    if(purchase._serverConfirmed===false||purchase.voided_at||purchase.status!=='received'||(endDate&&date>endDate)||Number(purchase.total||0)<=0)continue;
     if(!activeSources.has('purchase|'+purchase.id))
       addInvalid({id:'missing-purchase-'+purchase.id,description:'Purchase '+(purchase.product_name_snapshot||''),source_type:'purchase',source_id:purchase.id,entry_date:date},'Received purchase has no active purchase journal');
   }
