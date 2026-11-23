@@ -20,14 +20,17 @@ test('phone normalization accepts Rwanda local and international formats', () =>
   assert.equal(normalize('1234'), null);
 });
 
-test('owner registration uses phone identity and supports immediate session without SMS verification', () => {
+test('owner registration and login use a phone-derived email alias without Twilio or SMS', () => {
   assert.match(html, /id="signupPhone"[^>]*required/);
-  assert.match(html, /sb\.auth\.signUp\(\{phone,password,options/);
+  assert.match(html, /function sheriPhoneLoginEmail\(phone\)/);
+  assert.match(html, /phone-login\.shericeri\.test/);
+  assert.match(html, /sb\.auth\.signUp\(\{email:loginEmail,password,options\}\)/);
   assert.ok(html.includes("if(data.session){setAuthStatus('Account created. Let’s set up your business…');await onAuthed(data.session);}"), 'registration must continue immediately when Supabase returns a session');
-  assert.ok(html.includes('Testing mode: SMS verification is skipped'), 'signup screen must explain no-OTP testing mode');
-  assert.match(html, /sb\.auth\.verifyOtp\(\{phone,token,type:'sms'\}\)/);
-  assert.match(html, /function verifyOwnerPhoneOtp\(/);
-  assert.match(html, /full_name,contact_email:email\|\|null/);
+  assert.ok(html.includes('No Supabase Phone provider, Twilio SID, Auth Token, or SMS is used.'), 'signup screen must explain no-SMS testing mode');
+  assert.match(html, /contact_phone:phone,contact_email:email\|\|null,auth_method:'phone_password_test'/);
+  assert.match(html, /email:sheriPhoneLoginEmail\(phone\),password/);
+  assert.match(html, /Legacy phone sign-in request timed out/);
+  assert.match(html, /Confirm email under Supabase Auth/);
 });
 
 test('owner login accepts phone or email and staff login is phone plus PIN', () => {
