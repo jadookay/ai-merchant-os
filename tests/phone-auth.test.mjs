@@ -47,3 +47,14 @@ test('account authentication edits do not replace transaction, ledger or sync pa
   }
   assert.match(html, /function sheriWrapSyncBatch\(name\)\{/);
 });
+
+test('generated staff Auth passwords stay within Supabase 72-character limit', () => {
+  const match = edge.match(/function randomPassword\(\)\s*\{[\s\S]*?\n\}/);
+  assert.ok(match, 'staff password generator must exist');
+  const context = { crypto: { getRandomValues(bytes) { for (let i = 0; i < bytes.length; i++) bytes[i] = i; return bytes; } } };
+  vm.runInNewContext(match[0] + '; this.makePassword = randomPassword;', context);
+  const password = context.makePassword();
+  assert.equal(password.length, 64);
+  assert.ok(password.length <= 72);
+  assert.match(password, /^[0-9a-f]{64}$/);
+});
