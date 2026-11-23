@@ -20,7 +20,7 @@ test('phone normalization accepts Rwanda local and international formats', () =>
   assert.equal(normalize('1234'), null);
 });
 
-test('owner registration uses phone identity, legal name metadata and SMS verification', () => {
+test('owner registration uses phone identity and supports immediate session without SMS verification', () => {
   assert.match(html, /id="signupPhone"[^>]*required/);
   assert.match(html, /sb\.auth\.signUp\(\{phone,password,options/);
   assert.match(html, /sb\.auth\.verifyOtp\(\{phone,token,type:'sms'\}\)/);
