@@ -6304,7 +6304,7 @@ function accLedgerIntegrity(endDate=null){
   const activeSources=new Set(),reversalsBySource=new Map();
   for(const e of entries){
     const entryDate=String(e.entry_date||e.created_at||'').slice(0,10);if(!e.voided&&e.source_type&&e.source_id&&(!endDate||entryDate<=endDate))activeSources.add(e.source_type+'|'+e.source_id);
-    if(!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void'].includes(e.source_type)&&e.source_id){
+    if(!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void','expense_delete','payment_void'].includes(e.source_type)&&e.source_id){
       if(!reversalsBySource.has(e.source_id))reversalsBySource.set(e.source_id,[]);
       reversalsBySource.get(e.source_id).push(e);
     }
