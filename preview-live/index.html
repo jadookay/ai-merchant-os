@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.80 isolated expense-payment reconciliation and stable reports">
+<meta name="app-version" content="V14.4.79 preview supplier bill PDF and multilingual bill details">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -277,7 +277,7 @@ window.ensurePdfJs=async function(){
 <body>
 <div id="aibos-preview-environment-banner" role="status" style="position:sticky;top:0;z-index:10000;background:#7f1d1d;color:#fff;text-align:center;padding:9px 12px;font:700 12px/1.4 system-ui,sans-serif;letter-spacing:.02em">ISOLATED AIBOS PREVIEW · TEST DATA ONLY · NOT PRODUCTION</div>
 
-<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS (AIBOS)</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" type="button" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" type="button" onclick="switchAuthMode('signup')">Create account</button><button id="authTabStaff" type="button" onclick="switchAuthMode('staff')">Staff PIN</button></div><label class="auth-remember-row" for="keepMeLoggedIn"><input id="keepMeLoggedIn" type="checkbox" checked><span>Keep me logged in on this device</span></label><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('authPassword',this)">View PW</button></div><button id="authSignInBtn" class="btn" type="button" style="width:100%;margin-top:14px">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="staffPanel" class="auth-panel"><label>Business account ID</label><input id="staffMerchantCode" inputmode="numeric" maxlength="6" pattern="[0-9]{1,6}" placeholder="6-digit business ID"><label style="margin-top:10px">Full name, phone or email</label><input id="staffIdentifier" autocomplete="username" placeholder="Your full name, phone or email"><label style="margin-top:10px">PIN (6–8 digits)</label><div class="auth-field"><input id="staffPin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter your PIN"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('staffPin',this)">View PW</button></div><button class="btn" type="button" style="width:100%;margin-top:14px" onclick="signInWithTeamPin()">Sign in as team member</button><div class="field-help">Forgot your PIN? Ask your Owner, Admin or an authorized Manager to reset it securely. Do not share your PIN with anyone.</div></div><div id="signupPanel" class="auth-panel"><label>Full name</label><input id="signupFullName" type="text" autocomplete="name" maxlength="120" required placeholder="Enter your full name"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn2" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPasswordConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div>
+<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS (AIBOS)</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" type="button" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" type="button" onclick="switchAuthMode('signup')">Create account</button><button id="authTabStaff" type="button" onclick="switchAuthMode('staff')">Staff PIN</button></div><label class="auth-remember-row" for="keepMeLoggedIn"><input id="keepMeLoggedIn" type="checkbox" checked><span>Keep me logged in on this device</span></label><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('authPassword',this)">View PW</button></div><button id="authSignInBtn" class="btn" type="button" style="width:100%;margin-top:14px">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="staffPanel" class="auth-panel"><label>Business account ID</label><input id="staffMerchantCode" inputmode="numeric" maxlength="6" pattern="[0-9]{1,6}" placeholder="6-digit business ID"><label style="margin-top:10px">Name, phone or email</label><input id="staffIdentifier" autocomplete="username" placeholder="Your name, phone or email"><label style="margin-top:10px">PIN (6–8 digits)</label><div class="auth-field"><input id="staffPin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter your PIN"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('staffPin',this)">View PW</button></div><button class="btn" type="button" style="width:100%;margin-top:14px" onclick="signInWithTeamPin()">Sign in as team member</button><div class="field-help">Forgot your PIN? Ask your Owner, Admin or an authorized Manager to reset it securely. Do not share your PIN with anyone.</div></div><div id="signupPanel" class="auth-panel"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn2" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPasswordConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div>
 <script>
 /* SHERI AUTH SAFETY NET — deliberately independent of the main application boot. */
 (function(){
@@ -1307,14 +1307,6 @@ function sheriSyncErrorInfo(err){
 function sheriSyncDelayMs(attempts){return Math.min(60000,Math.max(5000,5000*Math.pow(2,Math.min(Number(attempts)||0,4))))}
 async function sheriSyncJournalBatch(op){
   const entry=op.entry||{};
-  if(entry.source_type==='purchase'){
-    const {data:purchase,error:purchaseError}=await sb.from('purchases').select('id,status,stock_applied')
-      .eq('id',entry.source_id).eq('merchant_id',entry.merchant_id).maybeSingle();
-    if(purchaseError)throw purchaseError;
-    if(!purchase||purchase.status!=='received'||purchase.stock_applied!==true)
-      throw new Error('Purchase journal is waiting for the matching received purchase and stock movement to be confirmed on the server.');
-  }
-
   let lines=Array.isArray(op.lines)?op.lines:[];
   // Old offline batches can carry locally-generated/stale account UUIDs.
   // Resolve them by the merchant's account code before the server validates
@@ -1543,12 +1535,6 @@ async function sheriUnblockSchemaRepairedOperations(){
     (item.op?.type==='inventory_adjustment'&&/product not found/i.test(String(item.last_error||''))&&(state.products||[]).some(p=>p.id===item.op.product_id))||
     (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(String(item.last_error||'')))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)))
   ));
-  const settingsRetries=queued.filter(item=>item.blocked&&item.op?.type==='accounting_settings_upsert'&&
-    item.op.record?.merchant_id===state.merchant?.id&&!item.accounting_settings_rls_retry&&
-    /row-level security|permission denied/i.test(String(item.last_error||'')));
-  for(const item of settingsRetries){
-    await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,accounting_settings_rls_retry:true,recovered_at:sheriNow()});
-  }
   if(!candidates.length)return;
   const [products,suppliers]=await Promise.all([
     sb.from('products').select('created_by,created_by_name').limit(0),
@@ -1559,34 +1545,6 @@ async function sheriUnblockSchemaRepairedOperations(){
     await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,recovered_at:sheriNow()});
   }
 }
-async function sheriSyncAccountingSettingsOperation(op){
-  const record=op?.record||{},merchantId=String(record.merchant_id||'');
-  if(!merchantId||merchantId!==String(state.merchant?.id||''))throw new Error('Accounting settings sync was stopped because the saved business ID does not match the active business. Refresh the active business before retrying.');
-  const {data:existing,error:readError}=await sb.from('accounting_settings')
-    .select('merchant_id,locked_through,updated_at,created_at').eq('merchant_id',merchantId).maybeSingle();
-  if(readError)throw readError;
-  const localStamp=Date.parse(record.updated_at||record.created_at||'');
-  const applyNewerSettings=async current=>{
-    const serverStamp=Date.parse(current?.updated_at||current?.created_at||'');
-    if(Number.isFinite(localStamp)&&(!Number.isFinite(serverStamp)||localStamp>serverStamp)){
-      const {data,error}=await sb.from('accounting_settings')
-        .update({locked_through:record.locked_through??null,updated_at:record.updated_at||sheriNow()})
-        .eq('merchant_id',merchantId).select('merchant_id,locked_through,updated_at').maybeSingle();
-      if(error)throw error;
-      if(!data)throw new Error('The accounting settings update was not confirmed by the server.');
-    }
-  };
-  if(existing){await applyNewerSettings(existing);return;}
-  const {error:insertError}=await sb.from('accounting_settings').insert(sheriServerRecord(record));
-  if(!insertError)return;
-  if(insertError.code!=='23505')throw insertError;
-  const {data:current,error:retryReadError}=await sb.from('accounting_settings')
-    .select('merchant_id,locked_through,updated_at,created_at').eq('merchant_id',merchantId).maybeSingle();
-  if(retryReadError)throw retryReadError;
-  if(!current)throw insertError;
-  await applyNewerSettings(current);
-}
-
 async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy||sheriSyncBatchDepth>0)return;
   sheriSyncBusy=true;
@@ -1667,7 +1625,7 @@ async function sheriSyncOutbox(){
           else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}
           else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         }
-        else if(op.type==='accounting_settings_upsert'){await sheriSyncAccountingSettingsOperation(op)}
+        else if(op.type==='accounting_settings_upsert'){const {error}=await sb.from('accounting_settings').upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'});if(error)throw error}
         else if(op.type==='accounting_delete'){const {error}=await sb.from(op.table).delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
         else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
@@ -1703,7 +1661,6 @@ async function sheriSyncOutbox(){
               else if(op.type==='purchase_upsert'){const {error}=await sb.from('purchases').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='cash_upsert'){const {error}=await sb.from('cash_entries').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
-              else if(op.type==='accounting_settings_upsert'){await sheriSyncAccountingSettingsOperation(op)}
               else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
               else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
               else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
@@ -1747,8 +1704,8 @@ async function sheriSyncOutbox(){
 
 function sheriOnlineEvents(){
   window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sherriSyncKick()});
-  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
-  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri focus refresh]',e));});
+  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
+  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri focus refresh]',e));});
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator){
@@ -1994,10 +1951,8 @@ function markSignupExistingEmail(message){const el=document.getElementById('sign
 async function handleSignUp(){
   if(!sb)await sheriInitSupabase();
   if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
-  const full_name=String(document.getElementById('signupFullName')?.value||'').trim().replace(/\\s+/g,' '),email=normalizeAuthEmail(document.getElementById('signupEmail').value),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;
-  document.getElementById('signupFullName').value=full_name;
+  const email=normalizeAuthEmail(document.getElementById('signupEmail').value),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;
   document.getElementById('signupEmail').value=email;
-  if(!full_name||full_name.length<2||full_name.length>120)return setAuthStatus('Enter your full name (2–120 characters).',true);
   if(!email||!password||!confirm)return setAuthStatus('Enter your email, password and password confirmation.',true);
   if(password.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);
   if(password!==confirm)return setAuthStatus('Passwords do not match.',true);
@@ -2005,12 +1960,12 @@ async function handleSignUp(){
   try{
     sheriTurnstileBusy=true;
     setAuthStatus('Creating account…');
-    let result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,data:{full_name}}}),12000,'Account creation timed out');
+    let result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT}}),12000,'Account creation timed out');
     let {data,error}=result;
     if(error && /captcha|turnstile|challenge/i.test(String(error?.message||''))){
       setAuthStatus('Security verification required…');
       const captchaToken=await sheriWithTimeout(sheriGetCaptchaToken(),9000,'Security check timed out');
-      result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,captchaToken,data:{full_name}}}),12000,'Verified account creation timed out');
+      result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,captchaToken}}),12000,'Verified account creation timed out');
       ({data,error}=result);
     }
     if(error)return markSignupExistingEmail(friendlyAuthError(error));
@@ -2136,9 +2091,6 @@ function sheriStopMerchantRealtime(){
   if(sheriRealtimeChannel&&sb){try{sb.removeChannel(sheriRealtimeChannel)}catch(e){console.warn('[Shericeri realtime] unsubscribe failed',e)}}
   sheriRealtimeChannel=null;sheriRealtimeMerchantId=null;
 }
-function sheriDeferBackgroundRender(){
-  return !!document.getElementById('accRepairDialog')||sheriCurrentView==='reports';
-}
 function sheriSubscribeMerchantRealtime(merchantId){
   if(!sb||!merchantId||!session?.access_token)return;
   if(sheriRealtimeChannel&&sheriRealtimeMerchantId===merchantId)return;
@@ -2153,7 +2105,7 @@ function sheriSubscribeMerchantRealtime(merchantId){
     sheriRealtimeRefreshTimer=setTimeout(()=>{
       sheriRealtimeRefreshTimer=null;
       if(state.merchant?.id!==merchantId||!session?.access_token)return;
-      loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
+      loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
     },220);
   };
   for(const table of tables){
@@ -2236,7 +2188,7 @@ async function loadAll(silent=false){
   if(navigator.onLine&&!(await sheriVerifyActiveStaffMembership(mId)))return;
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
-  if(hadLocal&&!(silent&&sheriDeferBackgroundRender()))render();
+  if(hadLocal)render();
   if(!navigator.onLine){await sheriLoadAccountingSnapshot(mId);await accEnsureBase();await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
   try{
     const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr},{data:memory,error:mErr},{data:customers,error:cErr},{data:suppliers,error:supErr},{data:purchases,error:purErr},{data:cashEntries,error:cashErr},{data:budgets,error:budErr}]=await Promise.all([
@@ -5841,7 +5793,6 @@ async function addOSPurchase(){
   if(navigator.onLine)sheriToast(sheriLocalized('Purchase recorded. Synchronization will continue automatically.','Achat enregistré. La synchronisation se poursuivra automatiquement.','Ibyaguzwe byanditswe. Kohereza amakuru bizakomeza byikora.'),'success');
   else sheriToast(sheriLocalized('Purchase saved on this device. It will synchronize when you are back online.','Achat enregistré sur cet appareil. Il sera synchronisé dès le retour de la connexion.','Ibyaguzwe byabitswe kuri iki gikoresho. Bizoherezwa kuri seriveri igihe internet izaba yongeye kuboneka.'),'warning');
   document.getElementById('osPurchaseQty').value=1;document.getElementById('osPurchaseCost').value='';document.getElementById('osPurchaseDue').value='';render();
-  return data;
 }
 async function deleteOSPurchase(id){if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('Only a Manager, Admin or Owner with inventory access can cancel purchases.','error');const x=state.purchases.find(p=>p.id===id);if(!x)return;if(x.status!=='ordered')return sheriToast('Received purchases cannot be cancelled here because they affect stock and accounting. Use the audited void workflow for received purchases.','warning');const reason=prompt('Reason for cancelling this ordered purchase (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');if(!confirm('Cancel this ordered purchase?\\nReason: '+reason.trim()))return;await sheriQueue({type:'purchase_delete',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:sheriUuid()});state.purchases=state.purchases.filter(p=>p.id!==id);await sheriSaveSnapshot();if(navigator.onLine)await sheriSyncOutbox();render()}
 async function voidOSPurchase(id){
@@ -5996,92 +5947,14 @@ async function accEnsureOperationalLedger({approved=false}={}){
   await sheriSaveAccountingSnapshot();
   return {repairedLines,blocked};
 }
-function accShowRepairConfirmation(message){
-  return new Promise(resolve=>{
-    document.getElementById('accRepairDialog')?.remove();
-    if(!document.getElementById('accRepairDialogStyle')){
-      const style=document.createElement('style');style.id='accRepairDialogStyle';
-      style.textContent=`
-        #accRepairDialog{position:fixed;inset:0;z-index:1000000;display:grid;place-items:center;box-sizing:border-box;padding:18px;background:rgba(8,12,28,.68);overscroll-behavior:contain}
-        #accRepairDialog *{box-sizing:border-box}
-        #accRepairDialog .acc-repair-panel{width:min(760px,100%);max-height:min(86dvh,820px);display:flex;flex-direction:column;gap:12px;overflow:hidden;background:#fff;color:#172033;border:2px solid #F7EB5B;border-radius:16px;box-shadow:0 22px 70px rgba(0,0,0,.38);padding:clamp(14px,3vw,24px)}
-        #accRepairDialog .acc-repair-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-        #accRepairDialog .acc-repair-heading h2{margin:0;font-size:1.2rem;line-height:1.3}
-        #accRepairDialog .acc-repair-summary{margin:0;color:#475569;font-size:.92rem;line-height:1.45}
-        #accRepairDialog .acc-repair-details{display:block;width:100%;min-height:150px;max-height:48dvh;overflow:auto;resize:vertical;margin:0;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#0f172a;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
-        #accRepairDialog .acc-repair-status{min-height:18px;margin:0;color:#475569;font-size:.82rem}
-        #accRepairDialog .acc-repair-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px}
-        #accRepairDialog .acc-repair-actions button{min-height:42px;padding:9px 15px;border:1px solid #cbd5e1;border-radius:9px;font:600 14px/1.2 system-ui,sans-serif;cursor:pointer}
-        #accRepairDialog .acc-repair-copy{margin-right:auto;background:#010080;color:#F7EB5B;border-color:#010080!important}
-        #accRepairDialog .acc-repair-cancel{background:#fff;color:#172033}
-        #accRepairDialog .acc-repair-confirm{background:#F7EB5B;color:#010080;border-color:#010080!important}
-        #accRepairDialog button:focus-visible,#accRepairDialog .acc-repair-details:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
-        @media(max-width:520px){#accRepairDialog{padding:10px}#accRepairDialog .acc-repair-panel{max-height:92dvh;border-radius:12px}#accRepairDialog .acc-repair-actions{display:grid;grid-template-columns:1fr 1fr}#accRepairDialog .acc-repair-copy{grid-column:1/-1;margin:0}#accRepairDialog .acc-repair-details{max-height:48dvh}}
-      `;
-      document.head.appendChild(style);
-    }
-    const t={
-      title:sheriLocalized('Review ledger repair','Vérifier la correction du grand livre','Genzura ikosorwa ry’ibaruramari'),
-      summary:sheriLocalized('Copy the complete diagnostic below and paste it into ChatGPT if you want me to inspect it before approving. No changes are made until you confirm.','Copiez le diagnostic complet ci-dessous et collez-le dans ChatGPT pour vérification avant approbation. Aucune modification ne sera effectuée avant votre confirmation.','Koporora amakuru yose ari hepfo uyashyire muri ChatGPT kugira ngo nyasuzume mbere yo kwemeza. Nta gihinduka mbere yo kwemeza.'),
-      copy:sheriLocalized('Copy diagnostic','Copier le diagnostic','Koporora amakuru'),
-      cancel:sheriLocalized('Cancel','Annuler','Hagarika'),
-      confirm:sheriLocalized('Confirm repair','Confirmer la correction','Emeza ikosora'),
-      copied:sheriLocalized('Diagnostic copied. Paste it into the chat.','Diagnostic copié. Collez-le dans la conversation.','Amakuru yakoporowe. Yashyire mu kiganiro.'),
-      failed:sheriLocalized('Copy was unavailable. Select the text above and copy it.','Copie indisponible. Sélectionnez le texte ci-dessus et copiez-le.','Koporora ntibyashobotse. Hitamo inyandiko iri hejuru uyikoporore.')
-    };
-    const overlay=document.createElement('div');overlay.id='accRepairDialog';
-    const panel=document.createElement('section');panel.className='acc-repair-panel';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','accRepairDialogTitle');
-    panel.innerHTML='<div class="acc-repair-heading"><h2 id="accRepairDialogTitle"></h2></div><p class="acc-repair-summary"></p><pre class="acc-repair-details" tabindex="0"></pre><p class="acc-repair-status" aria-live="polite"></p><div class="acc-repair-actions"><button type="button" class="acc-repair-copy"></button><button type="button" class="acc-repair-cancel"></button><button type="button" class="acc-repair-confirm"></button></div>';
-    panel.querySelector('h2').textContent=t.title;panel.querySelector('.acc-repair-summary').textContent=t.summary;panel.querySelector('.acc-repair-details').textContent=message;
-    panel.querySelector('.acc-repair-copy').textContent=t.copy;panel.querySelector('.acc-repair-cancel').textContent=t.cancel;panel.querySelector('.acc-repair-confirm').textContent=t.confirm;
-    overlay.appendChild(panel);document.body.appendChild(overlay);
-    let settled=false;const finish=value=>{if(settled)return;settled=true;document.removeEventListener('keydown',onKey);overlay.remove();resolve(value)};
-    const onKey=e=>{if(e.key==='Escape'){e.preventDefault();finish(false)}};
-    document.addEventListener('keydown',onKey);
-    overlay.addEventListener('click',e=>{if(e.target===overlay)finish(false)});
-    panel.querySelector('.acc-repair-cancel').addEventListener('click',()=>finish(false));
-    panel.querySelector('.acc-repair-confirm').addEventListener('click',()=>finish(true));
-    panel.querySelector('.acc-repair-copy').addEventListener('click',async()=>{
-      const status=panel.querySelector('.acc-repair-status');
-      try{
-        if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(message);
-        else{const area=document.createElement('textarea');area.value=message;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();const ok=document.execCommand('copy');area.remove();if(!ok)throw new Error('Clipboard unavailable');}
-        status.textContent=t.copied;
-      }catch(_){status.textContent=t.failed;const details=panel.querySelector('.acc-repair-details');details.focus();const range=document.createRange();range.selectNodeContents(details);const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);}
-    });
-    panel.querySelector('.acc-repair-details').focus();
-  });
-}
 async function accReconcileOperationalLedger(){
   if(!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return sheriToast('Only an authorized finance manager or owner can repair the ledger.','error');
   if(!accServerSnapshotAuthoritative)return sheriToast('Refresh the server data before repairing the ledger.','warning');
   const integrity=accLedgerIntegrity();
   if(!integrity.invalidCount)return sheriToast('The ledger is already balanced.');
-  const accountNames=new Map((state.accounts||[]).map(a=>[a.id,(a.code||'?')+' '+(a.name||'')]));
-  const diagnostic=[
-    'AIBOS LEDGER REPAIR REVIEW',
-    'Generated: '+new Date().toISOString(),
-    'Business: '+(state.merchant?.name||'Unknown'),
-    'Flagged entries: '+integrity.invalidCount,
-    'Repair policy: add only missing lines matching active source records; conflicting or locked entries remain unchanged.',
-    '',
-    ...integrity.invalid.map((x,i)=>{
-      const lines=accLinesForEntry(x.entry.id);
-      return [
-        (i+1)+'. '+(x.entry.description||x.entry.source_type||'Journal entry'),
-        '   Entry ID: '+(x.entry.id||'not created'),
-        '   Source: '+(x.entry.source_type||'unknown')+' / '+(x.entry.source_id||'unknown'),
-        '   Date: '+(x.entry.entry_date||'unknown'),
-        '   Finding: '+(x.reason||'Review required'),
-        '   Existing lines: '+(x.count||0)+' | Debits: '+money(x.debit||0)+' | Credits: '+money(x.credit||0)+' | Difference: '+money(x.difference||0),
-        '   Line detail: '+(lines.length?lines.map(l=>(accountNames.get(l.account_id)||l.account_id)+' [Dr '+money(l.debit||0)+' / Cr '+money(l.credit||0)+']').join('; '):'No journal lines found')
-      ].join('\\n');
-    }),
-    '',
-    'No repair has been applied. Review and approve explicitly.'
-  ].join('\\n');
-  const promptText='The ledger audit found '+integrity.invalidCount+' item(s) requiring review. Inspect or copy the full diagnostic before approving. The repair will add only missing lines matching active source records; conflicting or locked entries will remain unchanged.\\n\\n'+diagnostic;
-  if(!await accShowRepairConfirmation(promptText))return;
+  const preview=integrity.invalid.slice(0,8).map(x=>'• '+(x.entry.description||x.entry.source_type||'Journal entry')+' — '+(x.reason||'Review required')+' ('+(x.count||0)+' line(s))').join('\n');
+  const promptText='There are '+integrity.invalidCount+' incomplete or unbalanced journal entries. The repair will add only missing lines that match active source records. Entries with conflicting lines or locked dates will be left unchanged.\n\n'+preview+'\n\nContinue with the repair?';
+  if(!confirm(promptText))return;
   const button=document.getElementById('accReconcileButton');if(button){button.disabled=true;button.textContent=sheriPendingText('Repairing ledger…');}
   try{
     const result=await sheriWithSyncBatch(()=>accEnsureOperationalLedger({approved:true}));
@@ -6396,7 +6269,7 @@ function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('re
 function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accLedgerIntegrity(endDate=null){
-  const entries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed!==false),lines=state.journalLines||[],sales=state.sales||[];
+  const entries=state.journalEntries||[],lines=state.journalLines||[],sales=state.sales||[];
   const totals=new Map(),linesByEntry=new Map(),entryById=new Map(entries.map(e=>[e.id,e]));
   const saleById=new Map(sales.map(s=>[s.id,s]));
   const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
@@ -6500,13 +6373,8 @@ function accLedgerIntegrity(endDate=null){
     if(!activeSources.has('expense|'+expense.id)){
       addInvalid({id:'missing-expense-'+expense.id,description:'Expense '+(expense.description||''),source_type:'expense',source_id:expense.id,entry_date:date},'Active expense has no active expense journal');continue;
     }
-    const linkedPaid=(state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===expense.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0);
-    const usePayable=linkedPaid>0||['unpaid','partial'].includes(String(expense.payment_status||'').toLowerCase());
-    const expected=usePayable
-      ?[{code:'6000',debit:Number(expense.amount),credit:0},{code:'2050',debit:0,credit:Number(expense.amount)}]
-      :[{code:'6000',debit:Number(expense.amount),credit:0},{code:'1000',debit:0,credit:Number(expense.amount)}];
-    if(original&&(!matchesExpected(original,expected)||hasExactReversal(original))){
-      const v=totals.get(original.id)||{count:0,debit:0,credit:0};addInvalid(original,'Expense journal does not match its amount or payment-liability treatment, or has already been reversed',v.count,v.debit,v.credit);
+    if(original&&(!matchesExpected(original,[{code:'6000',debit:Number(expense.amount),credit:0},{code:'1000',debit:0,credit:Number(expense.amount)}])||hasExactReversal(original))){
+      const v=totals.get(original.id)||{count:0,debit:0,credit:0};addInvalid(original,'Expense journal does not match its amount/accounts or has already been reversed',v.count,v.debit,v.credit);
     }
   }
   for(const purchase of state.purchases||[]){
@@ -6548,15 +6416,13 @@ function accLedgerIntegrity(endDate=null){
     const date=String(payment.payment_date||payment.created_at||'').slice(0,10);if((endDate&&date>endDate)||Number(payment.amount||0)<=0)continue;
     const entry=entries.find(e=>e.source_type==='payment'&&e.source_id===payment.id&&!e.voided);
     if(!activeSources.has('payment|'+payment.id)){addInvalid({id:'missing-payment-'+payment.id,description:'Payment '+(payment.reference||''),source_type:'payment',source_id:payment.id,entry_date:date},'Payment source has no active payment journal');continue;}
-    const amount=Number(payment.amount),expected=payment.source_type==='expense'&&payment.direction==='payment'
-      ?[{code:'2050',debit:amount,credit:0},{accountId:payment.account_id,debit:0,credit:amount}]
-      :payment.source_type==='invoice'
-        ?[{accountId:payment.account_id,debit:amount,credit:0},{code:'1100',debit:0,credit:amount}]
-        :['bill','purchase'].includes(payment.source_type)
-          ?[{code:'2000',debit:amount,credit:0},{accountId:payment.account_id,debit:0,credit:amount}]
-          :payment.direction==='receipt'
-            ?[{accountId:payment.account_id,debit:amount,credit:0},{code:'4100',debit:0,credit:amount}]
-            :[{code:'6000',debit:amount,credit:0},{accountId:payment.account_id,debit:0,credit:amount}];
+    const amount=Number(payment.amount),expected=payment.source_type==='invoice'
+      ?[{accountId:payment.account_id,debit:amount,credit:0},{code:'1100',debit:0,credit:amount}]
+      :['bill','purchase'].includes(payment.source_type)
+        ?[{code:'2000',debit:amount,credit:0},{accountId:payment.account_id,debit:0,credit:amount}]
+        :payment.direction==='receipt'
+          ?[{accountId:payment.account_id,debit:amount,credit:0},{code:'4100',debit:0,credit:amount}]
+          :[{code:'6000',debit:amount,credit:0},{accountId:payment.account_id,debit:0,credit:amount}];
     if(entry&&!matchesExpected(entry,expected)){const v=totals.get(entry.id)||{count:0,debit:0,credit:0};addInvalid(entry,'Payment journal does not match its direction, amount or cash/bank account',v.count,v.debit,v.credit);}
   }
   for(const cash of state.cashEntries||[]){
@@ -6687,14 +6553,37 @@ async function exportStatement(id,title,kind){
 }
 function accCashFlowForPeriod(startDate,endDate){
   const cashIds=new Set((state.accounts||[]).filter(a=>['1000','1010','1020'].includes(String(a.code))||(state.bankAccounts||[]).some(b=>b.account_id===a.id)).map(a=>a.id));
-  const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
+  const accounts=new Map((state.accounts||[]).map(a=>[a.id,a]));
   const reversedEntries=new Set((state.journalEntries||[]).filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void'].includes(e.source_type)).map(e=>e.source_id));
   const linesByEntry=new Map();
   for(const line of state.journalLines||[]){
     if(!linesByEntry.has(line.journal_entry_id))linesByEntry.set(line.journal_entry_id,[]);
     linesByEntry.get(line.journal_entry_id).push(line);
   }
-  let inflows=0,outflows=0,opening=0,closing=0;
+  const flows={
+    operating:{inflows:0,outflows:0,net:0},
+    investing:{inflows:0,outflows:0,net:0},
+    financing:{inflows:0,outflows:0,net:0},
+    unclassified:{inflows:0,outflows:0,net:0}
+  };
+  let opening=0,closing=0;
+  const classifyAccount=account=>{
+    if(!account)return 'unclassified';
+    const type=String(account.type||'').toLowerCase();
+    const balanceClass=String(account.balance_sheet_class||'').toLowerCase();
+    if(['income','other_income','cogs','expense'].includes(type))return 'operating';
+    if(type==='equity')return 'financing';
+    if(type==='asset'||type==='liability'){
+      if(balanceClass==='current')return 'operating';
+      if(balanceClass==='non_current')return type==='asset'?'investing':'financing';
+    }
+    return 'unclassified';
+  };
+  const addFlow=(classification,amount)=>{
+    const bucket=flows[classification]||flows.unclassified;
+    if(amount>0.005)bucket.inflows+=amount;
+    else if(amount< -0.005)bucket.outflows+=Math.abs(amount);
+  };
   for(const entry of state.journalEntries||[]){
     if(entry.voided&&!reversedEntries.has(entry.id)&&!reversedEntries.has(entry.source_id))continue;
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
@@ -6707,13 +6596,26 @@ function accCashFlowForPeriod(startDate,endDate){
     if(startDate&&date<startDate)opening+=cashChange;
     if(!endDate||date<=endDate)closing+=cashChange;
     const inRange=(!startDate||date>=startDate)&&(!endDate||date<=endDate);
-    // Ignore transfers between cash-equivalent accounts: they change neither
-    // total cash nor cash flow, even though one cash account is debited and another credited.
-    const hasNonCashCounterpart=lines.some(line=>!cashIds.has(line.account_id));
-    if(inRange&&hasNonCashCounterpart){if(cashChange>0)inflows+=cashChange;else if(cashChange<0)outflows-=cashChange;}
+    if(!inRange)continue;
+    // Classify each non-cash counterpart independently. This handles compound
+    // entries and keeps transfers between cash-equivalent accounts out of cash flow.
+    const counterpartLines=lines.filter(line=>!cashIds.has(line.account_id));
+    let allocatedCashChange=0;
+    for(const line of counterpartLines){
+      const counterpartCashChange=Number(line.credit||0)-Number(line.debit||0);
+      if(Math.abs(counterpartCashChange)<=0.005)continue;
+      addFlow(classifyAccount(accounts.get(line.account_id)),counterpartCashChange);
+      allocatedCashChange+=counterpartCashChange;
+    }
+    // Any unmatched cash movement remains visible as unclassified; never silently drop it.
+    const unallocated=cashChange-allocatedCashChange;
+    if(Math.abs(unallocated)>0.005)addFlow('unclassified',unallocated);
   }
+  for(const bucket of Object.values(flows))bucket.net=bucket.inflows-bucket.outflows;
+  const inflows=Object.values(flows).reduce((sum,bucket)=>sum+bucket.inflows,0);
+  const outflows=Object.values(flows).reduce((sum,bucket)=>sum+bucket.outflows,0);
   const net=inflows-outflows;
-  return{inflows,outflows,net,opening,closing,reconciliationDifference:opening+net-closing};
+  return{...flows,inflows,outflows,net,opening,closing,reconciliationDifference:opening+net-closing};
 }
 function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!document.getElementById('reports'))return;const reportStart=sheriReportStart,reportEnd=sheriReportEnd||sheriLocalDateKey(new Date());
   // If the accounting migration is not installed yet, never present zeroes when
@@ -6729,11 +6631,9 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
     document.getElementById('accTB').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accGL').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accAudit').innerHTML='<div class="empty">Audit trail will appear after accounting setup.</div>';return;
   }
   const integrity=accLedgerIntegrity(reportEnd);
-  const pendingLedgerEntries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed===false&&!entry.voided&&sheriDateInReportRange(entry.entry_date||entry.created_at));
   const reconcileButton=document.getElementById('accReconcileButton');
   if(reconcileButton){reconcileButton.style.display=integrity.invalidCount&&accServerSnapshotAuthoritative&&sheriCan('manage_finance')&&sheriCan('view_financial_reports')?'inline-flex':'none';reconcileButton.textContent=sheriPendingText('Review and repair ledger');}
-  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' server-confirmed journal entr'+(integrity.invalidCount===1?'y has':'ies have')+' missing, duplicated, mismatched or unbalanced postings. Review the General Ledger before relying on these totals.</div>':'';
-  const pendingLedgerNotice=pendingLedgerEntries.length?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+pendingLedgerEntries.length+' journal entr'+(pendingLedgerEntries.length===1?'y is':'ies are')+' saved on this device but not yet confirmed by the server. They are excluded from the server-ledger integrity count and the statements remain unverified until synchronization completes.</div>':'';
+  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' journal entr'+(integrity.invalidCount===1?'y has':'ies have')+' missing, duplicated, mismatched or unbalanced postings. Review the General Ledger before relying on these totals.</div>':'';
   const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd);
   const income=accStatementTotal('income',b,'credit');const salesRevenue=Number(b['4000']||0)-Number(b['4050']||0);const otherIncome=income-salesRevenue;
   const cogs=accStatementTotal('cogs',b,'debit');
@@ -6763,59 +6663,13 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
   const syncNotice=syncPending?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">Some transactions are still waiting to synchronize. These figures include only data currently available on this device and are NOT yet server-verified.</div>':'';
   const cashFlow=accCashFlowForPeriod(reportStart,reportEnd);
   const cashFlowNotice=Math.abs(cashFlow.reconciliationDifference)>0.005?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">'+sheriLocalized('Cash and cash equivalents do not reconcile. Difference: '+money(cashFlow.reconciliationDifference)+'. Review cash and bank journal lines before relying on these statements.','La trésorerie et les équivalents de trésorerie ne concordent pas. Écart : '+money(cashFlow.reconciliationDifference)+'. Vérifiez les écritures de caisse et de banque avant de vous fier à ces états.','Amafaranga ari mu bubiko na banki ntahura. Itandukaniro: '+money(cashFlow.reconciliationDifference)+'. Banza ugenzure inyandiko za cash na banki.')+'</div>':'';
-  const statementNotice=integrityNotice+pendingLedgerNotice+inventoryReconciliationNotice+trialBalanceNotice+balanceNotice+cashFlowNotice+refreshNotice+syncNotice+serverSnapshotNotice;
-  const statementsVerified=integrity.invalidCount===0&&inventoryReconciliationApplicable&&Math.abs(inventoryDifference)<=0.005&&Math.abs(trialBalanceDifference)<=0.005&&Math.abs(balanceDifference)<=0.005&&Math.abs(cashFlow.reconciliationDifference)<=0.005&&!sheriAccountingRefreshError&&!syncPending&&accServerSnapshotAuthoritative===true;document.getElementById('reportMetrics').innerHTML=(statementNotice?'<div style="grid-column:1/-1">'+statementNotice+'</div>':'')+[[sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha'),money(salesRevenue),''],['Net profit',money(net),net>=0?'good':'bad'],['Assets',money(assets),''],['Liabilities',money(liab),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');document.getElementById('accPL').innerHTML=statementNotice+`<div class="row"><span>${sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha')}</span><b>${money(salesRevenue)}</b></div><div class="row"><span>COGS</span><b>${money(cogs)}</b></div><div class="row"><span>Gross profit</span><b>${money(salesRevenue-cogs)}</b></div><div class="row"><span>${sheriLocalized('Other income','Autres produits','Ayandi mafaranga yinjijwe')}</span><b>${money(otherIncome)}</b></div><div class="row"><span>${sheriLocalized('Operating expenses','Charges d’exploitation','Amafaranga akoreshwa mu bikorwa')}</span><b>${money(exp)}</b></div><div class="row"><span>${sheriLocalized('Profit before tax','Bénéfice avant impôt','Inyungu mbere y’imisoro')}</span><b>${money(profitBeforeTax)}</b></div><div class="row"><span>${sheriLocalized('Income tax expense','Charge d’impôt sur le revenu','Ikiguzi cy’umusoro ku nyungu')}</span><b>${money(taxExpense)}</b></div><div class="row"><span>${sheriLocalized('Net profit','Bénéfice net','Inyungu nyakuri')}</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Overdue receivables: ${money((state.invoices||[]).filter(x=>x.due_date<accToday()&&accInvoiceStatus(x)!=='paid').reduce((s,x)=>s+x.total-accInvoicePaid(x),0))} • Overdue payables: ${money((state.bills||[]).filter(x=>x.due_date<accToday()&&accBillStatus(x)!=='paid').reduce((s,x)=>s+x.total-accBillPaid(x),0))}</div>`;document.getElementById('accBS').innerHTML=statementNotice+`<div class="row"><span>Total assets</span><b>${money(assets)}</b></div><div class="row"><span>${sheriLocalized('Inventory per product records','Stock selon les fiches produits','Ububiko nk’uko bwanditswe mu bicuruzwa')}</span><b>${inventoryReconciliationApplicable?money(inventorySubledgerValue):sheriLocalized('Not available for historical date','Non disponible à cette date historique','Ntibiboneka ku itariki yashize')}</b></div><div class="row"><span>${sheriLocalized('Inventory control account (1200)','Compte de stock (1200)','Konti y’ububiko (1200)')}</span><b>${money(inventoryLedgerBalance)}</b></div><div class="row"><span>${sheriLocalized('Inventory valuation difference','Écart de valorisation du stock','Itandukaniro ry’agaciro k’ububiko')}</span><b>${inventoryReconciliationApplicable?money(inventoryDifference):'—'}</b></div><div class="row"><span>Total liabilities</span><b>${money(liab)}</b></div><div class="row"><span>Tax payable (included in liabilities)</span><b>${money(bs['2100']||0)}</b></div><div class="row"><span>Input tax receivable (included in assets)</span><b>${money(bs['2110']||0)}</b></div><div class="row"><span>Equity incl. current profit</span><b>${money(equity)}</b></div><div class="sub" style="margin-top:8px">${statementsVerified?sheriLocalized('✓ Financial statements are verified.','✓ Les états financiers sont vérifiés.','✓ Raporo z’imari zigenzuwe neza.'):'⚠ '+sheriLocalized('Financial statements are NOT verified. Check journal integrity, inventory reconciliation, Trial Balance and server refresh before relying on these figures.','Les états financiers ne sont PAS vérifiés. Vérifiez le journal, le rapprochement des stocks, la balance générale et l’actualisation du serveur avant de vous fier à ces chiffres.','Raporo z’imari NTIZIRAGENZURWA. Banza ugenzure inyandiko z’ibaruramari, ihuzwa ry’ububiko, igereranya ry’amadeni n’inguzanyo, n’ivugururwa rya seriveri.')}</div>`;document.getElementById('accCF').innerHTML=statementNotice+`<div class="sub">${sheriLocalized("Direct cash movement summary (unclassified). Inflows and outflows use the net movement across cash, bank and mobile-money accounts. Transfers between cash-equivalent accounts are excluded. This is not yet a classified operating, investing and financing cash flow statement.","Résumé non classé des mouvements de trésorerie. Les entrées et sorties utilisent le mouvement net des comptes de caisse, bancaires et de mobile money. Les transferts entre équivalents de trésorerie sont exclus. Il ne s’agit pas encore d’un tableau classé entre activités opérationnelles, d’investissement et de financement.","Incamake y’ihinduka ry’amafaranga itarashyirwa mu byiciro. Amafaranga yinjiye n’ayagiye abarwa hashingiwe ku mpinduka rusange kuri konti za cash, banki na mobile money. Ihererekanya hagati ya konti z’amafaranga ntiribarebwa. Iyi si raporo yuzuye itandukanya ibikorwa bisanzwe, ishoramari n’inkunga cyangwa igishoro.")}</div><div class="row"><span>Opening cash and cash equivalents</span><b>${money(cashFlow.opening)}</b></div><div class="row"><span>Cash inflows in period</span><b>${money(cashFlow.inflows)}</b></div><div class="row"><span>Cash outflows in period</span><b>${money(cashFlow.outflows)}</b></div><div class="row"><span>Net cash flow in period</span><b>${money(cashFlow.net)}</b></div><div class="row"><span>Closing cash and cash equivalents</span><b>${money(cashFlow.closing)}</b></div><div class="sub" style="margin-top:8px">${Math.abs(cashFlow.reconciliationDifference)<=0.005?'✓ Cash movement reconciles.':'⚠ Cash movement does not reconcile. Difference: '+money(cashFlow.reconciliationDifference)}</div>`;const tbRows=[];let tbDebits=0,tbCredits=0;for(const a of (state.accounts||[])){const normalSide=String(a.normal_balance||(['liability','equity','income'].includes(a.type)?'credit':'debit')).toLowerCase(),balance=Number(bs[a.code]||0);if(Math.abs(balance)<=0.005)continue;const debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance),credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance);tbDebits+=debit;tbCredits+=credit;tbRows.push('<tr><td>'+esc(a.code)+'</td><td>'+esc(a.name)+'</td><td>'+money(debit)+'</td><td>'+money(credit)+'</td></tr>')}const tbDifference=tbDebits-tbCredits;document.getElementById('accTB').innerHTML=tbRows.length?'<table class="table"><thead><tr><th>Code</th><th>Account</th><th>Debit</th><th>Credit</th></tr></thead><tbody>'+tbRows.join('')+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+money(tbDebits)+'</th><th>'+money(tbCredits)+'</th></tr></tfoot></table><div class="sub" style="margin-top:8px">'+(Math.abs(tbDifference)<=0.005?'✓ Debits and credits balance.':'⚠ Trial Balance difference: '+money(tbDifference)+'. Review the General Ledger before relying on these figures.')+'</div>':'<div class="empty">No posted account balances exist for this reporting date yet.</div>';const gl=(state.journalEntries||[]).filter(e=>sheriDateInReportRange(e.entry_date||e.created_at)).slice().sort((a,b)=>String(b.created_at||b.entry_date).localeCompare(String(a.created_at||a.entry_date))).slice(0,30);document.getElementById('accGL').innerHTML=gl.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr>${gl.map(e=>{const ls=accLinesForEntry(e.id);return ls.map(l=>`<tr><td>${esc(e.entry_date)}</td><td>${esc(e.description)} — ${esc(accAccount(l.account_id)?.name||'')}</td><td>${l.debit?money(l.debit):''}</td><td>${l.credit?money(l.credit):''}</td></tr>`).join('')}).join('')}</table>`:'<div class="empty">No journal entries yet.</div>';document.getElementById('accAudit').innerHTML=state.auditLog.length?`<table class="table"><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Reason</th><th>Details</th></tr>${state.auditLog.filter(x=>sheriDateInReportRange(x.created_at)).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,20).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audit events yet.</div>';}
+  const statementNotice=integrityNotice+inventoryReconciliationNotice+trialBalanceNotice+balanceNotice+cashFlowNotice+refreshNotice+syncNotice+serverSnapshotNotice;
+  const cashFlowClassificationNotice=(cashFlow.unclassified.inflows+cashFlow.unclassified.outflows)>0.005?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+sheriLocalized('Some cash movements are linked to accounts without a cash-flow classification. Review those account classifications before relying on category totals.','Certains mouvements de trésorerie sont liés à des comptes sans classification des flux. Vérifiez la classification de ces comptes avant de vous fier aux totaux par catégorie.','Hari amafaranga yagiye cyangwa yinjiye anyuze kuri konti zitarashyirwa mu byiciro by’imigendekere y’amafaranga. Banza uzishyire mu byiciro mbere yo kwishingikiriza ku mibare rusange.')+'</div>':'';
+  const statementsVerified=integrity.invalidCount===0&&inventoryReconciliationApplicable&&Math.abs(inventoryDifference)<=0.005&&Math.abs(trialBalanceDifference)<=0.005&&Math.abs(balanceDifference)<=0.005&&Math.abs(cashFlow.reconciliationDifference)<=0.005&&!sheriAccountingRefreshError&&!syncPending&&accServerSnapshotAuthoritative===true;document.getElementById('reportMetrics').innerHTML=(statementNotice?'<div style="grid-column:1/-1">'+statementNotice+'</div>':'')+[[sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha'),money(salesRevenue),''],['Net profit',money(net),net>=0?'good':'bad'],['Assets',money(assets),''],['Liabilities',money(liab),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');document.getElementById('accPL').innerHTML=statementNotice+`<div class="row"><span>${sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha')}</span><b>${money(salesRevenue)}</b></div><div class="row"><span>COGS</span><b>${money(cogs)}</b></div><div class="row"><span>Gross profit</span><b>${money(salesRevenue-cogs)}</b></div><div class="row"><span>${sheriLocalized('Other income','Autres produits','Ayandi mafaranga yinjijwe')}</span><b>${money(otherIncome)}</b></div><div class="row"><span>${sheriLocalized('Operating expenses','Charges d’exploitation','Amafaranga akoreshwa mu bikorwa')}</span><b>${money(exp)}</b></div><div class="row"><span>${sheriLocalized('Profit before tax','Bénéfice avant impôt','Inyungu mbere y’imisoro')}</span><b>${money(profitBeforeTax)}</b></div><div class="row"><span>${sheriLocalized('Income tax expense','Charge d’impôt sur le revenu','Ikiguzi cy’umusoro ku nyungu')}</span><b>${money(taxExpense)}</b></div><div class="row"><span>${sheriLocalized('Net profit','Bénéfice net','Inyungu nyakuri')}</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Overdue receivables: ${money((state.invoices||[]).filter(x=>x.due_date<accToday()&&accInvoiceStatus(x)!=='paid').reduce((s,x)=>s+x.total-accInvoicePaid(x),0))} • Overdue payables: ${money((state.bills||[]).filter(x=>x.due_date<accToday()&&accBillStatus(x)!=='paid').reduce((s,x)=>s+x.total-accBillPaid(x),0))}</div>`;document.getElementById('accBS').innerHTML=statementNotice+`<div class="row"><span>Total assets</span><b>${money(assets)}</b></div><div class="row"><span>${sheriLocalized('Inventory per product records','Stock selon les fiches produits','Ububiko nk’uko bwanditswe mu bicuruzwa')}</span><b>${inventoryReconciliationApplicable?money(inventorySubledgerValue):sheriLocalized('Not available for historical date','Non disponible à cette date historique','Ntibiboneka ku itariki yashize')}</b></div><div class="row"><span>${sheriLocalized('Inventory control account (1200)','Compte de stock (1200)','Konti y’ububiko (1200)')}</span><b>${money(inventoryLedgerBalance)}</b></div><div class="row"><span>${sheriLocalized('Inventory valuation difference','Écart de valorisation du stock','Itandukaniro ry’agaciro k’ububiko')}</span><b>${inventoryReconciliationApplicable?money(inventoryDifference):'—'}</b></div><div class="row"><span>Total liabilities</span><b>${money(liab)}</b></div><div class="row"><span>Tax payable (included in liabilities)</span><b>${money(bs['2100']||0)}</b></div><div class="row"><span>Input tax receivable (included in assets)</span><b>${money(bs['2110']||0)}</b></div><div class="row"><span>Equity incl. current profit</span><b>${money(equity)}</b></div><div class="sub" style="margin-top:8px">${statementsVerified?sheriLocalized('✓ Financial statements are verified.','✓ Les états financiers sont vérifiés.','✓ Raporo z’imari zigenzuwe neza.'):'⚠ '+sheriLocalized('Financial statements are NOT verified. Check journal integrity, inventory reconciliation, Trial Balance and server refresh before relying on these figures.','Les états financiers ne sont PAS vérifiés. Vérifiez le journal, le rapprochement des stocks, la balance générale et l’actualisation du serveur avant de vous fier à ces chiffres.','Raporo z’imari NTIZIRAGENZURWA. Banza ugenzure inyandiko z’ibaruramari, ihuzwa ry’ububiko, igereranya ry’amadeni n’inguzanyo, n’ivugururwa rya seriveri.')}</div>`;document.getElementById('accCF').innerHTML=statementNotice+cashFlowClassificationNotice+`<div class="sub">${sheriLocalized("Cash flows are classified using the account on the other side of each journal entry. Current assets and liabilities, income, cost of sales and expenses are operating; non-current assets are investing; equity and non-current liabilities are financing. Transfers between cash-equivalent accounts are excluded.","Les flux de trésorerie sont classés selon le compte en contrepartie de chaque écriture. Les actifs et passifs courants, les produits, le coût des ventes et les charges relèvent des activités opérationnelles ; les actifs non courants relèvent de l’investissement ; les capitaux propres et les passifs non courants relèvent du financement. Les transferts entre équivalents de trésorerie sont exclus.","Imigendekere y’amafaranga ishyirwa mu byiciro hakurikijwe konti ihanganye n’iya cash muri buri nyandiko y’ibaruramari. Umutungo n’imyenda by’igihe gito, amafaranga yinjiye, ikiguzi cy’ibyagurishijwe n’amafaranga akoreshwa biri mu bikorwa bisanzwe; umutungo w’igihe kirekire uri mu ishoramari; imari shingiro n’imyenda y’igihe kirekire biri mu bikorwa byo gushaka igishoro. Ihererekanya hagati ya konti z’amafaranga ntiribarwa.")}</div><div class="row"><b>${sheriLocalized('Operating activities','Activités opérationnelles','Ibikorwa bisanzwe by’ubucuruzi')}</b></div><div class="row"><span>${sheriLocalized('Operating cash inflows','Entrées de trésorerie opérationnelles','Amafaranga yinjiye mu bikorwa bisanzwe by’ubucuruzi')}</span><b>${money(cashFlow.operating.inflows)}</b></div><div class="row"><span>${sheriLocalized('Operating cash outflows','Sorties de trésorerie opérationnelles','Amafaranga yasohotse mu bikorwa bisanzwe by’ubucuruzi')}</span><b>${money(cashFlow.operating.outflows)}</b></div><div class="row"><span>${sheriLocalized('Net cash from operating activities','Flux net des activités opérationnelles','Amafaranga asigaye mu bikorwa bisanzwe by’ubucuruzi')}</span><b>${money(cashFlow.operating.net)}</b></div><div class="row"><b>${sheriLocalized('Investing activities','Activités d’investissement','Ibikorwa by’ishoramari')}</b></div><div class="row"><span>${sheriLocalized('Investing cash inflows','Entrées de trésorerie d’investissement','Amafaranga yinjiye mu bikorwa by’ishoramari')}</span><b>${money(cashFlow.investing.inflows)}</b></div><div class="row"><span>${sheriLocalized('Investing cash outflows','Sorties de trésorerie d’investissement','Amafaranga yasohotse mu bikorwa by’ishoramari')}</span><b>${money(cashFlow.investing.outflows)}</b></div><div class="row"><span>${sheriLocalized('Net cash from investing activities','Flux net des activités d’investissement','Amafaranga asigaye mu bikorwa by’ishoramari')}</span><b>${money(cashFlow.investing.net)}</b></div><div class="row"><b>${sheriLocalized('Financing activities','Activités de financement','Ibikorwa byo kubona no kwishyura inkunga n’imyenda')}</b></div><div class="row"><span>${sheriLocalized('Financing cash inflows','Entrées de trésorerie de financement','Amafaranga yinjiye avuye mu nkunga n’imyenda')}</span><b>${money(cashFlow.financing.inflows)}</b></div><div class="row"><span>${sheriLocalized('Financing cash outflows','Sorties de trésorerie de financement','Amafaranga yasohotse mu kwishyura inkunga n’imyenda')}</span><b>${money(cashFlow.financing.outflows)}</b></div><div class="row"><span>${sheriLocalized('Net cash from financing activities','Flux net des activités de financement','Amafaranga asigaye mu bikorwa byo kubona no kwishyura inkunga n’imyenda')}</span><b>${money(cashFlow.financing.net)}</b></div><div class="row"><b>${sheriLocalized('Unclassified cash flows','Flux de trésorerie non classés','Amafaranga atarashyirwa mu byiciro')}</b></div><div class="row"><span>${sheriLocalized('Unclassified cash inflows','Entrées de trésorerie non classées','Amafaranga yinjiye atarashyirwa mu byiciro')}</span><b>${money(cashFlow.unclassified.inflows)}</b></div><div class="row"><span>${sheriLocalized('Unclassified cash outflows','Sorties de trésorerie non classées','Amafaranga yasohotse atarashyirwa mu byiciro')}</span><b>${money(cashFlow.unclassified.outflows)}</b></div><div class="row"><span>${sheriLocalized('Opening cash and cash equivalents','Trésorerie et équivalents à l’ouverture','Amafaranga n’ibihwanye na yo byari bihari igihe hatangira')}</span><b>${money(cashFlow.opening)}</b></div><div class="row"><span>${sheriLocalized('Total cash inflows','Total des entrées de trésorerie','Amafaranga yose yinjiye')}</span><b>${money(cashFlow.inflows)}</b></div><div class="row"><span>${sheriLocalized('Total cash outflows','Total des sorties de trésorerie','Amafaranga yose yasohotse')}</span><b>${money(cashFlow.outflows)}</b></div><div class="row"><span>${sheriLocalized('Net change in cash and cash equivalents','Variation nette de la trésorerie et des équivalents','Impinduka rusange mu mafaranga n’ibihwanye na yo')}</span><b>${money(cashFlow.net)}</b></div><div class="row"><span>${sheriLocalized('Closing cash and cash equivalents','Trésorerie et équivalents à la clôture','Amafaranga n’ibihwanye na yo bisigaye igihe kirangiye')}</span><b>${money(cashFlow.closing)}</b></div><div class="sub" style="margin-top:8px">${Math.abs(cashFlow.reconciliationDifference)<=0.005?sheriLocalized('✓ Cash movement reconciles.','✓ Les mouvements de trésorerie sont rapprochés.','✓ Amafaranga yinjiye n’asohotse arahura.'):'⚠ '+sheriLocalized('Cash movement does not reconcile. Difference:','Les mouvements de trésorerie ne concordent pas. Écart :','Imigendekere y’amafaranga ntihuye. Itandukaniro:')+' '+money(cashFlow.reconciliationDifference)}</div>`;const tbRows=[];let tbDebits=0,tbCredits=0;for(const a of (state.accounts||[])){const normalSide=String(a.normal_balance||(['liability','equity','income'].includes(a.type)?'credit':'debit')).toLowerCase(),balance=Number(bs[a.code]||0);if(Math.abs(balance)<=0.005)continue;const debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance),credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance);tbDebits+=debit;tbCredits+=credit;tbRows.push('<tr><td>'+esc(a.code)+'</td><td>'+esc(a.name)+'</td><td>'+money(debit)+'</td><td>'+money(credit)+'</td></tr>')}const tbDifference=tbDebits-tbCredits;document.getElementById('accTB').innerHTML=tbRows.length?'<table class="table"><thead><tr><th>Code</th><th>Account</th><th>Debit</th><th>Credit</th></tr></thead><tbody>'+tbRows.join('')+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+money(tbDebits)+'</th><th>'+money(tbCredits)+'</th></tr></tfoot></table><div class="sub" style="margin-top:8px">'+(Math.abs(tbDifference)<=0.005?'✓ Debits and credits balance.':'⚠ Trial Balance difference: '+money(tbDifference)+'. Review the General Ledger before relying on these figures.')+'</div>':'<div class="empty">No posted account balances exist for this reporting date yet.</div>';const gl=(state.journalEntries||[]).filter(e=>sheriDateInReportRange(e.entry_date||e.created_at)).slice().sort((a,b)=>String(b.created_at||b.entry_date).localeCompare(String(a.created_at||a.entry_date))).slice(0,30);document.getElementById('accGL').innerHTML=gl.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr>${gl.map(e=>{const ls=accLinesForEntry(e.id);return ls.map(l=>`<tr><td>${esc(e.entry_date)}</td><td>${esc(e.description)} — ${esc(accAccount(l.account_id)?.name||'')}</td><td>${l.debit?money(l.debit):''}</td><td>${l.credit?money(l.credit):''}</td></tr>`).join('')}).join('')}</table>`:'<div class="empty">No journal entries yet.</div>';document.getElementById('accAudit').innerHTML=state.auditLog.length?`<table class="table"><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Reason</th><th>Details</th></tr>${state.auditLog.filter(x=>sheriDateInReportRange(x.created_at)).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,20).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audit events yet.</div>';}
 // POS sale revenue and COGS are posted atomically by the database sales trigger.
 // Do not create a second client-side journal batch for the same sale.
 const _v14_1_recordSale=recordSale;recordSale=async function(){const before=state.sales.length;await _v14_1_recordSale();const created=state.sales.slice(before);for(const s of created){const total=Number(s.qty||0)*Number(s.price||0),cogs=Number(s.qty||0)*Number(s.cost||0);try{await accAudit('create','sale',s.id,{total,cogs,invoice_number:s.invoice_number||null,transaction_id:s.transaction_id||null})}catch(e){console.warn('[Sheri audit] sale audit event could not be queued',e)}}render()};
-const _v14_1_addOSPurchase=addOSPurchase;
-addOSPurchase=async function(){
-  const requestedStatus=document.getElementById('osPurchaseStatus')?.value||'received';
-  let inv=null,ap=null;
-  if(requestedStatus!=='ordered'){
-    try{
-      await accEnsureBase();
-      inv=accAccountCode('1200');ap=accAccountCode('2000');
-      if(!inv||!ap)throw new Error('Inventory (1200) and Accounts Payable (2000) accounts must be active.');
-    }catch(e){
-      sheriToast('Purchase was not recorded because its accounting setup is unavailable: '+(e?.message||String(e)),'error');
-      return null;
-    }
-  }
-  const p=await _v14_1_addOSPurchase();
-  if(p&&p.status!=='ordered'){
-    try{
-      const total=Number(p.total||Number(p.qty||0)*Number(p.unit_cost||0));
-      const date=String(p.purchased_at||p.created_at||sheriNow()).slice(0,10);
-      await accPostEntry({date,description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});
-      await accAudit('create','purchase',p.id,{total});
-      if(navigator.onLine)await sheriSyncOutbox();
-      let serverConfirmed=false;
-      if(navigator.onLine){
-        const {data:entry,error:entryError}=await sb.from('journal_entries').select('id')
-          .eq('merchant_id',p.merchant_id).eq('source_type','purchase').eq('source_id',p.id).eq('voided',false).maybeSingle();
-        if(entryError)throw entryError;
-        if(entry){
-          const {data:lines,error:lineError}=await sb.from('journal_lines').select('account_id,debit,credit')
-            .eq('merchant_id',p.merchant_id).eq('journal_entry_id',entry.id);
-          if(lineError)throw lineError;
-          const invLine=(lines||[]).find(line=>state.accounts.find(a=>a.id===line.account_id)?.code==='1200');
-          const apLine=(lines||[]).find(line=>state.accounts.find(a=>a.id===line.account_id)?.code==='2000');
-          serverConfirmed=(lines||[]).length===2&&!!invLine&&!!apLine&&
-            Math.abs(Number(invLine.debit||0)-total)<=0.005&&Number(invLine.credit||0)===0&&
-            Math.abs(Number(apLine.credit||0)-total)<=0.005&&Number(apLine.debit||0)===0;
-        }
-      }
-      if(serverConfirmed)sheriToast('Purchase saved; inventory and Accounts Payable journal confirmed on the server.','success');
-      else sheriToast('Purchase saved and stock updated. Its accounting journal is queued or awaiting server confirmation; do not rely on the statements yet.','warning');
-    }catch(e){
-      console.warn('[Sheri accounting] purchase ledger failed',e);
-      sheriToast('Purchase saved and stock updated, but its accounting journal needs attention: '+(e?.message||String(e)),'error');
-    }
-  }
-  render();
-  return p;
-};
+const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const before=state.purchases.length;await _v14_1_addOSPurchase();const p=state.purchases[before];if(p&&p.status!=='ordered'){try{await accEnsureBase();const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||p.qty*p.unit_cost);await accPostEntry({date:String(p.purchased_at||p.created_at).slice(0,10),description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});await accAudit('create','purchase',p.id,{total})}catch(e){console.warn('[Sheri accounting] purchase ledger failed',e)}}render()};
 // Expense accounting is handled once inside addExpense; no second wrapper posts another journal entry.
 
 </script>
@@ -8218,7 +8072,7 @@ addOSPurchase=async function(){
     'welcome back':'Murakaza neza',
     'sign in':'Injira','sign in to access your business workspace.':'Injira kugira ngo ukoreshe ibikorwa by’ubucuruzi bwawe.',
     'staff pin':'PIN y’umukozi','create account':'Fungura konti','email':'Imeyili','password':'Ijambo ry’ibanga',
-    'your password':'Ijambo ry’ibanga ryawe','full name':'Amazina yose','your full name':'Amazina yawe yose','full name, phone or email':'Amazina yose, telefoni cyangwa imeyili','your full name, phone or email':'Amazina yawe yose, telefoni cyangwa imeyili','your name, phone or email':'Izina ryawe, telefoni cyangwa imeyili',
+    'your password':'Ijambo ry’ibanga ryawe','your name, phone or email':'Izina ryawe, telefoni cyangwa imeyili',
     'enter your pin':'Andika PIN yawe','at least 8 characters':'Nibura inyuguti cyangwa imibare 8','repeat your password':'Ongera wandike ijambo ry’ibanga',
     'email confirmation may be required before first sign-in. if the message does not arrive, check spam or resend it.':'Mbere yo kwinjira bwa mbere ushobora gusabwa kwemeza imeyili. Niba ubutumwa butagezeho, reba muri spam cyangwa wongere wohereze ubutumwa bwo kwemeza.',
     'enter the email on your account and we’ll send a secure recovery link.':'Andika imeyili iri kuri konti yawe, tukohereze umurongo utekanye wo kugarura konti.',
@@ -8253,7 +8107,7 @@ addOSPurchase=async function(){
     'welcome back':'Bon retour',
     'sign in':'Se connecter','sign in to access your business workspace.':'Connectez-vous pour accéder à votre espace commercial.',
     'staff pin':'Code PIN du personnel','create account':'Créer un compte','email':'E-mail','password':'Mot de passe',
-    'your password':'Votre mot de passe','full name':'Nom complet','your full name':'Votre nom complet','full name, phone or email':'Nom complet, téléphone ou e-mail','your full name, phone or email':'Votre nom complet, téléphone ou adresse e-mail','your name, phone or email':'Votre nom, téléphone ou adresse e-mail',
+    'your password':'Votre mot de passe','your name, phone or email':'Votre nom, téléphone ou adresse e-mail',
     'enter your pin':'Saisissez votre code PIN','at least 8 characters':'Au moins 8 caractères','repeat your password':'Confirmez votre mot de passe',
     'email confirmation may be required before first sign-in. if the message does not arrive, check spam or resend it.':'Une confirmation de l’e-mail peut être nécessaire avant la première connexion. Si le message n’arrive pas, vérifiez les courriers indésirables ou renvoyez-le.',
     'enter the email on your account and we’ll send a secure recovery link.':'Saisissez l’adresse e-mail de votre compte et nous vous enverrons un lien sécurisé de récupération.',
@@ -9092,11 +8946,10 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   const portrait=document.querySelector('#dashboard .sheri-launcher .sheri-thumb img');
   function paint(language){
     const names=labels[language]||labels.en;
-    Array.from(nav.querySelectorAll('button')).filter(b=>b!==sheri).slice(0,5).forEach((button,index)=>{const label=['⌂','＋','▦','⚙','◈'][index]+' '+names[index];if(button.textContent!==label)button.textContent=label;button.setAttribute('aria-label',names[index])});const subnav=document.getElementById('aibosCommandSubnav');if(subnav){const w={en:['Customer','Suppliers & Purchases','Expenses','Reports','Money','AI Advisor','Forecast','Return','AI Business Insight'],rw:['Umukiriya','Abaranguza n’ibyaguzwe','Amafaranga yakoreshejwe','Raporo','Amafaranga','Umujyanama wa AI','Iteganyagihe','Ibyasubijwe','Inama z’ubucuruzi za AI'],fr:['Clients','Fournisseurs & achats','Dépenses','Rapports','Finances','Conseiller IA','Prévisions','Retours','Conseils IA sur l’entreprise']};subnav.querySelectorAll('button').forEach((b,i)=>{const label=(w[language]||w.en)[i]||b.textContent;if(b.textContent!==label)b.textContent=label})}
-    if(portrait&&!sheri.querySelector('.sheri-nav-thumb')){const img=portrait.cloneNode(true);img.removeAttribute('id');img.className='sheri-nav-thumb';img.alt='Shericeri';sheri.appendChild(img)}
-    let labelNode=Array.from(sheri.childNodes).find(node=>node.nodeType===Node.TEXT_NODE);
-    if(!labelNode){labelNode=document.createTextNode(names[5]);sheri.appendChild(labelNode)}else if(labelNode.nodeValue!==names[5])labelNode.nodeValue=names[5];
-    sheri.setAttribute('aria-label',names[5]);sheri.title=names[5];
+    Array.from(nav.querySelectorAll('button')).filter(b=>b!==sheri).slice(0,5).forEach((button,index)=>{button.textContent=['⌂','＋','▦','⚙','◈'][index]+' '+names[index];button.setAttribute('aria-label',names[index])});const subnav=document.getElementById('aibosCommandSubnav');if(subnav){const w={en:['Customer','Suppliers & Purchases','Expenses','Reports','Money','AI Advisor','Forecast','Return','AI Business Insight'],rw:['Umukiriya','Abaranguza n’ibyaguzwe','Amafaranga yakoreshejwe','Raporo','Amafaranga','Umujyanama wa AI','Iteganyagihe','Ibyasubijwe','Inama z’ubucuruzi za AI'],fr:['Clients','Fournisseurs & achats','Dépenses','Rapports','Finances','Conseiller IA','Prévisions','Retours','Conseils IA sur l’entreprise']};subnav.querySelectorAll('button').forEach((b,i)=>b.textContent=(w[language]||w.en)[i]||b.textContent)}
+    sheri.replaceChildren();
+    if(portrait){const img=portrait.cloneNode(true);img.removeAttribute('id');img.className='sheri-nav-thumb';img.alt='Shericeri';sheri.appendChild(img)}
+    sheri.appendChild(document.createTextNode(names[5]));sheri.setAttribute('aria-label',names[5]);sheri.title=names[5];
   }
   const oldLauncher=document.querySelector('#appRoot .side > .sheri-global-launcher');if(oldLauncher)oldLauncher.remove();
   const picker=document.getElementById('aibosLanguageSelect'),getLanguage=()=>picker?.value||window.AIBOS_I18N?.getLanguage?.()||'en';
@@ -9358,13 +9211,29 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
  #appRoot .side .nav button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
  #appRoot .side .nav button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
  #appRoot .main{
-  margin:0!important;
+  margin:calc(var(--aibos-side-height, 330px) + 14px) 0 0!important;
   width:100%!important;max-width:100%!important;
   padding:16px 12px 18px!important;box-sizing:border-box!important;
  }
 }
 </style>
-
+<script id="aibos-navigation-live-clearance-v2">
+(function(){
+ const side=document.querySelector('#appRoot .side'),root=document.getElementById('appRoot');
+ if(!side||!root)return;
+ let last=0;
+ function measure(){
+  if(window.innerWidth>650){root.style.removeProperty('--aibos-side-height');return}
+  const h=Math.ceil(side.getBoundingClientRect().height);
+  if(h>0&&h!==last){last=h;root.style.setProperty('--aibos-side-height',h+'px')}
+ }
+ if('ResizeObserver' in window){const observer=new ResizeObserver(measure);observer.observe(side)}
+ window.addEventListener('resize',measure,{passive:true});
+ window.addEventListener('aibos:languagechange',()=>{measure();requestAnimationFrame(measure)});
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',measure,{once:true});
+ measure();
+})();
+</script>
 
 <!-- Global application UI consistency: same responsive design system in English, Kinyarwanda and French. -->
 <style id="aibos-global-ui-consistency-all-locales-v1">
@@ -9547,14 +9416,36 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
   #appRoot .side .nav>button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
   #appRoot .side .nav>button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
   #appRoot .main{
-    margin:0!important;
+    margin:calc(var(--aibos-side-height, 300px) + 14px) 0 0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:16px 12px 18px!important;
   }
   #appRoot .main .table{font-size:12px!important}
 }
 </style>
-
+<script id="aibos-locale-layout-measure-v2">
+(function(){
+  const root=document.getElementById('appRoot');
+  const side=root?.querySelector('.side');
+  if(!root||!side)return;
+  let last=-1,frame=0;
+  function measure(){
+    if(window.innerWidth>650){root.style.removeProperty('--aibos-side-height');last=-1;return}
+    const height=Math.ceil(Math.max(side.getBoundingClientRect().height,side.scrollHeight));
+    if(height>0&&height!==last){last=height;root.style.setProperty('--aibos-side-height',height+'px')}
+  }
+  function schedule(){if(frame)return;frame=requestAnimationFrame(()=>{frame=0;measure()})}
+  if('ResizeObserver' in window){const observer=new ResizeObserver(schedule);observer.observe(side)}
+  const mutations=new MutationObserver(schedule);
+  mutations.observe(side,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style']});
+  const appVisibility=new MutationObserver(schedule);
+  appVisibility.observe(root,{attributes:true,attributeFilter:['style','class']});
+  window.addEventListener('resize',schedule,{passive:true});
+  window.addEventListener('aibos:languagechange',schedule);
+  if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
+  schedule();
+})();
+</script>
 
 <!-- Authoritative cross-locale layout: Kinyarwanda changes copy, never the design geometry. -->
 <style id="aibos-final-cross-locale-layout-v3">
@@ -9669,13 +9560,48 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
     background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;
   }
   #appRoot .main{
-    margin:0!important;
+    margin:calc(var(--aibos-side-height, 330px) + 16px) 0 0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:14px 12px 18px!important;overflow-x:hidden!important;
   }
 }
 </style>
-
+<script id="aibos-final-cross-locale-layout-measure-v3">
+(function(){
+  const root=document.getElementById('appRoot');
+  const side=root?.querySelector('.side');
+  if(!root||!side||root.__aibosLayoutMeasureV3)return;
+  root.__aibosLayoutMeasureV3=true;
+  let frame=0,lastHeight=-1;
+  function measure(){
+    if(window.innerWidth>650){
+      if(root.style.getPropertyValue('--aibos-side-height'))root.style.removeProperty('--aibos-side-height');
+      lastHeight=-1;return;
+    }
+    const height=Math.ceil(side.getBoundingClientRect().height);
+    if(height>0&&height!==lastHeight){
+      lastHeight=height;
+      root.style.setProperty('--aibos-side-height',height+'px');
+    }
+  }
+  function schedule(){
+    if(frame)return;
+    frame=requestAnimationFrame(()=>{frame=0;measure()});
+  }
+  if('ResizeObserver' in window){
+    const observer=new ResizeObserver(schedule);observer.observe(side);
+  }
+  const mutations=new MutationObserver(schedule);
+  mutations.observe(side,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style','hidden']});
+  const rootObserver=new MutationObserver(schedule);
+  rootObserver.observe(root,{attributes:true,attributeFilter:['style','class']});
+  window.addEventListener('resize',schedule,{passive:true});
+  window.addEventListener('aibos:languagechange',schedule);
+  if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});
+  schedule();
+})();
+</script>
 
 
 <!-- Single authoritative navigation theme: identical computed design in EN/RW/FR. -->
@@ -9847,7 +9773,7 @@ html[lang="fr"] #appRoot #aibosCommandSubnav>button{
   html[lang="en"] #appRoot .main,
   html[lang="rw"] #appRoot .main,
   html[lang="fr"] #appRoot .main{
-    box-sizing:border-box!important;margin:0!important;
+    box-sizing:border-box!important;margin:calc(var(--aibos-side-height,330px) + 16px) 0 0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:14px 12px 18px!important;overflow-x:hidden!important;
   }
@@ -10262,90 +10188,5 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
 }
 </style>
 
-
-<!-- Approved 3-2-1 navigation and horizontal sync layout -->
-
-<script id="aibos-approved-navigation-and-sync-v2">
-(function(){
- 'use strict';
- const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),nav=side?.querySelector('.nav');
- const main=app?.querySelector('.main'),picker=document.getElementById('aibosLanguageSwitcher');
- const sync=document.getElementById('sheriOfflineBar'),auth=document.getElementById('authScreen');
- if(!app||!side||!nav||!main)return;
- const order=['dashboard','sales','inventory','businessOS','settings'];
- const labels={en:['Home','Sell','Stock','AIBOS Command Center','Settings','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Igenzura ry’ubucuruzi','Igenamiterere','Shericeri'],fr:['Accueil','Vendre','Stock','Centre de gestion AIBOS','Paramètres','Shericeri']},icons=['⌂','＋','▦','◈','⚙',''];
- function paint(lang){
-  const code=String(lang||'en').toLowerCase(),key=code.startsWith('fr')?'fr':(code.startsWith('rw')||code.startsWith('ki'))?'rw':'en',names=labels[key];
-  order.forEach((id,i)=>{const b=nav.querySelector(':scope > button[data-view="'+id+'"]');if(b){const label=icons[i]+' '+names[i];if(b.textContent!==label)b.textContent=label;b.setAttribute('aria-label',names[i])}});
-  const s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');
-  if(s){const node=Array.from(s.childNodes).find(n=>n.nodeType===Node.TEXT_NODE);if(node){if(node.nodeValue!==names[5])node.nodeValue=names[5]}else s.appendChild(document.createTextNode(names[5]));s.setAttribute('aria-label',names[5]);s.title=names[5]}
- }
- function arrange(){
-  const wanted=order.map(id=>nav.querySelector(':scope > button[data-view="'+id+'"]')).filter(Boolean),s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(s)wanted.push(s);
-  const current=Array.from(nav.children).filter(el=>el.matches('button'));if(wanted.some((el,i)=>current[i]!==el))wanted.forEach(el=>nav.appendChild(el));
-  const active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none'),mobile=window.innerWidth<=650;
-  if(active&&mobile){
-   const sub=document.getElementById('aibosCommandSubnav');
-   if(picker&&picker.parentElement!==side)side.insertBefore(picker,sub||null);
-   if(picker&&sync&&(sync.parentElement!==side||sync.previousElementSibling!==picker))side.insertBefore(sync,picker.nextSibling);
-  }else{
-   if(picker&&picker.parentElement===side)document.body.appendChild(picker);
-   if(sync&&sync.parentElement!==main)main.insertBefore(sync,main.firstChild);
-  }
-  main.style.removeProperty('margin-top');
-  paint(picker?.querySelector('select')?.value||window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en');
- }
- const select=picker?.querySelector('select');select?.addEventListener('change',()=>paint(select.value));
- window.addEventListener('aibos:languagechange',e=>{paint(e.detail?.language||select?.value||'en');arrange()});
- window.addEventListener('resize',arrange,{passive:true});window.addEventListener('orientationchange',arrange,{passive:true});
- const observer=new MutationObserver(arrange);observer.observe(app,{attributes:true,attributeFilter:['style']});if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
- arrange();
-})();
-</script>
-<!-- V14.4.67: one locale-independent natural-flow header and horizontal sync layout -->
-<style id="aibos-locale-invariant-header-sync-v67">
-/* Shared layout for every locale. Translation changes text, never geometry. */
-html[lang] body #appRoot .side{background:#010080!important;color:#F7EB5B!important}
-html[lang] body #appRoot .side .nav>button{background:#010080!important;color:#F7EB5B!important;border-color:rgba(247,235,91,.8)!important}
-html[lang] body #appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important;border-color:#F7EB5B!important}
-html[lang] body #appRoot .side #aibosLanguageSwitcher{background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important}
-html[lang] body #appRoot .side #aibosLanguageSwitcher select{background:#010080!important;color:#F7EB5B!important;border-color:#F7EB5B!important}
-html[lang] body #appRoot #sheriOfflineBar{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:7px 9px!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0 0 12px!important;padding:8px 10px!important;position:static!important;inset:auto!important;top:auto!important;z-index:auto!important;overflow:visible!important;background:#F8FAFC!important;color:#010080!important;border:1px solid #F7EB5B!important;border-radius:11px!important;box-shadow:none!important;writing-mode:horizontal-tb!important}
-html[lang] body #appRoot #sheriOfflineBar>div:first-child{display:flex!important;flex:1 1 150px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:4px 7px!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;color:#010080!important;background:transparent!important;writing-mode:horizontal-tb!important;font-size:13px!important;line-height:1.3!important}
-html[lang] body #appRoot #sheriOfflineBar>div:last-child{display:flex!important;flex:1 1 190px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;overflow:visible!important;white-space:normal!important;background:transparent!important;writing-mode:horizontal-tb!important}
-html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:34px!important;margin:0!important;padding:7px 9px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;font-family:inherit!important;font-size:12px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;writing-mode:horizontal-tb!important;transform:none!important}
-@media(max-width:650px){
- html[lang] body #appRoot .side{position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:8px 10px 9px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important;color:#F7EB5B!important;border:0!important;border-bottom:2px solid #F7EB5B!important;border-radius:0!important;box-shadow:none!important;transform:none!important;z-index:auto!important}
- html[lang] body #appRoot .side .brand{color:#F7EB5B!important;margin:0 0 5px!important;padding:0 0 5px!important}
- html[lang] body #appRoot .side .nav{display:grid!important;position:relative!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(44px,auto))!important;grid-auto-flow:row!important;align-items:stretch!important;gap:5px!important;width:100%!important;min-width:0!important;margin:0!important;padding:5px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important}
- html[lang] body #appRoot .side .nav>button{display:flex!important;grid-column:span 2!important;align-items:center!important;justify-content:center!important;width:100%!important;min-width:0!important;max-width:100%!important;min-height:44px!important;height:auto!important;max-height:none!important;margin:0!important;padding:5px 3px!important;box-sizing:border-box!important;font-family:inherit!important;font-size:clamp(11px,3.3vw,13px)!important;font-weight:650!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;border:1px solid rgba(247,235,91,.8)!important;border-radius:9px!important;box-shadow:none!important}
- html[lang] body #appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
- html[lang] body #appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
- html[lang] body #appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
- html[lang] body #appRoot .side .nav>button[data-view="businessOS"],html[lang] body #appRoot .side .nav>button[data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}
- html[lang] body #appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
- html[lang] body #appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important;justify-content:center!important}
- html[lang] body #appRoot .side #aibosLanguageSwitcher{position:static!important;inset:auto!important;transform:none!important;align-self:center!important;order:0!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:max-content!important;max-width:calc(100% - 12px)!important;height:auto!important;margin:7px auto 7px!important;padding:4px 8px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;box-shadow:none!important}
- html[lang] body #appRoot .side #aibosLanguageSwitcher select{width:auto!important;min-width:0!important;max-width:calc(100vw - 40px)!important;color:#F7EB5B!important;background:#010080!important;border:0!important;font-family:inherit!important;font-size:13px!important;font-weight:650!important;text-align:center!important}
- html[lang] body #appRoot #sheriOfflineBar{margin:0 0 10px!important;padding:8px!important;gap:6px 8px!important}
- html[lang] body #appRoot #sheriOfflineBar>div:first-child{flex:1 1 125px!important;width:auto!important;font-size:13px!important}
- html[lang] body #appRoot #sheriOfflineBar>div:last-child{flex:1 1 175px!important;width:auto!important;gap:5px!important}
- html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{flex:0 1 auto!important;min-height:34px!important;font-size:12px!important;padding:7px 8px!important}
- html[lang] body #appRoot .main{position:relative!important;top:auto!important;inset:auto!important;margin:0!important;margin-top:0!important;padding:12px 12px 18px!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:0!important;box-sizing:border-box!important;overflow-x:hidden!important}
-}
-@media(max-width:380px){html[lang] body #appRoot .side{padding-left:7px!important;padding-right:7px!important}html[lang] body #appRoot .side .nav{gap:4px!important;padding:4px!important}html[lang] body #appRoot #sheriOfflineBar{gap:5px!important;padding:7px!important}html[lang] body #appRoot #sheriOfflineBar>div:first-child{flex-basis:110px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child{flex-basis:165px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child{gap:4px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{font-size:11px!important;padding:6px!important}}
-</style>
-
-<!-- V14.4.71: force the sync panel into one locale-neutral two-column layout -->
-<style id="aibos-sync-locale-neutral-v71">
-/* Translation may change text length, but never the sync panel's layout or palette. */
-html[lang] body #appRoot #sheriOfflineBar{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr)!important;grid-auto-flow:row!important;align-items:center!important;justify-items:stretch!important;gap:7px 9px!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;padding:8px 10px!important;margin:0 0 12px!important;position:static!important;inset:auto!important;top:auto!important;z-index:auto!important;overflow:visible!important;writing-mode:horizontal-tb!important;direction:ltr!important;background:#F8FAFC!important;color:#010080!important;border:1px solid #F7EB5B!important;border-radius:11px!important;box-shadow:none!important}
-html[lang] body #appRoot #sheriOfflineBar>div:first-child{display:flex!important;flex:initial!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:4px 7px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;color:#010080!important;background:transparent!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;writing-mode:horizontal-tb!important;font-size:13px!important;line-height:1.3!important}
-html[lang] body #appRoot #sheriOfflineBar>div:first-child b,html[lang] body #appRoot #sheriOfflineBar>div:first-child span{min-width:0!important;max-width:100%!important;color:#010080!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;writing-mode:horizontal-tb!important}
-html[lang] body #appRoot #sheriOfflineBar>div:last-child{display:flex!important;flex:initial!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:5px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;overflow:visible!important;white-space:normal!important;background:transparent!important;writing-mode:horizontal-tb!important;direction:ltr!important}
-html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{display:inline-flex!important;flex:1 1 76px!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:34px!important;margin:0!important;padding:6px 7px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;font-family:inherit!important;font-size:12px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;writing-mode:horizontal-tb!important;transform:none!important}
-@media(max-width:650px){html[lang] body #appRoot #sheriOfflineBar{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important;gap:6px 7px!important;padding:8px!important;margin:0 0 10px!important}html[lang] body #appRoot #sheriOfflineBar>div:first-child{font-size:12px!important;line-height:1.25!important;gap:3px 5px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child{gap:4px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{flex:1 1 68px!important;min-height:34px!important;font-size:11px!important;padding:6px 5px!important}}
-@media(max-width:350px){html[lang] body #appRoot #sheriOfflineBar{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)!important;gap:5px!important;padding:7px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{font-size:10.5px!important;padding:5px 4px!important}}
-</style>
 </body>
 </html>
