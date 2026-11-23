@@ -262,7 +262,7 @@ test("new product opening stock creates an audited inventory movement", () => {
 });
 
 test("service worker cache is bumped to release V14.4.81", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v71"));
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v81"));
   assert.ok(serviceWorker.includes("V14.4.81"));
   assert.ok(html.includes('name="app-version" content="V14.4.81 reconciled accounting, supplier payments and legal-name enforcement"'));
 });
@@ -299,7 +299,7 @@ test("received purchases persist the updated local stock and record the register
 });
  
 test("the production application shell uses V14.4.81", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v71"));
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v81"));
   assert.ok(serviceWorker.includes("const RELEASE='V14.4.81'"));
 });
 
