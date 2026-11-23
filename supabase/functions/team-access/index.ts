@@ -13,7 +13,7 @@ const json = (body: unknown, status = 200) =>
   });
 
 function randomPassword() {
-  const bytes = crypto.getRandomValues(new Uint8Array(48));
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 function normalizeFullLegalName(value: unknown): string | null {

@@ -261,10 +261,10 @@ test("new product opening stock creates an audited inventory movement", () => {
   assert.ok(openingTriggerMigration.includes("v_type='opening_balance' and (old.stock<>0 or new.stock<=old.stock)"));
 });
 
-test("service worker cache is bumped to release V14.4.84", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v84"));
-  assert.ok(serviceWorker.includes("V14.4.84"));
-  assert.ok(html.includes('name="app-version" content="V14.4.84 owner phone no-SMS testing mode"'));
+test("service worker cache is bumped to release V14.4.85", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v85"));
+  assert.ok(serviceWorker.includes("V14.4.85"));
+  assert.ok(html.includes('name="app-version" content="V14.4.85 owner phone no-SMS testing mode"'));
 });
 
 test("duplicate team identifiers return a conflict instead of an ambiguous 2xx response", () => {
@@ -298,9 +298,9 @@ test("received purchases persist the updated local stock and record the register
   assert.ok(block.includes("await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}})"));
 });
  
-test("the production application shell uses V14.4.84", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v84"));
-  assert.ok(serviceWorker.includes("const RELEASE='V14.4.84'"));
+test("the production application shell uses V14.4.85", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v85"));
+  assert.ok(serviceWorker.includes("const RELEASE='V14.4.85'"));
 });
 
 test("the preview application shell is bumped to V14.4.79 without changing production", () => {
