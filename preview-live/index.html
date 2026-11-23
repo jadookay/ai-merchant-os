@@ -1545,6 +1545,34 @@ async function sheriUnblockSchemaRepairedOperations(){
     await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,recovered_at:sheriNow()});
   }
 }
+async function sheriSyncAccountingSettingsOperation(op){
+  const record=op?.record||{},merchantId=String(record.merchant_id||'');
+  if(!merchantId||merchantId!==String(state.merchant?.id||''))throw new Error('Accounting settings sync was stopped because the saved business ID does not match the active business. Refresh the active business before retrying.');
+  const {data:existing,error:readError}=await sb.from('accounting_settings')
+    .select('merchant_id,locked_through,updated_at,created_at').eq('merchant_id',merchantId).maybeSingle();
+  if(readError)throw readError;
+  const localStamp=Date.parse(record.updated_at||record.created_at||'');
+  const applyNewerSettings=async current=>{
+    const serverStamp=Date.parse(current?.updated_at||current?.created_at||'');
+    if(Number.isFinite(localStamp)&&(!Number.isFinite(serverStamp)||localStamp>serverStamp)){
+      const {data,error}=await sb.from('accounting_settings')
+        .update({locked_through:record.locked_through??null,updated_at:record.updated_at||sheriNow()})
+        .eq('merchant_id',merchantId).select('merchant_id,locked_through,updated_at').maybeSingle();
+      if(error)throw error;
+      if(!data)throw new Error('The accounting settings update was not confirmed by the server.');
+    }
+  };
+  if(existing){await applyNewerSettings(existing);return;}
+  const {error:insertError}=await sb.from('accounting_settings').insert(sheriServerRecord(record));
+  if(!insertError)return;
+  if(insertError.code!=='23505')throw insertError;
+  const {data:current,error:retryReadError}=await sb.from('accounting_settings')
+    .select('merchant_id,locked_through,updated_at,created_at').eq('merchant_id',merchantId).maybeSingle();
+  if(retryReadError)throw retryReadError;
+  if(!current)throw insertError;
+  await applyNewerSettings(current);
+}
+
 async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy||sheriSyncBatchDepth>0)return;
   sheriSyncBusy=true;
@@ -1625,8 +1653,15 @@ async function sheriSyncOutbox(){
           else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}
           else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         }
-        else if(op.type==='accounting_settings_upsert'){const {error}=await sb.from('accounting_settings').upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'});if(error)throw error}
+        else if(op.type==='accounting_settings_upsert'){await sheriSyncAccountingSettingsOperation(op)}
         else if(op.type==='accounting_delete'){const {error}=await sb.from(op.table).delete().eq('id',op.id);if(error)throw error}
+        if(op.type==='accounting_journal_batch'&&op.entry?.source_type==='purchase'){
+          const {data:purchase,error:purchaseError}=await sb.from('purchases').select('id,status,stock_applied')
+            .eq('id',op.entry.source_id).eq('merchant_id',op.entry.merchant_id).maybeSingle();
+          if(purchaseError)throw purchaseError;
+          if(!purchase||purchase.status!=='received'||purchase.stock_applied!==true)
+            throw new Error('Purchase journal is waiting for the matching received purchase and stock movement to be confirmed on the server.');
+        }
         else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
         else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         else if(op.type==='customer_upsert'){const {error}=await sb.from('customers').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
@@ -5795,6 +5830,7 @@ async function addOSPurchase(){
   if(navigator.onLine)sheriToast(sheriLocalized('Purchase recorded. Synchronization will continue automatically.','Achat enregistré. La synchronisation se poursuivra automatiquement.','Ibyaguzwe byanditswe. Kohereza amakuru bizakomeza byikora.'),'success');
   else sheriToast(sheriLocalized('Purchase saved on this device. It will synchronize when you are back online.','Achat enregistré sur cet appareil. Il sera synchronisé dès le retour de la connexion.','Ibyaguzwe byabitswe kuri iki gikoresho. Bizoherezwa kuri seriveri igihe internet izaba yongeye kuboneka.'),'warning');
   document.getElementById('osPurchaseQty').value=1;document.getElementById('osPurchaseCost').value='';document.getElementById('osPurchaseDue').value='';render();
+  return data;
 }
 async function deleteOSPurchase(id){if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('Only a Manager, Admin or Owner with inventory access can cancel purchases.','error');const x=state.purchases.find(p=>p.id===id);if(!x)return;if(x.status!=='ordered')return sheriToast('Received purchases cannot be cancelled here because they affect stock and accounting. Use the audited void workflow for received purchases.','warning');const reason=prompt('Reason for cancelling this ordered purchase (required):');if(!reason||reason.trim().length<3)return sheriToast('A clear reason is required.','error');if(!confirm('Cancel this ordered purchase?\\nReason: '+reason.trim()))return;await sheriQueue({type:'purchase_delete',id,merchant_id:state.merchant.id,reason:reason.trim(),audit_id:sheriUuid()});state.purchases=state.purchases.filter(p=>p.id!==id);await sheriSaveSnapshot();if(navigator.onLine)await sheriSyncOutbox();render()}
 async function voidOSPurchase(id){
@@ -6634,7 +6670,54 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
 // POS sale revenue and COGS are posted atomically by the database sales trigger.
 // Do not create a second client-side journal batch for the same sale.
 const _v14_1_recordSale=recordSale;recordSale=async function(){const before=state.sales.length;await _v14_1_recordSale();const created=state.sales.slice(before);for(const s of created){const total=Number(s.qty||0)*Number(s.price||0),cogs=Number(s.qty||0)*Number(s.cost||0);try{await accAudit('create','sale',s.id,{total,cogs,invoice_number:s.invoice_number||null,transaction_id:s.transaction_id||null})}catch(e){console.warn('[Sheri audit] sale audit event could not be queued',e)}}render()};
-const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const before=state.purchases.length;await _v14_1_addOSPurchase();const p=state.purchases[before];if(p&&p.status!=='ordered'){try{await accEnsureBase();const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||p.qty*p.unit_cost);await accPostEntry({date:String(p.purchased_at||p.created_at).slice(0,10),description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});await accAudit('create','purchase',p.id,{total})}catch(e){console.warn('[Sheri accounting] purchase ledger failed',e)}}render()};
+const _v14_1_addOSPurchase=addOSPurchase;
+addOSPurchase=async function(){
+  const requestedStatus=document.getElementById('osPurchaseStatus')?.value||'received';
+  let inv=null,ap=null;
+  if(requestedStatus!=='ordered'){
+    try{
+      await accEnsureBase();
+      inv=accAccountCode('1200');ap=accAccountCode('2000');
+      if(!inv||!ap)throw new Error('Inventory (1200) and Accounts Payable (2000) accounts must be active.');
+    }catch(e){
+      sheriToast('Purchase was not recorded because its accounting setup is unavailable: '+(e?.message||String(e)),'error');
+      return null;
+    }
+  }
+  const p=await _v14_1_addOSPurchase();
+  if(p&&p.status!=='ordered'){
+    try{
+      const total=Number(p.total||Number(p.qty||0)*Number(p.unit_cost||0));
+      const date=String(p.purchased_at||p.created_at||sheriNow()).slice(0,10);
+      await accPostEntry({date,description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});
+      await accAudit('create','purchase',p.id,{total});
+      if(navigator.onLine)await sheriSyncOutbox();
+      let serverConfirmed=false;
+      if(navigator.onLine){
+        const {data:entry,error:entryError}=await sb.from('journal_entries').select('id')
+          .eq('merchant_id',p.merchant_id).eq('source_type','purchase').eq('source_id',p.id).eq('voided',false).maybeSingle();
+        if(entryError)throw entryError;
+        if(entry){
+          const {data:lines,error:lineError}=await sb.from('journal_lines').select('account_id,debit,credit')
+            .eq('merchant_id',p.merchant_id).eq('journal_entry_id',entry.id);
+          if(lineError)throw lineError;
+          const invLine=(lines||[]).find(line=>state.accounts.find(a=>a.id===line.account_id)?.code==='1200');
+          const apLine=(lines||[]).find(line=>state.accounts.find(a=>a.id===line.account_id)?.code==='2000');
+          serverConfirmed=(lines||[]).length===2&&!!invLine&&!!apLine&&
+            Math.abs(Number(invLine.debit||0)-total)<=0.005&&Number(invLine.credit||0)===0&&
+            Math.abs(Number(apLine.credit||0)-total)<=0.005&&Number(apLine.debit||0)===0;
+        }
+      }
+      if(serverConfirmed)sheriToast('Purchase saved; inventory and Accounts Payable journal confirmed on the server.','success');
+      else sheriToast('Purchase saved and stock updated. Its accounting journal is queued or awaiting server confirmation; do not rely on the statements yet.','warning');
+    }catch(e){
+      console.warn('[Sheri accounting] purchase ledger failed',e);
+      sheriToast('Purchase saved and stock updated, but its accounting journal needs attention: '+(e?.message||String(e)),'error');
+    }
+  }
+  render();
+  return p;
+};
 // Expense accounting is handled once inside addExpense; no second wrapper posts another journal entry.
 
 </script>
