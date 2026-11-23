@@ -19,6 +19,10 @@ const teamAccess = readFileSync(new URL("../supabase/functions/team-access/index
 const liveSyncMigration = readFileSync(new URL("../supabase/migrations/20261114170000_enable_authorized_realtime_and_register_owner_devices.sql", import.meta.url), "utf8");
 const realtimeRlsMigration = readFileSync(new URL("../supabase/migrations/20261114171500_authorize_realtime_device_and_inventory_views.sql", import.meta.url), "utf8");
 const sixDigitIdMigration = readFileSync(new URL("../supabase/migrations/20261114162636_enforce_six_digit_shericeri_business_ids.sql", import.meta.url), "utf8");
+const sequenceMaxMigration = readFileSync(new URL("../supabase/migrations/20261114190000_enforce_six_digit_business_id_sequence_max.sql", import.meta.url), "utf8");
+const openingStockMigration = readFileSync(new URL("../supabase/migrations/20261114193000_allow_opening_balance_inventory_movement_for_inventory_managers.sql", import.meta.url), "utf8");
+const openingTriggerMigration = readFileSync(new URL("../supabase/migrations/20261114194000_allow_opening_balance_inventory_movement_trigger.sql", import.meta.url), "utf8");
+
 const voidBlock = html.slice(html.indexOf("async function voidSale(id){"), html.indexOf("const sheriSearchValues"));
 
 test("Kinyarwanda covers core finance and stock terms", () => {
@@ -215,6 +219,57 @@ test("cross-device server rows override stale local rows and foreground tabs ref
 test("trial balance places abnormal account balances on the opposite side", () => {
   assert.ok(html.includes("debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance)"));
   assert.ok(html.includes("credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance)"));
+});
+
+
+test("ledger repair is explicit, permission-gated and skips voided sales", () => {
+  assert.ok(html.includes("async function accEnsureOperationalLedger({approved=false}={})"));
+  assert.ok(html.includes("if(!approved||!state.merchant||!navigator.onLine||!accServerSnapshotAuthoritative"));
+  assert.ok(html.includes("(state.sales||[]).filter(x=>!x.voided)"));
+  assert.ok(html.includes("async function accReconcileOperationalLedger()"));
+  assert.ok(html.includes("if(!await accShowRepairConfirmation(promptText))return"));
+  assert.ok(html.includes('id="accReconcileButton"'));
+});
+
+test("journal recovery adds only missing expected lines and refuses conflicting entries", () => {
+  assert.ok(html.includes("const existingEntry=sourceType&&sourceId?"));
+  assert.ok(html.includes("const unexpected=existingLines.filter(l=>!used.has(l.id))"));
+  assert.ok(html.includes("Existing journal lines conflict with the source transaction."));
+  assert.ok(html.includes("lines:syncLines"));
+});
+
+test("multi-step records batch local writes before starting network sync", () => {
+  assert.ok(html.includes("let sheriSyncBatchDepth=0"));
+  assert.ok(html.includes("if(navigator.onLine&&sheriSyncBatchDepth===0)sherriSyncKick()"));
+  assert.ok(html.includes("sheriSyncBusy||sheriSyncBatchDepth>0"));
+  assert.ok(html.includes("async function sheriWithSyncBatch(task)"));
+  assert.ok(html.includes("function sheriWrapSyncBatch(name)"));
+});
+
+test("six-digit business ID sequence has a hard upper bound", () => {
+  assert.ok(sequenceMaxMigration.includes("maxvalue 999999"));
+  assert.ok(sequenceMaxMigration.includes("minvalue 100000"));
+  assert.ok(sixDigitIdMigration.includes("merchants_shericeri_id_six_digits_check"));
+});
+
+test("new product opening stock creates an audited inventory movement", () => {
+  assert.ok(html.includes("record:{...p,stock:0}"));
+  assert.ok(html.includes("expected_stock:0,quantity_delta:initialStock"));
+  assert.ok(html.includes("movement_type:'opening_balance'"));
+  assert.ok(openingStockMigration.includes("p_movement_type not in ('adjustment','customer_return','supplier_return','writeoff','opening_balance')"));
+  assert.ok(openingTriggerMigration.includes("'opening_balance','sale','purchase_receipt'"));
+  assert.ok(openingTriggerMigration.includes("v_type='opening_balance' and (old.stock<>0 or new.stock<=old.stock)"));
+});
+
+test("service worker cache is bumped to release V14.4.71", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v71"));
+  assert.ok(serviceWorker.includes("V14.4.71"));
+  assert.ok(html.includes('name="app-version" content="V14.4.70 date-aware inventory and Trial Balance verification"'));
+});
+
+test("duplicate team identifiers return a conflict instead of an ambiguous 2xx response", () => {
+  assert.ok(teamAccess.includes('code === "23505"'));
+  assert.ok(teamAccess.includes("duplicate_member_identifier"));
 });
 
 test("English, French and Kinyarwanda share one horizontal whole-word table layout", () => {
