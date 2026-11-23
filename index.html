@@ -1741,8 +1741,8 @@ async function sheriSyncOutbox(){
 
 function sheriOnlineEvents(){
   window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sherriSyncKick()});
-  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
-  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri focus refresh]',e));});
+  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
+  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri focus refresh]',e));});
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator){
@@ -2130,6 +2130,11 @@ function sheriStopMerchantRealtime(){
   if(sheriRealtimeChannel&&sb){try{sb.removeChannel(sheriRealtimeChannel)}catch(e){console.warn('[Shericeri realtime] unsubscribe failed',e)}}
   sheriRealtimeChannel=null;sheriRealtimeMerchantId=null;
 }
+function sheriDeferBackgroundRender(){
+  // Reports are long, interactive views. Realtime/focus refreshes may update
+  // their data model, but must not replace the report DOM while it is open.
+  return !!document.getElementById('accRepairDialog')||sheriCurrentView==='reports';
+}
 function sheriSubscribeMerchantRealtime(merchantId){
   if(!sb||!merchantId||!session?.access_token)return;
   if(sheriRealtimeChannel&&sheriRealtimeMerchantId===merchantId)return;
@@ -2144,7 +2149,7 @@ function sheriSubscribeMerchantRealtime(merchantId){
     sheriRealtimeRefreshTimer=setTimeout(()=>{
       sheriRealtimeRefreshTimer=null;
       if(state.merchant?.id!==merchantId||!session?.access_token)return;
-      loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
+      loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
     },220);
   };
   for(const table of tables){
@@ -2227,7 +2232,7 @@ async function loadAll(silent=false){
   if(navigator.onLine&&!(await sheriVerifyActiveStaffMembership(mId)))return;
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
-  if(hadLocal)render();
+  if(hadLocal&&!(silent&&sheriDeferBackgroundRender()))render();
   if(!navigator.onLine){await accEnsureBase();await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
   try{
     const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr},{data:memory,error:mErr},{data:customers,error:cErr},{data:suppliers,error:supErr},{data:purchases,error:purErr},{data:cashEntries,error:cashErr},{data:budgets,error:budErr}]=await Promise.all([
