@@ -385,6 +385,15 @@ test("inventory staff can add products and receive purchases without editing exi
 });
 
 
+test("pending local-only journals are reported separately from server ledger integrity", () => {
+  for (const [label, source] of [["main app", html], ["isolated preview", previewLiveHtml]]) {
+    assert.ok(source.includes("const entries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed!==false)"), label + ": pending local-only journals must not be counted as confirmed server-ledger defects");
+    assert.ok(source.includes("const pendingLedgerEntries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed===false"), label + ": pending local-only journals must be counted separately");
+    assert.ok(source.includes("saved on this device but not yet confirmed by the server"), label + ": users must see a clear synchronization warning");
+    assert.ok(source.includes("server-confirmed journal entr"), label + ": actual ledger integrity errors must remain visible");
+  }
+});
+
 test("received purchases post and verify their inventory/AP journal without unsafe settings upserts", () => {
   for (const [label, source] of [["main app", html], ["isolated preview", previewLiveHtml]]) {
     const purchaseStart = source.indexOf("async function addOSPurchase()");
