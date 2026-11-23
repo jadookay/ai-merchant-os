@@ -35,7 +35,7 @@ test('supplier payments can be allocated to received purchases and their linked 
   assert.match(html, /function accPurchaseOutstanding/);
   assert.match(html, /function accPaymentSourceOptions/);
   const sources = functionBody('accPaymentSourceOptions');
-  assert.match(sources, /purchase:/);
+  assert.match(sources, /kind:'purchase'/);
   const payment = functionBody('accCreatePayment');
   assert.match(payment, /sourceKind==='purchase'/);
   assert.match(payment, /accPurchaseOutstanding/);
@@ -78,8 +78,8 @@ test('tax rates are deduplicated and expense settlement is reflected in ledger r
 
 test('dashboard profit follows the posted accounting ledger snapshot', () => {
   assert.match(html, /function osAccountingProfitSnapshot/);
-  assert.match(html, /function profit\(\)\{const snapshot=osAccountingProfitSnapshot\(\)/);
-  assert.match(html, /function osGrossProfit\(\)\{const snapshot=osAccountingProfitSnapshot\(\)/);
+  assert.match(html, /function profit\(\)\{const ledger=osAccountingProfitSnapshot\(\)/);
+  assert.match(html, /function osGrossProfit\(\)\{const ledger=osAccountingProfitSnapshot\(\)/);
 });
 
 test('PDF export is loaded on demand and has guarded bill, invoice and receipt actions', () => {
@@ -92,9 +92,10 @@ test('PDF export is loaded on demand and has guarded bill, invoice and receipt a
   assert.match(html, /function accReceiptPdfClick/);
 });
 
-test('the existing transaction and sync functions remain in place without importing preview sync wrappers', () => {
+test('the existing transaction and sync functions remain in place with the established sync-batch wrapper', () => {
   for (const name of ['sheriQueue', 'sheriSyncOutbox', 'sheriSyncSaleOperation', 'sheriSyncSaleCartOperation']) {
     assert.ok(html.includes('function ' + name) || html.includes('async function ' + name), 'Missing protected function ' + name);
   }
-  assert.doesNotMatch(html, /function sheriWrapSyncBatch/);
+  assert.match(html, /function sheriWrapSyncBatch\(name\)\{/);
+  assert.match(html, /wrapped=function\(\.\.\.args\)\{return sheriWithSyncBatch\(\(\)=>original\.apply\(this,args\)\);\};/);
 });
