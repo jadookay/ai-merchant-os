@@ -2085,7 +2085,7 @@ async function verifyOwnerPhoneOtp(){
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}
   finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
-if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);const email=normalizeAuthEmail(document.getElementById('signupEmail')?.value);if(!email)return setAuthStatus('Enter the email you used to create the account.',true);if(!navigator.onLine)return setAuthStatus('Resending the confirmation email requires internet.',true);try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();const {error}=await sb.auth.resend({type:'signup',email,options:{captchaToken}});if(error)throw error;setAuthStatus('Confirmation email sent again. Check your inbox and spam.')}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}}
+
 async function handleSignIn(){
   if(!sb)await sheriInitSupabase();
   if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);

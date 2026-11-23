@@ -264,7 +264,7 @@ test("new product opening stock creates an audited inventory movement", () => {
 test("service worker cache is bumped to release V14.4.82", () => {
   assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v82"));
   assert.ok(serviceWorker.includes("V14.4.82"));
-  assert.ok(html.includes('name="app-version" content="V14.4.82 reconciled accounting, supplier payments and legal-name enforcement"'));
+  assert.ok(html.includes('name="app-version" content="V14.4.82 phone-based owner and staff authentication"'));
 });
 
 test("duplicate team identifiers return a conflict instead of an ambiguous 2xx response", () => {
