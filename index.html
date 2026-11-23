@@ -779,7 +779,7 @@ window.ensurePdfJs=async function(){
   <div class="top"><div><h1>Money</h1><div class="sub">Track business money and review the reports generated from your records.</div></div><div class="actions"><button class="btn secondary" onclick="show('expenses')">Expenses</button><button class="btn" onclick="show('reports')">View reports</button></div></div>
   <div class="metrics" id="accMetrics"></div>
   <div class="grid2 section">
-    <div class="card"><h2>Receive / make payment</h2><div class="formgrid"><div><label>Payment type</label><select id="accPaymentType"><option value="customer_receipt">Customer payment received</option><option value="supplier_payment">Supplier payment</option><option value="expense_payment">Expense paid</option><option value="other_income">Other income</option><option value="other_expense">Other expense</option></select></div><div><label>Related invoice/bill <span class="sub">(optional)</span></label><select id="accPaymentSource"></select></div><div><label>Amount</label><input id="accPaymentAmount" type="number" min="0" step="0.01"></div><div><label>Cash / bank account</label><select id="accPaymentAccount"></select></div><div><label>Date</label><input id="accPaymentDate" type="date"></div><div><label>Reference</label><input id="accPaymentRef" placeholder="Receipt / transaction ref"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreatePayment()">Record payment</button></div><div id="accPaymentSearchHost"></div><div id="accPaymentTable" style="margin-top:12px"></div></div>
+    <div class="card"><h2>Receive / make payment</h2><div class="formgrid"><div><label>Payment type</label><select id="accPaymentType" onchange="accPaymentSourceOptions()"><option value="customer_receipt">Customer payment received</option><option value="supplier_payment">Supplier payment</option><option value="expense_payment">Expense paid</option><option value="other_income">Other income</option><option value="other_expense">Other expense</option></select></div><div><label>Related invoice / bill / expense <span class="sub">(optional)</span></label><select id="accPaymentSource"></select></div><div><label>Amount</label><input id="accPaymentAmount" type="number" min="0" step="0.01"></div><div><label>Cash / bank account</label><select id="accPaymentAccount"></select></div><div><label>Date</label><input id="accPaymentDate" type="date"></div><div><label>Reference</label><input id="accPaymentRef" placeholder="Receipt / transaction ref"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreatePayment()">Record payment</button></div><div id="accPaymentSearchHost"></div><div id="accPaymentTable" style="margin-top:12px"></div></div>
     <div class="card"><h2>Cash & bank accounts</h2><div class="formgrid"><div><label>Account name</label><input id="accBankName" placeholder="Cash till / Bank account"></div><div><label>Type</label><select id="accBankType"><option value="cash">Cash</option><option value="bank">Bank</option><option value="mobile_money">Mobile money</option></select></div><div><label>Opening balance</label><input id="accBankOpening" type="number" min="0" step="0.01" value="0"></div></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="accCreateBankAccount()">Add account</button></div><div id="accBankTable" style="margin-top:12px"></div><div class="sub" style="margin-top:10px">Reconciliation records the last date you checked the account against its statement.</div></div>
   </div>
   <div class="grid2 section">
@@ -1304,6 +1304,14 @@ function sheriSyncErrorInfo(err){
 function sheriSyncDelayMs(attempts){return Math.min(60000,Math.max(5000,5000*Math.pow(2,Math.min(Number(attempts)||0,4))))}
 async function sheriSyncJournalBatch(op){
   const entry=op.entry||{};
+  if(entry.source_type==='purchase'){
+    const {data:purchase,error:purchaseError}=await sb.from('purchases').select('id,status,stock_applied')
+      .eq('id',entry.source_id).eq('merchant_id',entry.merchant_id).maybeSingle();
+    if(purchaseError)throw purchaseError;
+    if(!purchase||purchase.status!=='received'||purchase.stock_applied!==true)
+      throw new Error('Purchase journal is waiting for the matching received purchase and stock movement to be confirmed on the server.');
+  }
+
   let lines=Array.isArray(op.lines)?op.lines:[];
   // Old offline batches can carry locally-generated/stale account UUIDs.
   // Resolve them by the merchant's account code before the server validates
@@ -1527,6 +1535,12 @@ async function sheriUnblockSchemaRepairedOperations(){
     (item.op?.type==='inventory_adjustment'&&/product not found/i.test(String(item.last_error||''))&&(state.products||[]).some(p=>p.id===item.op.product_id))||
     (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(String(item.last_error||'')))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)))
   ));
+  const settingsRetries=queued.filter(item=>item.blocked&&item.op?.type==='accounting_settings_upsert'&&
+    item.op.record?.merchant_id===state.merchant?.id&&!item.accounting_settings_rls_retry&&
+    /row-level security|permission denied/i.test(String(item.last_error||'')));
+  for(const item of settingsRetries){
+    await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,accounting_settings_rls_retry:true,recovered_at:sheriNow()});
+  }
   if(!candidates.length)return;
   const [products,suppliers]=await Promise.all([
     sb.from('products').select('created_by,created_by_name').limit(0),
@@ -1537,6 +1551,36 @@ async function sheriUnblockSchemaRepairedOperations(){
     await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,recovered_at:sheriNow()});
   }
 }
+async function sheriSyncAccountingSettingsOperation(op){
+  const record=op?.record||{},merchantId=String(record.merchant_id||'');
+  if(!merchantId||merchantId!==String(state.merchant?.id||''))throw new Error('Accounting settings sync was stopped because the saved business ID does not match the active business. Refresh the active business before retrying.');
+  const {data:existing,error:readError}=await sb.from('accounting_settings')
+    .select('merchant_id,locked_through,updated_at,created_at').eq('merchant_id',merchantId).maybeSingle();
+  if(readError)throw readError;
+  const localStamp=Date.parse(record.updated_at||record.created_at||'');
+  const applyNewerSettings=async current=>{
+    const serverStamp=Date.parse(current?.updated_at||current?.created_at||'');
+    if(Number.isFinite(localStamp)&&(!Number.isFinite(serverStamp)||localStamp>serverStamp)){
+      const {data,error}=await sb.from('accounting_settings')
+        .update({locked_through:record.locked_through??null,updated_at:record.updated_at||sheriNow()})
+        .eq('merchant_id',merchantId).select('merchant_id,locked_through,updated_at').maybeSingle();
+      if(error)throw error;
+      if(!data)throw new Error('The accounting settings update was not confirmed by the server.');
+    }
+  };
+  if(existing){await applyNewerSettings(existing);return;}
+  const {error:insertError}=await sb.from('accounting_settings').insert(sheriServerRecord(record));
+  if(!insertError)return;
+  if(insertError.code!=='23505')throw insertError;
+  // Another tab/device may have created the one-row settings record between
+  // the read and insert. Re-read and apply only a genuinely newer local edit.
+  const {data:current,error:retryReadError}=await sb.from('accounting_settings')
+    .select('merchant_id,locked_through,updated_at,created_at').eq('merchant_id',merchantId).maybeSingle();
+  if(retryReadError)throw retryReadError;
+  if(!current)throw insertError;
+  await applyNewerSettings(current);
+}
+
 async function sheriSyncOutbox(){
   if(!session?.access_token||!state.merchant||!navigator.onLine||sheriSyncBusy||sheriSyncBatchDepth>0)return;
   sheriSyncBusy=true;
@@ -1617,7 +1661,7 @@ async function sheriSyncOutbox(){
           else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}
           else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
         }
-        else if(op.type==='accounting_settings_upsert'){const {error}=await sb.from('accounting_settings').upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'});if(error)throw error}
+        else if(op.type==='accounting_settings_upsert'){await sheriSyncAccountingSettingsOperation(op)}
         else if(op.type==='accounting_delete'){const {error}=await sb.from(op.table).delete().eq('id',op.id);if(error)throw error}
         else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
         else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
@@ -1653,6 +1697,7 @@ async function sheriSyncOutbox(){
               else if(op.type==='purchase_upsert'){const {error}=await sb.from('purchases').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='cash_upsert'){const {error}=await sb.from('cash_entries').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='accounting_settings_upsert'){await sheriSyncAccountingSettingsOperation(op)}
               else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
               else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
               else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
@@ -1696,8 +1741,8 @@ async function sheriSyncOutbox(){
 
 function sheriOnlineEvents(){
   window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sherriSyncKick()});
-  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
-  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri focus refresh]',e));});
+  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
+  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri focus refresh]',e));});
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator){
@@ -2085,6 +2130,11 @@ function sheriStopMerchantRealtime(){
   if(sheriRealtimeChannel&&sb){try{sb.removeChannel(sheriRealtimeChannel)}catch(e){console.warn('[Shericeri realtime] unsubscribe failed',e)}}
   sheriRealtimeChannel=null;sheriRealtimeMerchantId=null;
 }
+function sheriDeferBackgroundRender(){
+  // Reports are long, interactive views. Realtime/focus refreshes may update
+  // their data model, but must not replace the report DOM while it is open.
+  return !!document.getElementById('accRepairDialog')||sheriCurrentView==='reports';
+}
 function sheriSubscribeMerchantRealtime(merchantId){
   if(!sb||!merchantId||!session?.access_token)return;
   if(sheriRealtimeChannel&&sheriRealtimeMerchantId===merchantId)return;
@@ -2099,7 +2149,7 @@ function sheriSubscribeMerchantRealtime(merchantId){
     sheriRealtimeRefreshTimer=setTimeout(()=>{
       sheriRealtimeRefreshTimer=null;
       if(state.merchant?.id!==merchantId||!session?.access_token)return;
-      loadAll(true).then(()=>render()).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
+      loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
     },220);
   };
   for(const table of tables){
@@ -2182,7 +2232,7 @@ async function loadAll(silent=false){
   if(navigator.onLine&&!(await sheriVerifyActiveStaffMembership(mId)))return;
   // Local-first: render immediately even when connectivity is poor.
   const hadLocal=await sheriLoadLocalSnapshot(mId);
-  if(hadLocal)render();
+  if(hadLocal&&!(silent&&sheriDeferBackgroundRender()))render();
   if(!navigator.onLine){await accEnsureBase();await accEnsureOperationalLedger();sheriSetConnectivity('offline','Using on-device business data');return}
   try{
     const [{data:products,error:pErr},{data:sales,error:sErr},{data:expenses,error:eErr},{data:memory,error:mErr},{data:customers,error:cErr},{data:suppliers,error:supErr},{data:purchases,error:purErr},{data:cashEntries,error:cashErr},{data:budgets,error:budErr}]=await Promise.all([
@@ -3182,10 +3232,10 @@ async function addExpense(){
   const description=eDesc.value.trim(),amount=+eAmt.value,cat=eCat.value;
   if(!description||!Number.isFinite(amount)||amount<=0)return alert('Enter an expense description and a positive amount.');
   if(!confirm('Record this expense?\n'+description+' — '+money(amount)+'\nCategory: '+cat))return;
-  const data={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,cat,created_at:sheriNow(),created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
+  const data={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,cat,payment_status:'unpaid',created_at:sheriNow(),created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
   state.expenses.push(data);await sheriSaveSnapshot();await sheriQueue({type:'expense_upsert',record:data});
   let warning='';
-  try{await accEnsureBase();const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:data.created_at.slice(0,10),description:'Expense '+description,sourceType:'expense',sourceId:data.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});}
+  try{await accEnsureBase();const ex=accAccountCode('6000'),payable=accAccountCode('2050');if(!ex||!payable)throw new Error('Operating Expenses (6000) and Accrued Expenses Payable (2050) must be active.');data.payment_status='unpaid';await sheriPut('expenses',data.id,{merchant_id:state.merchant.id,record:{...data}});await accPostEntry({date:data.created_at.slice(0,10),description:'Expense '+description,sourceType:'expense',sourceId:data.id,lines:[{accountId:ex.id,debit:amount},{accountId:payable.id,credit:amount}]});}
   catch(err){warning=' Saved, but ledger posting needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] expense posting failed',err);}
   if(navigator.onLine)sherriSyncKick();clearExpenseForm();render();sheriToast('Expense recorded.'+warning,warning?'warning':'success');
 }
@@ -5730,6 +5780,7 @@ async function addOSPurchase(){
   await sheriQueue({type:'purchase_upsert',record:data,productId:p.id,expectedServerStock:status==='ordered'?null:oldStock,expectedServerCost:status==='ordered'?null:oldCost,localStock,localCost});
   if(navigator.onLine)await sheriSyncOutbox();
   document.getElementById('osPurchaseQty').value=1;document.getElementById('osPurchaseCost').value='';document.getElementById('osPurchaseDue').value='';render();
+  return data;
 }
 async function receiveOSPurchase(id){
   if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to receive purchases.','error');
@@ -5815,7 +5866,7 @@ async function generateOSInsight(){
 // ── V14.1 Accounting engine: simple QuickBooks-style double entry ─────────
 const ACC_DEFAULT_ACCOUNTS=[
   ['1000','Cash on hand','asset','debit'],['1010','Bank accounts','asset','debit'],['1020','Mobile money','asset','debit'],['1100','Accounts receivable','asset','debit'],['1200','Inventory','asset','debit'],
-  ['2000','Accounts payable','liability','credit'],['2100','Tax payable','liability','credit'],['2110','Input tax receivable','asset','debit'],['2200','Other liabilities','liability','credit'],
+  ['2000','Accounts payable','liability','credit'],['2050','Accrued expenses payable','liability','credit'],['2100','Tax payable','liability','credit'],['2110','Input tax receivable','asset','debit'],['2200','Other liabilities','liability','credit'],
   ['3000','Owner equity','equity','credit'],['3100','Owner drawings','equity','debit'],['4000','Sales revenue','income','credit'],['4050','Sales returns & discounts','income','debit'],['4100','Other income','income','credit'],
   ['5000','Cost of goods sold','cogs','debit'],['6000','Operating expenses','expense','debit'],['6100','Tax expense','expense','debit']
 ];
@@ -5827,7 +5878,7 @@ function accBalance(accountId){
   let n=0;
   const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
   const activeReversals=new Set((state.journalEntries||[])
-    .filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void'].includes(e.source_type))
+    .filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void','expense_delete','payment_void'].includes(e.source_type))
     .map(e=>e.source_id));
   for(const line of state.journalLines||[]){
     if(line.account_id!==accountId)continue;
@@ -5899,8 +5950,11 @@ async function accEnsureOperationalLedger({approved=false}={}){
     if(cost>0&&inv&&cogs)await safePost({date,description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:cost},{accountId:inv.id,credit:cost}]});
   }
   for(const e of (state.expenses||[]).filter(x=>!x.deleted)){
-    const ex=accAccountCode('6000'),cash=accAccountCode('1000'),amount=Number(e.amount||0),date=String(e.created_at||e.date||sheriNow()).slice(0,10);
-    if(amount>0&&ex&&cash)await safePost({date,description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});
+    const ex=accAccountCode('6000'),payable=accAccountCode('2050'),cash=accAccountCode('1000'),amount=Number(e.amount||0),date=String(e.created_at||e.date||sheriNow()).slice(0,10);
+    const linkedPayments=(state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===e.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0);
+    const usesPayable=linkedPayments>0||['unpaid','partial'].includes(String(e.payment_status||'').toLowerCase());
+    const offset=usesPayable?payable:cash;
+    if(amount>0&&ex&&offset)await safePost({date,description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:offset.id,credit:amount}]});
   }
   for(const p of (state.purchases||[]).filter(x=>x.status!=='ordered'&&!x.voided_at)){
     const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||Number(p.qty||0)*Number(p.unit_cost||p.cost||0)),date=String(p.purchased_at||p.created_at||sheriNow()).slice(0,10);
@@ -5909,14 +5963,92 @@ async function accEnsureOperationalLedger({approved=false}={}){
   await sheriSaveAccountingSnapshot();
   return {repairedLines,blocked};
 }
+function accShowRepairConfirmation(message){
+  return new Promise(resolve=>{
+    document.getElementById('accRepairDialog')?.remove();
+    if(!document.getElementById('accRepairDialogStyle')){
+      const style=document.createElement('style');style.id='accRepairDialogStyle';
+      style.textContent=`
+        #accRepairDialog{position:fixed;inset:0;z-index:1000000;display:grid;place-items:center;box-sizing:border-box;padding:18px;background:rgba(8,12,28,.68);overscroll-behavior:contain}
+        #accRepairDialog *{box-sizing:border-box}
+        #accRepairDialog .acc-repair-panel{width:min(760px,100%);max-height:min(86dvh,820px);display:flex;flex-direction:column;gap:12px;overflow:hidden;background:#fff;color:#172033;border:2px solid #F7EB5B;border-radius:16px;box-shadow:0 22px 70px rgba(0,0,0,.38);padding:clamp(14px,3vw,24px)}
+        #accRepairDialog .acc-repair-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+        #accRepairDialog .acc-repair-heading h2{margin:0;font-size:1.2rem;line-height:1.3}
+        #accRepairDialog .acc-repair-summary{margin:0;color:#475569;font-size:.92rem;line-height:1.45}
+        #accRepairDialog .acc-repair-details{display:block;width:100%;min-height:150px;max-height:48dvh;overflow:auto;resize:vertical;margin:0;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#0f172a;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
+        #accRepairDialog .acc-repair-status{min-height:18px;margin:0;color:#475569;font-size:.82rem}
+        #accRepairDialog .acc-repair-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px}
+        #accRepairDialog .acc-repair-actions button{min-height:42px;padding:9px 15px;border:1px solid #cbd5e1;border-radius:9px;font:600 14px/1.2 system-ui,sans-serif;cursor:pointer}
+        #accRepairDialog .acc-repair-copy{margin-right:auto;background:#010080;color:#F7EB5B;border-color:#010080!important}
+        #accRepairDialog .acc-repair-cancel{background:#fff;color:#172033}
+        #accRepairDialog .acc-repair-confirm{background:#F7EB5B;color:#010080;border-color:#010080!important}
+        #accRepairDialog button:focus-visible,#accRepairDialog .acc-repair-details:focus-visible{outline:3px solid #2563eb;outline-offset:2px}
+        @media(max-width:520px){#accRepairDialog{padding:10px}#accRepairDialog .acc-repair-panel{max-height:92dvh;border-radius:12px}#accRepairDialog .acc-repair-actions{display:grid;grid-template-columns:1fr 1fr}#accRepairDialog .acc-repair-copy{grid-column:1/-1;margin:0}#accRepairDialog .acc-repair-details{max-height:48dvh}}
+      `;
+      document.head.appendChild(style);
+    }
+    const t={
+      title:sheriLocalized('Review ledger repair','Vérifier la correction du grand livre','Genzura ikosorwa ry’ibaruramari'),
+      summary:sheriLocalized('Copy the complete diagnostic below and paste it into ChatGPT if you want me to inspect it before approving. No changes are made until you confirm.','Copiez le diagnostic complet ci-dessous et collez-le dans ChatGPT pour vérification avant approbation. Aucune modification ne sera effectuée avant votre confirmation.','Koporora amakuru yose ari hepfo uyashyire muri ChatGPT kugira ngo nyasuzume mbere yo kwemeza. Nta gihinduka mbere yo kwemeza.'),
+      copy:sheriLocalized('Copy diagnostic','Copier le diagnostic','Koporora amakuru'),
+      cancel:sheriLocalized('Cancel','Annuler','Hagarika'),
+      confirm:sheriLocalized('Confirm repair','Confirmer la correction','Emeza ikosora'),
+      copied:sheriLocalized('Diagnostic copied. Paste it into the chat.','Diagnostic copié. Collez-le dans la conversation.','Amakuru yakoporowe. Yashyire mu kiganiro.'),
+      failed:sheriLocalized('Copy was unavailable. Select the text above and copy it.','Copie indisponible. Sélectionnez le texte ci-dessus et copiez-le.','Koporora ntibyashobotse. Hitamo inyandiko iri hejuru uyikoporore.')
+    };
+    const overlay=document.createElement('div');overlay.id='accRepairDialog';
+    const panel=document.createElement('section');panel.className='acc-repair-panel';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-labelledby','accRepairDialogTitle');
+    panel.innerHTML='<div class="acc-repair-heading"><h2 id="accRepairDialogTitle"></h2></div><p class="acc-repair-summary"></p><pre class="acc-repair-details" tabindex="0"></pre><p class="acc-repair-status" aria-live="polite"></p><div class="acc-repair-actions"><button type="button" class="acc-repair-copy"></button><button type="button" class="acc-repair-cancel"></button><button type="button" class="acc-repair-confirm"></button></div>';
+    panel.querySelector('h2').textContent=t.title;panel.querySelector('.acc-repair-summary').textContent=t.summary;panel.querySelector('.acc-repair-details').textContent=message;
+    panel.querySelector('.acc-repair-copy').textContent=t.copy;panel.querySelector('.acc-repair-cancel').textContent=t.cancel;panel.querySelector('.acc-repair-confirm').textContent=t.confirm;
+    overlay.appendChild(panel);document.body.appendChild(overlay);
+    let settled=false;const finish=value=>{if(settled)return;settled=true;document.removeEventListener('keydown',onKey);overlay.remove();resolve(value)};
+    const onKey=e=>{if(e.key==='Escape'){e.preventDefault();finish(false)}};
+    document.addEventListener('keydown',onKey);
+    overlay.addEventListener('click',e=>{if(e.target===overlay)finish(false)});
+    panel.querySelector('.acc-repair-cancel').addEventListener('click',()=>finish(false));
+    panel.querySelector('.acc-repair-confirm').addEventListener('click',()=>finish(true));
+    panel.querySelector('.acc-repair-copy').addEventListener('click',async()=>{
+      const status=panel.querySelector('.acc-repair-status');
+      try{
+        if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(message);
+        else{const area=document.createElement('textarea');area.value=message;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();const ok=document.execCommand('copy');area.remove();if(!ok)throw new Error('Clipboard unavailable');}
+        status.textContent=t.copied;
+      }catch(_){status.textContent=t.failed;const details=panel.querySelector('.acc-repair-details');details.focus();const range=document.createRange();range.selectNodeContents(details);const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);}
+    });
+    panel.querySelector('.acc-repair-details').focus();
+  });
+}
 async function accReconcileOperationalLedger(){
   if(!sheriCan('manage_finance')||!sheriCan('view_financial_reports'))return sheriToast('Only an authorized finance manager or owner can repair the ledger.','error');
   if(!accServerSnapshotAuthoritative)return sheriToast('Refresh the server data before repairing the ledger.','warning');
   const integrity=accLedgerIntegrity();
   if(!integrity.invalidCount)return sheriToast('The ledger is already balanced.');
-  const preview=integrity.invalid.slice(0,8).map(x=>'• '+(x.entry.description||x.entry.source_type||'Journal entry')+' — '+(x.reason||'Review required')+' ('+(x.count||0)+' line(s))').join('\n');
-  const promptText='There are '+integrity.invalidCount+' incomplete or unbalanced journal entries. The repair will add only missing lines that match active source records. Entries with conflicting lines or locked dates will be left unchanged.\n\n'+preview+'\n\nContinue with the repair?';
-  if(!confirm(promptText))return;
+  const accountNames=new Map((state.accounts||[]).map(a=>[a.id,(a.code||'?')+' '+(a.name||'')]));
+  const diagnostic=[
+    'AIBOS LEDGER REPAIR REVIEW',
+    'Generated: '+new Date().toISOString(),
+    'Business: '+(state.merchant?.name||'Unknown'),
+    'Flagged entries: '+integrity.invalidCount,
+    'Repair policy: add only missing lines matching active source records; conflicting or locked entries remain unchanged.',
+    '',
+    ...integrity.invalid.map((x,i)=>{
+      const lines=accLinesForEntry(x.entry.id);
+      return [
+        (i+1)+'. '+(x.entry.description||x.entry.source_type||'Journal entry'),
+        '   Entry ID: '+(x.entry.id||'not created'),
+        '   Source: '+(x.entry.source_type||'unknown')+' / '+(x.entry.source_id||'unknown'),
+        '   Date: '+(x.entry.entry_date||'unknown'),
+        '   Finding: '+(x.reason||'Review required'),
+        '   Existing lines: '+(x.count||0)+' | Debits: '+money(x.debit||0)+' | Credits: '+money(x.credit||0)+' | Difference: '+money(x.difference||0),
+        '   Line detail: '+(lines.length?lines.map(l=>(accountNames.get(l.account_id)||l.account_id)+' [Dr '+money(l.debit||0)+' / Cr '+money(l.credit||0)+']').join('; '):'No journal lines found')
+      ].join('\\n');
+    }),
+    '',
+    'No repair has been applied. Review and approve explicitly.'
+  ].join('\\n');
+  const promptText='The ledger audit found '+integrity.invalidCount+' item(s) requiring review. Inspect or copy the full diagnostic before approving. The repair will add only missing lines matching active source records; conflicting or locked entries will remain unchanged.\\n\\n'+diagnostic;
+  if(!await accShowRepairConfirmation(promptText))return;
   const button=document.getElementById('accReconcileButton');if(button){button.disabled=true;button.textContent=sheriPendingText('Repairing ledger…');}
   try{
     const result=await sheriWithSyncBatch(()=>accEnsureOperationalLedger({approved:true}));
@@ -6009,9 +6141,65 @@ async function accCreateBill(){
   await accAudit('create','bill',id,{total,purchase_id:purchaseId||null});
   document.getElementById('accBillDesc').value='';document.getElementById('accBillCost').value='';document.getElementById('accBillDiscount').value='0';document.getElementById('accBillPurchase').value='';render();sheriToast('Bill created and linked to the purchase without duplicating inventory.','success');
 }
-function accPaymentSourceOptions(){const type=document.getElementById('accPaymentType')?.value;const sel=document.getElementById('accPaymentSource');if(!sel)return;const rows=type==='supplier_payment'?state.bills.filter(x=>accBillStatus(x)!=='paid'):type==='customer_receipt'?state.invoices.filter(x=>accInvoiceStatus(x)!=='paid'):[];sel.innerHTML='<option value="">— No linked document —</option>'+rows.map(x=>`<option value="${x.id}">${esc(x.invoice_number||x.bill_number)}${type==='supplier_payment'?' · '+(accSupplier(x.supplier_id)?.name||'Unassigned supplier'):''} — ${money((x.total||0)-(type==='supplier_payment'?accBillPaid(x):accInvoicePaid(x)))}</option>`).join('')}
+function accExpensePaid(expense){return (state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===expense.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0)}
+function accExpenseOutstanding(expense){return Math.max(0,Number(expense.amount||0)-accExpensePaid(expense))}
+function accPaymentSourceOptions(){
+  const type=document.getElementById('accPaymentType')?.value,sel=document.getElementById('accPaymentSource');if(!sel)return;
+  const rows=type==='supplier_payment'?state.bills.filter(x=>accBillStatus(x)!=='paid'):
+    type==='customer_receipt'?state.invoices.filter(x=>accInvoiceStatus(x)!=='paid'):
+    type==='expense_payment'?state.expenses.filter(x=>!x.deleted&&accExpenseOutstanding(x)>0.005):[];
+  const label=x=>type==='supplier_payment'?(x.bill_number||'Supplier bill')+' · '+(accSupplier(x.supplier_id)?.name||'Unassigned supplier'):
+    type==='customer_receipt'?(x.invoice_number||'Customer invoice'):
+    (x.description||'Expense');
+  const balance=x=>type==='supplier_payment'?Number(x.total||0)-accBillPaid(x):
+    type==='customer_receipt'?Number(x.total||0)-accInvoicePaid(x):accExpenseOutstanding(x);
+  sel.innerHTML='<option value="">— '+(type==='expense_payment'?'Choose an expense': 'No linked document')+' —</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(label(x))+' — '+money(balance(x))+'</option>').join('');
+}
 async function accCreatePayment(){
-  await accEnsureBase();const type=document.getElementById('accPaymentType').value,sourceId=document.getElementById('accPaymentSource').value||null,amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,date=document.getElementById('accPaymentDate').value||accToday();if(amount<=0||!accountId)return alert('Enter an amount and choose a cash/bank account.');if(accPeriodLocked(date))return alert('This payment date is inside a locked accounting period.');if(sourceId){const doc=type==='supplier_payment'?state.bills.find(x=>x.id===sourceId):type==='customer_receipt'?state.invoices.find(x=>x.id===sourceId):null;if(doc){const outstanding=Math.max(0,Number(doc.total||0)-(type==='supplier_payment'?accBillPaid(doc):accInvoicePaid(doc)));if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding balance of '+money(outstanding)+'.')}}let debitId,creditId,sourceType=null; if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100').id;sourceType='invoice'}else if(type==='supplier_payment'){debitId=accAccountCode('2000').id;creditId=accountId;sourceType='bill'}else if(type==='other_income'){debitId=accountId;creditId=accAccountCode('4100').id}else{debitId=accAccountCode('6000').id;creditId=accountId}const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),direction:type==='customer_receipt'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,amount,payment_date:date,reference:document.getElementById('accPaymentRef').value.trim()||null,created_at:sheriNow()};state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'payments',record:row});await accPostEntry({date,description:(type==='customer_receipt'?'Customer receipt':type==='supplier_payment'?'Supplier payment':type==='other_income'?'Other income':'Expense payment'),sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});await accAudit('create','payment',row.id,{amount,type});document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';render();alert('Payment recorded.');
+  await accEnsureBase();
+  const type=document.getElementById('accPaymentType').value,sourceId=document.getElementById('accPaymentSource').value||null,
+    amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,
+    date=document.getElementById('accPaymentDate').value||accToday();
+  if(amount<=0||!accountId)return alert('Enter an amount and choose a cash/bank account.');
+  if(accPeriodLocked(date))return alert('This payment date is inside a locked accounting period.');
+  let debitId=null,creditId=null,sourceType=null,linkedExpense=null;
+  if(type==='customer_receipt'||type==='supplier_payment'){
+    if(!sourceId)return alert('Choose the invoice or supplier bill this payment belongs to.');
+    const doc=type==='supplier_payment'?state.bills.find(x=>x.id===sourceId):state.invoices.find(x=>x.id===sourceId);
+    if(!doc)return alert('The selected invoice or supplier bill could not be found.');
+    const outstanding=Math.max(0,Number(doc.total||0)-(type==='supplier_payment'?accBillPaid(doc):accInvoicePaid(doc)));
+    if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding balance of '+money(outstanding)+'.');
+    if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100')?.id;sourceType='invoice';}
+    else{debitId=accAccountCode('2000')?.id;creditId=accountId;sourceType='bill';}
+  }else if(type==='expense_payment'){
+    if(!sourceId)return alert('Choose the existing expense being paid. This prevents recording the same expense twice.');
+    linkedExpense=state.expenses.find(x=>x.id===sourceId&&!x.deleted);
+    if(!linkedExpense)return alert('The selected expense could not be found or has been deleted.');
+    const outstanding=accExpenseOutstanding(linkedExpense);
+    if(outstanding<=0.005)return alert('This expense is already fully paid.');
+    if(amount>outstanding+0.005)return alert('Payment exceeds the expense balance of '+money(outstanding)+'.');
+    debitId=accAccountCode('2050')?.id;creditId=accountId;sourceType='expense';
+  }else if(type==='other_income'){
+    debitId=accountId;creditId=accAccountCode('4100')?.id;
+  }else if(type==='other_expense'){
+    debitId=accAccountCode('6000')?.id;creditId=accountId;
+  }else return alert('Choose a valid payment type.');
+  if(!debitId||!creditId)return alert('The required ledger account is missing. Refresh the chart of accounts before recording this payment.');
+  const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),
+    direction:type==='customer_receipt'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,
+    amount,payment_date:date,reference:document.getElementById('accPaymentRef').value.trim()||null,created_at:sheriNow()};
+  await accPostEntry({date,description:(type==='customer_receipt'?'Customer receipt':type==='supplier_payment'?'Supplier payment':type==='other_income'?'Other income':type==='expense_payment'?'Expense payment — '+(linkedExpense.description||''):'Other expense'),
+    sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});
+  state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});
+  await sheriQueue({type:'accounting_upsert',table:'payments',record:row});
+  if(linkedExpense){
+    linkedExpense.payment_status=accExpenseOutstanding(linkedExpense)<=0.005?'paid':'partial';
+    await sheriPut('expenses',linkedExpense.id,{merchant_id:state.merchant.id,record:{...linkedExpense}});
+    await sheriQueue({type:'expense_upsert',record:{...linkedExpense}});
+  }
+  await accAudit('create','payment',row.id,{amount,type,source_id:sourceId});
+  document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';
+  accPaymentSourceOptions();render();sheriToast('Payment recorded and posted to the correct ledger accounts.','success');
 }
 async function accCreateBankAccount(){await accEnsureBase();const name=document.getElementById('accBankName').value.trim(),type=document.getElementById('accBankType').value,opening=Number(document.getElementById('accBankOpening').value)||0;if(!name)return alert('Enter an account name.');const baseCode={cash:'1000',bank:'1010',mobile_money:'1020'}[type];let acct=accAccountCode(baseCode);if(acct&&state.bankAccounts.some(x=>x.account_id===acct.id)){let n=2;while(accAccountCode(baseCode+'-'+n))n++;acct={id:sheriUuid(),merchant_id:state.merchant.id,code:baseCode+'-'+n,name:name,type:'asset',normal_balance:'debit',balance_sheet_class:'current',active:true,created_at:sheriNow()};await accUpsert('chart_of_accounts',acct)}if(!acct)return alert('Could not create the ledger account for this cash/bank account.');const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),name,type,opening_balance:opening,account_id:acct.id,current_balance:opening,last_reconciled_at:null,reconciled_balance:null,reconciled_difference:null,created_at:sheriNow()};state.bankAccounts.push(row);await sheriPut('bankAccounts',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'bank_accounts',record:row});if(opening>0){const eq=accAccountCode('3000');await accPostEntry({date:accToday(),description:'Opening balance — '+name,sourceType:'bank_opening',sourceId:row.id,lines:[{accountId:acct.id,debit:opening},{accountId:eq.id,credit:opening}]})}document.getElementById('accBankName').value='';document.getElementById('accBankOpening').value='0';render();}
 async function accReconcileBank(id){const b=state.bankAccounts.find(x=>x.id===id);if(!b)return;const d=prompt('Reconciled through date (YYYY-MM-DD):',accToday());if(!d||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d))return alert('Use YYYY-MM-DD.');const statement=Number(prompt('Statement balance:',String(accNormalAmount(accAccount(b.account_id))||0)));if(!Number.isFinite(statement))return;const ledger=accNormalAmount(accAccount(b.account_id));b.last_reconciled_at=d;b.reconciled_balance=statement;b.reconciled_difference=statement-ledger;await accUpdate('bank_accounts',b);await accAudit('reconcile','bank_account',b.id,{statement,ledger,difference:b.reconciled_difference});render();}
@@ -6109,14 +6297,14 @@ function sheriApplyReportRange(){sheriApplyDateRange(document.getElementById('re
 function sheriApplySalesRange(){sheriApplyDateRange(document.getElementById('salesPeriod')?.value||'all','salesStartDate','salesEndDate');}
 function sheriApplyExpenseRange(){sheriApplyDateRange(document.getElementById('expensePeriod')?.value||'all','expenseStartDate','expenseEndDate');}
 function accLedgerIntegrity(endDate=null){
-  const entries=state.journalEntries||[],lines=state.journalLines||[],sales=state.sales||[];
+  const entries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed!==false),lines=state.journalLines||[],sales=state.sales||[],expenses=state.expenses||[],payments=state.payments||[];
   const totals=new Map(),linesByEntry=new Map(),entryById=new Map(entries.map(e=>[e.id,e]));
-  const saleById=new Map(sales.map(s=>[s.id,s]));
+  const saleById=new Map(sales.map(s=>[s.id,s])),expenseById=new Map(expenses.map(e=>[e.id,e])),paymentById=new Map(payments.map(p=>[p.id,p]));
   const accountCodeById=new Map((state.accounts||[]).map(a=>[a.id,String(a.code)]));
   const activeSources=new Set(),reversalsBySource=new Map();
   for(const e of entries){
     const entryDate=String(e.entry_date||e.created_at||'').slice(0,10);if(!e.voided&&e.source_type&&e.source_id&&(!endDate||entryDate<=endDate))activeSources.add(e.source_type+'|'+e.source_id);
-    if(!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void'].includes(e.source_type)&&e.source_id){
+    if(!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void','expense_delete','payment_void'].includes(e.source_type)&&e.source_id){
       if(!reversalsBySource.has(e.source_id))reversalsBySource.set(e.source_id,[]);
       reversalsBySource.get(e.source_id).push(e);
     }
@@ -6173,13 +6361,40 @@ function accLedgerIntegrity(endDate=null){
         if(!reason&&!exact)reason='POS journal lines do not match the sale quantity, price or cost';
       }
     }
+    if(!reason&&entry.source_type==='expense'){
+      const expense=expenseById.get(entry.source_id);
+      if(!expense&&!hasReversal)reason='Expense journal has no matching expense source record';
+      else if(expense&&!expense.deleted&&!hasReversal){
+        const paid=(payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===expense.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0);
+        const usePayable=paid>0||['unpaid','partial'].includes(String(expense.payment_status||'').toLowerCase());
+        const expected=usePayable
+          ?[{code:'6000',debit:Number(expense.amount||0),credit:0},{code:'2050',debit:0,credit:Number(expense.amount||0)}]
+          :[{code:'6000',debit:Number(expense.amount||0),credit:0},{code:'1000',debit:0,credit:Number(expense.amount||0)}];
+        const exact=Number(expense.amount||0)>0&&linesForEntry.length===2&&expected.every(want=>linesForEntry.some(line=>accountCodeById.get(line.account_id)===want.code&&Math.abs(Number(line.debit||0)-want.debit)<=0.005&&Math.abs(Number(line.credit||0)-want.credit)<=0.005));
+        if(!exact)reason='Expense journal does not match the expense amount or payment-liability treatment';
+      }
+    }
+    if(!reason&&entry.source_type==='payment'&&!hasReversal){
+      const payment=paymentById.get(entry.source_id);
+      if(!payment)reason='Payment journal has no matching payment source record';
+      else{
+        let expected=null;
+        if(payment.source_type==='expense'&&payment.direction==='payment')expected=[{account: '2050',debit:Number(payment.amount||0),credit:0},{accountId:payment.account_id,debit:0,credit:Number(payment.amount||0)}];
+        else if(payment.source_type==='bill'&&payment.direction==='payment')expected=[{account:'2000',debit:Number(payment.amount||0),credit:0},{accountId:payment.account_id,debit:0,credit:Number(payment.amount||0)}];
+        else if(payment.source_type==='invoice'&&payment.direction==='receipt')expected=[{accountId:payment.account_id,debit:Number(payment.amount||0),credit:0},{account:'1100',debit:0,credit:Number(payment.amount||0)}];
+        if(expected){
+          const exact=Number(payment.amount||0)>0&&linesForEntry.length===2&&expected.every(want=>linesForEntry.some(line=>(want.account?accountCodeById.get(line.account_id)===want.account:line.account_id===want.accountId)&&Math.abs(Number(line.debit||0)-want.debit)<=0.005&&Math.abs(Number(line.credit||0)-want.credit)<=0.005));
+          if(!exact)reason='Payment journal does not match its linked source, amount or cash/bank account';
+        }
+      }
+    }
     if(reason)addInvalid(entry,reason,v.count,v.debit,v.credit);
   }
   // A balanced ledger can still omit an entire source posting. Check operational
   // source records independently so missing journals cannot disappear from the audit.
   for(const sale of sales){
     const date=String(sale.created_at||'').slice(0,10);
-    if(sale.voided||(endDate&&date>endDate))continue;
+    if(sale._serverConfirmed===false||sale.voided||(endDate&&date>endDate))continue;
     if(Number(sale.qty||0)*Number(sale.price||0)>0&&!activeSources.has('sale|'+sale.id))
       addInvalid({id:'missing-sale-'+sale.id,description:'Sale '+(sale.product_name_snapshot||''),source_type:'sale',source_id:sale.id,entry_date:date},'Source sale has no active revenue journal');
     if(sale.stock_applied&&Number(sale.qty||0)*Number(sale.cost||0)>0&&!activeSources.has('sale_cogs|'+sale.id))
@@ -6187,13 +6402,13 @@ function accLedgerIntegrity(endDate=null){
   }
   for(const expense of state.expenses||[]){
     const date=String(expense.created_at||'').slice(0,10);
-    if(expense.deleted||(endDate&&date>endDate)||Number(expense.amount||0)<=0)continue;
+    if(expense._serverConfirmed===false||expense.deleted||(endDate&&date>endDate)||Number(expense.amount||0)<=0)continue;
     if(!activeSources.has('expense|'+expense.id))
       addInvalid({id:'missing-expense-'+expense.id,description:'Expense '+(expense.description||''),source_type:'expense',source_id:expense.id,entry_date:date},'Active expense has no active expense journal');
   }
   for(const purchase of state.purchases||[]){
     const date=String(purchase.purchased_at||purchase.created_at||'').slice(0,10);
-    if(purchase.voided_at||purchase.status!=='received'||(endDate&&date>endDate)||Number(purchase.total||0)<=0)continue;
+    if(purchase._serverConfirmed===false||purchase.voided_at||purchase.status!=='received'||(endDate&&date>endDate)||Number(purchase.total||0)<=0)continue;
     if(!activeSources.has('purchase|'+purchase.id))
       addInvalid({id:'missing-purchase-'+purchase.id,description:'Purchase '+(purchase.product_name_snapshot||''),source_type:'purchase',source_id:purchase.id,entry_date:date},'Received purchase has no active purchase journal');
   }
@@ -6229,7 +6444,26 @@ function accStatementTotal(type,balances,naturalSide){
   },0);
 }
 
-const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);if(!state.expenses.find(x=>x.id===id)?.deleted)return;try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
+const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){
+  const e=state.expenses.find(x=>x.id===id);if(!e)return;
+  const entryDate=String(e.created_at||'').slice(0,10)||accToday();
+  if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');
+  await _v14_1_deleteExpense(id);if(!state.expenses.find(x=>x.id===id)?.deleted)return;
+  try{
+    await accEnsureBase();
+    const originalExpense=(state.journalEntries||[]).find(j=>j.source_type==='expense'&&j.source_id===e.id&&!j.voided);
+    const expenseLines=originalExpense?accLinesForEntry(originalExpense.id):[];
+    if(expenseLines.length)await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:expenseLines.map(l=>({accountId:l.account_id,debit:Number(l.credit||0),credit:Number(l.debit||0)}))});
+    for(const payment of (state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===e.id&&p.direction==='payment')){
+      const paymentEntry=(state.journalEntries||[]).find(j=>j.source_type==='payment'&&j.source_id===payment.id&&!j.voided);
+      const paymentLines=paymentEntry?accLinesForEntry(paymentEntry.id):[];
+      if(paymentLines.length)await accPostEntry({date:String(payment.payment_date||payment.created_at||entryDate).slice(0,10),description:'Reverse payment for deleted expense '+(e.description||''),sourceType:'payment_void',sourceId:payment.id,lines:paymentLines.map(l=>({accountId:l.account_id,debit:Number(l.credit||0),credit:Number(l.debit||0)}))});
+    }
+    await accAudit('delete','expense',e.id,{amount:Number(e.amount||0),reversedPayments:(state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===e.id).length});
+    await sheriSyncOutbox();
+  }catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense was deleted, but its accounting reversal could not be completed: '+(err.message||err))}
+  render()
+};
 // Sale void accounting is handled atomically by sh ericeri_void_sale; no second reversal wrapper.
 
 const _v14_1_addOSCashEntry=addOSCashEntry;addOSCashEntry=async function(){const before=state.cashEntries.length;await _v14_1_addOSCashEntry();if(state.cashEntries.length>before){const x=state.cashEntries[state.cashEntries.length-1];try{await accEnsureBase();const cash=accAccountCode('1000'),amount=Number(x.amount||0);if(amount>0&&x.kind==='income')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash income',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:cash.id,debit:amount},{accountId:accAccountCode('4100').id,credit:amount}]});else if(amount>0&&x.kind==='expense')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash expense',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:accAccountCode('6000').id,debit:amount},{accountId:cash.id,credit:amount}]});if(x.kind!=='transfer')await accAudit('create','cash_entry',x.id,{amount,kind:x.kind})}catch(err){console.warn('[Sheri accounting] cash entry failed',err);alert('Cash movement saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
@@ -6314,9 +6548,12 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
     document.getElementById('accTB').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accGL').innerHTML='<div class="empty">Accounting ledger not installed yet.</div>';document.getElementById('accAudit').innerHTML='<div class="empty">Audit trail will appear after accounting setup.</div>';return;
   }
   const integrity=accLedgerIntegrity(reportEnd);
+  const pendingLedgerEntries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed===false&&!entry.voided&&sheriDateInReportRange(entry.entry_date||entry.created_at));
+  const pendingLedgerSources=[...(state.sales||[]),...(state.expenses||[]),...(state.purchases||[])].filter(source=>source._serverConfirmed===false&&!source.voided&&!source.deleted&&sheriDateInReportRange(source.created_at||source.purchased_at)).length;
   const reconcileButton=document.getElementById('accReconcileButton');
   if(reconcileButton){reconcileButton.style.display=integrity.invalidCount&&accServerSnapshotAuthoritative&&sheriCan('manage_finance')&&sheriCan('view_financial_reports')?'inline-flex':'none';reconcileButton.textContent=sheriPendingText('Review and repair ledger');}
-  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' journal entr'+(integrity.invalidCount===1?'y has':'ies have')+' missing, duplicated, mismatched or unbalanced postings. Review the General Ledger before relying on these totals.</div>':'';
+  const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' server-confirmed journal entr'+(integrity.invalidCount===1?'y has':'ies have')+' missing, duplicated, mismatched or unbalanced postings. Review the General Ledger before relying on these totals.</div>':'';
+  const pendingLedgerNotice=(pendingLedgerEntries.length||pendingLedgerSources)?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+pendingLedgerEntries.length+' journal entr'+(pendingLedgerEntries.length===1?'y':'ies')+' and '+pendingLedgerSources+' source record(s) are saved on this device but not yet confirmed by the server. They are excluded from confirmed-ledger defect checks; statements remain unverified until synchronization completes.</div>':'';
   const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd);
   const income=accStatementTotal('income',b,'credit');const salesRevenue=Number(b['4000']||0)-Number(b['4050']||0);const otherIncome=income-salesRevenue;
   const cogs=accStatementTotal('cogs',b,'debit');
@@ -6346,7 +6583,7 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
   const syncNotice=syncPending?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">Some transactions are still waiting to synchronize. These figures include only data currently available on this device and are NOT yet server-verified.</div>':'';
   const cashFlow=accCashFlowForPeriod(reportStart,reportEnd);
   const cashFlowNotice=Math.abs(cashFlow.reconciliationDifference)>0.005?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">'+sheriLocalized('Cash and cash equivalents do not reconcile. Difference: '+money(cashFlow.reconciliationDifference)+'. Review cash and bank journal lines before relying on these statements.','La trésorerie et les équivalents de trésorerie ne concordent pas. Écart : '+money(cashFlow.reconciliationDifference)+'. Vérifiez les écritures de caisse et de banque avant de vous fier à ces états.','Amafaranga ari mu bubiko na banki ntahura. Itandukaniro: '+money(cashFlow.reconciliationDifference)+'. Banza ugenzure inyandiko za cash na banki.')+'</div>':'';
-  const statementNotice=integrityNotice+inventoryReconciliationNotice+trialBalanceNotice+balanceNotice+cashFlowNotice+refreshNotice+syncNotice+serverSnapshotNotice;
+  const statementNotice=integrityNotice+pendingLedgerNotice+inventoryReconciliationNotice+trialBalanceNotice+balanceNotice+cashFlowNotice+refreshNotice+syncNotice+serverSnapshotNotice;
   const statementsVerified=integrity.invalidCount===0&&inventoryReconciliationApplicable&&Math.abs(inventoryDifference)<=0.005&&Math.abs(trialBalanceDifference)<=0.005&&Math.abs(balanceDifference)<=0.005&&Math.abs(cashFlow.reconciliationDifference)<=0.005&&!sheriAccountingRefreshError&&!syncPending&&accServerSnapshotAuthoritative===true;document.getElementById('reportMetrics').innerHTML=(statementNotice?'<div style="grid-column:1/-1">'+statementNotice+'</div>':'')+[[sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha'),money(salesRevenue),''],['Net profit',money(net),net>=0?'good':'bad'],['Assets',money(assets),''],['Liabilities',money(liab),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');document.getElementById('accPL').innerHTML=statementNotice+`<div class="row"><span>${sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha')}</span><b>${money(salesRevenue)}</b></div><div class="row"><span>COGS</span><b>${money(cogs)}</b></div><div class="row"><span>Gross profit</span><b>${money(salesRevenue-cogs)}</b></div><div class="row"><span>${sheriLocalized('Other income','Autres produits','Ayandi mafaranga yinjijwe')}</span><b>${money(otherIncome)}</b></div><div class="row"><span>${sheriLocalized('Operating expenses','Charges d’exploitation','Amafaranga akoreshwa mu bikorwa')}</span><b>${money(exp)}</b></div><div class="row"><span>${sheriLocalized('Profit before tax','Bénéfice avant impôt','Inyungu mbere y’imisoro')}</span><b>${money(profitBeforeTax)}</b></div><div class="row"><span>${sheriLocalized('Income tax expense','Charge d’impôt sur le revenu','Ikiguzi cy’umusoro ku nyungu')}</span><b>${money(taxExpense)}</b></div><div class="row"><span>${sheriLocalized('Net profit','Bénéfice net','Inyungu nyakuri')}</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Overdue receivables: ${money((state.invoices||[]).filter(x=>x.due_date<accToday()&&accInvoiceStatus(x)!=='paid').reduce((s,x)=>s+x.total-accInvoicePaid(x),0))} • Overdue payables: ${money((state.bills||[]).filter(x=>x.due_date<accToday()&&accBillStatus(x)!=='paid').reduce((s,x)=>s+x.total-accBillPaid(x),0))}</div>`;document.getElementById('accBS').innerHTML=statementNotice+`<div class="row"><span>Total assets</span><b>${money(assets)}</b></div><div class="row"><span>${sheriLocalized('Inventory per product records','Stock selon les fiches produits','Ububiko nk’uko bwanditswe mu bicuruzwa')}</span><b>${inventoryReconciliationApplicable?money(inventorySubledgerValue):sheriLocalized('Not available for historical date','Non disponible à cette date historique','Ntibiboneka ku itariki yashize')}</b></div><div class="row"><span>${sheriLocalized('Inventory control account (1200)','Compte de stock (1200)','Konti y’ububiko (1200)')}</span><b>${money(inventoryLedgerBalance)}</b></div><div class="row"><span>${sheriLocalized('Inventory valuation difference','Écart de valorisation du stock','Itandukaniro ry’agaciro k’ububiko')}</span><b>${inventoryReconciliationApplicable?money(inventoryDifference):'—'}</b></div><div class="row"><span>Total liabilities</span><b>${money(liab)}</b></div><div class="row"><span>Tax payable (included in liabilities)</span><b>${money(bs['2100']||0)}</b></div><div class="row"><span>Input tax receivable (included in assets)</span><b>${money(bs['2110']||0)}</b></div><div class="row"><span>Equity incl. current profit</span><b>${money(equity)}</b></div><div class="sub" style="margin-top:8px">${statementsVerified?sheriLocalized('✓ Financial statements are verified.','✓ Les états financiers sont vérifiés.','✓ Raporo z’imari zigenzuwe neza.'):'⚠ '+sheriLocalized('Financial statements are NOT verified. Check journal integrity, inventory reconciliation, Trial Balance and server refresh before relying on these figures.','Les états financiers ne sont PAS vérifiés. Vérifiez le journal, le rapprochement des stocks, la balance générale et l’actualisation du serveur avant de vous fier à ces chiffres.','Raporo z’imari NTIZIRAGENZURWA. Banza ugenzure inyandiko z’ibaruramari, ihuzwa ry’ububiko, igereranya ry’amadeni n’inguzanyo, n’ivugururwa rya seriveri.')}</div>`;document.getElementById('accCF').innerHTML=statementNotice+`<div class="sub">${sheriLocalized("Direct cash movement summary (unclassified). Inflows and outflows use the net movement across cash, bank and mobile-money accounts. Transfers between cash-equivalent accounts are excluded. This is not yet a classified operating, investing and financing cash flow statement.","Résumé non classé des mouvements de trésorerie. Les entrées et sorties utilisent le mouvement net des comptes de caisse, bancaires et de mobile money. Les transferts entre équivalents de trésorerie sont exclus. Il ne s’agit pas encore d’un tableau classé entre activités opérationnelles, d’investissement et de financement.","Incamake y’ihinduka ry’amafaranga itarashyirwa mu byiciro. Amafaranga yinjiye n’ayagiye abarwa hashingiwe ku mpinduka rusange kuri konti za cash, banki na mobile money. Ihererekanya hagati ya konti z’amafaranga ntiribarebwa. Iyi si raporo yuzuye itandukanya ibikorwa bisanzwe, ishoramari n’inkunga cyangwa igishoro.")}</div><div class="row"><span>Opening cash and cash equivalents</span><b>${money(cashFlow.opening)}</b></div><div class="row"><span>Cash inflows in period</span><b>${money(cashFlow.inflows)}</b></div><div class="row"><span>Cash outflows in period</span><b>${money(cashFlow.outflows)}</b></div><div class="row"><span>Net cash flow in period</span><b>${money(cashFlow.net)}</b></div><div class="row"><span>Closing cash and cash equivalents</span><b>${money(cashFlow.closing)}</b></div><div class="sub" style="margin-top:8px">${Math.abs(cashFlow.reconciliationDifference)<=0.005?'✓ Cash movement reconciles.':'⚠ Cash movement does not reconcile. Difference: '+money(cashFlow.reconciliationDifference)}</div>`;const tbRows=[];let tbDebits=0,tbCredits=0;for(const a of (state.accounts||[])){const normalSide=String(a.normal_balance||(['liability','equity','income'].includes(a.type)?'credit':'debit')).toLowerCase(),balance=Number(bs[a.code]||0);if(Math.abs(balance)<=0.005)continue;const debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance),credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance);tbDebits+=debit;tbCredits+=credit;tbRows.push('<tr><td>'+esc(a.code)+'</td><td>'+esc(sheriLocalizedAccountName(a))+'</td><td>'+money(debit)+'</td><td>'+money(credit)+'</td></tr>')}const tbDifference=tbDebits-tbCredits;document.getElementById('accTB').innerHTML=tbRows.length?'<table class="table"><thead><tr><th>Code</th><th>Account</th><th>Debit</th><th>Credit</th></tr></thead><tbody>'+tbRows.join('')+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+money(tbDebits)+'</th><th>'+money(tbCredits)+'</th></tr></tfoot></table><div class="sub" style="margin-top:8px">'+(Math.abs(tbDifference)<=0.005?'✓ Debits and credits balance.':'⚠ Trial Balance difference: '+money(tbDifference)+'. Review the General Ledger before relying on these figures.')+'</div>':'<div class="empty">No posted account balances exist for this reporting date yet.</div>';const gl=(state.journalEntries||[]).filter(e=>sheriDateInReportRange(e.entry_date||e.created_at)).slice().sort((a,b)=>String(b.created_at||b.entry_date).localeCompare(String(a.created_at||a.entry_date))).slice(0,30);document.getElementById('accGL').innerHTML=gl.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr>${gl.map(e=>{const ls=accLinesForEntry(e.id);return ls.map(l=>`<tr><td>${esc(e.entry_date)}</td><td>${esc(e.description)} — ${esc(sheriLocalizedAccountName(accAccount(l.account_id)))}</td><td>${l.debit?money(l.debit):''}</td><td>${l.credit?money(l.credit):''}</td></tr>`).join('')}).join('')}</table>`:'<div class="empty">No journal entries yet.</div>';document.getElementById('accAudit').innerHTML=state.auditLog.length?`<table class="table"><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Reason</th><th>Details</th></tr>${state.auditLog.filter(x=>sheriDateInReportRange(x.created_at)).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,20).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audit events yet.</div>';}
 
 /* V14.4.93: translate every financial-report text node consistently in EN/FR/RW.
@@ -6483,9 +6720,56 @@ renderReports=function(){const result=_sheriReportsWithTranslations.apply(this,a
 // Do not create a second client-side journal batch for the same sale.
 const _v14_1_recordSale=recordSale;
 // The sales AFTER INSERT database trigger posts revenue and COGS atomically with the stock transaction. Keep this client wrapper audit-only; posting again here would duplicate the ledger.recordSale=async function(){const before=state.sales.length;await _v14_1_recordSale();const created=state.sales.slice(before);for(const s of created){const total=Number(s.qty||0)*Number(s.price||0),cogs=Number(s.qty||0)*Number(s.cost||0);try{await accAudit('create','sale',s.id,{total,cogs,invoice_number:s.invoice_number||null,transaction_id:s.transaction_id||null})}catch(e){console.warn('[Sheri audit] sale audit event could not be queued',e)}}render()};
-const _v14_1_addOSPurchase=addOSPurchase;addOSPurchase=async function(){const before=state.purchases.length;await _v14_1_addOSPurchase();const p=state.purchases[before];if(p&&p.status!=='ordered'){try{await accEnsureBase();const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||p.qty*p.unit_cost);await accPostEntry({date:String(p.purchased_at||p.created_at).slice(0,10),description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});await accAudit('create','purchase',p.id,{total})}catch(e){console.warn('[Sheri accounting] purchase ledger failed',e)}}render()};
+const _v14_1_addOSPurchase=addOSPurchase;
+addOSPurchase=async function(){
+  const requestedStatus=document.getElementById('osPurchaseStatus')?.value||'received';
+  let inv=null,ap=null;
+  if(requestedStatus!=='ordered'){
+    try{
+      await accEnsureBase();
+      inv=accAccountCode('1200');ap=accAccountCode('2000');
+      if(!inv||!ap)throw new Error('Inventory (1200) and Accounts Payable (2000) accounts must be active.');
+    }catch(e){
+      sheriToast('Purchase was not recorded because its accounting setup is unavailable: '+(e?.message||String(e)),'error');
+      return null;
+    }
+  }
+  const p=await _v14_1_addOSPurchase();
+  if(p&&p.status!=='ordered'){
+    try{
+      const total=Number(p.total||Number(p.qty||0)*Number(p.unit_cost||0));
+      const date=String(p.purchased_at||p.created_at||sheriNow()).slice(0,10);
+      await accPostEntry({date,description:'Purchase '+(p.product_name_snapshot||''),sourceType:'purchase',sourceId:p.id,lines:[{accountId:inv.id,debit:total},{accountId:ap.id,credit:total}]});
+      await accAudit('create','purchase',p.id,{total});
+      if(navigator.onLine)await sheriSyncOutbox();
+      let serverConfirmed=false;
+      if(navigator.onLine){
+        const {data:entry,error:entryError}=await sb.from('journal_entries').select('id')
+          .eq('merchant_id',p.merchant_id).eq('source_type','purchase').eq('source_id',p.id).eq('voided',false).maybeSingle();
+        if(entryError)throw entryError;
+        if(entry){
+          const {data:lines,error:lineError}=await sb.from('journal_lines').select('account_id,debit,credit')
+            .eq('merchant_id',p.merchant_id).eq('journal_entry_id',entry.id);
+          if(lineError)throw lineError;
+          const invLine=(lines||[]).find(line=>state.accounts.find(a=>a.id===line.account_id)?.code==='1200');
+          const apLine=(lines||[]).find(line=>state.accounts.find(a=>a.id===line.account_id)?.code==='2000');
+          serverConfirmed=(lines||[]).length===2&&!!invLine&&!!apLine&&
+            Math.abs(Number(invLine.debit||0)-total)<=0.005&&Number(invLine.credit||0)===0&&
+            Math.abs(Number(apLine.credit||0)-total)<=0.005&&Number(apLine.debit||0)===0;
+        }
+      }
+      if(serverConfirmed)sheriToast('Purchase saved; inventory and Accounts Payable journal confirmed on the server.','success');
+      else sheriToast('Purchase saved and stock updated. Its accounting journal is queued or awaiting server confirmation; do not rely on the statements yet.','warning');
+    }catch(e){
+      console.warn('[Sheri accounting] purchase ledger failed',e);
+      sheriToast('Purchase saved and stock updated, but its accounting journal needs attention: '+(e?.message||String(e)),'error');
+    }
+  }
+  render();
+  return p;
+};
 // Expense wrapper: locate newly added expense after original operation and post cash/expense entry.
-const _v14_1_addExpense=addExpense;addExpense=async function(){const before=state.expenses.length;await _v14_1_addExpense();if(state.expenses.length>before){const e=state.expenses[state.expenses.length-1];try{await accEnsureBase();const ex=accAccountCode('6000'),cash=accAccountCode('1000'),amount=Number(e.amount||0);if(amount<=0)throw new Error('Expense amount must be positive.');await accPostEntry({date:String(e.created_at||sheriNow()).slice(0,10),description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});await accAudit('create','expense',e.id,{amount})}catch(err){console.warn('[Sheri accounting] expense ledger failed',err);alert('Expense was saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
+const _v14_1_addExpense=addExpense;addExpense=async function(){const before=state.expenses.length;await _v14_1_addExpense();if(state.expenses.length>before){const e=state.expenses[state.expenses.length-1];try{await accEnsureBase();const ex=accAccountCode('6000'),payable=accAccountCode('2050'),amount=Number(e.amount||0);if(amount<=0||!ex||!payable)throw new Error('Expense amount or required ledger account is invalid.');await accPostEntry({date:String(e.created_at||sheriNow()).slice(0,10),description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:payable.id,credit:amount}]});await accAudit('create','expense',e.id,{amount})}catch(err){console.warn('[Sheri accounting] expense ledger failed',err);alert('Expense was saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
 
 </script>
 
@@ -8673,10 +8957,11 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   const portrait=document.querySelector('#dashboard .sheri-launcher .sheri-thumb img');
   function paint(language){
     const names=labels[language]||labels.en;
-    Array.from(nav.querySelectorAll('button')).filter(b=>b!==sheri).slice(0,5).forEach((button,index)=>{button.textContent=['⌂','＋','▦','⚙','◈'][index]+' '+names[index];button.setAttribute('aria-label',names[index])});const subnav=document.getElementById('aibosCommandSubnav');if(subnav){const w={en:['Customer','Suppliers & Purchases','Expenses','Reports','Money','AI Advisor','Forecast','Return','AI Business Insight'],rw:['Umukiriya','Abaranguza n’ibyaguzwe','Amafaranga yakoreshejwe','Raporo','Amafaranga','Umujyanama wa AI','Iteganyagihe','Ibyasubijwe','Inama z’ubucuruzi za AI'],fr:['Clients','Fournisseurs & achats','Dépenses','Rapports','Finances','Conseiller IA','Prévisions','Retours','Conseils IA sur l’entreprise']};subnav.querySelectorAll('button').forEach((b,i)=>b.textContent=(w[language]||w.en)[i]||b.textContent)}
-    sheri.replaceChildren();
-    if(portrait){const img=portrait.cloneNode(true);img.removeAttribute('id');img.className='sheri-nav-thumb';img.alt='Shericeri';sheri.appendChild(img)}
-    sheri.appendChild(document.createTextNode(names[5]));sheri.setAttribute('aria-label',names[5]);sheri.title=names[5];
+    Array.from(nav.querySelectorAll('button')).filter(b=>b!==sheri).slice(0,5).forEach((button,index)=>{const label=['⌂','＋','▦','⚙','◈'][index]+' '+names[index];if(button.textContent!==label)button.textContent=label;button.setAttribute('aria-label',names[index])});const subnav=document.getElementById('aibosCommandSubnav');if(subnav){const w={en:['Customer','Suppliers & Purchases','Expenses','Reports','Money','AI Advisor','Forecast','Return','AI Business Insight'],rw:['Umukiriya','Abaranguza n’ibyaguzwe','Amafaranga yakoreshejwe','Raporo','Amafaranga','Umujyanama wa AI','Iteganyagihe','Ibyasubijwe','Inama z’ubucuruzi za AI'],fr:['Clients','Fournisseurs & achats','Dépenses','Rapports','Finances','Conseiller IA','Prévisions','Retours','Conseils IA sur l’entreprise']};subnav.querySelectorAll('button').forEach((b,i)=>{const label=(w[language]||w.en)[i]||b.textContent;if(b.textContent!==label)b.textContent=label})}
+    if(portrait&&!sheri.querySelector('.sheri-nav-thumb')){const img=portrait.cloneNode(true);img.removeAttribute('id');img.className='sheri-nav-thumb';img.alt='Shericeri';sheri.appendChild(img)}
+    let labelNode=Array.from(sheri.childNodes).find(node=>node.nodeType===Node.TEXT_NODE);
+    if(!labelNode){labelNode=document.createTextNode(names[5]);sheri.appendChild(labelNode)}else if(labelNode.nodeValue!==names[5])labelNode.nodeValue=names[5];
+    sheri.setAttribute('aria-label',names[5]);sheri.title=names[5];
   }
   const oldLauncher=document.querySelector('#appRoot .side > .sheri-global-launcher');if(oldLauncher)oldLauncher.remove();
   const picker=document.getElementById('aibosLanguageSelect'),getLanguage=()=>picker?.value||window.AIBOS_I18N?.getLanguage?.()||'en';
@@ -8938,29 +9223,13 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
  #appRoot .side .nav button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
  #appRoot .side .nav button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
  #appRoot .main{
-  margin:calc(var(--aibos-side-height, 330px) + 14px) 0 0!important;
+  margin:0!important;
   width:100%!important;max-width:100%!important;
   padding:16px 12px 18px!important;box-sizing:border-box!important;
  }
 }
 </style>
-<script id="aibos-navigation-live-clearance-v2">
-(function(){
- const side=document.querySelector('#appRoot .side'),root=document.getElementById('appRoot');
- if(!side||!root)return;
- let last=0;
- function measure(){
-  if(window.innerWidth>650){root.style.removeProperty('--aibos-side-height');return}
-  const h=Math.ceil(side.getBoundingClientRect().height);
-  if(h>0&&h!==last){last=h;root.style.setProperty('--aibos-side-height',h+'px')}
- }
- if('ResizeObserver' in window){const observer=new ResizeObserver(measure);observer.observe(side)}
- window.addEventListener('resize',measure,{passive:true});
- window.addEventListener('aibos:languagechange',()=>{measure();requestAnimationFrame(measure)});
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',measure,{once:true});
- measure();
-})();
-</script>
+
 
 <!-- Global application UI consistency: same responsive design system in English, Kinyarwanda and French. -->
 <style id="aibos-global-ui-consistency-all-locales-v1">
@@ -9143,36 +9412,14 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
   #appRoot .side .nav>button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
   #appRoot .side .nav>button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
   #appRoot .main{
-    margin:calc(var(--aibos-side-height, 300px) + 14px) 0 0!important;
+    margin:0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:16px 12px 18px!important;
   }
   #appRoot .main .table{font-size:12px!important}
 }
 </style>
-<script id="aibos-locale-layout-measure-v2">
-(function(){
-  const root=document.getElementById('appRoot');
-  const side=root?.querySelector('.side');
-  if(!root||!side)return;
-  let last=-1,frame=0;
-  function measure(){
-    if(window.innerWidth>650){root.style.removeProperty('--aibos-side-height');last=-1;return}
-    const height=Math.ceil(Math.max(side.getBoundingClientRect().height,side.scrollHeight));
-    if(height>0&&height!==last){last=height;root.style.setProperty('--aibos-side-height',height+'px')}
-  }
-  function schedule(){if(frame)return;frame=requestAnimationFrame(()=>{frame=0;measure()})}
-  if('ResizeObserver' in window){const observer=new ResizeObserver(schedule);observer.observe(side)}
-  const mutations=new MutationObserver(schedule);
-  mutations.observe(side,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style']});
-  const appVisibility=new MutationObserver(schedule);
-  appVisibility.observe(root,{attributes:true,attributeFilter:['style','class']});
-  window.addEventListener('resize',schedule,{passive:true});
-  window.addEventListener('aibos:languagechange',schedule);
-  if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
-  schedule();
-})();
-</script>
+
 
 <!-- Authoritative cross-locale layout: Kinyarwanda changes copy, never the design geometry. -->
 <style id="aibos-final-cross-locale-layout-v3">
@@ -9287,48 +9534,13 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
     background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;
   }
   #appRoot .main{
-    margin:calc(var(--aibos-side-height, 330px) + 16px) 0 0!important;
+    margin:0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:14px 12px 18px!important;overflow-x:hidden!important;
   }
 }
 </style>
-<script id="aibos-final-cross-locale-layout-measure-v3">
-(function(){
-  const root=document.getElementById('appRoot');
-  const side=root?.querySelector('.side');
-  if(!root||!side||root.__aibosLayoutMeasureV3)return;
-  root.__aibosLayoutMeasureV3=true;
-  let frame=0,lastHeight=-1;
-  function measure(){
-    if(window.innerWidth>650){
-      if(root.style.getPropertyValue('--aibos-side-height'))root.style.removeProperty('--aibos-side-height');
-      lastHeight=-1;return;
-    }
-    const height=Math.ceil(side.getBoundingClientRect().height);
-    if(height>0&&height!==lastHeight){
-      lastHeight=height;
-      root.style.setProperty('--aibos-side-height',height+'px');
-    }
-  }
-  function schedule(){
-    if(frame)return;
-    frame=requestAnimationFrame(()=>{frame=0;measure()});
-  }
-  if('ResizeObserver' in window){
-    const observer=new ResizeObserver(schedule);observer.observe(side);
-  }
-  const mutations=new MutationObserver(schedule);
-  mutations.observe(side,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style','hidden']});
-  const rootObserver=new MutationObserver(schedule);
-  rootObserver.observe(root,{attributes:true,attributeFilter:['style','class']});
-  window.addEventListener('resize',schedule,{passive:true});
-  window.addEventListener('aibos:languagechange',schedule);
-  if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});
-  schedule();
-})();
-</script>
+
 
 
 <!-- Single authoritative navigation theme: identical computed design in EN/RW/FR. -->
@@ -9500,7 +9712,7 @@ html[lang="fr"] #appRoot #aibosCommandSubnav>button{
   html[lang="en"] #appRoot .main,
   html[lang="rw"] #appRoot .main,
   html[lang="fr"] #appRoot .main{
-    box-sizing:border-box!important;margin:calc(var(--aibos-side-height,330px) + 16px) 0 0!important;
+    box-sizing:border-box!important;margin:0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:14px 12px 18px!important;overflow-x:hidden!important;
   }
@@ -9917,113 +10129,88 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
 
 
 <!-- Approved 3-2-1 navigation and horizontal sync layout -->
-<style id="aibos-approved-navigation-and-sync-v1">
-#appRoot .side{display:flex!important;flex-direction:column!important;align-items:stretch!important}
-#appRoot .side .nav{display:flex!important;flex-direction:column!important;align-items:stretch!important}
-#appRoot .side #aibosLanguageSwitcher{position:static!important;inset:auto!important;transform:none!important;align-self:center!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:max-content!important;max-width:calc(100% - 12px)!important;min-width:0!important;margin:12px auto!important;padding:5px 9px!important;box-sizing:border-box!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:10px!important;box-shadow:none!important;z-index:2!important}
-#appRoot .side #aibosLanguageSwitcher select{width:auto!important;min-width:140px!important;max-width:100%!important;background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;text-align:center!important}
-#sheriOfflineBar{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:space-between!important;gap:8px!important;width:100%!important;min-width:0!important;box-sizing:border-box!important}
-#sheriOfflineBar>div:first-child{display:flex!important;flex:1 1 auto!important;flex-direction:row!important;align-items:center!important;gap:6px!important;min-width:0!important}
-#sheriOfflineBar>div:first-child #sheriSyncLabel{display:inline-block!important;min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important;line-height:1.25!important}
-#sheriOfflineBar>div:last-child{display:flex!important;flex:0 1 auto!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:flex-end!important;gap:5px!important;min-width:0!important;max-width:65%!important;overflow-x:auto!important;overflow-y:hidden!important;white-space:nowrap!important;-webkit-overflow-scrolling:touch!important;scrollbar-width:thin!important}
-#sheriOfflineBar>div:last-child .btn{display:inline-flex!important;flex:0 0 auto!important;align-items:center!important;white-space:nowrap!important;max-width:none!important;font-size:11px!important;line-height:1.15!important;padding:6px 8px!important}
-@media(max-width:650px){
- #appRoot .side{padding:9px 10px 10px!important;overflow:visible!important}
- #appRoot .side .nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(48px,auto))!important;grid-auto-flow:row!important;gap:6px!important;width:100%!important;min-width:0!important}
- #appRoot .side .nav>button{grid-column:span 2!important;grid-row:auto!important;min-width:0!important;width:100%!important;min-height:48px!important;height:auto!important;padding:6px 3px!important;display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;line-height:1.15!important;font-size:clamp(10px,3.1vw,13px)!important}
- #appRoot .side .nav>button:nth-child(1){grid-column:1 / span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(2){grid-column:3 / span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(3){grid-column:5 / span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(4){grid-column:1 / span 3!important;grid-row:2!important}
- #appRoot .side .nav>button:nth-child(5){grid-column:4 / span 3!important;grid-row:2!important}
- #appRoot .side .nav>button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
- #appRoot .side #aibosLanguageSwitcher{margin:9px auto 7px!important;max-width:100%!important}
- #appRoot .side #aibosLanguageSwitcher select{min-width:140px!important;max-width:calc(100vw - 48px)!important}
- #sheriOfflineBar{gap:5px!important;padding:7px 8px!important;margin:0 0 10px!important}
- #sheriOfflineBar>div:first-child{gap:4px!important;font-size:11px!important}
- #sheriOfflineBar>div:last-child{max-width:62%!important;gap:4px!important}
- #sheriOfflineBar>div:last-child .btn{font-size:10px!important;padding:5px 6px!important;min-height:30px!important}
-}
-@media(max-width:380px){
- #appRoot .side .nav{gap:4px!important}
- #appRoot .side .nav>button{font-size:10px!important;padding:5px 2px!important;min-height:45px!important}
- #sheriOfflineBar>div:first-child{font-size:10px!important}
- #sheriOfflineBar>div:last-child{max-width:60%!important}
- #sheriOfflineBar>div:last-child .btn{font-size:9.5px!important;padding:5px!important}
-}
-</style>
-<script id="aibos-approved-navigation-and-sync-v1">
+
+<script id="aibos-approved-navigation-and-sync-v2">
 (function(){
  'use strict';
- const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),nav=side?.querySelector('.nav'),main=app?.querySelector('.main'),picker=document.getElementById('aibosLanguageSwitcher'),auth=document.getElementById('authScreen');
- if(!side||!nav)return;
+ const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),nav=side?.querySelector('.nav');
+ const main=app?.querySelector('.main'),picker=document.getElementById('aibosLanguageSwitcher');
+ const sync=document.getElementById('sheriOfflineBar'),auth=document.getElementById('authScreen');
+ if(!app||!side||!nav||!main)return;
  const order=['dashboard','sales','inventory','businessOS','settings'];
  const labels={en:['Home','Sell','Stock','AIBOS Command Center','Settings','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Igenzura ry’ubucuruzi','Igenamiterere','Shericeri'],fr:['Accueil','Vendre','Stock','Centre de gestion AIBOS','Paramètres','Shericeri']},icons=['⌂','＋','▦','◈','⚙',''];
  function paint(lang){
-  const names=labels[lang]||labels.en;
+  const code=String(lang||'en').toLowerCase(),key=code.startsWith('fr')?'fr':(code.startsWith('rw')||code.startsWith('ki'))?'rw':'en',names=labels[key];
   order.forEach((id,i)=>{const b=nav.querySelector(':scope > button[data-view="'+id+'"]');if(b){const label=icons[i]+' '+names[i];if(b.textContent!==label)b.textContent=label;b.setAttribute('aria-label',names[i])}});
-  const s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(s){const labelNode=Array.from(s.childNodes).find(n=>n.nodeType===Node.TEXT_NODE);if(labelNode){if(labelNode.nodeValue!==names[5])labelNode.nodeValue=names[5]}else s.appendChild(document.createTextNode(names[5]));s.setAttribute('aria-label',names[5]);s.title=names[5]}
+  const s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');
+  if(s){const node=Array.from(s.childNodes).find(n=>n.nodeType===Node.TEXT_NODE);if(node){if(node.nodeValue!==names[5])node.nodeValue=names[5]}else s.appendChild(document.createTextNode(names[5]));s.setAttribute('aria-label',names[5]);s.title=names[5]}
  }
  function arrange(){
   const wanted=order.map(id=>nav.querySelector(':scope > button[data-view="'+id+'"]')).filter(Boolean),s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(s)wanted.push(s);
-  const current=Array.from(nav.children).filter(x=>x.matches('button'));if(wanted.some((x,i)=>current[i]!==x))wanted.forEach(x=>nav.appendChild(x));
-  const active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none');
-  if(picker&&active){const sub=document.getElementById('aibosCommandSubnav');if(picker.parentElement!==side||picker.nextElementSibling!==sub)side.insertBefore(picker,sub||null)}
-  paint(picker?.querySelector('select')?.value||window.AIBOS_I18N?.getLanguage?.()||'en');
-  if(main&&window.innerWidth<=650&&active)main.style.setProperty('margin-top',(side.getBoundingClientRect().height+10)+'px','important');
-  else if(main)main.style.removeProperty('margin-top');
+  const current=Array.from(nav.children).filter(el=>el.matches('button'));if(wanted.some((el,i)=>current[i]!==el))wanted.forEach(el=>nav.appendChild(el));
+  const active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none'),mobile=window.innerWidth<=650;
+  if(active&&mobile){
+   const sub=document.getElementById('aibosCommandSubnav');
+   if(picker&&picker.parentElement!==side)side.insertBefore(picker,sub||null);
+   if(picker&&sync&&(sync.parentElement!==side||sync.previousElementSibling!==picker))side.insertBefore(sync,picker.nextSibling);
+  }else{
+   if(picker&&picker.parentElement===side)document.body.appendChild(picker);
+   if(sync&&sync.parentElement!==main)main.insertBefore(sync,main.firstChild);
+  }
+  main.style.removeProperty('margin-top');
+  paint(picker?.querySelector('select')?.value||window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en');
  }
- const select=picker?.querySelector('select');
- select?.addEventListener('change',()=>paint(select.value));
+ const select=picker?.querySelector('select');select?.addEventListener('change',()=>paint(select.value));
  window.addEventListener('aibos:languagechange',e=>{paint(e.detail?.language||select?.value||'en');arrange()});
- window.addEventListener('resize',arrange,{passive:true});
- const observer=new MutationObserver(arrange);observer.observe(side,{childList:true});if(main)observer.observe(main,{childList:true});observer.observe(app,{attributes:true,attributeFilter:['style']});if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
+ window.addEventListener('resize',arrange,{passive:true});window.addEventListener('orientationchange',arrange,{passive:true});
+ const observer=new MutationObserver(arrange);observer.observe(app,{attributes:true,attributeFilter:['style']});if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
  arrange();
 })();
 </script>
-<!-- V14.4.58: unified sync status layout and readable mobile typography across every locale -->
-<style id="aibos-unified-sync-layout-v58">
-/* Locale changes text only: the same sizing, flex rules and typography apply to EN/RW/FR. */
-#appRoot #sheriOfflineBar{
-  display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
-  align-items:center!important;justify-content:space-between!important;gap:10px!important;
-  width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;
-  padding:9px 12px!important;overflow:hidden!important;
-}
-#appRoot #sheriOfflineBar>div:first-child{
-  display:flex!important;flex:1 1 0!important;flex-direction:row!important;flex-wrap:wrap!important;
-  align-items:center!important;gap:5px 7px!important;min-width:0!important;max-width:none!important;
-  font-size:13.5px!important;line-height:1.3!important;
-}
-#appRoot #sheriOfflineBar>div:first-child #sheriConnectivityLabel,
-#appRoot #sheriOfflineBar>div:first-child #sheriSyncLabel{
-  font-size:inherit!important;line-height:1.3!important;overflow-wrap:anywhere!important;
-}
-#appRoot #sheriOfflineBar>div:last-child{
-  display:flex!important;flex:0 1 auto!important;flex-direction:row!important;flex-wrap:nowrap!important;
-  align-items:center!important;justify-content:flex-end!important;gap:6px!important;
-  width:max-content!important;min-width:0!important;max-width:68%!important;
-  overflow-x:auto!important;overflow-y:hidden!important;white-space:nowrap!important;
-  -webkit-overflow-scrolling:touch!important;scrollbar-width:thin!important;
-}
-#appRoot #sheriOfflineBar>div:last-child .btn{
-  display:inline-flex!important;flex:0 0 auto!important;align-items:center!important;justify-content:center!important;
-  min-height:34px!important;height:auto!important;width:auto!important;min-width:max-content!important;
-  max-width:none!important;box-sizing:border-box!important;padding:7px 9px!important;
-  font-size:12.5px!important;line-height:1.2!important;white-space:nowrap!important;
-}
+<!-- V14.4.67: one locale-independent natural-flow header and horizontal sync layout -->
+<style id="aibos-locale-invariant-header-sync-v67">
+/* Shared layout for every locale. Translation changes text, never geometry. */
+html[lang] body #appRoot .side{background:#010080!important;color:#F7EB5B!important}
+html[lang] body #appRoot .side .nav>button{background:#010080!important;color:#F7EB5B!important;border-color:rgba(247,235,91,.8)!important}
+html[lang] body #appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important;border-color:#F7EB5B!important}
+html[lang] body #appRoot .side #aibosLanguageSwitcher{background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important}
+html[lang] body #appRoot .side #aibosLanguageSwitcher select{background:#010080!important;color:#F7EB5B!important;border-color:#F7EB5B!important}
+html[lang] body #appRoot #sheriOfflineBar{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:7px 9px!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0 0 12px!important;padding:8px 10px!important;position:static!important;inset:auto!important;top:auto!important;z-index:auto!important;overflow:visible!important;background:#F8FAFC!important;color:#010080!important;border:1px solid #F7EB5B!important;border-radius:11px!important;box-shadow:none!important;writing-mode:horizontal-tb!important}
+html[lang] body #appRoot #sheriOfflineBar>div:first-child{display:flex!important;flex:1 1 150px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:4px 7px!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;color:#010080!important;background:transparent!important;writing-mode:horizontal-tb!important;font-size:13px!important;line-height:1.3!important}
+html[lang] body #appRoot #sheriOfflineBar>div:last-child{display:flex!important;flex:1 1 190px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;overflow:visible!important;white-space:normal!important;background:transparent!important;writing-mode:horizontal-tb!important}
+html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:34px!important;margin:0!important;padding:7px 9px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;font-family:inherit!important;font-size:12px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;writing-mode:horizontal-tb!important;transform:none!important}
 @media(max-width:650px){
-  #appRoot #sheriOfflineBar{gap:7px!important;padding:8px 9px!important;margin-bottom:10px!important}
-  #appRoot #sheriOfflineBar>div:first-child{font-size:13px!important;gap:4px 6px!important}
-  #appRoot #sheriOfflineBar>div:last-child{max-width:70%!important;gap:5px!important}
-  #appRoot #sheriOfflineBar>div:last-child .btn{font-size:12px!important;padding:7px 8px!important;min-height:34px!important}
+ html[lang] body #appRoot .side{position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:8px 10px 9px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important;color:#F7EB5B!important;border:0!important;border-bottom:2px solid #F7EB5B!important;border-radius:0!important;box-shadow:none!important;transform:none!important;z-index:auto!important}
+ html[lang] body #appRoot .side .brand{color:#F7EB5B!important;margin:0 0 5px!important;padding:0 0 5px!important}
+ html[lang] body #appRoot .side .nav{display:grid!important;position:relative!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(44px,auto))!important;grid-auto-flow:row!important;align-items:stretch!important;gap:5px!important;width:100%!important;min-width:0!important;margin:0!important;padding:5px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important}
+ html[lang] body #appRoot .side .nav>button{display:flex!important;grid-column:span 2!important;align-items:center!important;justify-content:center!important;width:100%!important;min-width:0!important;max-width:100%!important;min-height:44px!important;height:auto!important;max-height:none!important;margin:0!important;padding:5px 3px!important;box-sizing:border-box!important;font-family:inherit!important;font-size:clamp(11px,3.3vw,13px)!important;font-weight:650!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;border:1px solid rgba(247,235,91,.8)!important;border-radius:9px!important;box-shadow:none!important}
+ html[lang] body #appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
+ html[lang] body #appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
+ html[lang] body #appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
+ html[lang] body #appRoot .side .nav>button[data-view="businessOS"],html[lang] body #appRoot .side .nav>button[data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}
+ html[lang] body #appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
+ html[lang] body #appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important;justify-content:center!important}
+ html[lang] body #appRoot .side #aibosLanguageSwitcher{position:static!important;inset:auto!important;transform:none!important;align-self:center!important;order:0!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:max-content!important;max-width:calc(100% - 12px)!important;height:auto!important;margin:7px auto 7px!important;padding:4px 8px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;box-shadow:none!important}
+ html[lang] body #appRoot .side #aibosLanguageSwitcher select{width:auto!important;min-width:0!important;max-width:calc(100vw - 40px)!important;color:#F7EB5B!important;background:#010080!important;border:0!important;font-family:inherit!important;font-size:13px!important;font-weight:650!important;text-align:center!important}
+ html[lang] body #appRoot #sheriOfflineBar{margin:0 0 10px!important;padding:8px!important;gap:6px 8px!important}
+ html[lang] body #appRoot #sheriOfflineBar>div:first-child{flex:1 1 125px!important;width:auto!important;font-size:13px!important}
+ html[lang] body #appRoot #sheriOfflineBar>div:last-child{flex:1 1 175px!important;width:auto!important;gap:5px!important}
+ html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{flex:0 1 auto!important;min-height:34px!important;font-size:12px!important;padding:7px 8px!important}
+ html[lang] body #appRoot .main{position:relative!important;top:auto!important;inset:auto!important;margin:0!important;margin-top:0!important;padding:12px 12px 18px!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:0!important;box-sizing:border-box!important;overflow-x:hidden!important}
 }
-@media(max-width:380px){
-  #appRoot #sheriOfflineBar{gap:5px!important;padding:7px 7px!important}
-  #appRoot #sheriOfflineBar>div:first-child{font-size:12.5px!important}
-  #appRoot #sheriOfflineBar>div:last-child{max-width:70%!important}
-  #appRoot #sheriOfflineBar>div:last-child .btn{font-size:11.5px!important;padding:7px!important;min-height:34px!important}
-}
+@media(max-width:380px){html[lang] body #appRoot .side{padding-left:7px!important;padding-right:7px!important}html[lang] body #appRoot .side .nav{gap:4px!important;padding:4px!important}html[lang] body #appRoot #sheriOfflineBar{gap:5px!important;padding:7px!important}html[lang] body #appRoot #sheriOfflineBar>div:first-child{flex-basis:110px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child{flex-basis:165px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child{gap:4px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{font-size:11px!important;padding:6px!important}}
+</style>
+
+<!-- V14.4.71: force the sync panel into one locale-neutral two-column layout -->
+<style id="aibos-sync-locale-neutral-v71">
+/* Translation may change text length, but never the sync panel's layout or palette. */
+html[lang] body #appRoot #sheriOfflineBar{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr)!important;grid-auto-flow:row!important;align-items:center!important;justify-items:stretch!important;gap:7px 9px!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;padding:8px 10px!important;margin:0 0 12px!important;position:static!important;inset:auto!important;top:auto!important;z-index:auto!important;overflow:visible!important;writing-mode:horizontal-tb!important;direction:ltr!important;background:#F8FAFC!important;color:#010080!important;border:1px solid #F7EB5B!important;border-radius:11px!important;box-shadow:none!important}
+html[lang] body #appRoot #sheriOfflineBar>div:first-child{display:flex!important;flex:initial!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:4px 7px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;color:#010080!important;background:transparent!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;writing-mode:horizontal-tb!important;font-size:13px!important;line-height:1.3!important}
+html[lang] body #appRoot #sheriOfflineBar>div:first-child b,html[lang] body #appRoot #sheriOfflineBar>div:first-child span{min-width:0!important;max-width:100%!important;color:#010080!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;writing-mode:horizontal-tb!important}
+html[lang] body #appRoot #sheriOfflineBar>div:last-child{display:flex!important;flex:initial!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:5px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;overflow:visible!important;white-space:normal!important;background:transparent!important;writing-mode:horizontal-tb!important;direction:ltr!important}
+html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{display:inline-flex!important;flex:1 1 76px!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:34px!important;margin:0!important;padding:6px 7px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;font-family:inherit!important;font-size:12px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;writing-mode:horizontal-tb!important;transform:none!important}
+@media(max-width:650px){html[lang] body #appRoot #sheriOfflineBar{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important;gap:6px 7px!important;padding:8px!important;margin:0 0 10px!important}html[lang] body #appRoot #sheriOfflineBar>div:first-child{font-size:12px!important;line-height:1.25!important;gap:3px 5px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child{gap:4px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{flex:1 1 68px!important;min-height:34px!important;font-size:11px!important;padding:6px 5px!important}}
+@media(max-width:350px){html[lang] body #appRoot #sheriOfflineBar{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)!important;gap:5px!important;padding:7px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{font-size:10.5px!important;padding:5px 4px!important}}
 </style>
 </body>
 </html>

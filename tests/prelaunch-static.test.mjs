@@ -384,6 +384,104 @@ test("inventory staff can add products and receive purchases without editing exi
   assert.ok(teamMigration.includes("stock_applied"));
 });
 
+
+test("pending local-only journals are reported separately from server ledger integrity", () => {
+  for (const [label, source] of [["main app", html], ...(previewLiveHtml.trim() ? [["isolated preview", previewLiveHtml]] : [])]) {
+    assert.ok(source.includes("const entries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed!==false)"), label + ": pending local-only journals must not be counted as confirmed server-ledger defects");
+    assert.ok(source.includes("const pendingLedgerEntries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed===false"), label + ": pending local-only journals must be counted separately");
+    assert.ok(source.includes("saved on this device but not yet confirmed by the server"), label + ": users must see a clear synchronization warning");
+    assert.ok(source.includes("server-confirmed journal entr"), label + ": actual ledger integrity errors must remain visible");
+  }
+});
+
+test("expense recording and expense payments use separate balanced payable postings", () => {
+  assert.ok(html.includes("['2050','Accrued expenses payable','liability','credit']"), "2050 must be present in the default chart");
+  const expenseStart=html.indexOf("async function addExpense()");
+  const expenseEnd=html.indexOf("\\nasync function deleteExpense",expenseStart);
+  const expense=html.slice(expenseStart,expenseEnd);
+  assert.ok(expense.includes("payment_status:'unpaid'"), "new expenses must start as unpaid");
+  assert.ok(expense.includes("accountId:payable.id,credit:amount"), "expense recognition must credit accrued expenses payable");
+  const paymentStart=html.indexOf("async function accCreatePayment()");
+  const paymentEnd=html.indexOf("\\nasync function accCreateBankAccount()",paymentStart);
+  const payment=html.slice(paymentStart,paymentEnd);
+  assert.ok(payment.includes("debitId=accAccountCode('2050')?.id;creditId=accountId;sourceType='expense'"), "paying an existing expense must debit accrued expenses payable");
+  assert.ok(payment.includes("sourceType:'payment',sourceId:row.id"), "each payment must have a unique journal source");
+  assert.ok(payment.includes("linkedExpense.payment_status=accExpenseOutstanding(linkedExpense)<=0.005?'paid':'partial'"), "expense paid status must track cumulative linked payments");
+  assert.ok(payment.includes("if(amount>outstanding+0.005)"), "payments must not exceed the remaining expense balance");
+  assert.ok(html.includes("sourceType:'expense_delete',sourceId:e.id"), "expense deletion must reverse the original expense journal");
+  assert.ok(html.includes("sourceType:'payment_void',sourceId:payment.id"), "expense deletion must reverse every linked payment journal");
+  assert.ok(html.includes("'expense_delete','payment_void'].includes(e.source_type)"), "ledger integrity must recognize exact expense/payment reversal journals");
+  assert.ok(html.includes("Payment journal does not match its linked source, amount or cash/bank account"), "ledger integrity must validate payment posting semantics, not only debit-credit equality");
+  assert.ok(html.includes("Expense journal does not match the expense amount or payment-liability treatment"), "ledger integrity must validate expense posting semantics");
+});
+
+test("ledger repair review is centered, copyable and requires explicit confirmation", () => {
+  assert.ok(html.includes("function accShowRepairConfirmation(message)"));
+  assert.ok(html.includes("#accRepairDialog{position:fixed;inset:0;z-index:1000000;display:grid;place-items:center"));
+  assert.ok(html.includes("if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(message)"));
+  assert.ok(html.includes("acc-repair-details"));
+  assert.ok(html.includes("if(!await accShowRepairConfirmation(promptText))return;"));
+  assert.ok(html.includes("integrity.invalid.map((x,i)=>"), "diagnostic must include every flagged entry, not only the first eight");
+});
+
+test("background refresh does not rerender the active financial reports view", () => {
+  assert.ok(html.includes("function sheriDeferBackgroundRender()"));
+  assert.ok(html.includes("sheriCurrentView==='reports'"));
+  assert.ok(html.includes("if(hadLocal&&!(silent&&sheriDeferBackgroundRender()))render()"));
+  assert.ok(html.includes("loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()})"));
+  assert.ok(html.includes("source._serverConfirmed===false"), "pending local source records must not be reported as missing server journals");
+});
+
+test("received purchases post and verify their inventory/AP journal without unsafe settings upserts", () => {
+  for (const [label, source] of [["main app", html], ["isolated preview", previewLiveHtml]]) {
+    const purchaseStart = source.indexOf("async function addOSPurchase()");
+    const purchaseEnd = source.indexOf("\nasync function", purchaseStart + 1);
+    assert.ok(purchaseStart >= 0 && purchaseEnd > purchaseStart, label + ": expected the complete purchase recorder");
+    assert.ok(source.slice(purchaseStart, purchaseEnd).includes("return data;"), label + ": purchase recorder must return the exact saved purchase");
+
+    const wrapperStart = source.indexOf("const _v14_1_addOSPurchase=addOSPurchase");
+    const wrapperEnd = source.indexOf("\n// Expense", wrapperStart);
+    assert.ok(wrapperStart >= 0 && wrapperEnd > wrapperStart, label + ": expected the purchase accounting wrapper");
+    const wrapper = source.slice(wrapperStart, wrapperEnd);
+    assert.ok(wrapper.includes("const p=await _v14_1_addOSPurchase()"), label + ": wrapper must use the returned purchase, not a fragile array index");
+    assert.ok(wrapper.indexOf("await accEnsureBase()") < wrapper.indexOf("await _v14_1_addOSPurchase()"), label + ": accounting accounts must be validated before stock is changed");
+    assert.ok(wrapper.includes("await accPostEntry("), label + ": received purchases must debit inventory and credit accounts payable");
+    assert.ok(wrapper.includes("await sheriSyncOutbox()"), label + ": purchase journal must be actively synchronized");
+    assert.ok(wrapper.includes("journal confirmed on the server"), label + ": UI must distinguish a server-confirmed journal from a queued one");
+
+    assert.ok(source.includes("async function sheriSyncAccountingSettingsOperation(op)"), label + ": settings sync must use the safe update-first handler");
+    assert.ok(source.includes(".select('merchant_id,locked_through,updated_at,created_at')"), label + ": settings sync must read the existing server row first");
+    assert.ok(source.includes(".update({locked_through:record.locked_through??null,updated_at:record.updated_at||sheriNow()})"), label + ": only newer settings may update the server row");
+    assert.ok(source.includes(".insert(sheriServerRecord(record))"), label + ": missing settings rows must use an insert");
+    assert.ok(!source.includes(".upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'})"), label + ": settings must not use a conflict-ignore upsert that can fail RLS checks");
+
+    const journalFunction = source.indexOf("function sheriSyncJournalBatch(op){");
+    const purchaseJournalGuard = source.indexOf("if(entry.source_type==='purchase')", journalFunction);
+    const journalSync = source.indexOf("await sheriSyncJournalBatch(op)", source.indexOf("async function sheriSyncOutbox"));
+    assert.ok(journalFunction >= 0 && purchaseJournalGuard > journalFunction && journalSync > purchaseJournalGuard, label + ": purchase journal sync must wait for a server-confirmed received purchase and stock movement");
+    assert.ok(source.includes("accounting_settings_rls_retry:true"), label + ": a previously blocked settings RLS operation must get one safe retry");
+  }
+});
+
+test("isolated preview validates expense accruals and linked payments against the payable account", () => {
+  assert.ok(previewLiveHtml.includes("const usePayable=linkedPaid>0||['unpaid','partial'].includes(String(expense.payment_status||'').toLowerCase())"));
+  assert.ok(previewLiveHtml.includes("payment.source_type==='expense'&&payment.direction==='payment'"));
+  assert.ok(previewLiveHtml.includes("code:'2050',debit:amount,credit:0"));
+  assert.ok(previewLiveHtml.includes("https://hicvgrkltwkqhnioakcg.supabase.co"));
+  assert.doesNotMatch(previewLiveHtml, /https:\/\/bhtodxjhgucgwarpaqzy\.supabase\.co/);
+});
+
+test("isolated preview defers background Reports renders and uses a centered copyable repair dialog", () => {
+  assert.ok(previewLiveHtml.includes("function sheriDeferBackgroundRender()"));
+  assert.ok(previewLiveHtml.includes("sheriCurrentView==='reports'"));
+  assert.ok(previewLiveHtml.includes("if(hadLocal&&!(silent&&sheriDeferBackgroundRender()))render()"));
+  assert.ok(previewLiveHtml.includes("if(!sheriDeferBackgroundRender())render()"));
+  assert.ok(previewLiveHtml.includes("function accShowRepairConfirmation(message)"));
+  assert.ok(previewLiveHtml.includes("place-items:center"));
+  assert.ok(previewLiveHtml.includes("navigator.clipboard?.writeText"));
+  assert.ok(previewLiveHtml.includes("integrity.invalid.map((x,i)=>"));
+});
+
 test("team administration requires the manager role, not only a delegated flag", () => {
   assert.ok(teamAccess.includes("membership.role === \"manager\" && callerPermissions.manage_team === true"));
   assert.ok(teamAccess.includes("callerRole === \"manager\" && callerPermissions.manage_team === true"));
@@ -871,12 +969,31 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
   assert.ok(html.includes("if(!full_name||full_name.length<2||full_name.length>120)"));
 });
 
-test("sync status bar uses one locale-invariant horizontal layout with readable, non-squashed controls", () => {
+test("navigation, language picker and sync layout use one locale-independent natural-flow system", () => {
   for (const source of [html, previewLiveHtml]) {
-    assert.ok(source.includes('id="aibos-unified-sync-layout-v58"'));
-    assert.match(source, /#appRoot #sheriOfflineBar>div:last-child\s*\{[\s\S]*?flex-direction:row!important;[\s\S]*?flex-wrap:nowrap!important/);
-    assert.match(source, /#appRoot #sheriOfflineBar>div:last-child \.btn\s*\{[\s\S]*?flex:0 0 auto!important;[\s\S]*?font-size:12\.5px!important/);
-    assert.match(source, /@media\(max-width:380px\)[\s\S]*?#appRoot #sheriOfflineBar>div:last-child \.btn\s*\{[\s\S]*?font-size:11\.5px!important/);
-    assert.doesNotMatch(source, /(?:html\[lang="(?:en|rw|fr)"\]|:lang\((?:en|rw|fr)\))[^{}]*#sheriOfflineBar/);
+    assert.ok(source.includes('id="aibos-locale-invariant-header-sync-v67"'));
+    assert.ok(source.includes('id="aibos-sync-locale-neutral-v71"'));
+    assert.ok(source.includes('grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important'));
+    assert.ok(source.includes('background:#F8FAFC!important;color:#010080!important;border:1px solid #F7EB5B!important'));
+    assert.ok(source.includes('color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important'));
+    assert.ok(source.includes('html[lang] body #appRoot #sheriOfflineBar'));
+    assert.ok(source.includes('html[lang] body #appRoot .side'));
+    assert.ok(source.includes('id="aibos-approved-navigation-and-sync-v2"'));
+    assert.ok(source.includes('grid-template-columns:repeat(6,minmax(0,1fr))'));
+    assert.ok(source.includes('data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}'));
+    assert.ok(source.includes('data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}'));
+    assert.ok(source.includes('data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important;justify-content:center!important}'));
+    assert.ok(source.includes('display:flex!important;flex-direction:row!important;flex-wrap:wrap!important'));
+    assert.ok(source.includes('flex:1 1 190px!important;flex-direction:row!important;flex-wrap:wrap!important'));
+    assert.ok(source.includes('flex:1 1 125px!important;width:auto!important;font-size:13px!important'));
+    assert.ok(source.includes('color:#F7EB5B!important;background:#010080!important'));
+    assert.ok(source.includes('margin:0!important;margin-top:0!important'));
+    assert.doesNotMatch(source, /aibos-side-height/);
+    const layoutScript = source.match(/<script id="aibos-approved-navigation-and-sync-v2">([\s\S]*?)<\/script>/)?.[1] || "";
+    assert.ok(layoutScript.includes("main.style.removeProperty('margin-top')"));
+        assert.doesNotMatch(layoutScript, /getBoundingClientRect\(\)\.height/);
+        assert.doesNotMatch(layoutScript, /setProperty\(['"]margin-top['"]/);
+        assert.doesNotMatch(source, /html\[lang="(?:en|rw|fr)"\][^{}]*#sheriOfflineBar/);
+    assert.ok(!source.includes('aibos-approved-navigation-and-sync-v1'));
   }
 });
