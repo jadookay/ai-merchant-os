@@ -1697,6 +1697,7 @@ async function sheriSyncOutbox(){
               else if(op.type==='purchase_upsert'){const {error}=await sb.from('purchases').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='cash_upsert'){const {error}=await sb.from('cash_entries').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
               else if(op.type==='budget_upsert'){const {error}=await sb.from('budgets').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
+              else if(op.type==='accounting_settings_upsert'){await sheriSyncAccountingSettingsOperation(op)}
               else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}
               else if(op.type==='accounting_upsert'){if(op.table==='chart_of_accounts'){const r=await sheriSyncChartAccount(op.record);if(r?.error)throw r.error}else if(op.table==='audit_log'){const {error}=await sb.rpc('shericeri_write_audit',{p_merchant_id:op.record.merchant_id,p_audit_id:op.record.id,p_action:op.record.action,p_entity_type:op.record.entity_type,p_entity_id:op.record.entity_id||null,p_reason:op.record.reason||null,p_details:op.record.details||{}});if(error)throw error}else{const {error}=await sb.from(op.table).upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}}
               else if(op.type==='memory_insert'){const {error}=await sb.from('shericeri_memory').upsert(sheriServerRecord(op.record),{onConflict:'id'});if(error)throw error}
