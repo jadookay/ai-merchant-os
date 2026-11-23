@@ -388,12 +388,12 @@ test("inventory staff can add products and receive purchases without editing exi
 test("received purchases post and verify their inventory/AP journal without unsafe settings upserts", () => {
   for (const [label, source] of [["main app", html], ["isolated preview", previewLiveHtml]]) {
     const purchaseStart = source.indexOf("async function addOSPurchase()");
-    const purchaseEnd = source.indexOf("\\nasync function", purchaseStart + 1);
+    const purchaseEnd = source.indexOf("\nasync function", purchaseStart + 1);
     assert.ok(purchaseStart >= 0 && purchaseEnd > purchaseStart, label + ": expected the complete purchase recorder");
     assert.ok(source.slice(purchaseStart, purchaseEnd).includes("return data;"), label + ": purchase recorder must return the exact saved purchase");
 
     const wrapperStart = source.indexOf("const _v14_1_addOSPurchase=addOSPurchase");
-    const wrapperEnd = source.indexOf("\\n// Expense", wrapperStart);
+    const wrapperEnd = source.indexOf("\n// Expense", wrapperStart);
     assert.ok(wrapperStart >= 0 && wrapperEnd > wrapperStart, label + ": expected the purchase accounting wrapper");
     const wrapper = source.slice(wrapperStart, wrapperEnd);
     assert.ok(wrapper.includes("const p=await _v14_1_addOSPurchase()"), label + ": wrapper must use the returned purchase, not a fragile array index");
@@ -408,9 +408,11 @@ test("received purchases post and verify their inventory/AP journal without unsa
     assert.ok(source.includes(".insert(sheriServerRecord(record))"), label + ": missing settings rows must use an insert");
     assert.ok(!source.includes(".upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'})"), label + ": settings must not use a conflict-ignore upsert that can fail RLS checks");
 
-    const purchaseJournalGuard = source.indexOf("if(op.type==='accounting_journal_batch'&&op.entry?.source_type==='purchase')");
-    const journalSync = source.indexOf("else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}", purchaseJournalGuard);
-    assert.ok(purchaseJournalGuard >= 0 && journalSync > purchaseJournalGuard, label + ": purchase journal sync must wait for a server-confirmed received purchase and stock movement");
+    const journalFunction = source.indexOf("function sheriSyncJournalBatch(op){");
+    const purchaseJournalGuard = source.indexOf("if(entry.source_type==='purchase')", journalFunction);
+    const journalSync = source.indexOf("await sheriSyncJournalBatch(op)", source.indexOf("async function sheriSyncOutbox"));
+    assert.ok(journalFunction >= 0 && purchaseJournalGuard > journalFunction && journalSync > purchaseJournalGuard, label + ": purchase journal sync must wait for a server-confirmed received purchase and stock movement");
+    assert.ok(source.includes("accounting_settings_rls_retry:true"), label + ": a previously blocked settings RLS operation must get one safe retry");
   }
 });
 
