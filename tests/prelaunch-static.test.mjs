@@ -880,7 +880,7 @@ test("navigation, language picker and sync layout use one locale-independent nat
     assert.ok(source.includes('grid-template-columns:repeat(6,minmax(0,1fr))'));
     assert.ok(source.includes('data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}'));
     assert.ok(source.includes('data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}'));
-    assert.ok(source.includes('data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important}'));
+    assert.ok(source.includes('data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important;justify-content:center!important}'));
     assert.ok(source.includes('display:flex!important;flex-direction:row!important;flex-wrap:wrap!important'));
     assert.ok(source.includes('flex:1 1 190px!important;flex-direction:row!important;flex-wrap:wrap!important'));
     assert.ok(source.includes('flex:1 1 125px!important;width:auto!important;font-size:13px!important'));
