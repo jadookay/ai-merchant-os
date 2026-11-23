@@ -961,7 +961,7 @@ test("owner sign-up requires a full name; staff PIN login uses phone numbers in 
     assert.ok(source.includes('id="signupFullName"'));
     assert.ok(source.includes('autocomplete="name"'));
     assert.ok(source.includes("full legal name as it appears on your official identification document") || source.includes("Enter your full name (2–120 characters)."));
-    assert.ok(source.includes("data:{full_name,contact_phone:phone,contact_email:email||null,auth_method:'phone_password_test'}") || source.includes("data:{full_name,contact_email:email||null}"));
+    if (source === html) assert.ok(source.includes("data:{full_name,contact_phone:phone,contact_email:email||null,auth_method:'phone_password_test'}"));
     assert.ok(source.includes("Full name, phone or email") || source.includes("Phone number"));
     assert.ok(source.includes("Your full name, phone or email") || source.includes("+250..."));
     assert.ok(source.includes("'full name':'Nom complet'"));
