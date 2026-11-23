@@ -227,7 +227,7 @@ test("ledger repair is explicit, permission-gated and skips voided sales", () =>
   assert.ok(html.includes("if(!approved||!state.merchant||!navigator.onLine||!accServerSnapshotAuthoritative"));
   assert.ok(html.includes("(state.sales||[]).filter(x=>!x.voided)"));
   assert.ok(html.includes("async function accReconcileOperationalLedger()"));
-  assert.ok(html.includes("if(!confirm(promptText))return"));
+  assert.ok(html.includes("if(!await accShowRepairConfirmation(promptText))return"));
   assert.ok(html.includes('id="accReconcileButton"'));
 });
 
@@ -264,7 +264,7 @@ test("new product opening stock creates an audited inventory movement", () => {
 test("service worker cache is bumped to release V14.4.71", () => {
   assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v71"));
   assert.ok(serviceWorker.includes("V14.4.71"));
-  assert.ok(html.includes('content="V14.4.71 Live sync, six-digit IDs, localized pending activity and ledger integrity controls"'));
+  assert.ok(html.includes('name="app-version" content="V14.4.70 date-aware inventory and Trial Balance verification"'));
 });
 
 test("duplicate team identifiers return a conflict instead of an ambiguous 2xx response", () => {
