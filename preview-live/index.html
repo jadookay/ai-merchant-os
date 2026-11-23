@@ -10846,5 +10846,43 @@ if(document.fonts?.ready)document.fonts.ready.then(schedule);schedule();
 }
 </style>
 
+
+<!-- V14.4.66: final high-specificity shared sync layout for EN/RW/FR -->
+<style id="aibos-sync-shared-cascade-v66">
+/* The three locale selectors intentionally share every declaration. Only text is translated. */
+@media(max-width:650px){
+ html[lang="en"] body #appRoot #sheriOfflineBar,html[lang="rw"] body #appRoot #sheriOfflineBar,html[lang="fr"] body #appRoot #sheriOfflineBar{
+  display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;
+  gap:6px 8px!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:6px 0 0!important;padding:7px 8px!important;
+  box-sizing:border-box!important;color:#010080!important;background:#F8FAFC!important;border:1px solid #F7EB5B!important;border-radius:10px!important;
+  box-shadow:none!important;overflow:visible!important;position:static!important;inset:auto!important;top:auto!important;transform:none!important;writing-mode:horizontal-tb!important
+ }
+ html[lang="en"] body #appRoot #sheriOfflineBar>div:first-child,html[lang="rw"] body #appRoot #sheriOfflineBar>div:first-child,html[lang="fr"] body #appRoot #sheriOfflineBar>div:first-child{
+  display:flex!important;flex:1 1 125px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;
+  gap:3px 6px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;
+  color:#010080!important;background:transparent!important;writing-mode:horizontal-tb!important
+ }
+ html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child{
+  display:flex!important;flex:1 1 185px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;
+  gap:5px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;
+  color:#010080!important;background:transparent!important;overflow:visible!important;white-space:normal!important;writing-mode:horizontal-tb!important
+ }
+ html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child>.btn,
+ html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child>button{
+  display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;align-self:center!important;
+  width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:32px!important;margin:0!important;padding:6px 8px!important;
+  box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:8px!important;
+  font-family:inherit!important;font-size:11.5px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;
+  overflow-wrap:anywhere!important;writing-mode:horizontal-tb!important;transform:none!important
+ }
+}
+@media(max-width:380px){
+ html[lang="en"] body #appRoot #sheriOfflineBar,html[lang="rw"] body #appRoot #sheriOfflineBar,html[lang="fr"] body #appRoot #sheriOfflineBar{gap:5px!important;padding:6px!important}
+ html[lang="en"] body #appRoot #sheriOfflineBar>div:first-child,html[lang="rw"] body #appRoot #sheriOfflineBar>div:first-child,html[lang="fr"] body #appRoot #sheriOfflineBar>div:first-child{flex-basis:110px!important}
+ html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child{flex-basis:170px!important;gap:4px!important}
+ html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child>.btn{font-size:10.5px!important;padding:5px 6px!important}
+}
+</style>
+
 </body>
 </html>
