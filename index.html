@@ -8673,10 +8673,11 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
   const portrait=document.querySelector('#dashboard .sheri-launcher .sheri-thumb img');
   function paint(language){
     const names=labels[language]||labels.en;
-    Array.from(nav.querySelectorAll('button')).filter(b=>b!==sheri).slice(0,5).forEach((button,index)=>{button.textContent=['⌂','＋','▦','⚙','◈'][index]+' '+names[index];button.setAttribute('aria-label',names[index])});const subnav=document.getElementById('aibosCommandSubnav');if(subnav){const w={en:['Customer','Suppliers & Purchases','Expenses','Reports','Money','AI Advisor','Forecast','Return','AI Business Insight'],rw:['Umukiriya','Abaranguza n’ibyaguzwe','Amafaranga yakoreshejwe','Raporo','Amafaranga','Umujyanama wa AI','Iteganyagihe','Ibyasubijwe','Inama z’ubucuruzi za AI'],fr:['Clients','Fournisseurs & achats','Dépenses','Rapports','Finances','Conseiller IA','Prévisions','Retours','Conseils IA sur l’entreprise']};subnav.querySelectorAll('button').forEach((b,i)=>b.textContent=(w[language]||w.en)[i]||b.textContent)}
-    sheri.replaceChildren();
-    if(portrait){const img=portrait.cloneNode(true);img.removeAttribute('id');img.className='sheri-nav-thumb';img.alt='Shericeri';sheri.appendChild(img)}
-    sheri.appendChild(document.createTextNode(names[5]));sheri.setAttribute('aria-label',names[5]);sheri.title=names[5];
+    Array.from(nav.querySelectorAll('button')).filter(b=>b!==sheri).slice(0,5).forEach((button,index)=>{const label=['⌂','＋','▦','⚙','◈'][index]+' '+names[index];if(button.textContent!==label)button.textContent=label;button.setAttribute('aria-label',names[index])});const subnav=document.getElementById('aibosCommandSubnav');if(subnav){const w={en:['Customer','Suppliers & Purchases','Expenses','Reports','Money','AI Advisor','Forecast','Return','AI Business Insight'],rw:['Umukiriya','Abaranguza n’ibyaguzwe','Amafaranga yakoreshejwe','Raporo','Amafaranga','Umujyanama wa AI','Iteganyagihe','Ibyasubijwe','Inama z’ubucuruzi za AI'],fr:['Clients','Fournisseurs & achats','Dépenses','Rapports','Finances','Conseiller IA','Prévisions','Retours','Conseils IA sur l’entreprise']};subnav.querySelectorAll('button').forEach((b,i)=>{const label=(w[language]||w.en)[i]||b.textContent;if(b.textContent!==label)b.textContent=label})}
+    if(portrait&&!sheri.querySelector('.sheri-nav-thumb')){const img=portrait.cloneNode(true);img.removeAttribute('id');img.className='sheri-nav-thumb';img.alt='Shericeri';sheri.appendChild(img)}
+    let labelNode=Array.from(sheri.childNodes).find(node=>node.nodeType===Node.TEXT_NODE);
+    if(!labelNode){labelNode=document.createTextNode(names[5]);sheri.appendChild(labelNode)}else if(labelNode.nodeValue!==names[5])labelNode.nodeValue=names[5];
+    sheri.setAttribute('aria-label',names[5]);sheri.title=names[5];
   }
   const oldLauncher=document.querySelector('#appRoot .side > .sheri-global-launcher');if(oldLauncher)oldLauncher.remove();
   const picker=document.getElementById('aibosLanguageSelect'),getLanguage=()=>picker?.value||window.AIBOS_I18N?.getLanguage?.()||'en';
