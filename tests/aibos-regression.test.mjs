@@ -518,3 +518,86 @@ test("accounting balances and integrity checks recognize purchase_void as the ex
     assert.ok(app.includes("['sale','sale_cogs','purchase'].includes(entry.source_type)"));
   }
 });
+
+
+function evaluateCashFlowForTest(app, fixture, startDate, endDate) {
+  const start = app.indexOf("function accCashFlowForPeriod(");
+  const end = app.indexOf("\nfunction renderReports()", start);
+  assert.ok(start >= 0 && end > start, "Cash flow function must exist");
+  const source = app.slice(start, end).trim();
+  const calculate = new Script("(" + source + ")").runInNewContext({ state: fixture });
+  return calculate(startDate, endDate);
+}
+
+test("classified cash flow separates operating, investing, financing and unclassified activity", () => {
+  const accounts = [
+    { id: "cash", code: "1000", type: "asset", balance_sheet_class: "current" },
+    { id: "bank", code: "1010", type: "asset", balance_sheet_class: "current" },
+    { id: "sales", code: "4000", type: "income", balance_sheet_class: "not_applicable" },
+    { id: "expense", code: "6000", type: "expense", balance_sheet_class: "not_applicable" },
+    { id: "inventory", code: "1200", type: "asset", balance_sheet_class: "current" },
+    { id: "ppe", code: "1500", type: "asset", balance_sheet_class: "non_current" },
+    { id: "equity", code: "3000", type: "equity", balance_sheet_class: "not_applicable" },
+    { id: "loan", code: "2300", type: "liability", balance_sheet_class: "non_current" },
+    { id: "other", code: "2200", type: "liability", balance_sheet_class: null }
+  ];
+  const entries = [];
+  const lines = [];
+  const addEntry = (id, date, sourceType, sourceId, parts, voided = false) => {
+    entries.push({ id, entry_date: date, source_type: sourceType, source_id: sourceId, voided });
+    for (const [accountId, debit, credit] of parts) {
+      lines.push({ journal_entry_id: id, account_id: accountId, debit, credit });
+    }
+  };
+  addEntry("opening-sale", "2026-10-31", "sale", "opening-sale-source", [["cash", 500, 0], ["sales", 0, 500]]);
+  addEntry("sale", "2026-11-02", "sale", "sale-source", [["cash", 1000, 0], ["sales", 0, 1000]]);
+  addEntry("expense", "2026-11-03", "expense", "expense-source", [["expense", 250, 0], ["cash", 0, 250]]);
+  addEntry("asset-buy", "2026-11-04", "purchase", "asset-buy-source", [["ppe", 500, 0], ["cash", 0, 500]]);
+  addEntry("asset-sale", "2026-11-05", "asset-disposal", "asset-sale-source", [["cash", 150, 0], ["ppe", 0, 150]]);
+  addEntry("capital", "2026-11-06", "capital", "capital-source", [["cash", 800, 0], ["equity", 0, 800]]);
+  addEntry("loan", "2026-11-07", "loan", "loan-source", [["cash", 2000, 0], ["loan", 0, 2000]]);
+  addEntry("unclassified", "2026-11-08", "other", "other-source", [["cash", 300, 0], ["other", 0, 300]]);
+  addEntry("cash-transfer", "2026-11-09", "transfer", "transfer-source", [["bank", 100, 0], ["cash", 0, 100]]);
+  addEntry("voided-purchase", "2026-11-10", "purchase", "purchase-source", [["inventory", 400, 0], ["cash", 0, 400]], true);
+  addEntry("purchase-reversal", "2026-11-10", "purchase_void", "purchase-source", [["cash", 400, 0], ["inventory", 0, 400]]);
+  addEntry("unreversed-voided-sale", "2026-11-11", "sale", "voided-sale-source", [["cash", 200, 0], ["sales", 0, 200]], true);
+  const fixture = { accounts, bankAccounts: [], journalEntries: entries, journalLines: lines };
+  const result = evaluateCashFlowForTest(html, fixture, "2026-11-01", "2026-11-30");
+
+  assert.equal(result.operating.inflows, 1400);
+  assert.equal(result.operating.outflows, 650);
+  assert.equal(result.operating.net, 750);
+  assert.equal(result.investing.inflows, 150);
+  assert.equal(result.investing.outflows, 500);
+  assert.equal(result.investing.net, -350);
+  assert.equal(result.financing.inflows, 2800);
+  assert.equal(result.financing.outflows, 0);
+  assert.equal(result.financing.net, 2800);
+  assert.equal(result.unclassified.inflows, 300);
+  assert.equal(result.unclassified.outflows, 0);
+  assert.equal(result.inflows, 4650);
+  assert.equal(result.outflows, 1150);
+  assert.equal(result.net, 3500);
+  assert.equal(result.opening, 500);
+  assert.equal(result.closing, 4000);
+  assert.equal(result.reconciliationDifference, 0);
+});
+
+test("classified cash flow is present and fully labelled in English, French and Kinyarwanda in both app builds", () => {
+  const requiredLabels = [
+    "Operating activities", "Activités opérationnelles", "Ibikorwa bisanzwe",
+    "Investing activities", "Activités d’investissement", "Ibikorwa by’ishoramari",
+    "Financing activities", "Activités de financement", "Ibikorwa byo kubona no kwishyura inkunga n’imyenda",
+    "Unclassified cash flows", "Flux de trésorerie non classés", "Amafaranga atarashyirwa mu byiciro",
+    "Net change in cash and cash equivalents", "Variation nette de la trésorerie et des équivalents",
+    "Impinduka rusange mu mafaranga n’ibihwanye na yo"
+  ];
+  for (const app of [html, previewHtml]) {
+    assert.ok(app.includes("cashFlow.operating.inflows"));
+    assert.ok(app.includes("cashFlow.investing.inflows"));
+    assert.ok(app.includes("cashFlow.financing.inflows"));
+    assert.ok(app.includes("cashFlow.unclassified.inflows"));
+    assert.ok(!app.includes("Direct cash movement summary (unclassified)"));
+    for (const label of requiredLabels) assert.ok(app.includes(label), "Missing cash-flow translation: " + label);
+  }
+});
