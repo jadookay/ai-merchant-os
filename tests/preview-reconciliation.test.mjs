@@ -63,6 +63,19 @@ test('purchase register displays payments and bill links and prevents direct voi
   assert.match(html, /async function voidOSPurchase\(id\)/);
 });
 
+test('tax rates are deduplicated and expense settlement is reflected in ledger repair', () => {
+  assert.match(html, /function accUniqueTaxRates/);
+  assert.match(html, /accUniqueTaxRates\(\)\.filter/);
+  assert.match(html, /accUniqueTaxRates\(\)\.map/);
+  assert.match(html, /function accExpensePaid/);
+  const rebuild = functionBody('accRebuildFromOperations');
+  assert.match(rebuild, /payment_status/);
+  assert.match(rebuild, /sourceType:'payment'/);
+  assert.match(html, /async function accCreateTaxRate/);
+  assert.match(html, /async function toggleProductStatus/);
+  assert.doesNotMatch(functionBody('toggleProductStatus'), /p\.status_reason\s*=/);
+});
+
 test('dashboard profit follows the posted accounting ledger snapshot', () => {
   assert.match(html, /function osAccountingProfitSnapshot/);
   assert.match(html, /function profit\(\)\{const snapshot=osAccountingProfitSnapshot\(\)/);
