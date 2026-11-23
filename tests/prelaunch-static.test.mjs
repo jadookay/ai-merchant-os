@@ -394,6 +394,41 @@ test("pending local-only journals are reported separately from server ledger int
   }
 });
 
+test("expense recording and expense payments use separate balanced payable postings", () => {
+  assert.ok(html.includes("['2050','Accrued expenses payable','liability','credit']"), "2050 must be present in the default chart");
+  const expenseStart=html.indexOf("async function addExpense()");
+  const expenseEnd=html.indexOf("\\nasync function deleteExpense",expenseStart);
+  const expense=html.slice(expenseStart,expenseEnd);
+  assert.ok(expense.includes("payment_status:'unpaid'"), "new expenses must start as unpaid");
+  assert.ok(expense.includes("accountId:payable.id,credit:amount"), "expense recognition must credit accrued expenses payable");
+  const paymentStart=html.indexOf("async function accCreatePayment()");
+  const paymentEnd=html.indexOf("\\nasync function accCreateBankAccount()",paymentStart);
+  const payment=html.slice(paymentStart,paymentEnd);
+  assert.ok(payment.includes("debitId=accAccountCode('2050')?.id;creditId=accountId;sourceType='expense'"), "paying an existing expense must debit accrued expenses payable");
+  assert.ok(payment.includes("sourceType:'payment',sourceId:row.id"), "each payment must have a unique journal source");
+  assert.ok(payment.includes("linkedExpense.payment_status=accExpenseOutstanding(linkedExpense)<=0.005?'paid':'partial'"), "expense paid status must track cumulative linked payments");
+  assert.ok(payment.includes("if(amount>outstanding+0.005)"), "payments must not exceed the remaining expense balance");
+  assert.ok(html.includes("Payment journal does not match its linked source, amount or cash/bank account"), "ledger integrity must validate payment posting semantics, not only debit-credit equality");
+  assert.ok(html.includes("Expense journal does not match the expense amount or payment-liability treatment"), "ledger integrity must validate expense posting semantics");
+});
+
+test("ledger repair review is centered, copyable and requires explicit confirmation", () => {
+  assert.ok(html.includes("function accShowRepairConfirmation(message)"));
+  assert.ok(html.includes("#accRepairDialog{position:fixed;inset:0;z-index:1000000;display:grid;place-items:center"));
+  assert.ok(html.includes("navigator.clipboard?.writeText(message)"));
+  assert.ok(html.includes("acc-repair-details"));
+  assert.ok(html.includes("if(!await accShowRepairConfirmation(promptText))return;"));
+  assert.ok(html.includes("integrity.invalid.map((x,i)=>"), "diagnostic must include every flagged entry, not only the first eight");
+});
+
+test("background refresh does not rerender the active financial reports view", () => {
+  assert.ok(html.includes("function sheriDeferBackgroundRender()"));
+  assert.ok(html.includes("sheriCurrentView==='reports'"));
+  assert.ok(html.includes("if(hadLocal&&!(silent&&sheriDeferBackgroundRender()))render()"));
+  assert.ok(html.includes("loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()})"));
+  assert.ok(html.includes("source._serverConfirmed===false"), "pending local source records must not be reported as missing server journals");
+});
+
 test("received purchases post and verify their inventory/AP journal without unsafe settings upserts", () => {
   for (const [label, source] of [["main app", html], ["isolated preview", previewLiveHtml]]) {
     const purchaseStart = source.indexOf("async function addOSPurchase()");
