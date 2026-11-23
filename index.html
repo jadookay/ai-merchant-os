@@ -3232,7 +3232,7 @@ async function addExpense(){
   const description=eDesc.value.trim(),amount=+eAmt.value,cat=eCat.value;
   if(!description||!Number.isFinite(amount)||amount<=0)return alert('Enter an expense description and a positive amount.');
   if(!confirm('Record this expense?\n'+description+' — '+money(amount)+'\nCategory: '+cat))return;
-  const data={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,cat,created_at:sheriNow(),created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
+  const data={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,cat,payment_status:'unpaid',created_at:sheriNow(),created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
   state.expenses.push(data);await sheriSaveSnapshot();await sheriQueue({type:'expense_upsert',record:data});
   let warning='';
   try{await accEnsureBase();const ex=accAccountCode('6000'),payable=accAccountCode('2050');if(!ex||!payable)throw new Error('Operating Expenses (6000) and Accrued Expenses Payable (2050) must be active.');data.payment_status='unpaid';await sheriPut('expenses',data.id,{merchant_id:state.merchant.id,record:{...data}});await accPostEntry({date:data.created_at.slice(0,10),description:'Expense '+description,sourceType:'expense',sourceId:data.id,lines:[{accountId:ex.id,debit:amount},{accountId:payable.id,credit:amount}]});}
