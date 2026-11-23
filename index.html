@@ -5878,7 +5878,7 @@ function accBalance(accountId){
   let n=0;
   const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
   const activeReversals=new Set((state.journalEntries||[])
-    .filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void'].includes(e.source_type))
+    .filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void','expense_delete','payment_void'].includes(e.source_type))
     .map(e=>e.source_id));
   for(const line of state.journalLines||[]){
     if(line.account_id!==accountId)continue;
@@ -6364,7 +6364,7 @@ function accLedgerIntegrity(endDate=null){
     if(!reason&&entry.source_type==='expense'){
       const expense=expenseById.get(entry.source_id);
       if(!expense&&!hasReversal)reason='Expense journal has no matching expense source record';
-      else if(expense){
+      else if(expense&&!expense.deleted&&!hasReversal){
         const paid=(payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===expense.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0);
         const usePayable=paid>0||['unpaid','partial'].includes(String(expense.payment_status||'').toLowerCase());
         const expected=usePayable
@@ -6374,7 +6374,7 @@ function accLedgerIntegrity(endDate=null){
         if(!exact)reason='Expense journal does not match the expense amount or payment-liability treatment';
       }
     }
-    if(!reason&&entry.source_type==='payment'){
+    if(!reason&&entry.source_type==='payment'&&!hasReversal){
       const payment=paymentById.get(entry.source_id);
       if(!payment)reason='Payment journal has no matching payment source record';
       else{
@@ -6444,7 +6444,26 @@ function accStatementTotal(type,balances,naturalSide){
   },0);
 }
 
-const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){const e=state.expenses.find(x=>x.id===id);if(!e)return;const entryDate=String(e.created_at||'').slice(0,10)||accToday();if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');await _v14_1_deleteExpense(id);if(!state.expenses.find(x=>x.id===id)?.deleted)return;try{await accEnsureBase();const amount=Number(e.amount||0);if(amount>0){const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:[{accountId:cash.id,debit:amount},{accountId:ex.id,credit:amount}]});await accAudit('delete','expense',e.id,{amount})}}catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense deleted, but the accounting reversal could not be posted: '+(err.message||err))}render()};
+const _v14_1_deleteExpense=deleteExpense;deleteExpense=async function(id){
+  const e=state.expenses.find(x=>x.id===id);if(!e)return;
+  const entryDate=String(e.created_at||'').slice(0,10)||accToday();
+  if(accPeriodLocked(entryDate)||accPeriodLocked(accToday()))return alert('This expense cannot be deleted while its accounting period is locked.');
+  await _v14_1_deleteExpense(id);if(!state.expenses.find(x=>x.id===id)?.deleted)return;
+  try{
+    await accEnsureBase();
+    const originalExpense=(state.journalEntries||[]).find(j=>j.source_type==='expense'&&j.source_id===e.id&&!j.voided);
+    const expenseLines=originalExpense?accLinesForEntry(originalExpense.id):[];
+    if(expenseLines.length)await accPostEntry({date:entryDate,description:'Reverse deleted expense '+(e.description||''),sourceType:'expense_delete',sourceId:e.id,lines:expenseLines.map(l=>({accountId:l.account_id,debit:Number(l.credit||0),credit:Number(l.debit||0)}))});
+    for(const payment of (state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===e.id&&p.direction==='payment')){
+      const paymentEntry=(state.journalEntries||[]).find(j=>j.source_type==='payment'&&j.source_id===payment.id&&!j.voided);
+      const paymentLines=paymentEntry?accLinesForEntry(paymentEntry.id):[];
+      if(paymentLines.length)await accPostEntry({date:String(payment.payment_date||payment.created_at||entryDate).slice(0,10),description:'Reverse payment for deleted expense '+(e.description||''),sourceType:'payment_void',sourceId:payment.id,lines:paymentLines.map(l=>({accountId:l.account_id,debit:Number(l.credit||0),credit:Number(l.debit||0)}))});
+    }
+    await accAudit('delete','expense',e.id,{amount:Number(e.amount||0),reversedPayments:(state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===e.id).length});
+    await sheriSyncOutbox();
+  }catch(err){console.warn('[Sheri accounting] expense reversal failed',err);alert('Expense was deleted, but its accounting reversal could not be completed: '+(err.message||err))}
+  render()
+};
 // Sale void accounting is handled atomically by sh ericeri_void_sale; no second reversal wrapper.
 
 const _v14_1_addOSCashEntry=addOSCashEntry;addOSCashEntry=async function(){const before=state.cashEntries.length;await _v14_1_addOSCashEntry();if(state.cashEntries.length>before){const x=state.cashEntries[state.cashEntries.length-1];try{await accEnsureBase();const cash=accAccountCode('1000'),amount=Number(x.amount||0);if(amount>0&&x.kind==='income')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash income',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:cash.id,debit:amount},{accountId:accAccountCode('4100').id,credit:amount}]});else if(amount>0&&x.kind==='expense')await accPostEntry({date:String(x.occurred_at||sheriNow()).slice(0,10),description:x.description||'Cash expense',sourceType:'cash_entry',sourceId:x.id,lines:[{accountId:accAccountCode('6000').id,debit:amount},{accountId:cash.id,credit:amount}]});if(x.kind!=='transfer')await accAudit('create','cash_entry',x.id,{amount,kind:x.kind})}catch(err){console.warn('[Sheri accounting] cash entry failed',err);alert('Cash movement saved, but its accounting entry could not be posted: '+(err.message||err))}}render()};
