@@ -143,8 +143,8 @@ Deno.serve(async (req: Request) => {
       const role = String(body?.role || "cashier");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
 
-      if (!merchantId || !fullName || (!email && !phone) || !/^\d{6,8}$/.test(pin)) {
-        return json({ error: "Provide a business, full legal name with at least two name parts, verified email or phone, and a 6–8 digit PIN." }, 400);
+      if (!merchantId || !fullName || !/^\d{6,8}$/.test(pin)) {
+        return json({ error: "Provide a business, full legal name with at least two name parts, and a 6–8 digit PIN." }, 400);
       }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       
@@ -160,6 +160,7 @@ Deno.serve(async (req: Request) => {
         phone = normalizePhoneForAuth(phone, merchant.country);
         if (!phone) return json({ error: "Enter a valid international phone number. For Rwanda, you may enter 078… or +25078… ." }, 400);
       }
+      if (!phone) return json({ error: "A staff phone number is required. Enter a valid international phone number." }, 400);
       const isOwner = merchant.user_id === callerData.user.id;
       if (!isOwner && !(await hasActiveDeviceSession(admin, merchantId, callerData.user.id, bearer))) {
         return json({ error: "This device session is no longer authorized. Sign in again." }, 403);
@@ -369,6 +370,7 @@ Deno.serve(async (req: Request) => {
       const fullNameToSave = normalizedFullName || String(target.full_name || fullName).trim();
       const nextEmail = email === undefined ? target.email : email;
       const nextPhone = phone === undefined ? target.phone : phone;
+      if (!nextPhone) return json({ error: "A staff phone number is required. Add a valid phone number before saving this team member." }, 400);
       const nextUsername = username === undefined ? target.username : username;
       if (!nextEmail && !nextPhone && !nextUsername) return json({ error: "Keep at least one staff login identifier: email, phone or username." }, 400);
       if (target.user_id === callerData.user.id) return json({ error: "Use the owner account to change another administrator's access; self-edits are disabled here." }, 403);

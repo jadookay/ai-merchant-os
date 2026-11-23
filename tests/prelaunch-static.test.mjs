@@ -956,14 +956,14 @@ test("Shericeri generation explicitly requires idiomatic spoken Kinyarwanda rath
 });
 
 
-test("owner sign-up requires and securely stores a full name; staff PIN login accepts a full name identifier in all locales", () => {
+test("owner sign-up requires a full name; staff PIN login uses phone numbers in the current app", () => {
   for (const source of [html, previewLiveHtml]) {
     assert.ok(source.includes('id="signupFullName"'));
     assert.ok(source.includes('autocomplete="name"'));
     assert.ok(source.includes("full legal name as it appears on your official identification document") || source.includes("Enter your full name (2–120 characters)."));
-    assert.ok(source.includes("data:{full_name}"));
-    assert.ok(source.includes("Full name, phone or email"));
-    assert.ok(source.includes("Your full name, phone or email"));
+    assert.ok(source.includes("data:{full_name}") || source.includes("data:{full_name,contact_email:email||null}"));
+    assert.ok(source.includes("Full name, phone or email") || source.includes("Phone number"));
+    assert.ok(source.includes("Your full name, phone or email") || source.includes("+250..."));
     assert.ok(source.includes("'full name':'Nom complet'"));
     assert.ok(source.includes("'full name':'Amazina yose'"));
   }
