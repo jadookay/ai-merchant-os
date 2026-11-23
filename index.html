@@ -9885,7 +9885,6 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
   const observer=new MutationObserver(pinLaptopPickerToItsOwnRow);
   observer.observe(auth,{attributes:true,attributeFilter:['style']});
   observer.observe(app,{attributes:true,attributeFilter:['style']});
- observer.observe(main,{attributes:true,attributeFilter:['style']});
   pinLaptopPickerToItsOwnRow();
 })();
 </script>
@@ -9953,644 +9952,75 @@ body.aibos-auth-visible #appRoot .side{display:none!important}
  #sheriOfflineBar>div:last-child .btn{font-size:9.5px!important;padding:5px!important}
 }
 </style>
-<script id="aibos-approved-navigation-and-sync-v1">
+<script id="aibos-approved-navigation-and-sync-v2">
 (function(){
  'use strict';
- const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),nav=side?.querySelector('.nav'),main=app?.querySelector('.main'),picker=document.getElementById('aibosLanguageSwitcher'),auth=document.getElementById('authScreen');
- if(!side||!nav)return;
+ const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),nav=side?.querySelector('.nav');
+ const main=app?.querySelector('.main'),picker=document.getElementById('aibosLanguageSwitcher');
+ const sync=document.getElementById('sheriOfflineBar'),auth=document.getElementById('authScreen');
+ if(!app||!side||!nav||!main)return;
  const order=['dashboard','sales','inventory','businessOS','settings'];
  const labels={en:['Home','Sell','Stock','AIBOS Command Center','Settings','Shericeri'],rw:['Ahabanza','Gurisha','Ibicuruzwa','Igenzura ry’ubucuruzi','Igenamiterere','Shericeri'],fr:['Accueil','Vendre','Stock','Centre de gestion AIBOS','Paramètres','Shericeri']},icons=['⌂','＋','▦','◈','⚙',''];
  function paint(lang){
-  const names=labels[lang]||labels.en;
+  const code=String(lang||'en').toLowerCase(),key=code.startsWith('fr')?'fr':(code.startsWith('rw')||code.startsWith('ki'))?'rw':'en',names=labels[key];
   order.forEach((id,i)=>{const b=nav.querySelector(':scope > button[data-view="'+id+'"]');if(b){const label=icons[i]+' '+names[i];if(b.textContent!==label)b.textContent=label;b.setAttribute('aria-label',names[i])}});
-  const s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(s){const labelNode=Array.from(s.childNodes).find(n=>n.nodeType===Node.TEXT_NODE);if(labelNode){if(labelNode.nodeValue!==names[5])labelNode.nodeValue=names[5]}else s.appendChild(document.createTextNode(names[5]));s.setAttribute('aria-label',names[5]);s.title=names[5]}
+  const s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');
+  if(s){const node=Array.from(s.childNodes).find(n=>n.nodeType===Node.TEXT_NODE);if(node){if(node.nodeValue!==names[5])node.nodeValue=names[5]}else s.appendChild(document.createTextNode(names[5]));s.setAttribute('aria-label',names[5]);s.title=names[5]}
  }
  function arrange(){
   const wanted=order.map(id=>nav.querySelector(':scope > button[data-view="'+id+'"]')).filter(Boolean),s=nav.querySelector(':scope > button[data-nav-shericeri="1"]');if(s)wanted.push(s);
-  const current=Array.from(nav.children).filter(x=>x.matches('button'));if(wanted.some((x,i)=>current[i]!==x))wanted.forEach(x=>nav.appendChild(x));
-  const active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none');
-  if(picker&&active){const sub=document.getElementById('aibosCommandSubnav');if(picker.parentElement!==side||picker.nextElementSibling!==sub)side.insertBefore(picker,sub||null)}
-  paint(picker?.querySelector('select')?.value||window.AIBOS_I18N?.getLanguage?.()||'en');
-  if(main&&window.innerWidth<=650&&active)main.style.setProperty('margin-top',(side.getBoundingClientRect().height+10)+'px','important');
-  else if(main)main.style.removeProperty('margin-top');
+  const current=Array.from(nav.children).filter(el=>el.matches('button'));if(wanted.some((el,i)=>current[i]!==el))wanted.forEach(el=>nav.appendChild(el));
+  const active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none'),mobile=window.innerWidth<=650;
+  if(active&&mobile){
+   const sub=document.getElementById('aibosCommandSubnav');
+   if(picker&&picker.parentElement!==side)side.insertBefore(picker,sub||null);
+   if(picker&&sync&&(sync.parentElement!==side||sync.previousElementSibling!==picker))side.insertBefore(sync,picker.nextSibling);
+  }else{
+   if(picker&&picker.parentElement===side)document.body.appendChild(picker);
+   if(sync&&sync.parentElement!==main)main.insertBefore(sync,main.firstChild);
+  }
+  main.style.removeProperty('margin-top');
+  paint(picker?.querySelector('select')?.value||window.AIBOS_I18N?.getLanguage?.()||document.documentElement.lang||'en');
  }
- const select=picker?.querySelector('select');
- select?.addEventListener('change',()=>paint(select.value));
+ const select=picker?.querySelector('select');select?.addEventListener('change',()=>paint(select.value));
  window.addEventListener('aibos:languagechange',e=>{paint(e.detail?.language||select?.value||'en');arrange()});
- window.addEventListener('resize',arrange,{passive:true});
- const observer=new MutationObserver(arrange);observer.observe(side,{childList:true});if(main)observer.observe(main,{childList:true});observer.observe(app,{attributes:true,attributeFilter:['style']});if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
+ window.addEventListener('resize',arrange,{passive:true});window.addEventListener('orientationchange',arrange,{passive:true});
+ const observer=new MutationObserver(arrange);observer.observe(app,{attributes:true,attributeFilter:['style']});if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
  arrange();
 })();
 </script>
-<!-- V14.4.58: unified sync status layout and readable mobile typography across every locale -->
-<style id="aibos-unified-sync-layout-v58">
-/* Locale changes text only: the same sizing, flex rules and typography apply to EN/RW/FR. */
-#appRoot #sheriOfflineBar{
-  display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
-  align-items:center!important;justify-content:space-between!important;gap:10px!important;
-  width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;
-  padding:9px 12px!important;overflow:hidden!important;
-}
-#appRoot #sheriOfflineBar>div:first-child{
-  display:flex!important;flex:1 1 0!important;flex-direction:row!important;flex-wrap:wrap!important;
-  align-items:center!important;gap:5px 7px!important;min-width:0!important;max-width:none!important;
-  font-size:13.5px!important;line-height:1.3!important;
-}
-#appRoot #sheriOfflineBar>div:first-child #sheriConnectivityLabel,
-#appRoot #sheriOfflineBar>div:first-child #sheriSyncLabel{
-  font-size:inherit!important;line-height:1.3!important;overflow-wrap:anywhere!important;
-}
-#appRoot #sheriOfflineBar>div:last-child{
-  display:flex!important;flex:0 1 auto!important;flex-direction:row!important;flex-wrap:nowrap!important;
-  align-items:center!important;justify-content:flex-end!important;gap:6px!important;
-  width:max-content!important;min-width:0!important;max-width:68%!important;
-  overflow-x:auto!important;overflow-y:hidden!important;white-space:nowrap!important;
-  -webkit-overflow-scrolling:touch!important;scrollbar-width:thin!important;
-}
-#appRoot #sheriOfflineBar>div:last-child .btn{
-  display:inline-flex!important;flex:0 0 auto!important;align-items:center!important;justify-content:center!important;
-  min-height:34px!important;height:auto!important;width:auto!important;min-width:max-content!important;
-  max-width:none!important;box-sizing:border-box!important;padding:7px 9px!important;
-  font-size:12.5px!important;line-height:1.2!important;white-space:nowrap!important;
-}
+<!-- V14.4.67: one locale-independent natural-flow header and horizontal sync layout -->
+<style id="aibos-locale-invariant-header-sync-v67">
+/* Shared layout for every locale. Translation changes text, never geometry. */
+#appRoot .side{background:#010080!important;color:#F7EB5B!important}
+#appRoot .side .nav>button{background:#010080!important;color:#F7EB5B!important;border-color:rgba(247,235,91,.8)!important}
+#appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important;border-color:#F7EB5B!important}
+#appRoot .side #aibosLanguageSwitcher{background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important}
+#appRoot .side #aibosLanguageSwitcher select{background:#010080!important;color:#F7EB5B!important;border-color:#F7EB5B!important}
+#appRoot #sheriOfflineBar{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:7px 9px!important;width:100%!important;min-width:0!important;max-width:100%!important;box-sizing:border-box!important;margin:0 0 12px!important;padding:8px 10px!important;position:static!important;inset:auto!important;top:auto!important;z-index:auto!important;overflow:visible!important;background:#F8FAFC!important;color:#010080!important;border:1px solid #F7EB5B!important;border-radius:11px!important;box-shadow:none!important;writing-mode:horizontal-tb!important}
+#appRoot #sheriOfflineBar>div:first-child{display:flex!important;flex:1 1 150px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:4px 7px!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;color:#010080!important;background:transparent!important;writing-mode:horizontal-tb!important;font-size:13px!important;line-height:1.3!important}
+#appRoot #sheriOfflineBar>div:last-child{display:flex!important;flex:1 1 100%!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;gap:6px!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;overflow:visible!important;white-space:normal!important;background:transparent!important;writing-mode:horizontal-tb!important}
+#appRoot #sheriOfflineBar>div:last-child>button,#appRoot #sheriOfflineBar>div:last-child>.btn,#appRoot #sheriOfflineBar>div:last-child>a,#appRoot #sheriOfflineBar>div:last-child>[role="button"]{display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:34px!important;margin:0!important;padding:7px 9px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;font-family:inherit!important;font-size:12px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;writing-mode:horizontal-tb!important;transform:none!important}
 @media(max-width:650px){
-  #appRoot #sheriOfflineBar{gap:7px!important;padding:8px 9px!important;margin-bottom:10px!important}
-  #appRoot #sheriOfflineBar>div:first-child{font-size:13px!important;gap:4px 6px!important}
-  #appRoot #sheriOfflineBar>div:last-child{max-width:70%!important;gap:5px!important}
-  #appRoot #sheriOfflineBar>div:last-child .btn{font-size:12px!important;padding:7px 8px!important;min-height:34px!important}
+ #appRoot .side{position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:8px 10px 9px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important;color:#F7EB5B!important;border:0!important;border-bottom:2px solid #F7EB5B!important;border-radius:0!important;box-shadow:none!important;transform:none!important;z-index:auto!important}
+ #appRoot .side .brand{color:#F7EB5B!important;margin:0 0 5px!important;padding:0 0 5px!important}
+ #appRoot .side .nav{display:grid!important;position:relative!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(44px,auto))!important;grid-auto-flow:row!important;align-items:stretch!important;gap:5px!important;width:100%!important;min-width:0!important;margin:0!important;padding:5px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important}
+ #appRoot .side .nav>button{display:flex!important;grid-column:span 2!important;align-items:center!important;justify-content:center!important;width:100%!important;min-width:0!important;max-width:100%!important;min-height:44px!important;height:auto!important;max-height:none!important;margin:0!important;padding:5px 3px!important;box-sizing:border-box!important;font-family:inherit!important;font-size:clamp(11px,3.3vw,13px)!important;font-weight:650!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;border:1px solid rgba(247,235,91,.8)!important;border-radius:9px!important;box-shadow:none!important}
+ #appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
+ #appRoot .side .nav>button[data-view="businessOS"],#appRoot .side .nav>button[data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}
+ #appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
+ #appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important;justify-content:center!important}
+ #appRoot .side #aibosLanguageSwitcher{position:static!important;inset:auto!important;transform:none!important;align-self:center!important;order:0!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:max-content!important;max-width:calc(100% - 12px)!important;height:auto!important;margin:7px auto 7px!important;padding:4px 8px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;box-shadow:none!important}
+ #appRoot .side #aibosLanguageSwitcher select{width:auto!important;min-width:0!important;max-width:calc(100vw - 40px)!important;color:#F7EB5B!important;background:#010080!important;border:0!important;font-family:inherit!important;font-size:13px!important;font-weight:650!important;text-align:center!important}
+ #appRoot #sheriOfflineBar{margin:0 0 10px!important;padding:8px!important;gap:6px 8px!important}
+ #appRoot #sheriOfflineBar>div:first-child{flex:1 1 100%!important;width:100%!important;font-size:13px!important}
+ #appRoot #sheriOfflineBar>div:last-child{flex:1 1 100%!important;width:100%!important;gap:5px!important}
+ #appRoot #sheriOfflineBar>div:last-child>button,#appRoot #sheriOfflineBar>div:last-child>.btn,#appRoot #sheriOfflineBar>div:last-child>a,#appRoot #sheriOfflineBar>div:last-child>[role="button"]{flex:0 1 auto!important;min-height:34px!important;font-size:12px!important;padding:7px 8px!important}
+ #appRoot .main{position:relative!important;top:auto!important;inset:auto!important;margin:0!important;margin-top:0!important;padding:12px 12px 18px!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:0!important;box-sizing:border-box!important;overflow-x:hidden!important}
 }
-@media(max-width:380px){
-  #appRoot #sheriOfflineBar{gap:5px!important;padding:7px 7px!important}
-  #appRoot #sheriOfflineBar>div:first-child{font-size:12.5px!important}
-  #appRoot #sheriOfflineBar>div:last-child{max-width:70%!important}
-  #appRoot #sheriOfflineBar>div:last-child .btn{font-size:11.5px!important;padding:7px!important;min-height:34px!important}
-}
+@media(max-width:380px){#appRoot .side{padding-left:7px!important;padding-right:7px!important}#appRoot .side .nav{gap:4px!important;padding:4px!important}#appRoot #sheriOfflineBar{gap:5px!important;padding:7px!important}#appRoot #sheriOfflineBar>div:last-child{gap:4px!important}#appRoot #sheriOfflineBar>div:last-child>button,#appRoot #sheriOfflineBar>div:last-child>.btn,#appRoot #sheriOfflineBar>div:last-child>a,#appRoot #sheriOfflineBar>div:last-child>[role="button"]{font-size:11px!important;padding:6px!important}}
 </style>
-<!-- V14.4.60: authoritative locale-neutral mobile header and sync layout -->
-<style id="aibos-locale-invariant-navigation-sync-v60">
-/* EN/FR/RW share identical structure and geometry; only translated text differs. */
-#appRoot .side{
- box-sizing:border-box!important;background:#010080!important;color:#F7EB5B!important;
-}
-#appRoot .side .nav{
- display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;
- grid-template-rows:repeat(3,minmax(48px,auto))!important;grid-auto-flow:row!important;
- align-items:stretch!important;gap:6px!important;width:100%!important;min-width:0!important;
- padding:6px!important;overflow:visible!important;box-sizing:border-box!important;
-}
-#appRoot .side .nav>button{
- display:flex!important;align-items:center!important;justify-content:center!important;
- box-sizing:border-box!important;min-width:0!important;width:100%!important;
- min-height:48px!important;height:auto!important;max-height:none!important;
- padding:6px 4px!important;margin:0!important;text-align:center!important;
- white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;
- line-height:1.16!important;font-size:clamp(11px,3.1vw,13px)!important;
- background:#010080!important;color:#F7EB5B!important;
- border:1px solid rgba(247,235,91,.78)!important;border-radius:11px!important;
-}
-#appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important}
-#appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
-#appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
-#appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
-#appRoot .side .nav>button[data-view="businessOS"]{grid-column:1/span 3!important;grid-row:2!important}
-#appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
-#appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important;justify-content:center!important}
-#appRoot .side #aibosLanguageSwitcher{
- position:static!important;inset:auto!important;transform:none!important;align-self:center!important;
- display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;
- width:max-content!important;max-width:calc(100% - 16px)!important;
- margin:9px auto 7px!important;padding:5px 8px!important;box-sizing:border-box!important;
- background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;
-}
-#appRoot .side #aibosLanguageSwitcher select{
- width:auto!important;min-width:140px!important;max-width:calc(100vw - 48px)!important;
- background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;text-align:center!important;
-}
-#appRoot #sheriOfflineBar{
- display:flex!important;flex-flow:row wrap!important;align-items:center!important;justify-content:flex-start!important;
- gap:7px 9px!important;width:100%!important;min-width:0!important;max-width:100%!important;
- box-sizing:border-box!important;overflow:visible!important;background:#F8FAFC!important;
- border:1px solid #CBD5E1!important;border-radius:12px!important;padding:9px 10px!important;
-}
-#appRoot #sheriOfflineBar>div:first-child{
- display:flex!important;flex:1 1 180px!important;flex-flow:row wrap!important;align-items:center!important;
- gap:4px 7px!important;min-width:0!important;max-width:100%!important;font-size:13px!important;line-height:1.3!important;
-}
-#appRoot #sheriOfflineBar>div:last-child{
- display:flex!important;flex:1 1 100%!important;flex-flow:row wrap!important;align-items:center!important;
- justify-content:flex-start!important;gap:6px!important;width:100%!important;min-width:0!important;
- max-width:100%!important;overflow:visible!important;white-space:normal!important;
-}
-#appRoot #sheriOfflineBar>div:last-child .btn{
- display:inline-flex!important;flex:0 1 auto!important;align-items:center!important;justify-content:center!important;
- width:auto!important;min-width:0!important;max-width:100%!important;min-height:34px!important;height:auto!important;
- box-sizing:border-box!important;padding:7px 9px!important;font-size:12px!important;line-height:1.2!important;
- white-space:normal!important;overflow-wrap:anywhere!important;text-align:center!important;
- background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;border-radius:10px!important;
-}
-@media(max-width:650px){
- #appRoot .side{
-  position:fixed!important;inset:0 0 auto 0!important;width:100%!important;height:auto!important;
-  min-height:0!important;max-height:none!important;overflow:visible!important;overscroll-behavior:auto!important;
-  display:flex!important;flex-direction:column!important;align-items:stretch!important;
-  padding:9px 10px 10px!important;background:#010080!important;
-  border:0!important;border-bottom:2px solid #F7EB5B!important;border-radius:0 0 14px 14px!important;z-index:1300!important;
- }
- #appRoot .side .nav{flex:none!important;overflow:visible!important}
- #appRoot .main{box-sizing:border-box!important;width:100%!important;max-width:100%!important;
-  padding:12px 12px 18px!important;min-height:0!important;overflow-x:hidden!important}
- #appRoot #sheriOfflineBar{gap:6px 8px!important;padding:8px!important;margin:0 0 10px!important}
- #appRoot #sheriOfflineBar>div:first-child{flex:1 1 100%!important;font-size:13px!important}
- #appRoot #sheriOfflineBar>div:last-child{flex:1 1 100%!important;gap:5px!important}
- #appRoot #sheriOfflineBar>div:last-child .btn{flex:0 1 auto!important;min-height:34px!important;font-size:12px!important;padding:7px 8px!important}
-}
-@media(max-width:380px){
- #appRoot #sheriOfflineBar>div:first-child{font-size:12px!important}
- #appRoot #sheriOfflineBar>div:last-child .btn{font-size:11px!important;padding:6px 7px!important}
-}
-</style>
-<script id="aibos-locale-invariant-navigation-sync-v60">
-(function(){
- 'use strict';
- const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),main=app?.querySelector('.main'),auth=document.getElementById('authScreen');
- if(!app||!side||!main)return;
- let frame=0;
- function measure(){
-  frame=0;
-  const active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none');
-  if(window.innerWidth>650||!active){main.style.removeProperty('margin-top');return}
-  side.scrollTop=0;
-  const nav=side.querySelector('.nav');if(nav)nav.scrollTop=0;
-  main.style.setProperty('margin-top',(Math.ceil(side.getBoundingClientRect().height)+2)+'px','important');
- }
- function schedule(){if(frame)return;frame=requestAnimationFrame(measure)}
- window.addEventListener('resize',schedule,{passive:true});
- window.addEventListener('aibos:languagechange',schedule);
- if('ResizeObserver' in window){const ro=new ResizeObserver(schedule);ro.observe(side)}
- if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});
- schedule();
-})();
-</script>
-
-<!-- V14.4.61: single-source mobile header clearance and wrapping sync controls -->
-<style id="aibos-locale-invariant-navigation-sync-v61">
-/* All three locales share one geometry. The only locale-dependent content is text. */
-@media(max-width:650px){
-  #appRoot .side{
-    position:fixed!important;inset:0 0 auto 0!important;height:auto!important;
-    min-height:0!important;max-height:none!important;overflow:visible!important;
-    display:flex!important;flex-direction:column!important;align-items:stretch!important;
-    box-sizing:border-box!important;padding:8px 10px 9px!important;
-    background:#010080!important;border-bottom:2px solid #F7EB5B!important;
-  }
-  #appRoot .side .nav{
-    display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;
-    grid-template-rows:repeat(3,minmax(44px,auto))!important;
-    grid-auto-rows:minmax(44px,auto)!important;grid-auto-flow:row!important;
-    gap:5px!important;padding:5px!important;margin:0!important;
-    width:100%!important;min-width:0!important;box-sizing:border-box!important;
-  }
-  #appRoot .side .nav>button{
-    min-width:0!important;width:100%!important;min-height:44px!important;
-    height:auto!important;max-height:none!important;margin:0!important;padding:5px 3px!important;
-    box-sizing:border-box!important;display:flex!important;align-items:center!important;
-    justify-content:center!important;white-space:normal!important;overflow-wrap:anywhere!important;
-    word-break:normal!important;line-height:1.15!important;font-size:clamp(11px,3.4vw,13px)!important;
-  }
-  #appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
-  #appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
-  #appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
-  #appRoot .side .nav>button[data-view="businessOS"]{grid-column:1/span 3!important;grid-row:2!important}
-  #appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
-  #appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important}
-  #appRoot .side #aibosLanguageSwitcher{
-    position:static!important;inset:auto!important;transform:none!important;align-self:center!important;
-    display:flex!important;flex-direction:row!important;justify-content:center!important;align-items:center!important;
-    width:max-content!important;max-width:100%!important;margin:6px auto 0!important;padding:3px 7px!important;
-    background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;
-    border-radius:9px!important;box-sizing:border-box!important;
-  }
-  #appRoot .side #aibosLanguageSwitcher select{
-    min-width:0!important;width:auto!important;max-width:calc(100vw - 48px)!important;
-    background:#010080!important;color:#F7EB5B!important;border:0!important;
-    font-size:13px!important;text-align:center!important;
-  }
-  /* Replace conflicting legacy 190–260px offsets with one measured header clearance. */
-  #appRoot .main{
-    margin:0!important;margin-top:0!important;
-    padding:calc(var(--aibos-mobile-header-height, 0px) + 10px) 12px 18px!important;
-    width:100%!important;max-width:100%!important;min-width:0!important;
-    box-sizing:border-box!important;overflow-x:hidden!important;
-  }
-  #appRoot #sheriOfflineBar{
-    position:relative!important;top:auto!important;inset:auto!important;
-    display:flex!important;flex-flow:row wrap!important;align-items:center!important;
-    justify-content:flex-start!important;gap:6px 8px!important;width:100%!important;
-    min-width:0!important;max-width:100%!important;box-sizing:border-box!important;
-    margin:0 0 10px!important;padding:8px!important;overflow:visible!important;
-  }
-  #appRoot #sheriOfflineBar>div:first-child{
-    display:flex!important;flex:1 1 100%!important;flex-flow:row wrap!important;
-    align-items:center!important;gap:4px 7px!important;width:100%!important;
-    min-width:0!important;max-width:100%!important;font-size:13px!important;line-height:1.3!important;
-  }
-  #appRoot #sheriOfflineBar>div:last-child{
-    display:flex!important;flex:1 1 100%!important;flex-flow:row wrap!important;
-    align-items:stretch!important;justify-content:flex-start!important;gap:5px!important;
-    width:100%!important;min-width:0!important;max-width:100%!important;
-    overflow:visible!important;white-space:normal!important;
-  }
-  #appRoot #sheriOfflineBar>div:last-child .btn{
-    display:inline-flex!important;flex:1 1 92px!important;align-items:center!important;
-    justify-content:center!important;width:auto!important;min-width:0!important;max-width:100%!important;
-    min-height:36px!important;height:auto!important;box-sizing:border-box!important;
-    padding:7px 6px!important;font-size:12px!important;line-height:1.2!important;
-    white-space:normal!important;overflow-wrap:anywhere!important;text-align:center!important;
-  }
-}
-@media(max-width:380px){
-  #appRoot .side{padding-left:7px!important;padding-right:7px!important}
-  #appRoot .side .nav{gap:4px!important;padding:4px!important}
-  #appRoot #sheriOfflineBar>div:last-child .btn{font-size:11.5px!important;padding:6px 4px!important}
-}
-</style>
-<script id="aibos-locale-invariant-navigation-sync-v61">
-(function(){
- 'use strict';
- const app=document.getElementById('appRoot'),side=app?.querySelector('.side');
- const main=app?.querySelector('.main'),auth=document.getElementById('authScreen');
- if(!app||!side||!main)return;
- let raf=0,lastHeight=-1;
- function measure(){
-  raf=0;
-  const active=app.style.display!=='none'&&(!auth||getComputedStyle(auth).display==='none');
-  if(window.innerWidth>650||!active){
-   app.style.removeProperty('--aibos-mobile-header-height');
-   main.style.removeProperty('margin-top');return;
-  }
-  const height=Math.ceil(side.getBoundingClientRect().height);
-  if(height>0&&height!==lastHeight){
-   lastHeight=height;app.style.setProperty('--aibos-mobile-header-height',height+'px');
-  }
-  if(main.style.getPropertyValue('margin-top')!=='0px'||main.style.getPropertyPriority('margin-top')!=='important')main.style.setProperty('margin-top','0px','important');
- }
- function schedule(){if(!raf)raf=requestAnimationFrame(measure)}
- if('ResizeObserver' in window){const ro=new ResizeObserver(schedule);ro.observe(side)}
- window.addEventListener('resize',schedule,{passive:true});
- window.addEventListener('orientationchange',schedule,{passive:true});
- window.addEventListener('aibos:languagechange',schedule);
- const observer=new MutationObserver(schedule);
- observer.observe(side,{childList:true,subtree:true,attributes:true,attributeFilter:['class','style']});
- observer.observe(app,{attributes:true,attributeFilter:['style']});
- if(auth)observer.observe(auth,{attributes:true,attributeFilter:['style']});
- if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});
- schedule();
-})();
-</script>
-
-<!-- V14.4.62: natural-flow mobile header; no spacer offsets or fixed-header compensation -->
-<style id="aibos-locale-invariant-navigation-sync-v62">
-@media(max-width:650px){
- #appRoot .side{
-  position:relative!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;inset:auto!important;
-  width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;
-  overflow:visible!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;
-  padding:8px 10px 9px!important;margin:0!important;box-sizing:border-box!important;
-  background:#010080!important;color:#F7EB5B!important;border:0!important;
-  border-bottom:2px solid #F7EB5B!important;border-radius:0!important;z-index:auto!important;
- }
- #appRoot .side .brand{margin:2px 6px 7px!important;padding:0 0 6px!important}
- #appRoot .side .nav{
-  display:grid!important;position:relative!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;
-  grid-template-rows:repeat(3,minmax(44px,auto))!important;grid-auto-flow:row!important;
-  gap:5px!important;width:100%!important;min-width:0!important;margin:0!important;padding:5px!important;
-  overflow:visible!important;box-sizing:border-box!important;
- }
- #appRoot .side .nav>button{
-  grid-column:span 2!important;grid-row:auto!important;display:flex!important;
-  align-items:center!important;justify-content:center!important;width:100%!important;min-width:0!important;
-  min-height:44px!important;height:auto!important;max-height:none!important;margin:0!important;padding:5px 3px!important;
-  box-sizing:border-box!important;white-space:normal!important;overflow-wrap:anywhere!important;
-  line-height:1.15!important;font-size:clamp(11px,3.3vw,13px)!important;
-  background:#010080!important;color:#F7EB5B!important;border:1px solid rgba(247,235,91,.78)!important;
-  border-radius:10px!important;text-align:center!important;
- }
- #appRoot .side .nav>button:nth-child(1){grid-column:1/span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(2){grid-column:3/span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(3){grid-column:5/span 2!important;grid-row:1!important}
- #appRoot .side .nav>button:nth-child(4){grid-column:1/span 3!important;grid-row:2!important}
- #appRoot .side .nav>button:nth-child(5){grid-column:4/span 3!important;grid-row:2!important}
- #appRoot .side .nav>button:nth-child(6){grid-column:3/span 2!important;grid-row:3!important}
- #appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important}
- #appRoot .side #aibosLanguageSwitcher{
-  position:static!important;inset:auto!important;transform:none!important;align-self:center!important;
-  display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;
-  width:max-content!important;max-width:calc(100% - 12px)!important;height:auto!important;
-  margin:7px auto 0!important;padding:3px 7px!important;box-sizing:border-box!important;
-  background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;
-  border-radius:9px!important;box-shadow:none!important;
- }
- #appRoot .side #aibosLanguageSwitcher select{
-  width:auto!important;min-width:0!important;max-width:calc(100vw - 40px)!important;
-  background:#010080!important;color:#F7EB5B!important;border:0!important;font-size:13px!important;text-align:center!important;
- }
- #appRoot .side #aibosCommandSubnav{margin:5px 0 0!important}
- #appRoot .main{
-  position:relative!important;top:auto!important;margin:0!important;margin-top:0!important;
-  padding:12px 12px 18px!important;width:100%!important;max-width:100%!important;min-width:0!important;
-  min-height:0!important;box-sizing:border-box!important;overflow-x:hidden!important;
- }
- #appRoot #sheriOfflineBar{
-  position:relative!important;top:auto!important;inset:auto!important;
-  display:flex!important;flex-flow:row wrap!important;align-items:center!important;justify-content:flex-start!important;
-  gap:6px 8px!important;width:100%!important;min-width:0!important;max-width:100%!important;
-  margin:0 0 10px!important;padding:8px!important;box-sizing:border-box!important;overflow:visible!important;
- }
- #appRoot #sheriOfflineBar>div:first-child{
-  display:flex!important;flex:1 1 100%!important;flex-flow:row wrap!important;align-items:center!important;
-  gap:4px 7px!important;width:100%!important;min-width:0!important;max-width:100%!important;
- }
- #appRoot #sheriOfflineBar>div:last-child{
-  display:flex!important;flex:1 1 100%!important;flex-flow:row wrap!important;align-items:center!important;
-  justify-content:flex-start!important;gap:5px!important;width:100%!important;min-width:0!important;max-width:100%!important;
-  overflow:visible!important;white-space:normal!important;
- }
- #appRoot #sheriOfflineBar>div:last-child .btn{
-  display:inline-flex!important;flex:0 1 auto!important;align-items:center!important;justify-content:center!important;
-  width:auto!important;min-width:0!important;max-width:100%!important;min-height:36px!important;height:auto!important;
-  margin:0!important;padding:7px 8px!important;box-sizing:border-box!important;
-  white-space:normal!important;overflow-wrap:anywhere!important;text-align:center!important;
- }
-}
-@media(max-width:380px){
- #appRoot .side{padding-left:7px!important;padding-right:7px!important}
- #appRoot .side .nav{gap:4px!important;padding:4px!important}
- #appRoot #sheriOfflineBar>div:last-child .btn{font-size:11px!important;padding:6px 5px!important}
-}
-</style>
-<script id="aibos-locale-invariant-navigation-sync-v62">
-(function(){
- 'use strict';
- const app=document.getElementById('appRoot');
- const side=app?.querySelector('.side');
- const nav=side?.querySelector('.nav');
- const picker=document.getElementById('aibosLanguageSwitcher');
- const main=app?.querySelector('.main');
- if(!app||!side||!nav||!main)return;
- function placePicker(){
-  if(picker&&picker.parentElement!==side){
-   const subnav=side.querySelector('#aibosCommandSubnav');
-   side.insertBefore(picker,subnav||null);
-  }
- }
- function enforce(){
-  placePicker();
-  if(window.innerWidth<=650){
-   /* Natural document flow: header height itself creates the gap, never a guessed pixel spacer. */
-   main.style.setProperty('margin-top','0px','important');
-   main.style.setProperty('padding-top','12px','important');
-   side.style.setProperty('position','relative','important');
-  }
- }
- enforce();
- window.addEventListener('resize',enforce,{passive:true});
- window.addEventListener('aibos:languagechange',enforce);
- if('ResizeObserver' in window){const ro=new ResizeObserver(()=>{if(window.innerWidth<=650)enforce()});ro.observe(side)}
-})();
-</script>
-<!-- V14.4.63: place sync controls directly below the shared language selector -->
-<style id="aibos-locale-invariant-navigation-sync-v63">
-/* One shared presentation layer for EN, FR and RW. Locale changes text only. */
-@media(max-width:650px){
- html[lang] #appRoot .side{position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;width:100%!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:8px 10px 8px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important;color:#F7EB5B!important;border:0!important;border-bottom:2px solid #F7EB5B!important;border-radius:0!important;box-shadow:none!important;transform:none!important}
- html[lang] #appRoot .side>.brand{color:#F7EB5B!important;background:transparent!important;text-align:center!important;margin:0 0 5px!important;padding:0 0 5px!important;border:0!important}
- html[lang] #appRoot .side .nav{display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;grid-template-rows:repeat(3,minmax(44px,auto))!important;grid-auto-flow:row!important;align-items:stretch!important;gap:5px!important;width:100%!important;min-width:0!important;margin:0!important;padding:5px!important;overflow:visible!important;box-sizing:border-box!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:11px!important;box-shadow:none!important}
- html[lang] #appRoot .side .nav>button{display:flex!important;grid-column:span 2!important;align-items:center!important;justify-content:center!important;width:100%!important;min-width:0!important;min-height:44px!important;height:auto!important;max-height:none!important;margin:0!important;padding:5px 3px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid rgba(247,235,91,.8)!important;border-radius:9px!important;font-family:inherit!important;font-size:clamp(11px,3.3vw,13px)!important;font-weight:650!important;line-height:1.15!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;box-shadow:none!important}
- html[lang] #appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
- html[lang] #appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
- html[lang] #appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
- html[lang] #appRoot .side .nav>button[data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}
- html[lang] #appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
- html[lang] #appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important}
- html[lang] #appRoot .side .nav>button.active,html[lang] #appRoot .side .nav>button[aria-current="page"]{color:#010080!important;background:#F7EB5B!important;border-color:#F7EB5B!important}
- html[lang] #appRoot .side .nav .sheri-nav-thumb{border:1.5px solid #F7EB5B!important;flex:0 0 22px!important;width:22px!important;height:22px!important}
- html[lang] #appRoot .side #aibosLanguageSwitcher{position:static!important;inset:auto!important;transform:none!important;align-self:center!important;display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;width:max-content!important;max-width:calc(100% - 12px)!important;height:auto!important;margin:6px auto 0!important;padding:3px 7px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;box-shadow:none!important}
- html[lang] #appRoot .side #aibosLanguageSwitcher select,html[lang] #appRoot .side #aibosLanguageSwitcher select option{min-width:0!important;width:auto!important;max-width:calc(100vw - 40px)!important;color:#F7EB5B!important;background:#010080!important;border:0!important;font-family:inherit!important;font-size:13px!important;font-weight:650!important;text-align:center!important}
- html[lang] #appRoot #sheriOfflineBar{position:static!important;inset:auto!important;top:auto!important;z-index:auto!important;display:flex!important;flex-flow:row wrap!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:6px 8px!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:6px 0 0!important;padding:7px 8px!important;box-sizing:border-box!important;color:#010080!important;background:#F8FAFC!important;border:1px solid #F7EB5B!important;border-radius:10px!important;box-shadow:none!important;overflow:visible!important}
- html[lang] #appRoot #sheriOfflineBar>div:first-child{display:flex!important;flex:1 1 130px!important;flex-flow:row wrap!important;flex-direction:row!important;align-items:center!important;gap:3px 6px!important;width:auto!important;min-width:0!important;max-width:100%!important;color:#010080!important;font-size:12px!important;line-height:1.25!important}
- html[lang] #appRoot #sheriOfflineBar>div:last-child{display:flex!important;flex:0 1 auto!important;flex-flow:row wrap!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:5px!important;width:auto!important;min-width:0!important;max-width:100%!important;overflow:visible!important;white-space:normal!important}
- html[lang] #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] #appRoot #sheriOfflineBar>div:last-child>button{display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;align-self:center!important;width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:32px!important;margin:0!important;padding:6px 8px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:8px!important;font-family:inherit!important;font-size:11.5px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important}
- html[lang] #appRoot .main{position:relative!important;top:auto!important;inset:auto!important;margin:0!important;margin-top:0!important;padding:8px 12px 18px!important;width:100%!important;max-width:100%!important;min-width:0!important;min-height:0!important;box-sizing:border-box!important;overflow-x:hidden!important}
-}
-@media(max-width:380px){html[lang] #appRoot .side{padding-left:7px!important;padding-right:7px!important}html[lang] #appRoot .side .nav{gap:4px!important;padding:4px!important}html[lang] #appRoot #sheriOfflineBar{gap:5px!important;padding:6px!important}html[lang] #appRoot #sheriOfflineBar>div:last-child{gap:4px!important}html[lang] #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] #appRoot #sheriOfflineBar>div:last-child>button{font-size:10.5px!important;padding:5px 6px!important}}
-</style>
-<script id="aibos-locale-invariant-navigation-sync-v63">
-(function(){'use strict';
- const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),main=app?.querySelector('.main');
- const picker=document.getElementById('aibosLanguageSwitcher'),sync=document.getElementById('sheriOfflineBar');
- if(!app||!side||!main||!picker||!sync)return;
- function place(){
-  if(window.innerWidth<=650){
-   if(picker.parentElement!==side)side.insertBefore(picker,side.querySelector('#aibosCommandSubnav')||null);
-   if(sync.parentElement!==side||sync.previousElementSibling!==picker)side.insertBefore(sync,picker.nextSibling);
-  }else{
-   if(picker.parentElement===side)document.body.appendChild(picker);
-   if(sync.parentElement===side)main.insertBefore(sync,main.firstChild);
-  }
- }
- place();window.addEventListener('resize',place,{passive:true});window.addEventListener('orientationchange',place,{passive:true});window.addEventListener('aibos:languagechange',place);
-})();
-</script>
-
-<!-- V14.4.64: enforce identical locale-specific cascade and horizontal sync actions -->
-<style id="aibos-locale-invariant-navigation-sync-v64">
-@media(max-width:650px){
- html[lang="en"] #appRoot .side,html[lang="rw"] #appRoot .side,html[lang="fr"] #appRoot .side{
-  position:relative!important;inset:auto!important;top:auto!important;right:auto!important;bottom:auto!important;left:auto!important;
-  display:flex!important;flex-direction:column!important;align-items:stretch!important;width:100%!important;
-  height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;
-  padding:8px 10px 8px!important;overflow:visible!important;box-sizing:border-box!important;
-  background:#010080!important;color:#F7EB5B!important;border:0!important;
-  border-bottom:2px solid #F7EB5B!important;border-radius:0!important;box-shadow:none!important;transform:none!important
- }
- html[lang="en"] #appRoot .side>.brand,html[lang="rw"] #appRoot .side>.brand,html[lang="fr"] #appRoot .side>.brand{
-  color:#F7EB5B!important;background:#010080!important;text-align:center!important;margin:0 0 5px!important;
-  padding:0 0 5px!important;border:0!important
- }
- html[lang="en"] #appRoot .side .nav,html[lang="rw"] #appRoot .side .nav,html[lang="fr"] #appRoot .side .nav{
-  display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;
-  grid-template-rows:repeat(3,minmax(44px,auto))!important;grid-auto-flow:row!important;
-  align-items:stretch!important;gap:5px!important;width:100%!important;min-width:0!important;
-  margin:0!important;padding:5px!important;overflow:visible!important;box-sizing:border-box!important;
-  background:#010080!important;border:1px solid #F7EB5B!important;border-radius:11px!important;box-shadow:none!important;
-  flex-direction:unset!important
- }
- html[lang="en"] #appRoot .side .nav>button,html[lang="rw"] #appRoot .side .nav>button,html[lang="fr"] #appRoot .side .nav>button{
-  display:flex!important;grid-column:span 2!important;flex:0 1 auto!important;align-items:center!important;justify-content:center!important;
-  width:100%!important;min-width:0!important;max-width:100%!important;min-height:44px!important;height:auto!important;max-height:none!important;
-  margin:0!important;padding:5px 3px!important;box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;
-  border:1px solid rgba(247,235,91,.8)!important;border-radius:9px!important;font-family:inherit!important;
-  font-size:clamp(11px,3.3vw,13px)!important;font-weight:650!important;line-height:1.15!important;text-align:center!important;
-  white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important;box-shadow:none!important
- }
- html[lang="en"] #appRoot .side .nav>button[data-view="dashboard"],html[lang="rw"] #appRoot .side .nav>button[data-view="dashboard"],html[lang="fr"] #appRoot .side .nav>button[data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}
- html[lang="en"] #appRoot .side .nav>button[data-view="sales"],html[lang="rw"] #appRoot .side .nav>button[data-view="sales"],html[lang="fr"] #appRoot .side .nav>button[data-view="sales"]{grid-column:3/span 2!important;grid-row:1!important}
- html[lang="en"] #appRoot .side .nav>button[data-view="inventory"],html[lang="rw"] #appRoot .side .nav>button[data-view="inventory"],html[lang="fr"] #appRoot .side .nav>button[data-view="inventory"]{grid-column:5/span 2!important;grid-row:1!important}
- html[lang="en"] #appRoot .side .nav>button[data-nav-command-center="1"],html[lang="rw"] #appRoot .side .nav>button[data-nav-command-center="1"],html[lang="fr"] #appRoot .side .nav>button[data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}
- html[lang="en"] #appRoot .side .nav>button[data-view="settings"],html[lang="rw"] #appRoot .side .nav>button[data-view="settings"],html[lang="fr"] #appRoot .side .nav>button[data-view="settings"]{grid-column:4/span 3!important;grid-row:2!important}
- html[lang="en"] #appRoot .side .nav>button[data-nav-shericeri="1"],html[lang="rw"] #appRoot .side .nav>button[data-nav-shericeri="1"],html[lang="fr"] #appRoot .side .nav>button[data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important;justify-content:center!important;gap:5px!important}
- html[lang="en"] #appRoot .side .nav>button.active,html[lang="rw"] #appRoot .side .nav>button.active,html[lang="fr"] #appRoot .side .nav>button.active{background:#F7EB5B!important;color:#010080!important;border-color:#F7EB5B!important}
- html[lang="en"] #appRoot .side #aibosLanguageSwitcher,html[lang="rw"] #appRoot .side #aibosLanguageSwitcher,html[lang="fr"] #appRoot .side #aibosLanguageSwitcher{
-  position:static!important;inset:auto!important;transform:none!important;align-self:center!important;order:0!important;
-  display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;
-  width:max-content!important;max-width:calc(100% - 12px)!important;height:auto!important;
-  margin:6px auto 0!important;padding:3px 7px!important;box-sizing:border-box!important;
-  color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:9px!important;box-shadow:none!important
- }
- html[lang="en"] #appRoot .side #aibosLanguageSwitcher select,html[lang="rw"] #appRoot .side #aibosLanguageSwitcher select,html[lang="fr"] #appRoot .side #aibosLanguageSwitcher select{
-  min-width:0!important;width:auto!important;max-width:calc(100vw - 40px)!important;
-  color:#F7EB5B!important;background:#010080!important;border:0!important;font-family:inherit!important;font-size:13px!important;font-weight:650!important;text-align:center!important
- }
- html[lang="en"] #appRoot #sheriOfflineBar,html[lang="rw"] #appRoot #sheriOfflineBar,html[lang="fr"] #appRoot #sheriOfflineBar{
-  position:static!important;inset:auto!important;top:auto!important;z-index:auto!important;
-  display:flex!important;flex-flow:row wrap!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;
-  gap:6px 8px!important;width:100%!important;min-width:0!important;max-width:100%!important;
-  margin:6px 0 0!important;padding:7px 8px!important;box-sizing:border-box!important;
-  color:#010080!important;background:#F8FAFC!important;border:1px solid #F7EB5B!important;border-radius:10px!important;box-shadow:none!important;overflow:visible!important
- }
- html[lang="en"] #appRoot #sheriOfflineBar>div:first-child,html[lang="rw"] #appRoot #sheriOfflineBar>div:first-child,html[lang="fr"] #appRoot #sheriOfflineBar>div:first-child{
-  display:flex!important;flex:1 1 120px!important;flex-flow:row wrap!important;flex-direction:row!important;align-items:center!important;
-  gap:3px 6px!important;width:auto!important;min-width:0!important;max-width:100%!important;color:#010080!important;font-size:12px!important;line-height:1.25!important
- }
- html[lang="en"] #appRoot #sheriOfflineBar>div:last-child,html[lang="rw"] #appRoot #sheriOfflineBar>div:last-child,html[lang="fr"] #appRoot #sheriOfflineBar>div:last-child{
-  display:flex!important;flex:1 1 100%!important;flex-flow:row wrap!important;flex-direction:row!important;
-  align-items:center!important;justify-content:flex-start!important;gap:5px!important;
-  width:100%!important;min-width:0!important;max-width:100%!important;overflow:visible!important;white-space:normal!important
- }
- html[lang="en"] #appRoot #sheriOfflineBar>div:last-child>button,html[lang="rw"] #appRoot #sheriOfflineBar>div:last-child>button,html[lang="fr"] #appRoot #sheriOfflineBar>div:last-child>button{
-  display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;
-  width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:32px!important;
-  margin:0!important;padding:6px 8px!important;box-sizing:border-box!important;
-  color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:8px!important;
-  font-family:inherit!important;font-size:11.5px!important;font-weight:650!important;line-height:1.2!important;
-  text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important
- }
- html[lang="en"] #appRoot .main,html[lang="rw"] #appRoot .main,html[lang="fr"] #appRoot .main{
-  position:relative!important;top:auto!important;inset:auto!important;margin:0!important;margin-top:0!important;
-  padding:8px 12px 18px!important;width:100%!important;max-width:100%!important;min-width:0!important;
-  min-height:0!important;box-sizing:border-box!important;overflow-x:hidden!important
- }
-}
-</style>
-<script id="aibos-locale-invariant-navigation-sync-v64">
-(function(){'use strict';
- const app=document.getElementById('appRoot'),side=app?.querySelector('.side'),main=app?.querySelector('.main');
- const picker=document.getElementById('aibosLanguageSwitcher'),sync=document.getElementById('sheriOfflineBar');
- if(!app||!side||!main||!picker||!sync)return;
- function place(){
-  if(window.innerWidth<=650){
-   if(picker.parentElement!==side)side.insertBefore(picker,side.querySelector('#aibosCommandSubnav')||null);
-   if(sync.parentElement!==side||sync.previousElementSibling!==picker)side.insertBefore(sync,picker.nextSibling);
-  }else{
-   if(picker.parentElement===side)document.body.appendChild(picker);
-   if(sync.parentElement===side)main.insertBefore(sync,main.firstChild);
-  }
- }
- place();window.addEventListener('resize',place,{passive:true});window.addEventListener('orientationchange',place,{passive:true});window.addEventListener('aibos:languagechange',place);
-})();
-</script>
-
-
-<!-- V14.4.65: shared horizontal sync status/actions; wrap only when width requires it -->
-<style id="aibos-sync-horizontal-shared-v65">
-/* One rule for every supported and future locale; translations affect text only. */
-@media(max-width:650px){
- html[lang] #appRoot #sheriOfflineBar{
-  display:flex!important;flex-flow:row wrap!important;flex-direction:row!important;
-  align-items:center!important;justify-content:flex-start!important;
-  gap:6px 8px!important;width:100%!important;min-width:0!important;max-width:100%!important;
-  margin:6px 0 0!important;padding:7px 8px!important;box-sizing:border-box!important;
-  color:#010080!important;background:#F8FAFC!important;border:1px solid #F7EB5B!important;
-  border-radius:10px!important;box-shadow:none!important;overflow:visible!important;
-  writing-mode:horizontal-tb!important;
- }
- html[lang] #appRoot #sheriOfflineBar>div:first-child{
-  display:flex!important;flex:1 1 130px!important;flex-flow:row wrap!important;flex-direction:row!important;
-  align-items:center!important;justify-content:flex-start!important;gap:3px 6px!important;
-  width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;
-  color:#010080!important;background:transparent!important;writing-mode:horizontal-tb!important;
- }
- html[lang] #appRoot #sheriOfflineBar>div:last-child{
-  display:flex!important;flex:1 1 190px!important;flex-flow:row wrap!important;flex-direction:row!important;
-  align-items:center!important;justify-content:flex-start!important;gap:5px!important;
-  width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;
-  color:#010080!important;background:transparent!important;overflow:visible!important;white-space:normal!important;
-  writing-mode:horizontal-tb!important;
- }
- html[lang] #appRoot #sheriOfflineBar>div:last-child>button,
- html[lang] #appRoot #sheriOfflineBar>div:last-child>.btn,
- html[lang] #appRoot #sheriOfflineBar>div:last-child>a,
- html[lang] #appRoot #sheriOfflineBar>div:last-child>[role="button"]{
-  display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;
-  align-items:center!important;justify-content:center!important;align-self:center!important;
-  width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:32px!important;
-  margin:0!important;padding:6px 8px!important;box-sizing:border-box!important;
-  color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;
-  border-radius:8px!important;font-family:inherit!important;font-size:11.5px!important;font-weight:650!important;
-  line-height:1.2!important;text-align:center!important;white-space:normal!important;overflow-wrap:anywhere!important;
-  writing-mode:horizontal-tb!important;transform:none!important;
- }
-}
-@media(max-width:380px){
- html[lang] #appRoot #sheriOfflineBar{gap:5px!important;padding:6px!important}
- html[lang] #appRoot #sheriOfflineBar>div:first-child{flex-basis:115px!important}
- html[lang] #appRoot #sheriOfflineBar>div:last-child{flex-basis:175px!important;gap:4px!important}
- html[lang] #appRoot #sheriOfflineBar>div:last-child>button,
- html[lang] #appRoot #sheriOfflineBar>div:last-child>.btn,
- html[lang] #appRoot #sheriOfflineBar>div:last-child>a,
- html[lang] #appRoot #sheriOfflineBar>div:last-child>[role="button"]{font-size:10.5px!important;padding:5px 6px!important}
-}
-</style>
-
-
-<!-- V14.4.66: final high-specificity shared sync layout for EN/RW/FR -->
-<style id="aibos-sync-shared-cascade-v66">
-/* The three locale selectors intentionally share every declaration. Only text is translated. */
-@media(max-width:650px){
- html[lang="en"] body #appRoot #sheriOfflineBar,html[lang="rw"] body #appRoot #sheriOfflineBar,html[lang="fr"] body #appRoot #sheriOfflineBar{
-  display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;
-  gap:6px 8px!important;width:100%!important;min-width:0!important;max-width:100%!important;margin:6px 0 0!important;padding:7px 8px!important;
-  box-sizing:border-box!important;color:#010080!important;background:#F8FAFC!important;border:1px solid #F7EB5B!important;border-radius:10px!important;
-  box-shadow:none!important;overflow:visible!important;position:static!important;inset:auto!important;top:auto!important;transform:none!important;writing-mode:horizontal-tb!important
- }
- html[lang="en"] body #appRoot #sheriOfflineBar>div:first-child,html[lang="rw"] body #appRoot #sheriOfflineBar>div:first-child,html[lang="fr"] body #appRoot #sheriOfflineBar>div:first-child{
-  display:flex!important;flex:1 1 125px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;
-  gap:3px 6px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;
-  color:#010080!important;background:transparent!important;writing-mode:horizontal-tb!important
- }
- html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child{
-  display:flex!important;flex:1 1 185px!important;flex-direction:row!important;flex-wrap:wrap!important;align-items:center!important;justify-content:flex-start!important;
-  gap:5px!important;width:auto!important;min-width:0!important;max-width:100%!important;margin:0!important;padding:0!important;
-  color:#010080!important;background:transparent!important;overflow:visible!important;white-space:normal!important;writing-mode:horizontal-tb!important
- }
- html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child>.btn,
- html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child>button{
-  display:inline-flex!important;flex:0 1 auto!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;align-self:center!important;
-  width:auto!important;min-width:0!important;max-width:100%!important;height:auto!important;min-height:32px!important;margin:0!important;padding:6px 8px!important;
-  box-sizing:border-box!important;color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important;border-radius:8px!important;
-  font-family:inherit!important;font-size:11.5px!important;font-weight:650!important;line-height:1.2!important;text-align:center!important;white-space:normal!important;
-  overflow-wrap:anywhere!important;writing-mode:horizontal-tb!important;transform:none!important
- }
-}
-@media(max-width:380px){
- html[lang="en"] body #appRoot #sheriOfflineBar,html[lang="rw"] body #appRoot #sheriOfflineBar,html[lang="fr"] body #appRoot #sheriOfflineBar{gap:5px!important;padding:6px!important}
- html[lang="en"] body #appRoot #sheriOfflineBar>div:first-child,html[lang="rw"] body #appRoot #sheriOfflineBar>div:first-child,html[lang="fr"] body #appRoot #sheriOfflineBar>div:first-child{flex-basis:110px!important}
- html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child{flex-basis:170px!important;gap:4px!important}
- html[lang="en"] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang="rw"] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang="fr"] body #appRoot #sheriOfflineBar>div:last-child>.btn{font-size:10.5px!important;padding:5px 6px!important}
-}
-</style>
-
 </body>
 </html>
