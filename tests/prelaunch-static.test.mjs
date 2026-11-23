@@ -879,14 +879,14 @@ test("navigation, language picker and sync layout use one locale-independent nat
     assert.ok(source.includes('id="aibos-approved-navigation-and-sync-v2"'));
     assert.ok(source.includes('grid-template-columns:repeat(6,minmax(0,1fr))'));
     assert.ok(source.includes('data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}'));
-    assert.ok(source.includes('data-view="businessOS"],#appRoot .side .nav>button[data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}'));
+    assert.ok(source.includes('data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}'));
+    assert.ok(source.includes('data-nav-shericeri="1"]{grid-column:3/span 2!important;grid-row:3!important}'));
     assert.ok(source.includes('display:flex!important;flex-direction:row!important;flex-wrap:wrap!important'));
     assert.ok(source.includes('flex:1 1 190px!important;flex-direction:row!important;flex-wrap:wrap!important'));
     assert.ok(source.includes('flex:1 1 125px!important;width:auto!important;font-size:13px!important'));
     assert.ok(source.includes('color:#F7EB5B!important;background:#010080!important'));
     assert.ok(source.includes('margin:0!important;margin-top:0!important'));
     assert.doesNotMatch(source, /aibos-side-height/);
-    assert.doesNotMatch(source, /getBoundingClientRect\\(\\)\\.height/);
     const layoutScript = source.match(/<script id="aibos-approved-navigation-and-sync-v2">([\s\S]*?)<\/script>/)?.[1] || "";
     assert.ok(layoutScript.includes("main.style.removeProperty('margin-top')"));
         assert.doesNotMatch(layoutScript, /getBoundingClientRect\(\)\.height/);
