@@ -3230,7 +3230,7 @@ async function addExpense(){
   const data={id:sheriUuid(),merchant_id:state.merchant.id,description,amount,cat,created_at:sheriNow(),created_by:session?.user?.id||null,created_by_name:sheriCurrentActor()};
   state.expenses.push(data);await sheriSaveSnapshot();await sheriQueue({type:'expense_upsert',record:data});
   let warning='';
-  try{await accEnsureBase();const ex=accAccountCode('6000'),cash=accAccountCode('1000');await accPostEntry({date:data.created_at.slice(0,10),description:'Expense '+description,sourceType:'expense',sourceId:data.id,lines:[{accountId:ex.id,debit:amount},{accountId:cash.id,credit:amount}]});}
+  try{await accEnsureBase();const ex=accAccountCode('6000'),payable=accAccountCode('2050');if(!ex||!payable)throw new Error('Operating Expenses (6000) and Accrued Expenses Payable (2050) must be active.');data.payment_status='unpaid';await sheriPut('expenses',data.id,{merchant_id:state.merchant.id,record:{...data}});await accPostEntry({date:data.created_at.slice(0,10),description:'Expense '+description,sourceType:'expense',sourceId:data.id,lines:[{accountId:ex.id,debit:amount},{accountId:payable.id,credit:amount}]});}
   catch(err){warning=' Saved, but ledger posting needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] expense posting failed',err);}
   if(navigator.onLine)sherriSyncKick();clearExpenseForm();render();sheriToast('Expense recorded.'+warning,warning?'warning':'success');
 }
@@ -6055,9 +6055,65 @@ async function accCreateBill(){
   await accAudit('create','bill',id,{total,purchase_id:purchaseId||null});
   document.getElementById('accBillDesc').value='';document.getElementById('accBillCost').value='';document.getElementById('accBillDiscount').value='0';document.getElementById('accBillPurchase').value='';render();sheriToast('Bill created and linked to the purchase without duplicating inventory.','success');
 }
-function accPaymentSourceOptions(){const type=document.getElementById('accPaymentType')?.value;const sel=document.getElementById('accPaymentSource');if(!sel)return;const rows=type==='supplier_payment'?state.bills.filter(x=>accBillStatus(x)!=='paid'):type==='customer_receipt'?state.invoices.filter(x=>accInvoiceStatus(x)!=='paid'):[];sel.innerHTML='<option value="">— No linked document —</option>'+rows.map(x=>`<option value="${x.id}">${esc(x.invoice_number||x.bill_number)}${type==='supplier_payment'?' · '+(accSupplier(x.supplier_id)?.name||'Unassigned supplier'):''} — ${money((x.total||0)-(type==='supplier_payment'?accBillPaid(x):accInvoicePaid(x)))}</option>`).join('')}
+function accExpensePaid(expense){return (state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===expense.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0)}
+function accExpenseOutstanding(expense){return Math.max(0,Number(expense.amount||0)-accExpensePaid(expense))}
+function accPaymentSourceOptions(){
+  const type=document.getElementById('accPaymentType')?.value,sel=document.getElementById('accPaymentSource');if(!sel)return;
+  const rows=type==='supplier_payment'?state.bills.filter(x=>accBillStatus(x)!=='paid'):
+    type==='customer_receipt'?state.invoices.filter(x=>accInvoiceStatus(x)!=='paid'):
+    type==='expense_payment'?state.expenses.filter(x=>!x.deleted&&accExpenseOutstanding(x)>0.005):[];
+  const label=x=>type==='supplier_payment'?(x.bill_number||'Supplier bill')+' · '+(accSupplier(x.supplier_id)?.name||'Unassigned supplier'):
+    type==='customer_receipt'?(x.invoice_number||'Customer invoice'):
+    (x.description||'Expense');
+  const balance=x=>type==='supplier_payment'?Number(x.total||0)-accBillPaid(x):
+    type==='customer_receipt'?Number(x.total||0)-accInvoicePaid(x):accExpenseOutstanding(x);
+  sel.innerHTML='<option value="">— '+(type==='expense_payment'?'Choose an expense': 'No linked document')+' —</option>'+rows.map(x=>'<option value="'+esc(x.id)+'">'+esc(label(x))+' — '+money(balance(x))+'</option>').join('');
+}
 async function accCreatePayment(){
-  await accEnsureBase();const type=document.getElementById('accPaymentType').value,sourceId=document.getElementById('accPaymentSource').value||null,amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,date=document.getElementById('accPaymentDate').value||accToday();if(amount<=0||!accountId)return alert('Enter an amount and choose a cash/bank account.');if(accPeriodLocked(date))return alert('This payment date is inside a locked accounting period.');if(sourceId){const doc=type==='supplier_payment'?state.bills.find(x=>x.id===sourceId):type==='customer_receipt'?state.invoices.find(x=>x.id===sourceId):null;if(doc){const outstanding=Math.max(0,Number(doc.total||0)-(type==='supplier_payment'?accBillPaid(doc):accInvoicePaid(doc)));if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding balance of '+money(outstanding)+'.')}}let debitId,creditId,sourceType=null; if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100').id;sourceType='invoice'}else if(type==='supplier_payment'){debitId=accAccountCode('2000').id;creditId=accountId;sourceType='bill'}else if(type==='other_income'){debitId=accountId;creditId=accAccountCode('4100').id}else{debitId=accAccountCode('6000').id;creditId=accountId}const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),direction:type==='customer_receipt'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,amount,payment_date:date,reference:document.getElementById('accPaymentRef').value.trim()||null,created_at:sheriNow()};state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'payments',record:row});await accPostEntry({date,description:(type==='customer_receipt'?'Customer receipt':type==='supplier_payment'?'Supplier payment':type==='other_income'?'Other income':'Expense payment'),sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});await accAudit('create','payment',row.id,{amount,type});document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';render();alert('Payment recorded.');
+  await accEnsureBase();
+  const type=document.getElementById('accPaymentType').value,sourceId=document.getElementById('accPaymentSource').value||null,
+    amount=Number(document.getElementById('accPaymentAmount').value),accountId=document.getElementById('accPaymentAccount').value,
+    date=document.getElementById('accPaymentDate').value||accToday();
+  if(amount<=0||!accountId)return alert('Enter an amount and choose a cash/bank account.');
+  if(accPeriodLocked(date))return alert('This payment date is inside a locked accounting period.');
+  let debitId=null,creditId=null,sourceType=null,linkedExpense=null;
+  if(type==='customer_receipt'||type==='supplier_payment'){
+    if(!sourceId)return alert('Choose the invoice or supplier bill this payment belongs to.');
+    const doc=type==='supplier_payment'?state.bills.find(x=>x.id===sourceId):state.invoices.find(x=>x.id===sourceId);
+    if(!doc)return alert('The selected invoice or supplier bill could not be found.');
+    const outstanding=Math.max(0,Number(doc.total||0)-(type==='supplier_payment'?accBillPaid(doc):accInvoicePaid(doc)));
+    if(amount>outstanding+0.005)return alert('Payment exceeds the outstanding balance of '+money(outstanding)+'.');
+    if(type==='customer_receipt'){debitId=accountId;creditId=accAccountCode('1100')?.id;sourceType='invoice';}
+    else{debitId=accAccountCode('2000')?.id;creditId=accountId;sourceType='bill';}
+  }else if(type==='expense_payment'){
+    if(!sourceId)return alert('Choose the existing expense being paid. This prevents recording the same expense twice.');
+    linkedExpense=state.expenses.find(x=>x.id===sourceId&&!x.deleted);
+    if(!linkedExpense)return alert('The selected expense could not be found or has been deleted.');
+    const outstanding=accExpenseOutstanding(linkedExpense);
+    if(outstanding<=0.005)return alert('This expense is already fully paid.');
+    if(amount>outstanding+0.005)return alert('Payment exceeds the expense balance of '+money(outstanding)+'.');
+    debitId=accAccountCode('2050')?.id;creditId=accountId;sourceType='expense';
+  }else if(type==='other_income'){
+    debitId=accountId;creditId=accAccountCode('4100')?.id;
+  }else if(type==='other_expense'){
+    debitId=accAccountCode('6000')?.id;creditId=accountId;
+  }else return alert('Choose a valid payment type.');
+  if(!debitId||!creditId)return alert('The required ledger account is missing. Refresh the chart of accounts before recording this payment.');
+  const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),
+    direction:type==='customer_receipt'?'receipt':'payment',source_type:sourceType,source_id:sourceId,account_id:accountId,
+    amount,payment_date:date,reference:document.getElementById('accPaymentRef').value.trim()||null,created_at:sheriNow()};
+  await accPostEntry({date,description:(type==='customer_receipt'?'Customer receipt':type==='supplier_payment'?'Supplier payment':type==='other_income'?'Other income':type==='expense_payment'?'Expense payment — '+(linkedExpense.description||''):'Other expense'),
+    sourceType:'payment',sourceId:row.id,lines:[{accountId:debitId,debit:amount},{accountId:creditId,credit:amount}]});
+  state.payments.push(row);await sheriPut('payments',row.id,{merchant_id:state.merchant.id,record:{...row}});
+  await sheriQueue({type:'accounting_upsert',table:'payments',record:row});
+  if(linkedExpense){
+    linkedExpense.payment_status=accExpenseOutstanding(linkedExpense)<=0.005?'paid':'partial';
+    await sheriPut('expenses',linkedExpense.id,{merchant_id:state.merchant.id,record:{...linkedExpense}});
+    await sheriQueue({type:'expense_upsert',record:{...linkedExpense}});
+  }
+  await accAudit('create','payment',row.id,{amount,type,source_id:sourceId});
+  document.getElementById('accPaymentAmount').value='';document.getElementById('accPaymentRef').value='';
+  accPaymentSourceOptions();render();sheriToast('Payment recorded and posted to the correct ledger accounts.','success');
 }
 async function accCreateBankAccount(){await accEnsureBase();const name=document.getElementById('accBankName').value.trim(),type=document.getElementById('accBankType').value,opening=Number(document.getElementById('accBankOpening').value)||0;if(!name)return alert('Enter an account name.');const baseCode={cash:'1000',bank:'1010',mobile_money:'1020'}[type];let acct=accAccountCode(baseCode);if(acct&&state.bankAccounts.some(x=>x.account_id===acct.id)){let n=2;while(accAccountCode(baseCode+'-'+n))n++;acct={id:sheriUuid(),merchant_id:state.merchant.id,code:baseCode+'-'+n,name:name,type:'asset',normal_balance:'debit',balance_sheet_class:'current',active:true,created_at:sheriNow()};await accUpsert('chart_of_accounts',acct)}if(!acct)return alert('Could not create the ledger account for this cash/bank account.');const row={id:sheriUuid(),merchant_id:state.merchant.id,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),name,type,opening_balance:opening,account_id:acct.id,current_balance:opening,last_reconciled_at:null,reconciled_balance:null,reconciled_difference:null,created_at:sheriNow()};state.bankAccounts.push(row);await sheriPut('bankAccounts',row.id,{merchant_id:state.merchant.id,record:{...row}});await sheriQueue({type:'accounting_upsert',table:'bank_accounts',record:row});if(opening>0){const eq=accAccountCode('3000');await accPostEntry({date:accToday(),description:'Opening balance — '+name,sourceType:'bank_opening',sourceId:row.id,lines:[{accountId:acct.id,debit:opening},{accountId:eq.id,credit:opening}]})}document.getElementById('accBankName').value='';document.getElementById('accBankOpening').value='0';render();}
 async function accReconcileBank(id){const b=state.bankAccounts.find(x=>x.id===id);if(!b)return;const d=prompt('Reconciled through date (YYYY-MM-DD):',accToday());if(!d||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(d))return alert('Use YYYY-MM-DD.');const statement=Number(prompt('Statement balance:',String(accNormalAmount(accAccount(b.account_id))||0)));if(!Number.isFinite(statement))return;const ledger=accNormalAmount(accAccount(b.account_id));b.last_reconciled_at=d;b.reconciled_balance=statement;b.reconciled_difference=statement-ledger;await accUpdate('bank_accounts',b);await accAudit('reconcile','bank_account',b.id,{statement,ledger,difference:b.reconciled_difference});render();}
