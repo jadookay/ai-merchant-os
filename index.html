@@ -8938,29 +8938,13 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
  #appRoot .side .nav button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
  #appRoot .side .nav button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
  #appRoot .main{
-  margin:calc(var(--aibos-side-height, 330px) + 14px) 0 0!important;
+  margin:0!important;
   width:100%!important;max-width:100%!important;
   padding:16px 12px 18px!important;box-sizing:border-box!important;
  }
 }
 </style>
-<script id="aibos-navigation-live-clearance-v2">
-(function(){
- const side=document.querySelector('#appRoot .side'),root=document.getElementById('appRoot');
- if(!side||!root)return;
- let last=0;
- function measure(){
-  if(window.innerWidth>650){root.style.removeProperty('--aibos-side-height');return}
-  const h=Math.ceil(side.getBoundingClientRect().height);
-  if(h>0&&h!==last){last=h;root.style.setProperty('--aibos-side-height',h+'px')}
- }
- if('ResizeObserver' in window){const observer=new ResizeObserver(measure);observer.observe(side)}
- window.addEventListener('resize',measure,{passive:true});
- window.addEventListener('aibos:languagechange',()=>{measure();requestAnimationFrame(measure)});
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',measure,{once:true});
- measure();
-})();
-</script>
+
 
 <!-- Global application UI consistency: same responsive design system in English, Kinyarwanda and French. -->
 <style id="aibos-global-ui-consistency-all-locales-v1">
@@ -9143,36 +9127,14 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
   #appRoot .side .nav>button:nth-child(5){grid-column:4 / span 2!important;grid-row:2!important}
   #appRoot .side .nav>button:nth-child(6){grid-column:3 / span 2!important;grid-row:3!important}
   #appRoot .main{
-    margin:calc(var(--aibos-side-height, 300px) + 14px) 0 0!important;
+    margin:0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:16px 12px 18px!important;
   }
   #appRoot .main .table{font-size:12px!important}
 }
 </style>
-<script id="aibos-locale-layout-measure-v2">
-(function(){
-  const root=document.getElementById('appRoot');
-  const side=root?.querySelector('.side');
-  if(!root||!side)return;
-  let last=-1,frame=0;
-  function measure(){
-    if(window.innerWidth>650){root.style.removeProperty('--aibos-side-height');last=-1;return}
-    const height=Math.ceil(Math.max(side.getBoundingClientRect().height,side.scrollHeight));
-    if(height>0&&height!==last){last=height;root.style.setProperty('--aibos-side-height',height+'px')}
-  }
-  function schedule(){if(frame)return;frame=requestAnimationFrame(()=>{frame=0;measure()})}
-  if('ResizeObserver' in window){const observer=new ResizeObserver(schedule);observer.observe(side)}
-  const mutations=new MutationObserver(schedule);
-  mutations.observe(side,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style']});
-  const appVisibility=new MutationObserver(schedule);
-  appVisibility.observe(root,{attributes:true,attributeFilter:['style','class']});
-  window.addEventListener('resize',schedule,{passive:true});
-  window.addEventListener('aibos:languagechange',schedule);
-  if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
-  schedule();
-})();
-</script>
+
 
 <!-- Authoritative cross-locale layout: Kinyarwanda changes copy, never the design geometry. -->
 <style id="aibos-final-cross-locale-layout-v3">
@@ -9287,48 +9249,13 @@ html[lang="fr"] #aibosCommandSubnav button{box-sizing:border-box!important;width
     background:#010080!important;color:#F7EB5B!important;border:1px solid #F7EB5B!important;
   }
   #appRoot .main{
-    margin:calc(var(--aibos-side-height, 330px) + 16px) 0 0!important;
+    margin:0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:14px 12px 18px!important;overflow-x:hidden!important;
   }
 }
 </style>
-<script id="aibos-final-cross-locale-layout-measure-v3">
-(function(){
-  const root=document.getElementById('appRoot');
-  const side=root?.querySelector('.side');
-  if(!root||!side||root.__aibosLayoutMeasureV3)return;
-  root.__aibosLayoutMeasureV3=true;
-  let frame=0,lastHeight=-1;
-  function measure(){
-    if(window.innerWidth>650){
-      if(root.style.getPropertyValue('--aibos-side-height'))root.style.removeProperty('--aibos-side-height');
-      lastHeight=-1;return;
-    }
-    const height=Math.ceil(side.getBoundingClientRect().height);
-    if(height>0&&height!==lastHeight){
-      lastHeight=height;
-      root.style.setProperty('--aibos-side-height',height+'px');
-    }
-  }
-  function schedule(){
-    if(frame)return;
-    frame=requestAnimationFrame(()=>{frame=0;measure()});
-  }
-  if('ResizeObserver' in window){
-    const observer=new ResizeObserver(schedule);observer.observe(side);
-  }
-  const mutations=new MutationObserver(schedule);
-  mutations.observe(side,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:['class','style','hidden']});
-  const rootObserver=new MutationObserver(schedule);
-  rootObserver.observe(root,{attributes:true,attributeFilter:['style','class']});
-  window.addEventListener('resize',schedule,{passive:true});
-  window.addEventListener('aibos:languagechange',schedule);
-  if(document.fonts?.ready)document.fonts.ready.then(schedule).catch(()=>{});
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',schedule,{once:true});
-  schedule();
-})();
-</script>
+
 
 
 <!-- Single authoritative navigation theme: identical computed design in EN/RW/FR. -->
@@ -9500,7 +9427,7 @@ html[lang="fr"] #appRoot #aibosCommandSubnav>button{
   html[lang="en"] #appRoot .main,
   html[lang="rw"] #appRoot .main,
   html[lang="fr"] #appRoot .main{
-    box-sizing:border-box!important;margin:calc(var(--aibos-side-height,330px) + 16px) 0 0!important;
+    box-sizing:border-box!important;margin:0!important;
     width:100%!important;max-width:100%!important;min-height:0!important;
     padding:14px 12px 18px!important;overflow-x:hidden!important;
   }
