@@ -209,7 +209,7 @@ test("business IDs are capped at six digits in the app, staff login and database
 test("cross-device server rows override stale local rows and foreground tabs refresh", () => {
   assert.ok(html.includes("if(pendingIdsFor(store).has(x.id)&&!sm.has(x.id))"));
   assert.ok(html.includes("sheriSyncQueued=items.length"));
-  assert.ok(html.includes("loadAll(true).then(()=>render())"));
+  assert.ok(html.includes("loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()})"));
 });
 
 test("trial balance places abnormal account balances on the opposite side", () => {
