@@ -871,12 +871,12 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
   assert.ok(html.includes("if(!full_name||full_name.length<2||full_name.length>120)"));
 });
 
-test("sync status bar uses one locale-invariant horizontal layout with readable, non-squashed controls", () => {
+test("sync status bar uses the same responsive horizontal layout and navy-gold branding in all locales", () => {
   for (const source of [html, previewLiveHtml]) {
-    assert.ok(source.includes('id="aibos-unified-sync-layout-v58"'));
-    assert.match(source, /#appRoot #sheriOfflineBar>div:last-child\s*\{[\s\S]*?flex-direction:row!important;[\s\S]*?flex-wrap:nowrap!important/);
-    assert.match(source, /#appRoot #sheriOfflineBar>div:last-child \.btn\s*\{[\s\S]*?flex:0 0 auto!important;[\s\S]*?font-size:12\.5px!important/);
-    assert.match(source, /@media\(max-width:380px\)[\s\S]*?#appRoot #sheriOfflineBar>div:last-child \.btn\s*\{[\s\S]*?font-size:11\.5px!important/);
-    assert.doesNotMatch(source, /(?:html\[lang="(?:en|rw|fr)"\]|:lang\((?:en|rw|fr)\))[^{}]*#sheriOfflineBar/);
+    assert.ok(source.includes('id="aibos-locale-invariant-navigation-sync-v64"'));
+    assert.match(source, /html\[lang="en"\] #appRoot #sheriOfflineBar,html\[lang="rw"\] #appRoot #sheriOfflineBar,html\[lang="fr"\] #appRoot #sheriOfflineBar\s*\{[\s\S]*?flex-flow:row wrap!important/);
+    assert.match(source, /html\[lang="en"\] #appRoot #sheriOfflineBar>div:last-child,html\[lang="rw"\] #appRoot #sheriOfflineBar>div:last-child,html\[lang="fr"\] #appRoot #sheriOfflineBar>div:last-child\s*\{[\s\S]*?flex-direction:row!important/);
+    assert.match(source, /html\[lang="en"\] #appRoot #sheriOfflineBar>div:last-child>button,html\[lang="rw"\] #appRoot #sheriOfflineBar>div:last-child>button,html\[lang="fr"\] #appRoot #sheriOfflineBar>div:last-child>button\s*\{[\s\S]*?display:inline-flex!important;[\s\S]*?width:auto!important;[\s\S]*?background:#010080!important/);
+    assert.match(source, /html\[lang="en"\] #appRoot \.side,html\[lang="rw"\] #appRoot \.side,html\[lang="fr"\] #appRoot \.side\s*\{[\s\S]*?background:#010080!important;[\s\S]*?color:#F7EB5B!important/);
   }
 });
