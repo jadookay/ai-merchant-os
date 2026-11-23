@@ -40,7 +40,15 @@ set search_path = pg_catalog
 as $$
 declare
   candidate_name text;
+  auth_provider text;
 begin
+  auth_provider := coalesce(new.raw_app_meta_data ->> 'provider', '');
+  if auth_provider not in ('email', 'phone') then
+    raise exception using
+      errcode = '22023',
+      message = 'New accounts must use email or phone registration. Google/Apple sign-in is reserved for existing accounts.';
+  end if;
+
   candidate_name := coalesce(
     nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
     nullif(btrim(new.raw_user_meta_data ->> 'name'), '')
