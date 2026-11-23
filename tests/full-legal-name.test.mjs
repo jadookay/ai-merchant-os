@@ -35,5 +35,6 @@ test('owner and staff creation require the legal-name validator', () => {
 test('new Auth users are server-side checked before insertion', () => {
   assert.match(migration, /create trigger require_full_legal_name_on_auth_user\s+before insert on auth\.users/i);
   assert.match(migration, /public\.is_valid_full_legal_name\(candidate_name\)/);
+  assert.match(migration, /auth_provider not in \('email', 'phone'\)/);
   assert.match(migration, /at least two name parts/i);
 });
