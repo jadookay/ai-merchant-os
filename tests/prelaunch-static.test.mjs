@@ -384,6 +384,36 @@ test("inventory staff can add products and receive purchases without editing exi
   assert.ok(teamMigration.includes("stock_applied"));
 });
 
+
+test("received purchases post and verify their inventory/AP journal without unsafe settings upserts", () => {
+  for (const [label, source] of [["main app", html], ["isolated preview", previewLiveHtml]]) {
+    const purchaseStart = source.indexOf("async function addOSPurchase()");
+    const purchaseEnd = source.indexOf("\\nasync function", purchaseStart + 1);
+    assert.ok(purchaseStart >= 0 && purchaseEnd > purchaseStart, label + ": expected the complete purchase recorder");
+    assert.ok(source.slice(purchaseStart, purchaseEnd).includes("return data;"), label + ": purchase recorder must return the exact saved purchase");
+
+    const wrapperStart = source.indexOf("const _v14_1_addOSPurchase=addOSPurchase");
+    const wrapperEnd = source.indexOf("\\n// Expense", wrapperStart);
+    assert.ok(wrapperStart >= 0 && wrapperEnd > wrapperStart, label + ": expected the purchase accounting wrapper");
+    const wrapper = source.slice(wrapperStart, wrapperEnd);
+    assert.ok(wrapper.includes("const p=await _v14_1_addOSPurchase()"), label + ": wrapper must use the returned purchase, not a fragile array index");
+    assert.ok(wrapper.indexOf("await accEnsureBase()") < wrapper.indexOf("await _v14_1_addOSPurchase()"), label + ": accounting accounts must be validated before stock is changed");
+    assert.ok(wrapper.includes("await accPostEntry("), label + ": received purchases must debit inventory and credit accounts payable");
+    assert.ok(wrapper.includes("await sheriSyncOutbox()"), label + ": purchase journal must be actively synchronized");
+    assert.ok(wrapper.includes("journal confirmed on the server"), label + ": UI must distinguish a server-confirmed journal from a queued one");
+
+    assert.ok(source.includes("async function sheriSyncAccountingSettingsOperation(op)"), label + ": settings sync must use the safe update-first handler");
+    assert.ok(source.includes(".select('merchant_id,locked_through,updated_at,created_at')"), label + ": settings sync must read the existing server row first");
+    assert.ok(source.includes(".update({locked_through:record.locked_through??null,updated_at:record.updated_at||sheriNow()})"), label + ": only newer settings may update the server row");
+    assert.ok(source.includes(".insert(sheriServerRecord(record))"), label + ": missing settings rows must use an insert");
+    assert.ok(!source.includes(".upsert(sheriServerRecord(op.record),{onConflict:'merchant_id'})"), label + ": settings must not use a conflict-ignore upsert that can fail RLS checks");
+
+    const purchaseJournalGuard = source.indexOf("if(op.type==='accounting_journal_batch'&&op.entry?.source_type==='purchase')");
+    const journalSync = source.indexOf("else if(op.type==='accounting_journal_batch'){await sheriSyncJournalBatch(op)}", purchaseJournalGuard);
+    assert.ok(purchaseJournalGuard >= 0 && journalSync > purchaseJournalGuard, label + ": purchase journal sync must wait for a server-confirmed received purchase and stock movement");
+  }
+});
+
 test("team administration requires the manager role, not only a delegated flag", () => {
   assert.ok(teamAccess.includes("membership.role === \"manager\" && callerPermissions.manage_team === true"));
   assert.ok(teamAccess.includes("callerRole === \"manager\" && callerPermissions.manage_team === true"));
