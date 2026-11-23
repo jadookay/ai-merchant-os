@@ -874,6 +874,10 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
 test("navigation, language picker and sync layout use one locale-independent natural-flow system", () => {
   for (const source of [html, previewLiveHtml]) {
     assert.ok(source.includes('id="aibos-locale-invariant-header-sync-v67"'));
+    assert.ok(source.includes('id="aibos-sync-locale-neutral-v71"'));
+    assert.ok(source.includes('grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important'));
+    assert.ok(source.includes('background:#F8FAFC!important;color:#010080!important;border:1px solid #F7EB5B!important'));
+    assert.ok(source.includes('color:#F7EB5B!important;background:#010080!important;border:1px solid #F7EB5B!important'));
     assert.ok(source.includes('html[lang] body #appRoot #sheriOfflineBar'));
     assert.ok(source.includes('html[lang] body #appRoot .side'));
     assert.ok(source.includes('id="aibos-approved-navigation-and-sync-v2"'));
