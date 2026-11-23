@@ -5950,8 +5950,11 @@ async function accEnsureOperationalLedger({approved=false}={}){
     if(cost>0&&inv&&cogs)await safePost({date,description:'COGS '+(s.product_name_snapshot||''),sourceType:'sale_cogs',sourceId:s.id,lines:[{accountId:cogs.id,debit:cost},{accountId:inv.id,credit:cost}]});
   }
   for(const e of (state.expenses||[]).filter(x=>!x.deleted)){
-    const ex=accAccountCode('6000'),payable=accAccountCode('2050'),amount=Number(e.amount||0),date=String(e.created_at||e.date||sheriNow()).slice(0,10);
-    if(amount>0&&ex&&payable)await safePost({date,description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:payable.id,credit:amount}]});
+    const ex=accAccountCode('6000'),payable=accAccountCode('2050'),cash=accAccountCode('1000'),amount=Number(e.amount||0),date=String(e.created_at||e.date||sheriNow()).slice(0,10);
+    const linkedPayments=(state.payments||[]).filter(p=>p.source_type==='expense'&&p.source_id===e.id&&p.direction==='payment').reduce((sum,p)=>sum+Number(p.amount||0),0);
+    const usesPayable=linkedPayments>0||['unpaid','partial'].includes(String(e.payment_status||'').toLowerCase());
+    const offset=usesPayable?payable:cash;
+    if(amount>0&&ex&&offset)await safePost({date,description:'Expense '+(e.description||''),sourceType:'expense',sourceId:e.id,lines:[{accountId:ex.id,debit:amount},{accountId:offset.id,credit:amount}]});
   }
   for(const p of (state.purchases||[]).filter(x=>x.status!=='ordered'&&!x.voided_at)){
     const inv=accAccountCode('1200'),ap=accAccountCode('2000'),total=Number(p.total||Number(p.qty||0)*Number(p.unit_cost||p.cost||0)),date=String(p.purchased_at||p.created_at||sheriNow()).slice(0,10);
@@ -6527,10 +6530,11 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
   }
   const integrity=accLedgerIntegrity(reportEnd);
   const pendingLedgerEntries=(state.journalEntries||[]).filter(entry=>entry._serverConfirmed===false&&!entry.voided&&sheriDateInReportRange(entry.entry_date||entry.created_at));
+  const pendingLedgerSources=[...(state.sales||[]),...(state.expenses||[]),...(state.purchases||[])].filter(source=>source._serverConfirmed===false&&!source.voided&&!source.deleted&&sheriDateInReportRange(source.created_at||source.purchased_at)).length;
   const reconcileButton=document.getElementById('accReconcileButton');
   if(reconcileButton){reconcileButton.style.display=integrity.invalidCount&&accServerSnapshotAuthoritative&&sheriCan('manage_finance')&&sheriCan('view_financial_reports')?'inline-flex':'none';reconcileButton.textContent=sheriPendingText('Review and repair ledger');}
   const integrityNotice=integrity.invalidCount?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">Financial statements are NOT reconciled: '+integrity.invalidCount+' server-confirmed journal entr'+(integrity.invalidCount===1?'y has':'ies have')+' missing, duplicated, mismatched or unbalanced postings. Review the General Ledger before relying on these totals.</div>':'';
-  const pendingLedgerNotice=pendingLedgerEntries.length?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+pendingLedgerEntries.length+' journal entr'+(pendingLedgerEntries.length===1?'y is':'ies are')+' saved on this device but not yet confirmed by the server. They are excluded from the server-ledger integrity count and the statements remain unverified until synchronization completes.</div>':'';
+  const pendingLedgerNotice=(pendingLedgerEntries.length||pendingLedgerSources)?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+pendingLedgerEntries.length+' journal entr'+(pendingLedgerEntries.length===1?'y':'ies')+' and '+pendingLedgerSources+' source record(s) are saved on this device but not yet confirmed by the server. They are excluded from confirmed-ledger defect checks; statements remain unverified until synchronization completes.</div>':'';
   const b=accReportTotals(reportStart,reportEnd),bs=accReportTotals(null,reportEnd);
   const income=accStatementTotal('income',b,'credit');const salesRevenue=Number(b['4000']||0)-Number(b['4050']||0);const otherIncome=income-salesRevenue;
   const cogs=accStatementTotal('cogs',b,'debit');
