@@ -22,7 +22,7 @@ const sixDigitIdMigration = readFileSync(new URL("../supabase/migrations/2026111
 const sequenceMaxMigration = readFileSync(new URL("../supabase/migrations/20261114190000_enforce_six_digit_business_id_sequence_max.sql", import.meta.url), "utf8");
 const openingStockMigration = readFileSync(new URL("../supabase/migrations/20261114193000_allow_opening_balance_inventory_movement_for_inventory_managers.sql", import.meta.url), "utf8");
 const openingTriggerMigration = readFileSync(new URL("../supabase/migrations/20261114194000_allow_opening_balance_inventory_movement_trigger.sql", import.meta.url), "utf8");
-const serviceWorker = readFileSync(new URL("../shericeri_v14_4_aibos_sync_sw.js", import.meta.url), "utf8");
+
 const voidBlock = html.slice(html.indexOf("async function voidSale(id){"), html.indexOf("const sheriSearchValues"));
 
 test("Kinyarwanda covers core finance and stock terms", () => {
