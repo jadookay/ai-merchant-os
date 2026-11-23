@@ -871,13 +871,17 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
   assert.ok(html.includes("if(!full_name||full_name.length<2||full_name.length>120)"));
 });
 
-test("sync status bar keeps status and action groups horizontal with shared navy-gold branding", () => {
+test("navigation, language picker and sync layout use one locale-independent natural-flow system", () => {
   for (const source of [html, previewLiveHtml]) {
-    assert.ok(source.includes('id="aibos-sync-shared-cascade-v66"'));
-    assert.ok(source.includes('html[lang="en"] body #appRoot #sheriOfflineBar,html[lang="rw"] body #appRoot #sheriOfflineBar,html[lang="fr"] body #appRoot #sheriOfflineBar'));
+    assert.ok(source.includes('id="aibos-locale-invariant-header-sync-v67"'));
+    assert.ok(source.includes('grid-template-columns:repeat(6,minmax(0,1fr))'));
+    assert.ok(source.includes('data-view="dashboard"]{grid-column:1/span 2!important;grid-row:1!important}'));
+    assert.ok(source.includes('data-view="businessOS"],#appRoot .side .nav>button[data-nav-command-center="1"]{grid-column:1/span 3!important;grid-row:2!important}'));
     assert.ok(source.includes('display:flex!important;flex-direction:row!important;flex-wrap:wrap!important'));
-    assert.ok(source.includes('flex:1 1 185px!important;flex-direction:row!important;flex-wrap:wrap!important'));
-    assert.ok(source.includes('background:#010080!important;border:1px solid #F7EB5B!important'));
     assert.ok(source.includes('color:#F7EB5B!important;background:#010080!important'));
+    assert.ok(source.includes('margin:0!important;margin-top:0!important'));
+    assert.doesNotMatch(source, /html\\[lang="(?:en|rw|fr)"\\][^{}]*#sheriOfflineBar/);
+    assert.doesNotMatch(source, /getBoundingClientRect\\(\\)\\.height/);
+    assert.doesNotMatch(source, /setProperty\\(['"]margin-top['"]/);
   }
 });
