@@ -408,6 +408,9 @@ test("expense recording and expense payments use separate balanced payable posti
   assert.ok(payment.includes("sourceType:'payment',sourceId:row.id"), "each payment must have a unique journal source");
   assert.ok(payment.includes("linkedExpense.payment_status=accExpenseOutstanding(linkedExpense)<=0.005?'paid':'partial'"), "expense paid status must track cumulative linked payments");
   assert.ok(payment.includes("if(amount>outstanding+0.005)"), "payments must not exceed the remaining expense balance");
+  assert.ok(html.includes("sourceType:'expense_delete',sourceId:e.id"), "expense deletion must reverse the original expense journal");
+  assert.ok(html.includes("sourceType:'payment_void',sourceId:payment.id"), "expense deletion must reverse every linked payment journal");
+  assert.ok(html.includes("'expense_delete','payment_void'].includes(e.source_type)"), "ledger integrity must recognize exact expense/payment reversal journals");
   assert.ok(html.includes("Payment journal does not match its linked source, amount or cash/bank account"), "ledger integrity must validate payment posting semantics, not only debit-credit equality");
   assert.ok(html.includes("Expense journal does not match the expense amount or payment-liability treatment"), "ledger integrity must validate expense posting semantics");
 });
