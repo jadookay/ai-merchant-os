@@ -874,6 +874,10 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
 test("sync status bar keeps status and action groups horizontal with shared navy-gold branding", () => {
   for (const source of [html, previewLiveHtml]) {
     assert.ok(source.includes('id="aibos-sync-horizontal-shared-v65"'));
+    assert.ok(source.includes('id="aibos-sync-shared-cascade-v66"'));
+    assert.match(source, /html\\[lang="en"\\] body #appRoot #sheriOfflineBar,html\\[lang="rw"\\] body #appRoot #sheriOfflineBar,html\\[lang="fr"\\] body #appRoot #sheriOfflineBar\\s*\\{[\\s\\S]*?display:flex!important;flex-direction:row!important;flex-wrap:wrap!important/);
+    assert.match(source, /html\\[lang="en"\\] body #appRoot #sheriOfflineBar>div:last-child,html\\[lang="rw"\\] body #appRoot #sheriOfflineBar>div:last-child,html\\[lang="fr"\\] body #appRoot #sheriOfflineBar>div:last-child\\s*\\{[\\s\\S]*?flex:1 1 185px!important;flex-direction:row!important;flex-wrap:wrap!important/);
+    assert.match(source, /html\\[lang="en"\\] body #appRoot #sheriOfflineBar>div:last-child>\\.btn,html\\[lang="rw"\\] body #appRoot #sheriOfflineBar>div:last-child>\\.btn,html\\[lang="fr"\\] body #appRoot #sheriOfflineBar>div:last-child>\\.btn,[\\s\\S]*?background:#010080!important;border:1px solid #F7EB5B!important/);
     assert.match(source, /html\[lang\] #appRoot #sheriOfflineBar\s*\{[\s\S]*?display:flex!important;flex-flow:row wrap!important;flex-direction:row!important/);
     assert.match(source, /html\[lang\] #appRoot #sheriOfflineBar>div:first-child\s*\{[\s\S]*?flex:1 1 130px!important/);
     assert.match(source, /html\[lang\] #appRoot #sheriOfflineBar>div:last-child\s*\{[\s\S]*?flex:1 1 190px!important;[\s\S]*?width:auto!important/);
