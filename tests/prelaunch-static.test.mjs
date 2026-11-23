@@ -324,7 +324,7 @@ test("sales and expenses confirm before saving and post balanced journal entries
   const expenseEnd = html.indexOf("\nasync function deleteExpense", expenseStart);
   assert.ok(expenseStart >= 0 && expenseEnd > expenseStart, "expected the complete expense recording function");
   const expense = html.slice(expenseStart, expenseEnd);
-  assert.ok(expense.includes("confirm('Record this expense?"));
+  assert.match(expense,/confirm\('Record this '\+\(paymentMode===/);
   assert.ok(expense.includes("sourceType:'expense',sourceId:data.id"));
   assert.ok(expense.includes("sheriToast('Expense recorded."));
 });
@@ -349,7 +349,7 @@ test("staff login identifiers can be edited without exposing PIN hashes", () => 
   assert.ok(html.includes('id="teamEditEmail" type="email"'));
   assert.ok(html.includes('id="teamEditPhone"'));
   assert.ok(html.includes('id="teamEditUsername"'));
-  assert.ok(teamAccess.includes("const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status"));
+  assert.ok(teamAccess.includes("const memberPatch: Record<string, unknown> = { full_name: fullNameToSave, responsibility, role, permissions, status"));
   assert.ok(teamAccess.includes("admin.auth.admin.updateUserById(target.user_id, { email, email_confirm: true })"));
   assert.ok(teamAccess.includes("Keep at least one staff login identifier"));
   assert.doesNotMatch(teamAccess, /select\([^\n]*pin_hash/);
@@ -401,13 +401,14 @@ test("expense recording and expense payments use separate balanced payable posti
   const expense=html.slice(expenseStart,expenseEnd);
   assert.ok(expense.includes("payment_status:'unpaid'"), "new expenses must start as unpaid");
   assert.ok(expense.includes("accountId:payable.id,credit:amount"), "expense recognition must credit accrued expenses payable");
-  const paymentStart=html.indexOf("async function accCreatePayment()");
-  const paymentEnd=html.indexOf("\\nasync function accCreateBankAccount()",paymentStart);
+  const paymentStart=html.indexOf("function accRecordExpensePayment(");
+  const paymentEnd=html.indexOf("\nasync function addExpense",paymentStart);
   const payment=html.slice(paymentStart,paymentEnd);
-  assert.ok(payment.includes("debitId=accAccountCode('2050')?.id;creditId=accountId;sourceType='expense'"), "paying an existing expense must debit accrued expenses payable");
+  assert.ok(payment.includes("accountId:payable.id,debit:amount"), "expense payment must debit accrued expenses payable");
+  assert.ok(payment.includes("accountId:accountId,credit:amount"), "expense payment must credit the selected cash/bank account");
   assert.ok(payment.includes("sourceType:'payment',sourceId:row.id"), "each payment must have a unique journal source");
-  assert.ok(payment.includes("linkedExpense.payment_status=accExpenseOutstanding(linkedExpense)<=0.005?'paid':'partial'"), "expense paid status must track cumulative linked payments");
-  assert.ok(payment.includes("if(amount>outstanding+0.005)"), "payments must not exceed the remaining expense balance");
+  assert.ok(payment.includes("expense.payment_status=paidAfter+0.005>=Number(expense.amount||0)?'paid':'partial'"), "expense paid status must track cumulative linked payments");
+  assert.ok(payment.includes("amount>accExpenseOutstanding(expense)+0.005"), "payments must not exceed the remaining expense balance");
   assert.ok(html.includes("sourceType:'expense_delete',sourceId:e.id"), "expense deletion must reverse the original expense journal");
   assert.ok(html.includes("sourceType:'payment_void',sourceId:payment.id"), "expense deletion must reverse every linked payment journal");
   assert.ok(html.includes("'expense_delete','payment_void'].includes(e.source_type)"), "ledger integrity must recognize exact expense/payment reversal journals");
@@ -586,10 +587,10 @@ test("reorder tracking separates on-order stock from available stock and support
 
 test("supplier bills can document received purchases without duplicating inventory journals", () => {
   assert.match(html, /id="accBillPurchase"/);
-  assert.match(html, /purchase\.supplier_id/);
-  assert.match(html, /Math\.abs\(total-Number\(purchase\.total\|\|0\)\)>0\.005/);
-  assert.match(html, /bill_type:'inventory',debit_account_id:inv\.id,purchase_id:purchaseId\|\|null/);
-  assert.match(html, /if\(purchase\)\{/);
+  assert.match(html, /linkedPurchase\.supplier_id!==supplierId/);
+  assert.match(html, /Math\.abs\(linkedTotal-total\)>0\.005/);
+  assert.match(html, /bill_type:billType,debit_account_id:debitAccount\.id,purchase_id:purchaseId/);
+  assert.match(html, /if\(purchaseId\)\{linkedPurchase=/);
 });
 
 test("customer records support shared voice entry and confirmation before saving", () => {
@@ -959,7 +960,7 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
   for (const source of [html, previewLiveHtml]) {
     assert.ok(source.includes('id="signupFullName"'));
     assert.ok(source.includes('autocomplete="name"'));
-    assert.ok(source.includes("Enter your full name (2–120 characters)."));
+    assert.ok(source.includes("full legal name as it appears on your official identification document") || source.includes("Enter your full name (2–120 characters)."));
     assert.ok(source.includes("data:{full_name}"));
     assert.ok(source.includes("Full name, phone or email"));
     assert.ok(source.includes("Your full name, phone or email"));
