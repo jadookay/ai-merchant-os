@@ -20,9 +20,11 @@ test('phone normalization accepts Rwanda local and international formats', () =>
   assert.equal(normalize('1234'), null);
 });
 
-test('owner registration uses phone identity, legal name metadata and SMS verification', () => {
+test('owner registration uses phone identity and supports immediate session without SMS verification', () => {
   assert.match(html, /id="signupPhone"[^>]*required/);
   assert.match(html, /sb\.auth\.signUp\(\{phone,password,options/);
+  assert.ok(html.includes("if(data.session){setAuthStatus('Account created. Let’s set up your business…');await onAuthed(data.session);}"), 'registration must continue immediately when Supabase returns a session');
+  assert.ok(html.includes('Testing mode: SMS verification is skipped'), 'signup screen must explain no-OTP testing mode');
   assert.match(html, /sb\.auth\.verifyOtp\(\{phone,token,type:'sms'\}\)/);
   assert.match(html, /function verifyOwnerPhoneOtp\(/);
   assert.match(html, /full_name,contact_email:email\|\|null/);
