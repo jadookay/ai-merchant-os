@@ -5978,7 +5978,7 @@ function accShowRepairConfirmation(message){
         #accRepairDialog .acc-repair-details{display:block;width:100%;min-height:150px;max-height:48dvh;overflow:auto;resize:vertical;margin:0;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc;color:#0f172a;font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;-webkit-user-select:text}
         #accRepairDialog .acc-repair-status{min-height:18px;margin:0;color:#475569;font-size:.82rem}
         #accRepairDialog .acc-repair-actions{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:9px}
-        #accRepairDialog .acc-repair-actions button{min-height:42px;padding:9px 15px;border:1px solid #cbd5e1;border-radius:9px;font:600 14px inherit;cursor:pointer}
+        #accRepairDialog .acc-repair-actions button{min-height:42px;padding:9px 15px;border:1px solid #cbd5e1;border-radius:9px;font:600 14px/1.2 system-ui,sans-serif;cursor:pointer}
         #accRepairDialog .acc-repair-copy{margin-right:auto;background:#010080;color:#F7EB5B;border-color:#010080!important}
         #accRepairDialog .acc-repair-cancel{background:#fff;color:#172033}
         #accRepairDialog .acc-repair-confirm{background:#F7EB5B;color:#010080;border-color:#010080!important}
@@ -6014,7 +6014,7 @@ function accShowRepairConfirmation(message){
         if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(message);
         else{const area=document.createElement('textarea');area.value=message;area.style.position='fixed';area.style.opacity='0';document.body.appendChild(area);area.select();const ok=document.execCommand('copy');area.remove();if(!ok)throw new Error('Clipboard unavailable');}
         status.textContent=t.copied;
-      }catch(_){status.textContent=t.failed;const details=panel.querySelector('.acc-repair-details');details.focus();details.select?.();}
+      }catch(_){status.textContent=t.failed;const details=panel.querySelector('.acc-repair-details');details.focus();const range=document.createRange();range.selectNodeContents(details);const selection=window.getSelection();selection?.removeAllRanges();selection?.addRange(range);}
     });
     panel.querySelector('.acc-repair-details').focus();
   });
