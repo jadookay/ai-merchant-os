@@ -463,6 +463,25 @@ test("received purchases post and verify their inventory/AP journal without unsa
   }
 });
 
+test("isolated preview validates expense accruals and linked payments against the payable account", () => {
+  assert.ok(previewLiveHtml.includes("const usePayable=linkedPaid>0||['unpaid','partial'].includes(String(expense.payment_status||'').toLowerCase())"));
+  assert.ok(previewLiveHtml.includes("payment.source_type==='expense'&&payment.direction==='payment'"));
+  assert.ok(previewLiveHtml.includes("code:'2050',debit:amount,credit:0"));
+  assert.ok(previewLiveHtml.includes("https://hicvgrkltwkqhnioakcg.supabase.co"));
+  assert.doesNotMatch(previewLiveHtml, /https:\/\/bhtodxjhgucgwarpaqzy\.supabase\.co/);
+});
+
+test("isolated preview defers background Reports renders and uses a centered copyable repair dialog", () => {
+  assert.ok(previewLiveHtml.includes("function sheriDeferBackgroundRender()"));
+  assert.ok(previewLiveHtml.includes("sheriCurrentView==='reports'"));
+  assert.ok(previewLiveHtml.includes("if(hadLocal&&!(silent&&sheriDeferBackgroundRender()))render()"));
+  assert.ok(previewLiveHtml.includes("if(!sheriDeferBackgroundRender())render()"));
+  assert.ok(previewLiveHtml.includes("function accShowRepairConfirmation(message)"));
+  assert.ok(previewLiveHtml.includes("place-items:center"));
+  assert.ok(previewLiveHtml.includes("navigator.clipboard?.writeText"));
+  assert.ok(previewLiveHtml.includes("integrity.invalid.map((x,i)=>"));
+});
+
 test("team administration requires the manager role, not only a delegated flag", () => {
   assert.ok(teamAccess.includes("membership.role === \"manager\" && callerPermissions.manage_team === true"));
   assert.ok(teamAccess.includes("callerRole === \"manager\" && callerPermissions.manage_team === true"));
