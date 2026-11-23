@@ -16,6 +16,14 @@ function randomPassword() {
   const bytes = crypto.getRandomValues(new Uint8Array(48));
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
+function normalizeFullLegalName(value: unknown): string | null {
+  const name = String(value ?? "").normalize("NFC").trim().replace(/\s+/gu, " ");
+  if (name.length < 3 || name.length > 120) return null;
+  const parts = name.split(" ");
+  const partPattern = /^\p{L}(?:[\p{L}\p{M}]|['’.-][\p{L}\p{M}])*\.?$/u;
+  return parts.length >= 2 && parts.every((part) => partPattern.test(part)) ? name : null;
+}
+
 function normalizePhoneForAuth(value: string | null, country: string | null): string | null {
   const raw = String(value || "").trim();
   if (!raw) return null;
@@ -127,7 +135,7 @@ Deno.serve(async (req: Request) => {
       if (callerError || !callerData?.user) return json({ error: "Manager session is invalid." }, 401);
 
       const merchantId = String(body?.merchant_id || "");
-      const fullName = String(body?.full_name || "").trim();
+      const fullName = normalizeFullLegalName(body?.full_name) || "";
       const email = String(body?.email || "").trim().toLowerCase() || null;
       let phone = String(body?.phone || "").trim() || null;
       const username = String(body?.username || "").trim().toLowerCase() || null;
@@ -135,8 +143,8 @@ Deno.serve(async (req: Request) => {
       const role = String(body?.role || "cashier");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
 
-      if (!merchantId || fullName.length < 2 || (!email && !phone) || !/^\d{6,8}$/.test(pin)) {
-        return json({ error: "Provide a business, full name, verified email or phone, and a 6–8 digit PIN." }, 400);
+      if (!merchantId || !fullName || (!email && !phone) || !/^\d{6,8}$/.test(pin)) {
+        return json({ error: "Provide a business, full legal name with at least two name parts, verified email or phone, and a 6–8 digit PIN." }, 400);
       }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       
@@ -318,7 +326,7 @@ Deno.serve(async (req: Request) => {
       const status = String(body?.status || "active");
       const permissions = body?.permissions && typeof body.permissions === "object" ? body.permissions : {};
       const pin = String(body?.pin || "");
-      if (!merchantId || !memberId || fullName.length < 2) return json({ error: "Business, member and full name are required." }, 400);
+      if (!merchantId || !memberId || !fullName) return json({ error: "Business, member and full legal name are required." }, 400);
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
       
       if (username && !/^[a-z0-9._-]{3,40}$/.test(username)) return json({ error: "Username must be 3 to 40 letters, numbers, dots, underscores or hyphens." }, 400);
@@ -350,9 +358,15 @@ Deno.serve(async (req: Request) => {
       }
       const privileged = callerRole === "owner" || callerRole === "admin";
       const { data: target, error: targetError } = await admin.from("merchant_members")
-        .select("id,user_id,role,status,email,phone,username").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
+        .select("id,user_id,role,status,email,phone,username,full_name").eq("id", memberId).eq("merchant_id", merchantId).maybeSingle();
       if (targetError) throw targetError;
       if (!target) return json({ error: "Team member not found." }, 404);
+      const normalizedFullName = normalizeFullLegalName(fullName);
+      const unchangedLegacyName = fullName === String(target.full_name || "").trim();
+      if (!normalizedFullName && !unchangedLegacyName) {
+        return json({ error: "The staff member’s full legal name must contain at least two name parts (3–120 characters)." }, 400);
+      }
+      const fullNameToSave = normalizedFullName || String(target.full_name || fullName).trim();
       const nextEmail = email === undefined ? target.email : email;
       const nextPhone = phone === undefined ? target.phone : phone;
       const nextUsername = username === undefined ? target.username : username;
@@ -380,7 +394,7 @@ Deno.serve(async (req: Request) => {
         if (revokeError) throw revokeError;
       }
 
-      const memberPatch: Record<string, unknown> = { full_name: fullName, responsibility, role, permissions, status, updated_at: new Date().toISOString() };
+      const memberPatch: Record<string, unknown> = { full_name: fullNameToSave, responsibility, role, permissions, status, updated_at: new Date().toISOString() };
       if (email !== undefined) memberPatch.email = email;
       if (phone !== undefined) memberPatch.phone = phone;
       if (username !== undefined) memberPatch.username = username;
