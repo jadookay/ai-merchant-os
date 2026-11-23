@@ -967,7 +967,7 @@ test("owner sign-up requires and securely stores a full name; staff PIN login ac
     assert.ok(source.includes("'full name':'Nom complet'"));
     assert.ok(source.includes("'full name':'Amazina yose'"));
   }
-  assert.ok(html.includes("if(!full_name||full_name.length<2||full_name.length>120)"));
+  assert.ok(html.includes("const full_name=sheriNormalizeFullLegalName(document.getElementById('signupFullName')?.value)"));
 });
 
 test("navigation, language picker and sync layout use one locale-independent natural-flow system", () => {
