@@ -415,7 +415,7 @@ test("expense recording and expense payments use separate balanced payable posti
 test("ledger repair review is centered, copyable and requires explicit confirmation", () => {
   assert.ok(html.includes("function accShowRepairConfirmation(message)"));
   assert.ok(html.includes("#accRepairDialog{position:fixed;inset:0;z-index:1000000;display:grid;place-items:center"));
-  assert.ok(html.includes("navigator.clipboard?.writeText(message)"));
+  assert.ok(html.includes("if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(message)"));
   assert.ok(html.includes("acc-repair-details"));
   assert.ok(html.includes("if(!await accShowRepairConfirmation(promptText))return;"));
   assert.ok(html.includes("integrity.invalid.map((x,i)=>"), "diagnostic must include every flagged entry, not only the first eight");
