@@ -8,6 +8,7 @@ android {
         applicationId 'rw.jadookay.aibos'
         minSdk 23
         targetSdk 34
+        // The APK is a WebView shell; business logic is served by the verified production URL.
         versionCode 2
         versionName '14.4.81'
     }
