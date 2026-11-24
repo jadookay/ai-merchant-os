@@ -6719,17 +6719,7 @@ async function exportStatement(id,title,kind){
       XLSX.writeFile(wb,filename+'.xlsx');return;
     }
     if(kind==='doc'){
-      const html=`<html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body><h2>${esc(state.merchant?.name||'Business')} — ${esc(title)}</h2>${el.innerHTML}<style id="aibos-inventory-table-fit-v1">
-/* Give product names and headings room; on narrow screens scroll the table,
-   rather than squeezing every column until names become unreadable. */
-#inventoryTable{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
-#inventoryTable .table{width:100%;min-width:1120px;table-layout:auto}
-#inventoryTable .table th{white-space:nowrap}
-#inventoryTable .table th:nth-child(2),#inventoryTable .table td:nth-child(2){min-width:230px}
-#inventoryTable .table th:nth-child(3),#inventoryTable .table td:nth-child(3){min-width:190px}
-#inventoryTable .table td:nth-child(2),#inventoryTable .table td:nth-child(3){overflow-wrap:anywhere;white-space:normal}
-</style>
-
+      const html=`<html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body><h2>${esc(state.merchant?.name||'Business')} — ${esc(title)}</h2>${el.innerHTML}
 </body></html>`;
       downloadBlob(new Blob(['\\ufeff',html],{type:'application/msword'}),filename+'.doc');return;
     }
@@ -10515,5 +10505,16 @@ html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body 
 @media(max-width:650px){html[lang] body #appRoot #sheriOfflineBar{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important;gap:6px 7px!important;padding:8px!important;margin:0 0 10px!important}html[lang] body #appRoot #sheriOfflineBar>div:first-child{font-size:12px!important;line-height:1.25!important;gap:3px 5px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child{gap:4px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{flex:1 1 68px!important;min-height:34px!important;font-size:11px!important;padding:6px 5px!important}}
 @media(max-width:350px){html[lang] body #appRoot #sheriOfflineBar{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)!important;gap:5px!important;padding:7px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{font-size:10.5px!important;padding:5px 4px!important}}
 </style>
+<style id="aibos-inventory-table-fit-v1">
+/* Give product names and headings room; on narrow screens scroll the table,
+   rather than squeezing every column until names become unreadable. */
+#inventoryTable{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
+#inventoryTable .table{width:100%;min-width:1120px;table-layout:auto}
+#inventoryTable .table th{white-space:nowrap}
+#inventoryTable .table th:nth-child(2),#inventoryTable .table td:nth-child(2){min-width:230px}
+#inventoryTable .table th:nth-child(3),#inventoryTable .table td:nth-child(3){min-width:190px}
+#inventoryTable .table td:nth-child(2),#inventoryTable .table td:nth-child(3){overflow-wrap:anywhere;white-space:normal}
+</style>
+
 </body>
 </html>
