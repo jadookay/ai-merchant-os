@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.87 safe opening-stock retry and permission handling">
+<meta name="app-version" content="V14.4.88 recover authorized opening-stock queue items">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -1544,11 +1544,21 @@ async function sheriSyncPurchaseOperation(op){
 function sheriOutboxPriority(op){return ({merchant_upsert:0,product_upsert:1,supplier_upsert:1,customer_upsert:1,inventory_adjustment:2,purchase_upsert:3,sale_cart_upsert:4,sale_upsert:4})[op?.type]??5;}
 async function sheriUnblockSchemaRepairedOperations(){
   const queued=await sheriGetAll('outbox');
-  const candidates=queued.filter(item=>item.blocked&&(
-    (/created_by/i.test(String(item.last_error||''))&&/schema cache|column/i.test(String(item.last_error||''))&&['product_upsert','supplier_upsert'].includes(item.op?.type))||
-    (item.op?.type==='inventory_adjustment'&&/product not found/i.test(String(item.last_error||''))&&(state.products||[]).some(p=>p.id===item.op.product_id))||
-    (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(String(item.last_error||'')))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)))
-  ));
+  const canManageInventory=sheriCan('manage_inventory');
+  const canManageFinance=sheriCan('manage_finance');
+  const candidates=queued.filter(item=>{
+    if(!item.blocked)return false;
+    const errorText=String(item.last_error||'');
+    const openingIntegrity=/aibos integrity|opening stock requires exactly one active opening inventory journal/i.test(errorText);
+    const permissionFailure=/row-level security|permission denied|not authorized|requires finance permission/i.test(errorText);
+    const productRetry=['product_upsert'].includes(item.op?.type)&&!item.retry_recovered_v88&&canManageInventory&&(openingIntegrity||permissionFailure);
+    const stockRetry=item.op?.type==='inventory_adjustment'&&!item.retry_recovered_v88&&canManageInventory&&
+      (item.op?.movement_type!=='opening_balance'||canManageFinance)&&(openingIntegrity||permissionFailure);
+    return productRetry||stockRetry||
+      (/created_by/i.test(errorText)&&/schema cache|column/i.test(errorText)&&['product_upsert','supplier_upsert'].includes(item.op?.type))||
+      (item.op?.type==='inventory_adjustment'&&/product not found/i.test(errorText)&&(state.products||[]).some(p=>p.id===item.op.product_id))||
+      (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(errorText))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)));
+  });
   const settingsRetries=queued.filter(item=>item.blocked&&item.op?.type==='accounting_settings_upsert'&&
     item.op.record?.merchant_id===state.merchant?.id&&!item.accounting_settings_rls_retry&&
     /row-level security|permission denied/i.test(String(item.last_error||'')));
@@ -1562,7 +1572,7 @@ async function sheriUnblockSchemaRepairedOperations(){
   ]);
   if(products.error||suppliers.error)return;
   for(const item of candidates){
-    await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,recovered_at:sheriNow()});
+    await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,retry_recovered_v88:true,recovered_at:sheriNow()});
   }
 }
 async function sheriSyncAccountingSettingsOperation(op){
