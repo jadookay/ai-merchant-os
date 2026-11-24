@@ -2978,7 +2978,7 @@ async function saveProduct(){
   const isEditing=!!editingProductId;if(!isEditing&&stock>0&&cost<=0)return sheriToast(sheriLocalized('Opening stock needs a positive unit cost so its inventory value can be recorded.','Le stock initial doit avoir un coût unitaire positif afin que sa valeur soit comptabilisée.','Ububiko bw’ibanze bugomba kugira ikiguzi cya kimwe kirenze zeru kugira ngo agaciro kabwo kabarurwe.'),'error');if(!isEditing&&stock>0&&accPeriodLocked(sheriNow().slice(0,10)))return sheriToast(sheriLocalized('The current accounting period is locked. Unlock it before recording opening stock.','La période comptable actuelle est verrouillée. Déverrouillez-la avant d’enregistrer le stock initial.','Igihe cy’ibaruramari kirafunze. Banza ugifungure mbere yo kwandika ububiko bw’ibanze.'),'error');if(!isEditing&&stock>0&&!sheriCan('manage_finance'))return sheriToast(sheriLocalized('Opening stock requires finance permission because it creates an Inventory / Owner Equity journal. You can still create the product with zero stock and record a supplier purchase.','Le stock initial nécessite une autorisation financière, car il crée une écriture Stock / Capitaux propres. Vous pouvez créer le produit avec un stock nul puis enregistrer un achat fournisseur.','Ububiko bw’ibanze busaba uburenganzira bw’imari kuko buteza inyandiko ya Konti y’ububiko / Igishoro cya nyir’ubucuruzi. Ushobora gukora igicuruzwa gifite ububiko bwa zeru, hanyuma ukandika ibyo waguze ku muhereza.'),'error');if(isEditing&&!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can edit existing products.','error');let editReason=null;if(isEditing){editReason=prompt('Reason for editing this product (required):');if(!editReason||!editReason.trim())return sheriToast('A reason is required to edit a product.','error');}
   if(!confirm((isEditing?'Update':'Save')+' product?\\n'+name+'\\nCost: '+money(cost)+' · Selling price: '+money(sell)+'\\nStock: '+stock+' · Reorder level: '+reorder))return;
   const now=sheriNow();
-  let openingStockProduct=null;
+  let openingStockProduct=null,productCostCorrection=null;
   if(editingProductId){
     const p=product(editingProductId); if(!p)return;
     const previousStock=Number(p.stock||0),previousCost=Number(p.cost||0),stockDelta=(stock||0)-previousStock,costChanged=Math.abs(cost-previousCost)>0.0000001;
@@ -2992,6 +2992,7 @@ async function saveProduct(){
       });
       if(correctionError)return sheriToast(sheriLocalized('The cost correction was not completed: ','La correction du coût n’a pas été effectuée : ','Gukosora ikiguzi ntibyakozwe: ')+String(correctionError.message||correctionError),'error');
       if(correction?.ok!==true)return sheriToast(sheriLocalized('The cost correction was not confirmed by the server. The product was not updated.','Le serveur n’a pas confirmé la correction du coût. Le produit n’a pas été modifié.','Seriveri ntiyemeje ihinduka ry’ikiguzi. Igicuruzwa nticyahinduwe.'),'error');
+      productCostCorrection={old_cost:previousCost,new_cost:cost,stock:previousStock,inventory_delta:Number(correction.inventory_delta||0),journal_entry_id:correction.journal_entry_id||null};
     }
     Object.assign(p,{name,cat,cost,sell,stock:previousStock,reorder:reorder||0,barcode,expiry_date,updated_at:now});
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
@@ -3011,7 +3012,7 @@ async function saveProduct(){
     if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:0,quantity_delta:initialStock,reason:'Initial stock entry',movement_type:'opening_balance',source_id:sheriUuid(),entry_date:now.slice(0,10)});
   }
   // The opening-balance inventory RPC now creates the matching Inventory / Owner Equity journal in the same database transaction as the stock movement.
-  if(isEditing){const oldProductCost=Number(product(editingProductId)?product(editingProductId).cost:cost);await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name,unit_cost:cost,on_hand_stock:Number(product(editingProductId)?.stock||0),cost_correction_applied:true});}
+  if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name,...(productCostCorrection?{cost_correction:productCostCorrection}:{} )});
   if(navigator.onLine)sherriSyncKick();
   document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast(isEditing?'Product updated.':'Product saved.','success');
 }
