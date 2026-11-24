@@ -261,10 +261,25 @@ test("new product opening stock creates an audited inventory movement", () => {
   assert.ok(openingTriggerMigration.includes("v_type='opening_balance' and (old.stock<>0 or new.stock<=old.stock)"));
 });
 
-test("service worker cache is bumped to release V14.4.86", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v86"));
-  assert.ok(serviceWorker.includes("V14.4.86"));
-  assert.ok(html.includes('name="app-version" content="V14.4.86 live report refresh and inventory table fit"'));
+test("product retries always insert at zero stock and route stock through the audited adjustment RPC", () => {
+  const block = html.slice(html.indexOf("async function sheriSyncProductOperation(op){"), html.indexOf("async function sheriEnsurePurchaseDependencies(op){"));
+  assert.ok(block.includes("const productInsertRecord={...record,stock:0}"));
+  assert.ok(block.includes("products').insert(productInsertRecord)"));
+  assert.ok(html.includes("const openingRecord={...source,merchant_id:merchantId,stock:0}"));
+  assert.ok(html.includes("await sheriSyncProductOperation({record:{...source,merchant_id:merchantId,stock:0}})"));
+});
+
+test("AIBOS integrity failures are permanent and are not retried as transient network errors", () => {
+  const block = html.slice(html.indexOf("function sheriSyncErrorInfo(err){"), html.indexOf("function sheriSyncDelayMs"));
+  assert.ok(block.includes("aibos integrity"));
+  assert.ok(block.includes("opening stock requires exactly one active opening inventory journal"));
+  assert.ok(block.includes("row-level security"));
+});
+
+test("service worker cache is bumped to release V14.4.87", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v87"));
+  assert.ok(serviceWorker.includes("V14.4.87"));
+  assert.ok(html.includes('name="app-version" content="V14.4.87 safe opening-stock retry and permission handling"'));
 });
 
 
@@ -311,9 +326,9 @@ test("received purchases persist the updated local stock and record the register
   assert.ok(block.includes("await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}})"));
 });
  
-test("the production application shell uses V14.4.86", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v86"));
-  assert.ok(serviceWorker.includes("const RELEASE='V14.4.86'"));
+test("the production application shell uses V14.4.87", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v87"));
+  assert.ok(serviceWorker.includes("const RELEASE='V14.4.87'"));
 });
 
 test("the preview application shell is bumped to V14.4.79 without changing production", () => {
