@@ -2981,7 +2981,18 @@ async function saveProduct(){
   let openingStockProduct=null;
   if(editingProductId){
     const p=product(editingProductId); if(!p)return;
-    const previousStock=Number(p.stock||0),stockDelta=(stock||0)-previousStock;
+    const previousStock=Number(p.stock||0),previousCost=Number(p.cost||0),stockDelta=(stock||0)-previousStock,costChanged=Math.abs(cost-previousCost)>0.0000001;
+    if(costChanged&&previousStock>0){
+      if(!sheriCan('manage_finance'))return sheriToast(sheriLocalized('Changing unit cost for stock on hand requires Finance permission so the inventory correction can be journaled.','La modification du coût unitaire du stock disponible nécessite l’autorisation Finance afin de comptabiliser la correction.','Guhindura ikiguzi cy’igicuruzwa kiri mu bubiko bisaba uburenganzira bw’Imari kugira ngo ihinduka ryandikwe mu bitabo.'),'error');
+      if(!navigator.onLine)return sheriToast(sheriLocalized('Connect to the internet before correcting unit cost for stock on hand. No cost or ledger value was changed.','Connectez-vous à Internet avant de corriger le coût unitaire du stock disponible. Aucun coût ni solde comptable n’a été modifié.','Huza na interineti mbere yo gukosora ikiguzi cy’ibicuruzwa biri mu bubiko. Nta kiguzi cyangwa agaciro ko mu bitabo byahinduwe.'),'error');
+      const correctionSourceId=sheriUuid();
+      const {data:correction,error:correctionError}=await sb.rpc('shericeri_correct_product_cost',{
+        p_merchant_id:state.merchant.id,p_product_id:p.id,p_expected_cost:previousCost,p_new_cost:cost,
+        p_reason:editReason.trim(),p_source_id:correctionSourceId,p_entry_date:now.slice(0,10)
+      });
+      if(correctionError)return sheriToast(sheriLocalized('The cost correction was not completed: ','La correction du coût n’a pas été effectuée : ','Gukosora ikiguzi ntibyakozwe: ')+String(correctionError.message||correctionError),'error');
+      if(correction?.ok!==true)return sheriToast(sheriLocalized('The cost correction was not confirmed by the server. The product was not updated.','Le serveur n’a pas confirmé la correction du coût. Le produit n’a pas été modifié.','Seriveri ntiyemeje ihinduka ry’ikiguzi. Igicuruzwa nticyahinduwe.'),'error');
+    }
     Object.assign(p,{name,cat,cost,sell,stock:previousStock,reorder:reorder||0,barcode,expiry_date,updated_at:now});
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
@@ -3000,7 +3011,7 @@ async function saveProduct(){
     if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:0,quantity_delta:initialStock,reason:'Initial stock entry',movement_type:'opening_balance',source_id:sheriUuid(),entry_date:now.slice(0,10)});
   }
   // The opening-balance inventory RPC now creates the matching Inventory / Owner Equity journal in the same database transaction as the stock movement.
-  if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name});
+  if(isEditing){const oldProductCost=Number(product(editingProductId)?product(editingProductId).cost:cost);await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name,unit_cost:cost,on_hand_stock:Number(product(editingProductId)?.stock||0),cost_correction_applied:true});}
   if(navigator.onLine)sherriSyncKick();
   document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast(isEditing?'Product updated.':'Product saved.','success');
 }
