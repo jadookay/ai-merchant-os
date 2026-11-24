@@ -2657,17 +2657,7 @@ function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.onload=()=>w.print();
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><style id="aibos-inventory-table-fit-v1">
-/* Give product names and headings room; on narrow screens scroll the table,
-   rather than squeezing every column until names become unreadable. */
-#inventoryTable{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
-#inventoryTable .table{width:100%;min-width:1120px;table-layout:auto}
-#inventoryTable .table th{white-space:nowrap}
-#inventoryTable .table th:nth-child(2),#inventoryTable .table td:nth-child(2){min-width:230px}
-#inventoryTable .table th:nth-child(3),#inventoryTable .table td:nth-child(3){min-width:190px}
-#inventoryTable .table td:nth-child(2),#inventoryTable .table td:nth-child(3){overflow-wrap:anywhere;white-space:normal}
-</style>
-
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p>
 </body></html>');
    w.document.close();
 }
@@ -6729,7 +6719,18 @@ async function exportStatement(id,title,kind){
       XLSX.writeFile(wb,filename+'.xlsx');return;
     }
     if(kind==='doc'){
-      const html=`<html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body><h2>${esc(state.merchant?.name||'Business')} — ${esc(title)}</h2>${el.innerHTML}</body></html>`;
+      const html=`<html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body><h2>${esc(state.merchant?.name||'Business')} — ${esc(title)}</h2>${el.innerHTML}<style id="aibos-inventory-table-fit-v1">
+/* Give product names and headings room; on narrow screens scroll the table,
+   rather than squeezing every column until names become unreadable. */
+#inventoryTable{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
+#inventoryTable .table{width:100%;min-width:1120px;table-layout:auto}
+#inventoryTable .table th{white-space:nowrap}
+#inventoryTable .table th:nth-child(2),#inventoryTable .table td:nth-child(2){min-width:230px}
+#inventoryTable .table th:nth-child(3),#inventoryTable .table td:nth-child(3){min-width:190px}
+#inventoryTable .table td:nth-child(2),#inventoryTable .table td:nth-child(3){overflow-wrap:anywhere;white-space:normal}
+</style>
+
+</body></html>`;
       downloadBlob(new Blob(['\\ufeff',html],{type:'application/msword'}),filename+'.doc');return;
     }
     if(kind==='pdf'){
