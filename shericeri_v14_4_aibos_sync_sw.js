@@ -24,14 +24,69 @@ async function patchAppResponse(response){
       "const localTtsReady=!!(window.SHERICERI_VOICE_BRIDGE?.capabilities?.tts || window.SHERICERI_VOICE_BRIDGE?.isReady&&await window.SHERICERI_VOICE_BRIDGE.isReady(lang));if(localTtsReady){await window.SHERICERI_VOICE_BRIDGE.speak(next,lang);finish('local-bridge-complete');return;}"
     );
     const headers=new Headers(response.headers);
-    headers.delete('content-length');headers.delete('content-encoding');headers.delete('etag');
+    headers.delete('content-length');
+    headers.delete('content-encoding');
+    headers.delete('etag');
     headers.set('content-type','text/html; charset=utf-8');
     return new Response(html,{status:response.status,statusText:response.statusText,headers});
   }catch(_){return response;}
 }
-async function fetchAndPatch(request){const response=await fetch(request,{cache:'no-store'});return patchAppResponse(response);}
-self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE_NAME).then(async cache=>{try{const response=await fetch(APP,{cache:'no-store'});const patched=await patchAppResponse(response);if(patched&&patched.ok)await cache.put(APP,patched)}catch(_){}}).then(()=>self.skipWaiting()))});
-self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('shericeri-')&&k!==CACHE_NAME).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
-self.addEventListener('message',event=>{const type=event.data?.type;if(type==='SKIP_WAITING')self.skipWaiting();if(type==='CLIENT_READY'&&event.source?.postMessage)event.source.postMessage({type:'SHERICERI_SW_READY',version:RELEASE,cache:CACHE_NAME})});
-self.addEventListener('sync',event=>{if(event.tag!=='shericeri-outbox-sync')return;event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(clients=>clients.forEach(client=>client.postMessage({type:'SHERICERI_SYNC_REQUEST'}))))});
-self.addEventListener('fetch',event=>{const request=event.request;if(request.method!=='GET')return;if(request.mode==='navigate'){event.respondWith(fetchAndPatch(request).then(response=>{if(response&&response.ok){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(APP,copy)).catch(()=>{})}return response}).catch(()=>caches.match(APP)));return}const url=new URL(request.url);if(url.origin===location.origin){event.respondWith(fetch(request,{cache:'no-store'}).then(response=>{if(response&&response.ok){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{})}return response}).catch(()=>caches.match(request).then(cached=>cached||caches.match(APP))))}});
+
+async function fetchAndPatch(request){
+  const response=await fetch(request,{cache:'no-store'});
+  return patchAppResponse(response);
+}
+
+self.addEventListener('install',event=>{
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(async cache=>{
+        try{
+          const response=await fetch(APP,{cache:'no-store'});
+          const patched=await patchAppResponse(response);
+          if(patched&&patched.ok)await cache.put(APP,patched);
+        }catch(_){}
+      })
+      .then(()=>self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate',event=>{
+  event.waitUntil(
+    caches.keys()
+      .then(keys=>Promise.all(
+        keys.filter(k=>k.startsWith('shericeri-')&&k!==CACHE_NAME).map(k=>caches.delete(k))
+      ))
+      .then(()=>self.clients.claim())
+  );
+});
+
+self.addEventListener('message',event=>{
+  const type=event.data?.type;
+  if(type==='SKIP_WAITING')self.skipWaiting();
+  if(type==='CLIENT_READY'&&event.source?.postMessage)event.source.postMessage({type:'SHERICERI_SW_READY',version:RELEASE,cache:CACHE_NAME});
+});
+
+self.addEventListener('sync',event=>{
+  if(event.tag!=='shericeri-outbox-sync')return;
+  event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(clients=>clients.forEach(client=>client.postMessage({type:'SHERICERI_SYNC_REQUEST'}))));
+});
+
+self.addEventListener('fetch',event=>{
+  const request=event.request;
+  if(request.method!=='GET')return;
+  if(request.mode==='navigate'){
+    event.respondWith(fetchAndPatch(request).then(response=>{
+      if(response&&response.ok){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(APP,copy)).catch(()=>{});}
+      return response;
+    }).catch(()=>caches.match(APP)));
+    return;
+  }
+  const url=new URL(request.url);
+  if(url.origin===location.origin){
+    event.respondWith(fetch(request,{cache:'no-store'}).then(response=>{
+      if(response&&response.ok){const copy=response.clone();caches.open(CACHE_NAME).then(cache=>cache.put(request,copy)).catch(()=>{});}
+      return response;
+    }).catch(()=>caches.match(request).then(cached=>cached||caches.match(APP))));
+  }
+});
