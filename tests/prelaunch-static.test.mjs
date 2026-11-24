@@ -425,11 +425,13 @@ test("ledger repair review is centered, copyable and requires explicit confirmat
   assert.ok(html.includes("integrity.invalid.map((x,i)=>"), "diagnostic must include every flagged entry, not only the first eight");
 });
 
-test("background refresh does not rerender the active financial reports view", () => {
+test("background refresh updates the active financial reports view after loading server data", () => {
   assert.ok(html.includes("function sheriDeferBackgroundRender()"));
-  assert.ok(html.includes("sheriCurrentView==='reports'"));
+  assert.ok(html.includes("return !!document.getElementById('accRepairDialog')"));
+  assert.ok(html.includes("function sheriRenderAfterServerRefresh()"));
+  assert.ok(html.includes("if(sheriCurrentView==='reports'&&typeof renderReports==='function'){renderReports();return;}"));
   assert.ok(html.includes("if(hadLocal&&!(silent&&sheriDeferBackgroundRender()))render()"));
-  assert.ok(html.includes("loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()})"));
+  assert.ok(html.includes("sheriRenderAfterServerRefresh()"));
   assert.ok(html.includes("source._serverConfirmed===false"), "pending local source records must not be reported as missing server journals");
 });
 
