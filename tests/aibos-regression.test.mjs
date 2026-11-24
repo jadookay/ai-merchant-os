@@ -276,10 +276,18 @@ test("AIBOS integrity failures are permanent and are not retried as transient ne
   assert.ok(block.includes("row-level security"));
 });
 
-test("service worker cache is bumped to release V14.4.87", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v87"));
-  assert.ok(serviceWorker.includes("V14.4.87"));
-  assert.ok(html.includes('name="app-version" content="V14.4.87 safe opening-stock retry and permission handling"'));
+test("blocked opening-stock retries are recovered only when the active user has the required permissions", () => {
+  const block = html.slice(html.indexOf("async function sheriUnblockSchemaRepairedOperations(){"), html.indexOf("async function sheriSyncAccountingSettingsOperation(op){"));
+  assert.ok(block.includes("canManageInventory=sheriCan('manage_inventory')"));
+  assert.ok(block.includes("canManageFinance=sheriCan('manage_finance')"));
+  assert.ok(block.includes("item.op?.movement_type!=='opening_balance'||canManageFinance"));
+  assert.ok(block.includes("retry_recovered_v88:true"));
+});
+
+test("service worker cache is bumped to release V14.4.88", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v88"));
+  assert.ok(serviceWorker.includes("V14.4.88"));
+  assert.ok(html.includes('name="app-version" content="V14.4.88 recover authorized opening-stock queue items"'));
 });
 
 
@@ -326,9 +334,9 @@ test("received purchases persist the updated local stock and record the register
   assert.ok(block.includes("await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}})"));
 });
  
-test("the production application shell uses V14.4.87", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v87"));
-  assert.ok(serviceWorker.includes("const RELEASE='V14.4.87'"));
+test("the production application shell uses V14.4.88", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v88"));
+  assert.ok(serviceWorker.includes("const RELEASE='V14.4.88'"));
 });
 
 test("the preview application shell is bumped to V14.4.79 without changing production", () => {
