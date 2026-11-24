@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.86 live report refresh and inventory table fit">
+<meta name="app-version" content="V14.4.87 safe opening-stock retry and permission handling">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -1305,7 +1305,9 @@ function sheriSyncErrorInfo(err){
   const message=String(err?.message||err||'Sync failed').slice(0,240);
   const status=Number(err?.status||err?.code||0)||0;
   const lower=message.toLowerCase();
-  const permanent=status>=400&&status<500&&![401,408,409,425,429].includes(status) || /permission denied|row-level security|violates .*constraint|invalid input syntax|does not exist/.test(lower);
+  // Database integrity failures cannot be repaired by replaying the same
+  // operation. Keep them visible for review instead of retrying every minute.
+  const permanent=status>=400&&status<500&&![401,408,409,425,429].includes(status) || /permission denied|row-level security|violates .*constraint|invalid input syntax|does not exist|aibos integrity|opening stock requires exactly one active opening inventory journal/.test(lower);
   return {message,status,permanent};
 }
 function sheriSyncDelayMs(attempts){return Math.min(60000,Math.max(5000,5000*Math.pow(2,Math.min(Number(attempts)||0,4))))}
@@ -1395,7 +1397,7 @@ async function sheriEnsureProductBeforeStockChange(op){
   const pending=queued.find(x=>x.op?.type==='product_upsert'&&x.op.record?.id===productId);
   const local=product(productId),source=pending?.op?.record||local;
   if(!source)throw new Error('Inventory adjustment is waiting for its product to sync.');
-  const openingRecord={...source,merchant_id:merchantId,stock:Number(pending?.op?.record?.stock??op.expected_stock??0)};
+  const openingRecord={...source,merchant_id:merchantId,stock:0};
   await sheriSyncProductOperation({record:openingRecord});
   const verify=await sb.from('products').select('id').eq('id',productId).eq('merchant_id',merchantId).maybeSingle();
   if(verify.error)throw verify.error;
@@ -1431,6 +1433,10 @@ async function sheriSyncVoidSale(op){
 }
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
+  // Product metadata writes must never create stock implicitly. All stock
+  // quantities are applied by the audited stock RPC, which also posts the
+  // matching inventory journal in the same transaction.
+  const productInsertRecord={...record,stock:0};
   if(sheriCan('manage_team')){
     const {data:existing,error:findError}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
     if(findError)throw findError;
@@ -1439,14 +1445,14 @@ async function sheriSyncProductOperation(op){
       const {stock,...metadata}=record;
       const {error}=await sb.from('products').update(metadata).eq('id',record.id);if(error)throw error;
     }else{
-      const {error}=await sb.from('products').insert(record);if(error)throw error;
+      const {error}=await sb.from('products').insert(productInsertRecord);if(error)throw error;
     }
     return;
   }
   const {data,error}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
   if(error)throw error;
   if(data)return; // Non-managers may create a product, but never overwrite an existing one.
-  const {error:insertError}=await sb.from('products').insert(record);if(insertError)throw insertError;
+  const {error:insertError}=await sb.from('products').insert(productInsertRecord);if(insertError)throw insertError;
 }
 async function sheriEnsurePurchaseDependencies(op){
   const record=sheriServerRecord(op.record),merchantId=record.merchant_id;
@@ -1459,8 +1465,9 @@ async function sheriEnsurePurchaseDependencies(op){
     const pending=queued.find(x=>x.op?.type==='product_upsert'&&x.op.record?.id===productId);
     const local=product(productId),source=pending?.op?.record||local;
     if(!source)throw new Error('Purchase is waiting for its product to sync. No purchase or stock change was posted.');
-    const serverStock=Number(pending?.op?.record?.stock??op.expectedServerStock??local?.stock??0);
-    await sheriSyncProductOperation({record:{...source,merchant_id:merchantId,stock:serverStock}});
+    // A missing product is created at zero stock. The purchase receipt RPC
+    // applies the quantity and weighted-average cost atomically afterward.
+    await sheriSyncProductOperation({record:{...source,merchant_id:merchantId,stock:0}});
     const verify=await sb.from('products').select('id').eq('id',productId).eq('merchant_id',merchantId).maybeSingle();
     if(verify.error)throw verify.error;
     if(!verify.data)throw new Error('Purchase is waiting for its product to sync. No purchase or stock change was posted.');
