@@ -609,3 +609,14 @@ test("accounting balances and integrity checks recognize purchase_void as the ex
     assert.ok(app.includes("['sale','sale_cogs','purchase'].includes(entry.source_type)"));
   }
 });
+
+
+test("purchase sync verifies receipt through the RPC, not direct inventory_movements access", () => {
+  const start = html.indexOf("async function sheriSyncPurchaseOperation(op){");
+  const end = html.indexOf("\nfunction sheriOutboxPriority", start);
+  assert.ok(start >= 0 && end > start, "purchase sync operation is present");
+  const purchaseSync = html.slice(start, end);
+  assert.match(purchaseSync, /sb\.rpc\('shericeri_sync_purchase_stock'/);
+  assert.match(purchaseSync, /confirmed\.status==='received'&&confirmed\.stock_applied!==true/);
+  assert.doesNotMatch(purchaseSync, /sb\.from\(['"]inventory_movements['"]\)/);
+});
