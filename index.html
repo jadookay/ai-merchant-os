@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.85 owner phone no-SMS testing mode">
+<meta name="app-version" content="V14.4.86 live report refresh and inventory table fit">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -1748,8 +1748,8 @@ async function sheriSyncOutbox(){
 
 function sheriOnlineEvents(){
   window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sherriSyncKick()});
-  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
-  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri focus refresh]',e));});
+  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>{sheriRenderAfterServerRefresh()}).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
+  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>{sheriRenderAfterServerRefresh()}).catch(e=>console.warn('[Shericeri focus refresh]',e));});
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator){
@@ -2191,9 +2191,15 @@ function sheriStopMerchantRealtime(){
   sheriRealtimeChannel=null;sheriRealtimeMerchantId=null;
 }
 function sheriDeferBackgroundRender(){
-  // Reports are long, interactive views. Realtime/focus refreshes may update
-  // their data model, but must not replace the report DOM while it is open.
-  return !!document.getElementById('accRepairDialog')||sheriCurrentView==='reports';
+  // A ledger repair dialog owns the report DOM while it is open.
+  return !!document.getElementById('accRepairDialog');
+}
+function sheriRenderAfterServerRefresh(){
+  if(sheriDeferBackgroundRender())return;
+  // Keep the report controls in place, but refresh the figures from the newly
+  // loaded server snapshot. Previously this view was deferred indefinitely.
+  if(sheriCurrentView==='reports'&&typeof renderReports==='function'){renderReports();return;}
+  render();
 }
 function sheriSubscribeMerchantRealtime(merchantId){
   if(!sb||!merchantId||!session?.access_token)return;
@@ -2209,7 +2215,7 @@ function sheriSubscribeMerchantRealtime(merchantId){
     sheriRealtimeRefreshTimer=setTimeout(()=>{
       sheriRealtimeRefreshTimer=null;
       if(state.merchant?.id!==merchantId||!session?.access_token)return;
-      loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
+      loadAll(true).then(()=>{sheriRenderAfterServerRefresh()}).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
     },220);
   };
   for(const table of tables){
@@ -2651,7 +2657,17 @@ function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.onload=()=>w.print();
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p></body></html>');
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><style id="aibos-inventory-table-fit-v1">
+/* Give product names and headings room; on narrow screens scroll the table,
+   rather than squeezing every column until names become unreadable. */
+#inventoryTable{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
+#inventoryTable .table{width:100%;min-width:1120px;table-layout:auto}
+#inventoryTable .table th{white-space:nowrap}
+#inventoryTable .table th:nth-child(2),#inventoryTable .table td:nth-child(2){min-width:230px}
+#inventoryTable .table th:nth-child(3),#inventoryTable .table td:nth-child(3){min-width:190px}
+#inventoryTable .table td:nth-child(2),#inventoryTable .table td:nth-child(3){overflow-wrap:anywhere;white-space:normal}
+</style>
+</body></html>');
    w.document.close();
 }
 

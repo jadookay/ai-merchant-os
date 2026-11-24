@@ -213,7 +213,7 @@ test("business IDs are capped at six digits in the app, staff login and database
 test("cross-device server rows override stale local rows and foreground tabs refresh", () => {
   assert.ok(html.includes("if(pendingIdsFor(store).has(x.id)&&!sm.has(x.id))"));
   assert.ok(html.includes("sheriSyncQueued=items.length"));
-  assert.ok(html.includes("loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()})"));
+  assert.ok(html.includes("sheriRenderAfterServerRefresh()"));
 });
 
 test("trial balance places abnormal account balances on the opposite side", () => {
@@ -261,10 +261,23 @@ test("new product opening stock creates an audited inventory movement", () => {
   assert.ok(openingTriggerMigration.includes("v_type='opening_balance' and (old.stock<>0 or new.stock<=old.stock)"));
 });
 
-test("service worker cache is bumped to release V14.4.85", () => {
-  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v85"));
-  assert.ok(serviceWorker.includes("V14.4.85"));
-  assert.ok(html.includes('name="app-version" content="V14.4.85 owner phone no-SMS testing mode"'));
+test("service worker cache is bumped to release V14.4.86", () => {
+  assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v86"));
+  assert.ok(serviceWorker.includes("V14.4.86"));
+  assert.ok(html.includes('name="app-version" content="V14.4.85 live report refresh and inventory table fit"'));
+});
+
+
+test("live server refresh updates the open Reports view without rebuilding its controls", () => {
+  assert.ok(html.includes("function sheriRenderAfterServerRefresh(){"));
+  assert.ok(html.includes("if(sheriCurrentView==='reports'&&typeof renderReports==='function'){renderReports();return;}"));
+  assert.ok(html.includes("sheriRenderAfterServerRefresh()"));
+});
+
+test("inventory table gives product names and headings readable width", () => {
+  assert.ok(html.includes('id="aibos-inventory-table-fit-v1"'));
+  assert.ok(html.includes('#inventoryTable .table{width:100%;min-width:1120px;table-layout:auto}'));
+  assert.ok(html.includes('#inventoryTable .table th:nth-child(2),#inventoryTable .table td:nth-child(2){min-width:230px}'));
 });
 
 test("duplicate team identifiers return a conflict instead of an ambiguous 2xx response", () => {
