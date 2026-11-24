@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.88 recover authorized opening-stock queue items">
+<meta name="app-version" content="V14.4.89 fix purchase receipt sync verification">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -1533,12 +1533,12 @@ async function sheriSyncPurchaseOperation(op){
     .eq('id',purchaseRecord.id).eq('merchant_id',purchaseRecord.merchant_id).maybeSingle();
   if(verifyError)throw verifyError;
   if(!confirmed)throw new Error('Purchase sync was acknowledged but the purchase record is missing. It remains queued for safe retry and review.');
-  if(confirmed.status==='received'){
-    const {data:movement,error:movementError}=await sb.from('inventory_movements')
-      .select('id').eq('merchant_id',purchaseRecord.merchant_id)
-      .eq('source_id',purchaseRecord.id).eq('movement_type','purchase_receipt').limit(1).maybeSingle();
-    if(movementError)throw movementError;
-    if(!movement||confirmed.stock_applied!==true)throw new Error('Purchase record exists but its stock receipt is incomplete. The operation remains queued for review.');
+  // The purchase RPC runs as the trusted transaction boundary and verifies
+  // the receipt movement internally before returning ok:true (including safe
+  // idempotent retries). Do not query inventory_movements from the client:
+  // authenticated users intentionally have no direct table access.
+  if(confirmed.status==='received'&&confirmed.stock_applied!==true){
+    throw new Error('Purchase record exists but the server has not confirmed its stock receipt. The operation remains queued for review.');
   }
 }
 function sheriOutboxPriority(op){return ({merchant_upsert:0,product_upsert:1,supplier_upsert:1,customer_upsert:1,inventory_adjustment:2,purchase_upsert:3,sale_cart_upsert:4,sale_upsert:4})[op?.type]??5;}
