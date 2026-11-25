@@ -620,3 +620,35 @@ test("purchase sync verifies receipt through the RPC, not direct inventory_movem
   assert.match(purchaseSync, /confirmed\.status==='received'&&confirmed\.stock_applied!==true/);
   assert.doesNotMatch(purchaseSync, /sb\.from\(['"]inventory_movements['"]\)/);
 });
+
+
+test("isolated preview supports payment methods, customer credit details, reminders and repayment RPC", () => {
+  for (const value of [
+    "salePaymentMethod", "value='cash'", "value='momo'", "value='credit'",
+    "saleCreditName", "saleCreditPhone", "saleCreditDue", "saleCreditAmount",
+    "renderCreditReminders", "aibosCollectCredit",
+    "sheri_record_customer_receipt", "sale_invoice"
+  ]) assert.ok(previewHtml.includes(value), "Missing customer-credit workflow: "+value);
+});
+
+test("thermal POS receipt uses configured 58mm/80mm paper and includes cashier, shop phone, timestamp and footer", () => {
+  for (const value of [
+    "setShopPhone", "setReceiptWidth", "58mm", "80mm",
+    "paperWidth", "shopPhone", "cashier", "Africa/Kigali",
+    "Thank you for doing business with us!", "Please come back!",
+    "receipt_note"
+  ]) assert.ok(previewHtml.includes(value), "Missing POS receipt detail: "+value);
+});
+
+test("credit-sale migration preserves default cash behavior and reclassifies MoMo/credit sales to correct asset accounts", () => {
+  const creditPosMigration = readFileSync(new URL("../supabase/migrations/20261125190000_customer_credit_sales_and_pos_receipts.sql", import.meta.url), "utf8");
+  for (const value of [
+    "payment_method text not null default 'cash'",
+    "code='1020'", "code='1100'", "sale_payment_reclass",
+    "zz_sales_payment_reclass_after_insert",
+    "zz_sales_payment_reclass_void_after_update",
+    "create or replace function public.shericeri_record_customer_receipt",
+    "'sale_invoice'", "'sale_receipt'",
+    "grant execute on function public.shericeri_record_customer_receipt"
+  ]) assert.ok(creditPosMigration.includes(value), "Missing accounting safeguard: "+value);
+});
