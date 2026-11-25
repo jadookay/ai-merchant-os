@@ -174,7 +174,8 @@
       }
       const effective=prompt(t('compensationEffective'),e.compensation_effective_from||today());if(effective===null)return;
       const reason=prompt(t('compensationReason'),'Salary or allowance adjustment');if(reason===null)return;
-      const row={base_salary:salary,transport_allowance:transport,compensation_effective_from:effective,compensation_change_reason:reason,casual_days_in_tax_period:e.employment_type==='casual'?casualDays:null,casual_criteria_confirmed:e.employment_type==='casual'&&casualConfirmed,updated_by:(await sb.auth.getUser()).data.user.id,updated_at:new Date().toISOString()};
+      const {data:userData,error:userError}=await sb.auth.getUser();if(userError)throw userError;if(!userData?.user)throw new Error('Please sign in again.');
+      const row={base_salary:salary,transport_allowance:transport,compensation_effective_from:effective,compensation_change_reason:reason,casual_days_in_tax_period:e.employment_type==='casual'?casualDays:null,casual_criteria_confirmed:e.employment_type==='casual'&&casualConfirmed,updated_by:userData.user.id,updated_at:new Date().toISOString()};
       const {error:updateError}=await sb.from('payroll_employees').update(row).eq('id',id).eq('merchant_id',state.merchant.id);if(updateError)throw updateError;
       await loadEmployees();
       const status=document.getElementById('payrollSaveStatus');if(status)status.textContent=t('saved');
