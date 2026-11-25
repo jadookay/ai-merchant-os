@@ -287,7 +287,7 @@ test("blocked opening-stock retries are recovered only when the active user has 
 test("service worker cache is bumped to release V14.4.90", () => {
   assert.ok(serviceWorker.includes("shericeri-v14.4-aibos-sync-v90"));
   assert.ok(serviceWorker.includes("V14.4.90"));
-  assert.ok(html.includes('name="app-version" content="V14.4.90 fix purchase receipt sync verification"'));
+  assert.ok(html.includes('name="app-version" content="V14.4.90 Rwanda payroll foundation"'));
 });
 
 
