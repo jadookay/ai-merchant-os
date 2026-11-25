@@ -344,13 +344,13 @@
       const contributionType=typeMap[reminderType];if(!contributionType)throw new Error('Unsupported statutory payment type.');
       let periodStart,periodEnd;
       if(reminderKey.startsWith('paye-quarterly-')){
-        const match=reminderKey.slice('paye-quarterly-'.length).match(/^(\\d{4})-(\\d{2}) to (\\d{4})-(\\d{2})$/);
+        const match=reminderKey.slice('paye-quarterly-'.length).match(/^(\d{4})-(\d{2}) to (\d{4})-(\d{2})$/);
         if(!match)throw new Error('Could not identify the RRA quarterly tax period.');
         periodStart=match[1]+'-'+match[2]+'-01';
         const endYear=Number(match[3]),endMonth=Number(match[4]);
         periodEnd=new Date(endYear,endMonth,0).getFullYear()+'-'+String(new Date(endYear,endMonth,0).getMonth()+1).padStart(2,'0')+'-'+String(new Date(endYear,endMonth,0).getDate()).padStart(2,'0');
       }else{
-        const match=reminderKey.match(/(\\d{4})-(\\d{2})$/);
+        const match=reminderKey.match(/(\d{4})-(\d{2})$/);
         if(!match)throw new Error('Could not identify the statutory tax period.');
         periodStart=match[1]+'-'+match[2]+'-01';
         const last=new Date(Number(match[1]),Number(match[2]),0);
