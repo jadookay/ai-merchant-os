@@ -76,7 +76,10 @@ begin
     raise exception 'Payroll period and pay date are invalid';
   end if;
   if exists(select 1 from public.payroll_pay_runs where merchant_id=p_merchant_id and run_number=trim(p_run_number)) then
-    select id into v_run_id from public.payroll_pay_runs where merchant_id=p_merchant_id and run_number=trim(p_run_number);
+    select id into v_run_id from public.payroll_pay_runs
+    where merchant_id=p_merchant_id and run_number=trim(p_run_number)
+      and period_start=p_period_start and period_end=p_period_end and pay_date=p_pay_date;
+    if v_run_id is null then raise exception 'Payroll run number already exists with different dates'; end if;
     return v_run_id;
   end if;
 
@@ -147,7 +150,7 @@ begin
     insert into public.payroll_pay_items(
       merchant_id,pay_run_id,employee_id,earnings,deductions,gross_pay,taxable_income,paye,
       pension_employee,pension_employer,occupational_hazards_employer,other_employee_deductions,
-      net_pay,employer_cost,calculation_snapshot,other_taxable_earnings,casual_days_worked,calculation_period
+      net_pay,employer_cost,calculation_snapshot,other_taxable_earnings,casual_days_worked,calculation_period,payslip_number
     ) values (
       p_merchant_id,v_run_id,v_employee.id,
       jsonb_build_array(
@@ -168,7 +171,8 @@ begin
         'taxable_income_includes_transport',true),
       v_other,
       case when v_employee.employment_type='casual' then v_employee.casual_days_in_tax_period else null end,
-      p_period_end
+      p_period_end,
+      'PS-'||trim(p_run_number)||'-'||v_employee.employee_number
     );
     v_count:=v_count+1;
     v_gross_total:=v_gross_total+v_gross;
@@ -241,12 +245,12 @@ begin
  if exists(select 1 from public.accounting_settings where merchant_id=p_merchant_id and locked_through>=v_run.period_end) then
    raise exception 'Accounting period is locked through or beyond payroll period end';
  end if;
- select id into v_salary from public.chart_of_accounts where merchant_id=p_merchant_id and code='6300' and active;
- select id into v_employer_exp from public.chart_of_accounts where merchant_id=p_merchant_id and code='6310' and active;
- select id into v_net_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2210' and active;
- select id into v_paye_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2220' and active;
- select id into v_pension_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2230' and active;
- select id into v_oh_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2240' and active;
+ select id into v_salary from public.chart_of_accounts where merchant_id=p_merchant_id and code='6300' and active and type='expense' and normal_balance='debit';
+ select id into v_employer_exp from public.chart_of_accounts where merchant_id=p_merchant_id and code='6310' and active and type='expense' and normal_balance='debit';
+ select id into v_net_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2210' and active and type='liability' and normal_balance='credit';
+ select id into v_paye_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2220' and active and type='liability' and normal_balance='credit';
+ select id into v_pension_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2230' and active and type='liability' and normal_balance='credit';
+ select id into v_oh_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2240' and active and type='liability' and normal_balance='credit';
  if v_salary is null or v_employer_exp is null or v_net_payable is null or v_paye_payable is null or v_pension_payable is null or v_oh_payable is null then
    raise exception 'Payroll chart-of-account mapping is incomplete; no journal was posted';
  end if;
@@ -296,6 +300,7 @@ begin
  if not private.user_can_access_merchant(p_merchant_id,'manage_finance') then raise exception 'Finance payment permission is required'; end if;
  if p_amount is null or p_amount<=0 or p_payment_date is null or coalesce(trim(p_idempotency_key),'')='' then raise exception 'Payment amount, date and idempotency key are required'; end if;
  if p_payment_method not in ('bank','mobile_money','cash') then raise exception 'Unsupported salary payment method'; end if;
+ perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_merchant_id::text||':payroll-payment:'||p_idempotency_key,0));
  select id into v_payment from public.payroll_payments where merchant_id=p_merchant_id and idempotency_key=p_idempotency_key;
  if v_payment is not null then return v_payment; end if;
  select * into v_run from public.payroll_pay_runs where id=p_run_id and merchant_id=p_merchant_id for update;
@@ -304,7 +309,7 @@ begin
  if p_amount>v_outstanding then raise exception 'Payment exceeds outstanding net salaries payable'; end if;
  if exists(select 1 from public.accounting_settings where merchant_id=p_merchant_id and locked_through>=p_payment_date) then raise exception 'Payment date is in a locked accounting period'; end if;
  select id into v_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2210' and active;
- select id into v_cash from public.chart_of_accounts where merchant_id=p_merchant_id and code=case p_payment_method when 'bank' then '1010' when 'mobile_money' then '1020' else '1000' end and active;
+ select id into v_cash from public.chart_of_accounts where merchant_id=p_merchant_id and code=case p_payment_method when 'bank' then '1010' when 'mobile_money' then '1020' else '1000' end and active and type='asset' and normal_balance='debit';
  if v_payable is null or v_cash is null then raise exception 'Salary payable or payment account mapping is missing'; end if;
  insert into public.payroll_payments(merchant_id,pay_run_id,payment_date,amount,payment_method,reference,status,recorded_by,idempotency_key)
  values(p_merchant_id,p_run_id,p_payment_date,p_amount,p_payment_method,nullif(trim(p_reference),''),'recorded',auth.uid(),p_idempotency_key)
