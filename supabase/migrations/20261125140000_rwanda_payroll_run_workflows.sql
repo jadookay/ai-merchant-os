@@ -237,12 +237,7 @@ begin
       and r.effective_from<=p_period_end
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
-    v_pension_rate:=coalesce(v_pension_rate,case
-      when p_period_end>=date '2030-01-01' then 0.10
-      when p_period_end>=date '2029-01-01' then 0.09
-      when p_period_end>=date '2028-01-01' then 0.08
-      when p_period_end>=date '2027-01-01' then 0.07
-      else 0.06 end);
+    if v_pension_rate is null then raise exception 'No verified effective RSSB pension rule is configured for payroll period ending %',p_period_end; end if;
     v_pension_employee:=round(v_taxable_income*v_pension_rate,2);
     v_pension_employer:=v_pension_employee;
     -- Current RSSB Occupational Hazards basis is kept separate from pension;
@@ -254,7 +249,7 @@ begin
       and r.effective_from<=p_period_end
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
-    v_hazards_rate:=coalesce(v_hazards_rate,0.02);
+    if v_hazards_rate is null then raise exception 'No verified effective Occupational Hazards rule is configured for payroll period ending %',p_period_end; end if;
     v_hazards:=round((v_employee.base_salary+v_other+v_benefits)*v_hazards_rate,2);
     select coalesce((r.configuration->>'employee_rate')::numeric,0.003),
            coalesce((r.configuration->>'employer_rate')::numeric,0.003)
@@ -264,7 +259,7 @@ begin
       and r.effective_from<=p_period_end
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
-    v_maternity_rate:=coalesce(v_maternity_rate,0.003);
+    if v_maternity_rate is null or v_maternity_employer is null then raise exception 'No verified effective maternity contribution rule is configured for payroll period ending %',p_period_end; end if;
     v_maternity_base:=v_employee.base_salary+v_other+v_benefits;
     v_maternity_employee:=round(v_maternity_base*v_maternity_rate,2);
     v_maternity_employer:=round(v_maternity_base*coalesce(v_maternity_employer,0.003),2);
@@ -275,7 +270,7 @@ begin
       and r.effective_from<=p_period_end
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
-    v_cbhi_rate:=coalesce(v_cbhi_rate,0.005);
+    if v_cbhi_rate is null then raise exception 'No verified effective CBHI contribution rule is configured for payroll period ending %',p_period_end; end if;
     v_cbhi:=round(greatest(0,v_taxable_income-v_paye-v_pension_employee-v_pension_employer-v_hazards-v_maternity_employee-v_maternity_employer)*v_cbhi_rate,2);
     v_net:=round(v_gross-v_paye-v_pension_employee-v_maternity_employee-v_cbhi,2);
     v_cost:=round(v_gross+v_pension_employer+v_hazards+v_maternity_employer,2);
