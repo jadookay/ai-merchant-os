@@ -156,6 +156,7 @@ declare
   v_receivable uuid;
   v_entry uuid;
   v_existing public.payments%rowtype;
+  v_actor text;
 begin
   if p_payment_id is null or p_merchant_id is null or p_transaction_id is null
      or p_amount is null or p_amount<=0 or p_payment_date is null
@@ -168,6 +169,13 @@ begin
   ) then
     raise exception 'Not authorized to record customer receipts';
   end if;
+
+  select coalesce(nullif(btrim(mm.full_name),''),case when m.user_id=auth.uid() then 'Owner' else 'Staff' end)
+    into v_actor
+    from public.merchants m
+    left join public.merchant_members mm on mm.merchant_id=m.id and mm.user_id=auth.uid() and mm.status='active'
+   where m.id=p_merchant_id;
+  v_actor:=coalesce(v_actor,'Staff');
 
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(p_merchant_id::text||':sale_invoice_receipt:'||p_transaction_id::text,0)
@@ -222,7 +230,7 @@ begin
   values
     (p_payment_id,p_merchant_id,'receipt','sale_invoice',p_transaction_id,v_cash_account,
      p_amount,p_payment_date,nullif(btrim(p_reference),''),coalesce(p_notes,'Customer credit repayment'),
-     auth.uid(),coalesce(private.current_actor_name(p_merchant_id),'Staff'));
+     auth.uid(),v_actor);
 
   insert into public.journal_entries
     (merchant_id,entry_date,description,source_type,source_id,created_by,created_by_name)
