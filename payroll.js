@@ -16,7 +16,7 @@
   function tax(g,type){
     g=Math.max(0,Number(g)||0);
     if(type==='secondary_employer')return Math.round(g*.30);
-    if(type==='casual')return Math.round(g*.15);
+    if(type==='casual')return Math.round(Math.max(0,g-60000)*.15);
     return Math.round(Math.max(0,Math.min(g,100000)-60000)*.10+Math.max(0,Math.min(g,200000)-100000)*.20+Math.max(0,g-200000)*.30);
   }
   host.innerHTML=`
