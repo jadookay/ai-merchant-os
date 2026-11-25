@@ -24,7 +24,7 @@ alter table public.payroll_employees
 alter table public.payroll_employees add constraint payroll_employees_taxable_benefits_nonnegative check (taxable_benefits_in_kind>=0);
 alter table public.payroll_pay_items
   add constraint payroll_pay_items_rwanda_contributions_nonnegative
-  check (maternity_employee>=0 and maternity_employer>=0 and cbhi_employee>=0);
+  check (maternity_employee>=0 and maternity_employer>=0 and cbhi_employee>=0 and taxable_benefits_in_kind>=0);
 alter table public.payroll_pay_runs
   add constraint payroll_runs_amount_paid_range
   check (amount_paid_total>=0 and amount_paid_total<=net_pay_total);
