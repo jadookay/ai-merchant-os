@@ -8,6 +8,7 @@ const payroll = readFileSync(new URL("../payroll.js", import.meta.url), "utf8");
 const foundation = readFileSync(new URL("../supabase/migrations/20261125120000_rwanda_payroll_foundation.sql", import.meta.url), "utf8");
 const restrictions = readFileSync(new URL("../supabase/migrations/20261125123000_restrict_payroll_workflow_writes.sql", import.meta.url), "utf8");
 const futurePension = readFileSync(new URL("../supabase/migrations/20261125130000_rwanda_future_pension_rates.sql", import.meta.url), "utf8");
+const workflows = readFileSync(new URL("../supabase/migrations/20261125140000_rwanda_payroll_run_workflows.sql", import.meta.url), "utf8");
 
 test("Payroll is reachable from AIBOS Command Center navigation and hub", () => {
   assert.ok(html.includes("onclick=\"show('payroll')\">Payroll</button>"));
@@ -17,10 +18,14 @@ test("Payroll is reachable from AIBOS Command Center navigation and hub", () => 
   assert.ok(html.includes('src="payroll.js?v=1"'));
 });
 
-test("Rwanda payroll page is multilingual and does not claim filing or posting is live", () => {
+test("Rwanda payroll page is multilingual and keeps tax declarations and money transfers external", () => {
   for (const value of ["en:{", "rw:{", "fr:{", "PAYE", "RSSB Pension", "Occupational Hazards"])
     assert.ok(payroll.includes(value), "Missing payroll support: " + value);
-  assert.match(payroll, /does not submit declarations, pay salaries, approve payroll or post accounting journals/);
+  assert.match(payroll, /RRA\/RSSB declarations and bank or mobile-money transfers remain external/);
+  assert.ok(payroll.includes("payrollCreateRun"));
+  assert.ok(payroll.includes("aibosPayrollRunAction"));
+  assert.ok(payroll.includes("aibosPayrollPayRun"));
+  assert.ok(payroll.includes("aibosPayrollPayslips"));
 });
 
 test("PAYE estimator includes permanent, casual and secondary-employer classifications", () => {
@@ -52,6 +57,7 @@ test("Rwanda PAYE and pension rules are effective-dated", () => {
   }
   assert.ok(payroll.includes("period>='2030-01' ? 0.20"));
   assert.ok(payroll.includes("period>='2027-01' ? 0.14"));
+  assert.match(payroll, /type==='casual'\)return Math\.round\(g\*\.15\)/);
 });
 
 test("payroll run, payslip item, salary payment and reminder writes are not exposed directly", () => {
@@ -77,6 +83,38 @@ test("Payroll headings and navigation react to the selected app language", () =>
   assert.ok(payroll.includes("aibos:languagechange"));
   assert.ok(payroll.includes("getElementById('aibosLanguageSelect')"));
   assert.ok(payroll.includes("host.dataset.lang!==lang()"));
+});
+
+test("Payroll workflow RPCs create, submit, approve, post and pay with server-side authorization", () => {
+  for (const fn of [
+    "shericeri_create_payroll_run",
+    "shericeri_submit_payroll_run",
+    "shericeri_approve_payroll_run",
+    "shericeri_post_payroll_run",
+    "shericeri_record_payroll_payment"
+  ]) {
+    assert.ok(workflows.includes("function public."+fn));
+    assert.ok(workflows.includes("revoke all on function public."+fn));
+    assert.ok(workflows.includes("grant execute on function public."+fn+" to authenticated"));
+  }
+  assert.ok(workflows.includes("private.user_can_access_merchant(p_merchant_id,'manage_payroll')"));
+  assert.ok(workflows.includes("private.user_can_access_merchant(p_merchant_id,'manage_finance')"));
+  assert.ok(workflows.includes("status='approved'"));
+  assert.ok(workflows.includes("source_type,source_id,created_by"));
+  assert.ok(workflows.includes("payroll_run"));
+  assert.ok(workflows.includes("payroll_payment"));
+  assert.ok(workflows.includes("pg_advisory_xact_lock"));
+  assert.ok(workflows.includes("amount_paid_total=amount_paid_total+p_amount"));
+  assert.ok(workflows.includes("Accounting period is locked"));
+});
+
+test("Payroll chart-of-account mappings are validated and salary journals use dedicated accounts", () => {
+  for (const code of ["6300","6310","2210","2220","2230","2240"])
+    assert.ok(workflows.includes("code='"+code+"'"));
+  assert.ok(workflows.includes("type='expense' and normal_balance='debit'"));
+  assert.ok(workflows.includes("type='liability' and normal_balance='credit'"));
+  assert.ok(workflows.includes("type='asset' and normal_balance='debit'"));
+  assert.ok(workflows.includes("No journal was posted"));
 });
 
 test("payroll JavaScript parses", () => {
