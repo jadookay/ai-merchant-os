@@ -338,7 +338,10 @@ begin
  if not private.user_can_access_merchant(p_merchant_id,'manage_finance') then raise exception 'Finance posting permission is required'; end if;
  select * into v_run from public.payroll_pay_runs where id=p_run_id and merchant_id=p_merchant_id for update;
  if not found then raise exception 'Payroll run not found'; end if;
- if v_run.status='posted' and v_run.journal_entry_id is not null then return v_run.journal_entry_id; end if;
+ if v_run.status='posted' and v_run.journal_entry_id is not null then
+   if exists(select 1 from public.journal_entries where id=v_run.journal_entry_id and merchant_id=p_merchant_id and voided=false) then return v_run.journal_entry_id; end if;
+   raise exception 'The payroll journal was voided; use the payroll correction workflow before proceeding';
+ end if;
  if v_run.status<>'approved' then raise exception 'Payroll must be approved before posting'; end if;
  if exists(select 1 from public.accounting_settings where merchant_id=p_merchant_id and locked_through>=v_run.period_end) then
    raise exception 'Accounting period is locked through or beyond payroll period end';
@@ -408,6 +411,7 @@ begin
  if v_payment is not null then return v_payment; end if;
  select * into v_run from public.payroll_pay_runs where id=p_run_id and merchant_id=p_merchant_id for update;
  if not found or v_run.status not in ('posted','partially_paid','paid') then raise exception 'Only posted payroll can be paid'; end if;
+ if v_run.journal_entry_id is null or not exists(select 1 from public.journal_entries where id=v_run.journal_entry_id and merchant_id=p_merchant_id and voided=false) then raise exception 'The payroll accrual journal is missing or voided; no salary payment can be recorded'; end if;
  v_outstanding:=round(v_run.net_pay_total-v_run.amount_paid_total,2);
  if p_amount>v_outstanding then raise exception 'Payment exceeds outstanding net salaries payable'; end if;
  if exists(select 1 from public.accounting_settings where merchant_id=p_merchant_id and locked_through>=p_payment_date) then raise exception 'Payment date is in a locked accounting period'; end if;
