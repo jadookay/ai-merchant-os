@@ -105,9 +105,10 @@ test("CBHI uses employee net cash salary before CBHI and does not subtract emplo
 });
 
 test("RSSB employee registration reminder reflects the seven-day statutory period", () => {
-  assert.ok(payroll.includes("within 7 days after employment starts"));
-  assert.ok(payroll.includes("dans les 7 jours suivant le début de l’emploi"));
-  assert.ok(payroll.includes("due.setDate(due.getDate()+7)"));
+  assert.ok(payroll.includes("within 7 working days after employment starts"));
+  assert.ok(payroll.includes("dans les 7 jours ouvrables suivant le début de l’emploi"));
+  assert.ok(payroll.includes("while(workdays<7)"));
+  assert.ok(payroll.includes("due.getDay()!==0&&due.getDay()!==6"));
 });
 
 test("Payroll workflow RPCs create, submit, approve, post and pay with server-side authorization", () => {
