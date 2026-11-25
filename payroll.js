@@ -33,7 +33,7 @@
         <div><label>${t('transport')}</label><input id="payrollTransport" type="number" min="0" step="1" value="0"></div>
         <div><label>${t('taxid')}</label><input id="payrollTaxId"></div>
         <div><label>${t('rssb')}</label><input id="payrollRssb"></div>
-        <div><label>${t('casualDays')}</label><input id="payrollCasualDays" type="number" min="1" max="29" placeholder="1–30"></div>
+        <div><label>${t('casualDays')}</label><input id="payrollCasualDays" type="number" min="1" max="29" placeholder="1–29"></div>
         <div style="display:flex;align-items:center;gap:8px"><input id="payrollCasualConfirm" type="checkbox"><label for="payrollCasualConfirm">${t('casualConfirm')}</label></div>
         <div style="display:flex;align-items:center;gap:8px"><input id="payrollSecondaryConfirm" type="checkbox"><label for="payrollSecondaryConfirm">${t('secondaryConfirm')}</label></div>
       </div><div class="actions" style="margin-top:12px"><button class="btn" id="payrollSave">${t('save')}</button></div><div id="payrollSaveStatus" class="sub" role="status"></div></div>
@@ -170,7 +170,7 @@
       let casualDays=e.casual_days_in_tax_year,casualConfirmed=!!e.casual_criteria_confirmed;
       if(e.employment_type==='casual'){
         const daysText=prompt(t('casualDays'),String(casualDays||''));if(daysText===null)return;
-        casualDays=Number(daysText);if(!Number.isInteger(casualDays)||casualDays<1||casualDays>=30)throw new Error('Casual engagement must be 1–30 days.');
+        casualDays=Number(daysText);if(!Number.isInteger(casualDays)||casualDays<1||casualDays>=30)throw new Error('Casual engagement must be fewer than 30 days for the 15% rate.');
         casualConfirmed=confirm(t('casualConfirm'));if(!casualConfirmed)throw new Error('RRA casual-labour eligibility must be confirmed.');
       }
       let secondaryConfirmed=!!e.secondary_employer_confirmed;if(e.employment_type==='secondary_employer'){secondaryConfirmed=confirm(t('secondaryConfirm'));if(!secondaryConfirmed)throw new Error('Secondary-employer status must be confirmed.');}
@@ -202,7 +202,7 @@
       const legal=val('payrollName'),number=val('payrollNumber'),salary=Number(val('payrollSalary')),transport=Number(val('payrollTransport'));
       if(!legal||!number||!val('payrollStart')||!Number.isFinite(salary)||salary<0||!Number.isFinite(transport)||transport<0)throw new Error('Full legal name, employee number, start date and valid salary amounts are required.');
       const employmentType=val('payrollType'),casualDays=Number(val('payrollCasualDays'));
-      if(employmentType==='casual'&&(!Number.isInteger(casualDays)||casualDays<1||casualDays>=30||!document.getElementById('payrollCasualConfirm').checked))throw new Error('Casual employees require confirmed RRA eligibility and 1–30 engagement days.');
+      if(employmentType==='casual'&&(!Number.isInteger(casualDays)||casualDays<1||casualDays>=30||!document.getElementById('payrollCasualConfirm').checked))throw new Error('Casual employees require confirmed RRA eligibility and fewer than 30 engagement days in the tax year.');
       const secondaryConfirmed=document.getElementById('payrollSecondaryConfirm').checked;
       if(employmentType==='secondary_employer'&&!secondaryConfirmed)throw new Error('Confirm that this is not the employee’s primary employer before applying the 30% PAYE rate.');
       const row={merchant_id:state.merchant.id,employee_number:number,legal_name:legal,employment_type:employmentType,job_title:val('payrollTitle')||null,department:val('payrollDept')||null,hire_date:val('payrollStart'),base_salary:salary,transport_allowance:transport,tax_identifier:val('payrollTaxId')||null,rssb_member_number:val('payrollRssb')||null,compensation_effective_from:val('payrollStart'),compensation_change_reason:'Initial compensation',casual_days_in_tax_year:employmentType==='casual'?casualDays:null,casual_criteria_confirmed:employmentType==='casual'&&document.getElementById('payrollCasualConfirm').checked,secondary_employer_confirmed:employmentType==='secondary_employer'&&secondaryConfirmed,status:'active'};
