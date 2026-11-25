@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.89 fix purchase receipt sync verification">
+<meta name="app-version" content="V14.4.92 Rwanda payroll workflows">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -462,7 +462,7 @@ window.ensurePdfJs=async function(){
   <div class="nav" aria-label="Main navigation">
     <button class="active" data-view="dashboard">⌂ Home</button><button data-view="sales">＋ Sell</button><button data-view="inventory">▦ Stock</button><button data-view="settings">⚙ Setting</button><button data-view="businessOS" data-nav-command-center="1" aria-expanded="false">◈ AIBOS Command Center</button>
   </div>
-  <div id="aibosCommandSubnav" class="aibos-command-subnav" aria-label="AIBOS Command Center sections"><button type="button" onclick="show('customers')">Customer</button><button type="button" onclick="show('suppliersPurchases')">Suppliers &amp; Purchases</button><button type="button" onclick="show('expenses')">Expenses</button><button type="button" onclick="show('reports')">Reports</button><button type="button" onclick="show('money')">Money</button><button type="button" onclick="show('advisor')">AI Advisor</button><button type="button" onclick="show('forecast')">Forecast</button><button type="button" onclick="show('adjustments')">Return</button><button type="button" onclick="show('businessInsight');generateOSInsight()">AI Business Insight</button></div>
+  <div id="aibosCommandSubnav" class="aibos-command-subnav" aria-label="AIBOS Command Center sections"><button type="button" onclick="show('customers')">Customer</button><button type="button" onclick="show('suppliersPurchases')">Suppliers &amp; Purchases</button><button type="button" onclick="show('expenses')">Expenses</button><button type="button" onclick="show('reports')">Reports</button><button type="button" onclick="show('money')">Money</button><button type="button" onclick="show('advisor')">AI Advisor</button><button type="button" onclick="show('forecast')">Forecast</button><button type="button" onclick="show('adjustments')">Return</button><button type="button" onclick="show('businessInsight');generateOSInsight()">AI Business Insight</button><button type="button" onclick="show('payroll')">Payroll</button></div>
   <div class="sheri-global-launcher" role="button" tabindex="0" onclick="launchShericeri()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();launchShericeri()}">🎙️ Shericeri</div>
 </aside>
 <main class="main">
@@ -752,9 +752,11 @@ window.ensurePdfJs=async function(){
   </div>
 </section>
 
+<section id="payroll" class="view"><div class="top"><div><h1>Payroll</h1><div class="sub">Employee records, payroll estimates and Rwanda statutory compliance.</div></div></div><div id="payrollAppHost"></div></section>
+
 <section id="businessOS" class="view">
   <div class="top"><div><h1>AIBOS Command Center</h1><div class="sub">Your AI-powered business control center. Choose a business function.</div></div></div>
-  <div class="grid3 aibos-command-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px"><button class="card hub-card" onclick="show('customers')"><h2>☺ Customer</h2><div class="sub">Customer records and customer invoices.</div></button><button class="card hub-card" onclick="show('suppliersPurchases')"><h2>📦 Suppliers &amp; Purchases</h2><div class="sub">Supplier records, supplier bills and restocking.</div></button><button class="card hub-card" onclick="show('expenses')"><h2>◉ Expenses</h2><div class="sub">Record and review business expenses.</div></button><button class="card hub-card" onclick="show('reports')"><h2>▤ Reports</h2><div class="sub">Sales, profit, cash flow and financial statements.</div></button><button class="card hub-card" onclick="show('money')"><h2>💰 Money</h2><div class="sub">Payments, cash, tax, accounts and bookkeeping.</div></button><button class="card hub-card" onclick="show('advisor')"><h2>✦ AI Advisor</h2><div class="sub">Ask questions about your business records.</div></button><button class="card hub-card" onclick="show('forecast')"><h2>📈 Forecast</h2><div class="sub">Sales trends, stock risk and practical forecasts.</div></button><button class="card hub-card" onclick="show('adjustments')"><h2>↩ Return</h2><div class="sub">Returns, refunds and discounts.</div></button><button class="card hub-card" onclick="show('businessInsight');generateOSInsight()"><h2>✦ AI Business Insight</h2><div class="sub">One integrated view of performance, risks and opportunities across your business.</div></button></div>
+  <div class="grid3 aibos-command-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px"><button class="card hub-card" onclick="show('customers')"><h2>☺ Customer</h2><div class="sub">Customer records and customer invoices.</div></button><button class="card hub-card" onclick="show('suppliersPurchases')"><h2>📦 Suppliers &amp; Purchases</h2><div class="sub">Supplier records, supplier bills and restocking.</div></button><button class="card hub-card" onclick="show('expenses')"><h2>◉ Expenses</h2><div class="sub">Record and review business expenses.</div></button><button class="card hub-card" onclick="show('reports')"><h2>▤ Reports</h2><div class="sub">Sales, profit, cash flow and financial statements.</div></button><button class="card hub-card" onclick="show('money')"><h2>💰 Money</h2><div class="sub">Payments, cash, tax, accounts and bookkeeping.</div></button><button class="card hub-card" onclick="show('advisor')"><h2>✦ AI Advisor</h2><div class="sub">Ask questions about your business records.</div></button><button class="card hub-card" onclick="show('forecast')"><h2>📈 Forecast</h2><div class="sub">Sales trends, stock risk and practical forecasts.</div></button><button class="card hub-card" onclick="show('adjustments')"><h2>↩ Return</h2><div class="sub">Returns, refunds and discounts.</div></button><button class="card hub-card" onclick="show('businessInsight');generateOSInsight()"><h2>✦ AI Business Insight</h2><div class="sub">One integrated view of performance, risks and opportunities across your business.</div></button><button class="card hub-card" onclick="show('payroll')"><h2>👥 Payroll</h2><div class="sub">Employees, payroll estimates and Rwanda statutory obligations.</div></button></div>
   <div class="notice"><b>AIBOS is working from your records.</b> The numbers shown across the app come from the same business data, whether recorded online or offline.</div>
   <div class="legacy-os" aria-hidden="true">
   <div class="metrics" id="osMetrics"></div>
@@ -2583,7 +2585,7 @@ function dailyProfitTrend(windowDays=7){
 let sheriViewHistory=[];let sheriCurrentView='dashboard';
 function sheriEnsureViewBack(v){if(v==='dashboard')return;const view=document.getElementById(v),top=view?.querySelector('.top');if(!top||top.querySelector('.view-back'))return;const back=document.createElement('button');back.type='button';back.className='btn small secondary view-back';back.textContent='← Back';back.setAttribute('aria-label','Go back to previous page');back.onclick=sheriGoBack;top.insertBefore(back,top.firstChild);}
 function sheriGoBack(){const previous=sheriViewHistory.pop()||'dashboard';show(previous,true);}
-function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');const commandViews=['customers','suppliersPurchases','expenses','reports','money','advisor','forecast','adjustments','businessInsight'];document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v||(b.dataset.view==='businessOS'&&commandViews.includes(v))));if(v!=='businessOS'){const sn=document.getElementById('aibosCommandSubnav'),cb=document.querySelector('[data-nav-command-center=\"1\"]');sn?.classList.remove('open');cb?.setAttribute('aria-expanded','false')}sheriCurrentView=v;sheriEnsureViewBack(v);render()}
+function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');const commandViews=['customers','suppliersPurchases','expenses','reports','money','advisor','forecast','adjustments','businessInsight','payroll'];document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v||(b.dataset.view==='businessOS'&&commandViews.includes(v))));if(v!=='businessOS'){const sn=document.getElementById('aibosCommandSubnav'),cb=document.querySelector('[data-nav-command-center=\"1\"]');sn?.classList.remove('open');cb?.setAttribute('aria-expanded','false')}sheriCurrentView=v;sheriEnsureViewBack(v);render()}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
 
 function sheriRecentActivitiesHtml(){
@@ -3628,7 +3630,7 @@ async function editTeamMember(id){
   ['view_sales','View sales'],['create_sale','Record sales'],['manage_sales','Edit / void sales'],
   ['view_inventory','View inventory'],['manage_inventory','Manage inventory'],['view_inventory_costs','View inventory costs'],
   ['view_expenses','View expenses'],['manage_expenses','Manage expenses'],
-  ['view_financial_reports','View financial reports'],['manage_finance','Manage accounting and finance'],
+  ['view_financial_reports','View financial reports'],['manage_finance','Manage accounting and finance'],['manage_payroll','Manage payroll and employee records'],
   ['view_customers','View customers'],['manage_customers','Manage customers'],
   ['view_suppliers','View suppliers'],['manage_suppliers','Manage suppliers'],
   ['view_audit_log','View audit trail'],['manage_team','Manage team access']
@@ -10544,5 +10546,6 @@ html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body 
 #inventoryTable .table td:nth-child(2),#inventoryTable .table td:nth-child(3){overflow-wrap:anywhere;white-space:normal}
 </style>
 
+<script src="payroll.js?v=1"></script>
 </body>
 </html>
