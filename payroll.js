@@ -38,7 +38,7 @@
     </div>
     <div class="card" style="margin-top:14px"><h2>${t('estimate')}</h2><div class="formgrid">
       <div><label>${t('type')}</label><select id="payrollCalcType"><option value="permanent">${t('permanent')}</option><option value="casual">${t('casual')}</option><option value="secondary_employer">${t('secondary')}</option></select></div>
-      <div><label>${t('period')}</label><input id="payrollCalcPeriod" type="month" value="2026-11"></div>
+      <div><label>${t('period')}</label><input id="payrollCalcPeriod" type="month" value="${new Date().toISOString().slice(0,7)}"></div>
       <div><label>${t('basic')}</label><input id="payrollCalcBasic" type="number" min="0" value="300000"></div>
       <div><label>${t('transport')}</label><input id="payrollCalcTransport" type="number" min="0" value="0"></div>
       <div style="display:flex;align-items:end"><button class="btn" id="payrollCalculate">${t('calc')}</button></div>
@@ -80,7 +80,7 @@
   function calculate(){
     const type=document.getElementById('payrollCalcType').value,period=document.getElementById('payrollCalcPeriod').value,basic=Number(document.getElementById('payrollCalcBasic').value),transport=Number(document.getElementById('payrollCalcTransport').value),el=document.getElementById('payrollCalcResult');
     if(!period||!Number.isFinite(basic)||!Number.isFinite(transport)||basic<0||transport<0){el.textContent='Enter a payroll month and valid non-negative amounts.';return}
-    const gross=basic+transport,paye=tax(gross,type),pensionTotalRate=period>='2030-01'?.20:period>='2029-01'?.18:period>='2028-01'?.16:period>='2027-01'?.14:.12,pensionEmployeeRate=pensionTotalRate/2,employeePension=Math.round(gross*pensionEmployeeRate),employerPension=Math.round(gross*pensionEmployeeRate),hazards=Math.round(basic*.02),net=gross-paye-employeePension,cost=gross+employerPension+hazards;
+    const gross=basic+transport,paye=tax(gross,type),pensionTotalRate=period>='2030-01' ? 0.20 : period>='2029-01' ? 0.18 : period>='2028-01' ? 0.16 : period>='2027-01' ? 0.14 : 0.12,pensionEmployeeRate=pensionTotalRate/2,employeePension=Math.round(gross*pensionEmployeeRate),employerPension=Math.round(gross*pensionEmployeeRate),hazards=Math.round(basic*.02),net=gross-paye-employeePension,cost=gross+employerPension+hazards;
     const rows=[[t('gross'),gross],[t('paye'),paye],[t('empPension'),employeePension],[t('erPension'),employerPension],[t('oh'),hazards],[t('net'),net],[t('cost'),cost]];
     el.innerHTML='<div class="sub">Pension rate for '+esc(period)+': '+Math.round(pensionTotalRate*100)+'% total ('+Math.round(pensionEmployeeRate*100)+'% employee / '+Math.round(pensionEmployeeRate*100)+'% employer).</div><div class="grid3" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">'+rows.map(x=>'<div class="card"><div class="sub">'+esc(x[0])+'</div><strong>'+money(x[1])+'</strong></div>').join('')+'</div><div class="sub" style="margin-top:8px">Estimate only. PAYE is based on RRA bands. Pension includes transport. Occupational Hazards is estimated on basic salary excluding transport; confirm the employee-specific contribution base with RSSB. Other deductions and taxable benefits are not included.</div>';
   }
