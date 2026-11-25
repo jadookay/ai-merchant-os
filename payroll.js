@@ -108,15 +108,16 @@
     const {data:runs,error}=await sb.from('payroll_pay_runs').select('id,run_number,pay_date,status,net_pay_total').eq('merchant_id',state.merchant.id).in('status',['draft','submitted','approved','posted','partially_paid','paid']);
     if(error)throw error;
     const reminders=[];
+    const closeOpen=async(runId,type=null)=>{let q=sb.from('payroll_reminders').update({status:'completed',completed_at:new Date().toISOString()}).eq('merchant_id',state.merchant.id).eq('pay_run_id',runId).eq('status','open');if(type)q=q.eq('reminder_type',type);const {error:closeError}=await q;if(closeError)throw closeError};
     for(const run of runs||[]){
       const payDate=new Date(run.pay_date+'T00:00:00');
       const makeDate=days=>{const d=new Date(payDate);d.setDate(d.getDate()-days);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
       if(run.status==='paid'){
-        await sb.from('payroll_reminders').update({status:'completed',completed_at:new Date().toISOString()}).eq('merchant_id',state.merchant.id).eq('pay_run_id',run.id).eq('status','open');
+        await closeOpen(run.id);
         continue;
       }
-      if(run.status!=='draft')await sb.from('payroll_reminders').update({status:'completed',completed_at:new Date().toISOString()}).eq('merchant_id',state.merchant.id).eq('pay_run_id',run.id).eq('reminder_type','prepare_payroll').eq('status','open');
-      if(!['draft','submitted'].includes(run.status))await sb.from('payroll_reminders').update({status:'completed',completed_at:new Date().toISOString()}).eq('merchant_id',state.merchant.id).eq('pay_run_id',run.id).eq('reminder_type','approve_payroll').eq('status','open');
+      if(run.status!=='draft')await closeOpen(run.id,'prepare_payroll');
+      if(!['draft','submitted'].includes(run.status))await closeOpen(run.id,'approve_payroll');
       if(run.status==='draft')reminders.push({merchant_id:state.merchant.id,pay_run_id:run.id,reminder_type:'prepare_payroll',title:'Prepare payroll run '+run.run_number,message:'Review employee earnings and deductions before the payroll approval stage.',due_on:run.pay_date,remind_on:makeDate(5),status:'open',idempotency_key:'prepare-'+run.id});
       if(run.status==='submitted')reminders.push({merchant_id:state.merchant.id,pay_run_id:run.id,reminder_type:'approve_payroll',title:'Approve payroll run '+run.run_number,message:'Review and approve the payroll before its scheduled pay date.',due_on:run.pay_date,remind_on:makeDate(3),status:'open',idempotency_key:'approve-'+run.id});
       if(['approved','posted','partially_paid'].includes(run.status))reminders.push({merchant_id:state.merchant.id,pay_run_id:run.id,reminder_type:'pay_salaries',title:'Pay salaries for run '+run.run_number,message:'Salary payments totaling '+money(run.net_pay_total)+' are due on '+run.pay_date+'. Record payment only after it has actually been made.',due_on:run.pay_date,remind_on:run.pay_date,status:'open',idempotency_key:'pay-salaries-'+run.id});
