@@ -64,6 +64,10 @@ test("owner dashboard reminder generation is idempotent and dismissal does not m
   assert.ok(payroll.includes("ensureStatutoryReminders"));
   assert.ok(payroll.includes("onConflict:'merchant_id,idempotency_key',ignoreDuplicates:true"));
   assert.ok(payroll.includes("status:'dismissed'"));
+  assert.ok(payroll.includes("ensureRunReminders"));
+  assert.ok(payroll.includes("reminder_type:'pay_salaries'"));
+  assert.ok(payroll.includes("reminder_type:'approve_payroll'"));
+  assert.ok(payroll.includes("reminder_type:'prepare_payroll'"));
   assert.ok(!payroll.includes("status:'paid'"));
 });
 
@@ -71,6 +75,7 @@ test("Payroll headings and navigation react to the selected app language", () =>
   assert.ok(payroll.includes("pageTitle"));
   assert.ok(payroll.includes("translateHeader"));
   assert.ok(payroll.includes("aibos:languagechange"));
+  assert.ok(payroll.includes("getElementById('aibosLanguageSelect')"));
 });
 
 test("payroll JavaScript parses", () => {
