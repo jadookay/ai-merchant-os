@@ -10,6 +10,7 @@ const restrictions = readFileSync(new URL("../supabase/migrations/20261125123000
 const futurePension = readFileSync(new URL("../supabase/migrations/20261125130000_rwanda_future_pension_rates.sql", import.meta.url), "utf8");
 const workflows = readFileSync(new URL("../supabase/migrations/20261125140000_rwanda_payroll_run_workflows.sql", import.meta.url), "utf8");
 const compensationHistory = readFileSync(new URL("../supabase/migrations/20261125170000_payroll_compensation_history.sql", import.meta.url), "utf8");
+const statutoryPayments = readFileSync(new URL("../supabase/migrations/20261125180000_rwanda_payroll_statutory_payments.sql", import.meta.url), "utf8");
 
 test("Payroll is reachable from AIBOS Command Center navigation and hub", () => {
   assert.ok(html.includes("onclick=\"show('payroll')\">Payroll</button>"));
@@ -183,6 +184,30 @@ test("Taxable benefits in kind flow into PAYE and statutory contribution bases w
   assert.ok(payroll.includes("other_recurring_earnings:otherRecurring>0"));
   assert.ok(compensationHistory.includes("old.taxable_benefits_in_kind is distinct from new.taxable_benefits_in_kind"));
   assert.ok(payroll.includes("taxableBenefits"));
+});
+
+test("Statutory payment recording reconciles liability balances and clears them with journals", () => {
+  assert.ok(statutoryPayments.includes("payroll_statutory_payments"));
+  assert.ok(statutoryPayments.includes("shericeri_get_payroll_statutory_balance"));
+  assert.ok(statutoryPayments.includes("shericeri_record_payroll_statutory_payment"));
+  assert.ok(statutoryPayments.includes("private.user_can_access_merchant(p_merchant_id,'manage_finance')"));
+  assert.ok(statutoryPayments.includes("private.user_can_access_merchant(p_merchant_id,'manage_payroll')"));
+  assert.ok(statutoryPayments.includes("p.amount"));
+  assert.ok(statutoryPayments.includes("j.voided=false"));
+  assert.ok(statutoryPayments.includes("Payment exceeds outstanding statutory liability"));
+  assert.ok(statutoryPayments.includes("General ledger liability balance is below"));
+  assert.ok(statutoryPayments.includes("payroll_statutory_payment"));
+  assert.ok(statutoryPayments.includes("status='completed'"));
+  assert.ok(statutoryPayments.includes("paye-quarterly-"));
+});
+
+test("Owner dashboard can record statutory payments against RRA and RSSB reminders", () => {
+  assert.ok(payroll.includes("recordStatutoryPayment"));
+  assert.ok(payroll.includes("aibosPayrollRecordStatutoryPayment"));
+  assert.ok(payroll.includes("data-statutory-payment"));
+  assert.ok(payroll.includes("shericeri_get_payroll_statutory_balance"));
+  assert.ok(payroll.includes("shericeri_record_payroll_statutory_payment"));
+  assert.ok(payroll.includes("sessionStorage.getItem(storageKey)"));
 });
 
 test("payroll JavaScript parses", () => {
