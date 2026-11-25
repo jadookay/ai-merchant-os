@@ -10411,6 +10411,13 @@ printSaleTransaction=function(transactionId){
  window.__lastReceipt={business:state.merchant?.name||'Business',shopPhone:state.merchant?.phone||'',paperWidth:state.merchant?.receipt_paper_width||'58mm',cashier:sheriRecordActor(first),invoice:first.invoice_number||transactionId,createdAt:first.created_at,total,method:first.payment_method==='credit'?'On credit':first.payment_method==='momo'?'MoMo':'Cash',customerName:first.customer_name_snapshot||'',customerPhone:first.customer_phone_snapshot||'',dueDate:first.credit_due_date||'',note:first.receipt_note||'',items:rows.map(x=>({name:x.product_name_snapshot||product(x.product_id)?.name||'Product',qty:x.qty,price:x.price}))};
  printLastReceipt();window.__lastReceipt=previous;
 };
+const baseVoidSale=voidSale;
+voidSale=async function(id){
+ const row=(state.sales||[]).find(x=>x.id===id);const tx=row?.transaction_id||row?.id;
+ const receipts=(state.payments||[]).filter(p=>p.direction==='receipt'&&p.source_type==='sale_invoice'&&p.source_id===tx&&Number(p.amount||0)>0);
+ if(receipts.length)return sheriToast('This credit invoice has customer payments recorded. Refund or reverse those receipts before voiding the sale.','error');
+ return baseVoidSale(id);
+};
 function creditRows(){
  const map=new Map();
  for(const s of state.sales||[]){if(s.voided||s.voided_at||s.payment_method!=='credit'||!s.transaction_id)continue;let g=map.get(s.transaction_id);if(!g){g={id:s.transaction_id,invoice:s.invoice_number||s.transaction_id,name:s.customer_name_snapshot||'Customer',phone:s.customer_phone_snapshot||'',due:s.credit_due_date||'',total:0};map.set(s.transaction_id,g);}g.total+=Number(s.qty||0)*Number(s.price||0);}
