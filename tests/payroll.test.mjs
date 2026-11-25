@@ -251,3 +251,17 @@ test("Owner dashboard can record statutory payments against RRA and RSSB reminde
 test("payroll JavaScript parses", () => {
   assert.doesNotThrow(() => new Script(payroll, { filename: "payroll.js" }));
 });
+
+
+test("isolated preview exposes Rwanda payroll in Command Center without losing credit POS", () => {
+  const previewHtml = readFileSync(new URL("../preview-live/index.html", import.meta.url), "utf8");
+  const previewPayroll = readFileSync(new URL("../preview-live/payroll.js", import.meta.url), "utf8");
+  assert.ok(previewHtml.includes("onclick=\"show('payroll')\">Payroll</button>"));
+  assert.ok(previewHtml.includes("onclick=\"show('payroll')\"><h2>👥 Payroll</h2>"));
+  assert.ok(previewHtml.includes('id="payroll"'));
+  assert.ok(previewHtml.includes("businessInsight','payroll'"));
+  assert.ok(previewHtml.includes('src="payroll.js?v=1"'));
+  assert.ok(previewHtml.includes("aibos-credit-pos-v1"));
+  assert.ok(previewPayroll.includes("ensureStatutoryReminders"));
+  assert.ok(previewPayroll.includes("aibosPayrollRunAction"));
+});
