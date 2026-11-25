@@ -60,6 +60,12 @@ test("owner dashboard reminder generation is idempotent and dismissal does not m
   assert.ok(!payroll.includes("status:'paid'"));
 });
 
+test("Payroll headings and navigation react to the selected app language", () => {
+  assert.ok(payroll.includes("pageTitle"));
+  assert.ok(payroll.includes("translateHeader"));
+  assert.ok(payroll.includes("aibos:languagechange"));
+});
+
 test("payroll JavaScript parses", () => {
   assert.doesNotThrow(() => new Script(payroll, { filename: "payroll.js" }));
 });
