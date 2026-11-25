@@ -42,8 +42,8 @@ insert into public.chart_of_accounts(merchant_id,code,name,type,normal_balance,a
 select m.id,a.code,a.name,a.type,a.normal_balance,true,a.balance_sheet_class
 from public.merchants m
 cross join (values
- ('6300','Salaries and wages expense','expense','debit',null::text),
- ('6310','Employer payroll contributions expense','expense','debit',null::text),
+ ('6300','Salaries and wages expense','expense','debit','not_applicable'),
+ ('6310','Employer payroll contributions expense','expense','debit','not_applicable'),
  ('2210','Net salaries payable','liability','credit','current'),
  ('2220','PAYE payable','liability','credit','current'),
  ('2230','RSSB pension payable','liability','credit','current'),
