@@ -160,7 +160,7 @@
   }
   window.aibosPayrollEditEmployee=async function(id){
     try{
-      const {data:e,error}=await sb.from('payroll_employees').select('id,employment_type,base_salary,transport_allowance,casual_days_in_tax_period,casual_criteria_confirmed,compensation_effective_from').eq('id',id).eq('merchant_id',state.merchant.id).single();
+      const {data:e,error}=await sb.from('payroll_employees').select('id,employment_type,base_salary,transport_allowance,casual_days_in_tax_period,casual_criteria_confirmed,compensation_effective_from,rssb_member_number').eq('id',id).eq('merchant_id',state.merchant.id).single();
       if(error)throw error;
       const salaryText=prompt(t('salary'),String(e.base_salary));if(salaryText===null)return;
       const transportText=prompt(t('transport'),String(e.transport_allowance));if(transportText===null)return;
@@ -172,10 +172,11 @@
         casualDays=Number(daysText);if(!Number.isInteger(casualDays)||casualDays<1||casualDays>30)throw new Error('Casual engagement must be 1–30 days.');
         casualConfirmed=confirm(t('casualConfirm'));if(!casualConfirmed)throw new Error('RRA casual-labour eligibility must be confirmed.');
       }
+      const rssbNumber=prompt(t('rssb'),e.rssb_member_number||'');if(rssbNumber===null)return;
       const effective=prompt(t('compensationEffective'),e.compensation_effective_from||today());if(effective===null)return;
       const reason=prompt(t('compensationReason'),'Salary or allowance adjustment');if(reason===null)return;
       const {data:userData,error:userError}=await sb.auth.getUser();if(userError)throw userError;if(!userData?.user)throw new Error('Please sign in again.');
-      const row={base_salary:salary,transport_allowance:transport,compensation_effective_from:effective,compensation_change_reason:reason,casual_days_in_tax_period:e.employment_type==='casual'?casualDays:null,casual_criteria_confirmed:e.employment_type==='casual'&&casualConfirmed,updated_by:userData.user.id,updated_at:new Date().toISOString()};
+      const row={base_salary:salary,transport_allowance:transport,rssb_member_number:rssbNumber.trim()||null,compensation_effective_from:effective,compensation_change_reason:reason,casual_days_in_tax_period:e.employment_type==='casual'?casualDays:null,casual_criteria_confirmed:e.employment_type==='casual'&&casualConfirmed,updated_by:userData.user.id,updated_at:new Date().toISOString()};
       const {error:updateError}=await sb.from('payroll_employees').update(row).eq('id',id).eq('merchant_id',state.merchant.id);if(updateError)throw updateError;
       await loadEmployees();
       const status=document.getElementById('payrollSaveStatus');if(status)status.textContent=t('saved');
