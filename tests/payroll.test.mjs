@@ -9,6 +9,7 @@ const foundation = readFileSync(new URL("../supabase/migrations/20261125120000_r
 const restrictions = readFileSync(new URL("../supabase/migrations/20261125123000_restrict_payroll_workflow_writes.sql", import.meta.url), "utf8");
 const futurePension = readFileSync(new URL("../supabase/migrations/20261125130000_rwanda_future_pension_rates.sql", import.meta.url), "utf8");
 const workflows = readFileSync(new URL("../supabase/migrations/20261125140000_rwanda_payroll_run_workflows.sql", import.meta.url), "utf8");
+const compensationHistory = readFileSync(new URL("../supabase/migrations/20261125170000_payroll_compensation_history.sql", import.meta.url), "utf8");
 
 test("Payroll is reachable from AIBOS Command Center navigation and hub", () => {
   assert.ok(html.includes("onclick=\"show('payroll')\">Payroll</button>"));
@@ -143,6 +144,24 @@ test("RRA PAYE filing frequency is monthly by default and quarterly only when el
   assert.ok(payroll.includes("paye-monthly-"));
   assert.ok(payroll.includes("monthlyRelevant"));
   assert.ok(payroll.includes("quarterlyRelevant"));
+});
+
+test("Employee compensation edits are audited and history is tenant-protected", () => {
+  assert.ok(compensationHistory.includes("payroll_employee_compensation_history"));
+  assert.ok(compensationHistory.includes("enable row level security"));
+  assert.ok(compensationHistory.includes("private.user_can_access_merchant(merchant_id,'manage_payroll')"));
+  assert.ok(compensationHistory.includes("after insert or update of base_salary,transport_allowance,other_recurring_earnings"));
+  assert.ok(compensationHistory.includes("Initial compensation record"));
+  assert.ok(payroll.includes("aibosPayrollEditEmployee"));
+  assert.ok(payroll.includes("aibosPayrollCompensationHistory"));
+});
+
+test("Employees without RSSB numbers receive eight-day registration reminders", () => {
+  assert.ok(workflows.includes("rssb_registration_due"));
+  assert.ok(payroll.includes("rssb-registration-"));
+  assert.ok(payroll.includes("due.setDate(due.getDate()+7)"));
+  assert.ok(payroll.includes("rssbRegistrationTitle"));
+  assert.ok(payroll.includes("if(employee.rssb_member_number)"));
 });
 
 test("payroll JavaScript parses", () => {
