@@ -4,7 +4,8 @@
 alter table public.payroll_employees
   add column if not exists casual_days_in_tax_year integer,
   add column if not exists casual_criteria_confirmed boolean not null default false,
-  add column if not exists secondary_employer_confirmed boolean not null default false;
+  add column if not exists secondary_employer_confirmed boolean not null default false,
+  add column if not exists taxable_benefits_in_kind numeric(18,2) not null default 0;
 
 alter table public.payroll_pay_items
   add column if not exists other_taxable_earnings numeric(18,2) not null default 0,
@@ -12,13 +13,15 @@ alter table public.payroll_pay_items
   add column if not exists calculation_period date,
   add column if not exists maternity_employee numeric(18,2) not null default 0,
   add column if not exists maternity_employer numeric(18,2) not null default 0,
-  add column if not exists cbhi_employee numeric(18,2) not null default 0;
+  add column if not exists cbhi_employee numeric(18,2) not null default 0,
+  add column if not exists taxable_benefits_in_kind numeric(18,2) not null default 0;
 
 alter table public.payroll_pay_runs
   add column if not exists amount_paid_total numeric(18,2) not null default 0;
 alter table public.payroll_employees
   add constraint payroll_employees_casual_days_range
   check (casual_days_in_tax_year is null or casual_days_in_tax_year between 1 and 29);
+alter table public.payroll_employees add constraint payroll_employees_taxable_benefits_nonnegative check (taxable_benefits_in_kind>=0);
 alter table public.payroll_pay_items
   add constraint payroll_pay_items_rwanda_contributions_nonnegative
   check (maternity_employee>=0 and maternity_employer>=0 and cbhi_employee>=0);
@@ -105,6 +108,8 @@ declare
   v_run_id uuid;
   v_employee record;
   v_gross numeric(18,2);
+  v_taxable_income numeric(18,2);
+  v_benefits numeric(18,2);
   v_paye numeric(18,2);
   v_pension_rate numeric(8,6);
   v_pension_employee numeric(18,2);
@@ -173,7 +178,9 @@ begin
     where coalesce((x->>'taxable')::boolean,true);
 
     v_gross:=round(v_employee.base_salary+v_employee.transport_allowance+v_other,2);
-    if v_gross<0 then raise exception 'Invalid gross pay for employee %',v_employee.employee_number; end if;
+    v_benefits:=round(coalesce(v_employee.taxable_benefits_in_kind,0),2);
+    v_taxable_income:=round(v_gross+v_benefits,2);
+    if v_gross<0 or v_benefits<0 then raise exception 'Invalid gross pay for employee %',v_employee.employee_number; end if;
 
     if v_employee.employment_type='secondary_employer' and not v_employee.secondary_employer_confirmed then
       raise exception 'Confirm that this is not the employee primary employer before applying the 30% PAYE rate';
@@ -185,14 +192,14 @@ begin
         or v_employee.casual_days_in_tax_year>=30 then
         raise exception 'Casual employee % must have confirmed RRA eligibility and less than 30 days of engagement during the tax year and confirmed RRA eligibility',v_employee.employee_number;
       end if;
-      v_paye:=round(v_gross*0.15,2);
+      v_paye:=round(v_taxable_income*0.15,2);
     elsif v_employee.employment_type='secondary_employer' then
-      v_paye:=round(v_gross*0.30,2);
+      v_paye:=round(v_taxable_income*0.30,2);
     else
       v_paye:=round(
-        greatest(0,least(v_gross,100000)-60000)*0.10
-        + greatest(0,least(v_gross,200000)-100000)*0.20
-        + greatest(0,v_gross-200000)*0.30,2);
+        greatest(0,least(v_taxable_income,100000)-60000)*0.10
+        + greatest(0,least(v_taxable_income,200000)-100000)*0.20
+        + greatest(0,v_taxable_income-200000)*0.30,2);
     end if;
 
     select coalesce((r.configuration->>'employee_rate')::numeric,0.06)
@@ -208,11 +215,11 @@ begin
       when p_period_end>=date '2028-01-01' then 0.08
       when p_period_end>=date '2027-01-01' then 0.07
       else 0.06 end);
-    v_pension_employee:=round(v_gross*v_pension_rate,2);
+    v_pension_employee:=round(v_taxable_income*v_pension_rate,2);
     v_pension_employer:=v_pension_employee;
     -- Current RSSB Occupational Hazards basis is kept separate from pension;
-    -- this initial rule uses basic salary, excluding transport allowance.
-    v_hazards:=round((v_employee.base_salary+v_other)*0.02,2);
+    -- this rule uses gross remuneration excluding transport allowance, including taxable benefits.
+    v_hazards:=round((v_employee.base_salary+v_other+v_benefits)*0.02,2);
     select coalesce((r.configuration->>'employee_rate')::numeric,0.003),
            coalesce((r.configuration->>'employer_rate')::numeric,0.003)
     into v_maternity_rate,v_maternity_employer
@@ -222,7 +229,7 @@ begin
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
     v_maternity_rate:=coalesce(v_maternity_rate,0.003);
-    v_maternity_base:=v_employee.base_salary+v_other;
+    v_maternity_base:=v_employee.base_salary+v_other+v_benefits;
     v_maternity_employee:=round(v_maternity_base*v_maternity_rate,2);
     v_maternity_employer:=round(v_maternity_base*coalesce(v_maternity_employer,0.003),2);
     select coalesce((r.configuration->>'employee_rate')::numeric,0.005)
@@ -233,7 +240,7 @@ begin
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
     v_cbhi_rate:=coalesce(v_cbhi_rate,0.005);
-    v_cbhi:=round(greatest(0,v_gross-v_paye-v_pension_employee-v_pension_employer-v_hazards-v_maternity_employee-v_maternity_employer)*v_cbhi_rate,2);
+    v_cbhi:=round(greatest(0,v_taxable_income-v_paye-v_pension_employee-v_pension_employer-v_hazards-v_maternity_employee-v_maternity_employer)*v_cbhi_rate,2);
     v_net:=round(v_gross-v_paye-v_pension_employee-v_maternity_employee-v_cbhi,2);
     v_cost:=round(v_gross+v_pension_employer+v_hazards+v_maternity_employer,2);
     if v_net<0 then raise exception 'Deductions exceed gross pay for employee %',v_employee.employee_number; end if;
@@ -242,13 +249,14 @@ begin
       merchant_id,pay_run_id,employee_id,earnings,deductions,gross_pay,taxable_income,paye,
       pension_employee,pension_employer,occupational_hazards_employer,other_employee_deductions,
       net_pay,employer_cost,calculation_snapshot,other_taxable_earnings,casual_days_worked,calculation_period,payslip_number,
-      maternity_employee,maternity_employer,cbhi_employee
+      maternity_employee,maternity_employer,cbhi_employee,taxable_benefits_in_kind
     ) values (
       p_merchant_id,v_run_id,v_employee.id,
       jsonb_build_array(
         jsonb_build_object('type','basic_salary','amount',v_employee.base_salary),
         jsonb_build_object('type','transport_allowance','amount',v_employee.transport_allowance),
-        jsonb_build_object('type','other_taxable_earnings','amount',v_other)
+        jsonb_build_object('type','other_taxable_earnings','amount',v_other),
+        jsonb_build_object('type','taxable_benefits_in_kind','amount',v_benefits,'cash_payment',false)
       ),
       jsonb_build_array(
         jsonb_build_object('type','PAYE','amount',v_paye),
@@ -256,7 +264,7 @@ begin
         jsonb_build_object('type','maternity_employee','amount',v_maternity_employee),
         jsonb_build_object('type','cbhi_employee','amount',v_cbhi)
       ),
-      v_gross,v_gross,v_paye,v_pension_employee,v_pension_employer,v_hazards,0,
+      v_gross,v_taxable_income,v_paye,v_pension_employee,v_pension_employer,v_hazards,0,
       v_net,v_cost,
       jsonb_build_object('jurisdiction','RW','period_end',p_period_end,'employment_type',v_employee.employment_type,
         'paye_method',case when v_employee.employment_type='casual' then '15_percent_casual' when v_employee.employment_type='secondary_employer' then '30_percent_secondary' else 'progressive_monthly' end,
@@ -264,12 +272,12 @@ begin
         'occupational_hazards_rate',0.02,'occupational_hazards_base','gross_remuneration_excluding_transport',
         'maternity_employee_rate',v_maternity_rate,'maternity_employer_rate',0.003,'maternity_base','gross_salary_excluding_transport',
         'cbhi_employee_rate',v_cbhi_rate,'cbhi_base','gross_less_paye_total_pension_occupational_hazards_and_maternity_contributions',
-        'taxable_income_includes_transport',true),
+        'taxable_income_includes_transport',true,'taxable_benefits_in_kind',v_benefits,'cash_gross_pay',v_gross),
       v_other,
       case when v_employee.employment_type='casual' then v_employee.casual_days_in_tax_year else null end,
       p_period_end,
       'PS-'||trim(p_run_number)||'-'||v_employee.employee_number,
-      v_maternity_employee,v_maternity_employer,v_cbhi
+      v_maternity_employee,v_maternity_employer,v_cbhi,v_benefits
     );
     v_count:=v_count+1;
     v_gross_total:=v_gross_total+v_gross;
