@@ -19,7 +19,7 @@ test("Payroll is reachable from AIBOS Command Center navigation and hub", () => 
 test("Rwanda payroll page is multilingual and does not claim filing or posting is live", () => {
   for (const value of ["en:{", "rw:{", "fr:{", "PAYE", "RSSB Pension", "Occupational Hazards"])
     assert.ok(payroll.includes(value), "Missing payroll support: " + value);
-  assert.match(payroll, /does not submit declarations, pay salaries or post accounting journals/);
+  assert.match(payroll, /does not submit declarations, pay salaries, approve payroll or post accounting journals/);
 });
 
 test("PAYE estimator includes permanent, casual and secondary-employer classifications", () => {
