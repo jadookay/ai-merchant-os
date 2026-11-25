@@ -63,6 +63,27 @@ alter table public.payroll_reminders drop constraint if exists payroll_reminders
 alter table public.payroll_reminders add constraint payroll_reminders_reminder_type_check
   check (reminder_type in ('prepare_payroll','approve_payroll','pay_salaries','paye_due','pension_due','occupational_hazards_due','maternity_due','cbhi_due','other_statutory_due'));
 
+create table if not exists public.payroll_employer_settings (
+  merchant_id uuid primary key references public.merchants(id) on delete cascade,
+  paye_frequency text not null default 'monthly' check (paye_frequency in ('monthly','quarterly')),
+  annual_turnover numeric(18,2) check (annual_turnover is null or annual_turnover>=0),
+  quarterly_election_confirmed boolean not null default false,
+  updated_by uuid default auth.uid(),
+  updated_at timestamptz not null default now(),
+  check (paye_frequency<>'quarterly' or
+    (annual_turnover is not null and annual_turnover<200000000 and quarterly_election_confirmed))
+);
+alter table public.payroll_employer_settings enable row level security;
+grant select,insert,update on public.payroll_employer_settings to authenticated;
+create policy payroll_employer_settings_select on public.payroll_employer_settings
+  for select to authenticated using (private.user_can_access_merchant(merchant_id,'manage_payroll'));
+create policy payroll_employer_settings_insert on public.payroll_employer_settings
+  for insert to authenticated with check (private.user_can_access_merchant(merchant_id,'manage_payroll'));
+create policy payroll_employer_settings_update on public.payroll_employer_settings
+  for update to authenticated using (private.user_can_access_merchant(merchant_id,'manage_payroll'))
+  with check (private.user_can_access_merchant(merchant_id,'manage_payroll'));
+
+
 
 create or replace function public.shericeri_create_payroll_run(
   p_merchant_id uuid,
