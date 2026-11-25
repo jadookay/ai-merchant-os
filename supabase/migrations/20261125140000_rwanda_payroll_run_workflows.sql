@@ -64,7 +64,7 @@ on conflict (jurisdiction,rule_code,effective_from) do nothing;
 
 alter table public.payroll_reminders drop constraint if exists payroll_reminders_reminder_type_check;
 alter table public.payroll_reminders add constraint payroll_reminders_reminder_type_check
-  check (reminder_type in ('prepare_payroll','approve_payroll','pay_salaries','paye_due','pension_due','occupational_hazards_due','maternity_due','cbhi_due','other_statutory_due'));
+  check (reminder_type in ('prepare_payroll','approve_payroll','pay_salaries','paye_due','pension_due','occupational_hazards_due','maternity_due','cbhi_due','rssb_registration_due','other_statutory_due'));
 
 create table if not exists public.payroll_employer_settings (
   merchant_id uuid primary key references public.merchants(id) on delete cascade,
