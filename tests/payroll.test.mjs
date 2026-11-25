@@ -169,6 +169,19 @@ test("Employees without RSSB numbers receive eight-day registration reminders", 
   assert.ok(payroll.includes("if(employee.rssb_member_number)"));
 });
 
+test("Taxable benefits in kind flow into PAYE and statutory contribution bases without being paid as cash", () => {
+  assert.ok(workflows.includes("taxable_benefits_in_kind"));
+  assert.ok(workflows.includes("v_taxable_income:=round(v_gross+v_benefits,2)"));
+  assert.ok(workflows.includes("v_paye:=round(v_taxable_income*0.15,2)"));
+  assert.ok(workflows.includes("v_pension_employee:=round(v_taxable_income*v_pension_rate,2)"));
+  assert.ok(workflows.includes("cash_payment',false"));
+  assert.ok(workflows.includes("'cash_gross_pay',v_gross"));
+  assert.ok(compensationHistory.includes("taxable_benefits_in_kind"));
+  assert.ok(payroll.includes("payrollCalcBenefits"));
+  assert.ok(payroll.includes("payrollBenefits"));
+  assert.ok(payroll.includes("taxableBenefits"));
+});
+
 test("payroll JavaScript parses", () => {
   assert.doesNotThrow(() => new Script(payroll, { filename: "payroll.js" }));
 });
