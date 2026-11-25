@@ -58,7 +58,7 @@ values
   '{"period":"monthly","currency":"RWF","bands":[{"from":0,"to":60000,"rate":0},{"from":60000,"to":100000,"rate":0.10},{"from":100000,"to":200000,"rate":0.20},{"from":200000,"to":null,"rate":0.30}],"rounding":"RRA calculator method"}'::jsonb,
   'https://www.rra.gov.rw/en/domestic-tax-services/employment-tax-paye/calculate-paye','verified'),
  ('RW','PAYE_CASUAL','Rwanda PAYE - casual labour','2023-11-01',
-  '{"period":"monthly","currency":"RWF","bands":[{"from":0,"to":60000,"rate":0},{"from":60000,"to":null,"rate":0.15}],"eligibility_note":"Casual labour classification must satisfy current RRA legal definition"}'::jsonb,
+  '{"period":"monthly","currency":"RWF","flat_rate":0.15,"base":"taxable_employment_income","eligibility_note":"Apply 15% to taxable employment income only where the employee meets the RRA casual labourer definition and is engaged for no longer than 30 days in the tax period"}'::jsonb,
   'https://www.rra.gov.rw/fileadmin/user_upload/Brochure_PAYE_2024-Eng.pdf','verified'),
  ('RW','PAYE_SECONDARY','Rwanda PAYE - additional/secondary employer','2023-11-01',
   '{"period":"monthly","currency":"RWF","flat_rate":0.30,"eligibility_note":"Apply only where this employer is not the employee primary employer"}'::jsonb,
