@@ -149,6 +149,10 @@ begin
   if p_period_start is null or p_period_end is null or p_pay_date is null or p_period_end<p_period_start or p_pay_date<p_period_end then
     raise exception 'Payroll period and pay date are invalid; pay date cannot precede period end';
   end if;
+  if p_period_start<>date_trunc('month',p_period_start)::date
+     or p_period_end<>(date_trunc('month',p_period_start)+interval '1 month - 1 day')::date then
+    raise exception 'A payroll run must cover one complete calendar month; quarterly PAYE aggregates monthly payroll runs';
+  end if;
   if exists(select 1 from public.payroll_pay_runs where merchant_id=p_merchant_id and run_number=trim(p_run_number)) then
     select id into v_run_id from public.payroll_pay_runs
     where merchant_id=p_merchant_id and run_number=trim(p_run_number)
