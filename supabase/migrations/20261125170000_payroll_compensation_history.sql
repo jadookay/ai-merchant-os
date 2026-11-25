@@ -10,6 +10,7 @@ create table if not exists public.payroll_employee_compensation_history (
   effective_from date not null,
   base_salary numeric(18,2) not null check (base_salary>=0),
   transport_allowance numeric(18,2) not null check (transport_allowance>=0),
+  taxable_benefits_in_kind numeric(18,2) not null default 0 check (taxable_benefits_in_kind>=0),
   other_recurring_earnings jsonb not null default '[]'::jsonb check (jsonb_typeof(other_recurring_earnings)='array'),
   change_reason text,
   changed_by uuid,
@@ -36,15 +37,16 @@ begin
   else
     v_changed:=old.base_salary is distinct from new.base_salary
       or old.transport_allowance is distinct from new.transport_allowance
+      or old.taxable_benefits_in_kind is distinct from new.taxable_benefits_in_kind
       or old.other_recurring_earnings is distinct from new.other_recurring_earnings;
   end if;
   if v_changed then
     insert into public.payroll_employee_compensation_history(
-      merchant_id,employee_id,effective_from,base_salary,transport_allowance,
+      merchant_id,employee_id,effective_from,base_salary,transport_allowance,taxable_benefits_in_kind,
       other_recurring_earnings,change_reason,changed_by
     ) values (
       new.merchant_id,new.id,coalesce(new.compensation_effective_from,new.hire_date),
-      new.base_salary,new.transport_allowance,new.other_recurring_earnings,
+      new.base_salary,new.transport_allowance,new.taxable_benefits_in_kind,new.other_recurring_earnings,
       coalesce(nullif(trim(new.compensation_change_reason),''),case when tg_op='INSERT' then 'Initial compensation record' else 'Compensation update' end),
       auth.uid()
     );
@@ -55,7 +57,7 @@ $$;
 revoke all on function private.log_payroll_compensation_change() from public,anon,authenticated;
 drop trigger if exists payroll_employee_compensation_audit on public.payroll_employees;
 create trigger payroll_employee_compensation_audit
-after insert or update of base_salary,transport_allowance,other_recurring_earnings
+after insert or update of base_salary,transport_allowance,taxable_benefits_in_kind,other_recurring_earnings
 on public.payroll_employees
 for each row execute function private.log_payroll_compensation_change();
 comment on table public.payroll_employee_compensation_history is 'Append-only history of employee compensation changes; accessible only to members with manage_payroll.';
