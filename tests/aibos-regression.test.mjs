@@ -652,3 +652,12 @@ test("credit-sale migration preserves default cash behavior and reclassifies MoM
     "grant execute on function public.shericeri_record_customer_receipt"
   ]) assert.ok(creditPosMigration.includes(value), "Missing accounting safeguard: "+value);
 });
+
+
+test("credit invoices with collected receipts cannot be voided before refund or reversal", () => {
+  const guard = readFileSync(new URL("../supabase/migrations/20261125193000_guard_void_credit_sales_with_receipts.sql", import.meta.url), "utf8");
+  assert.ok(previewHtml.includes("Refund or reverse those receipts before voiding the sale."));
+  assert.ok(guard.includes("source_type='sale_invoice'"));
+  assert.ok(guard.includes("aibos_guard_credit_sale_void"));
+  assert.ok(guard.includes("before update of voided on public.sales"));
+});
