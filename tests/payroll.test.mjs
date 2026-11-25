@@ -31,7 +31,7 @@ test("Rwanda payroll page is multilingual and keeps tax declarations and money t
   assert.ok(payroll.includes("max=\"29\""));
   assert.ok(payroll.includes("secondaryConfirm"));
   assert.ok(payroll.includes("maternityEmployee=Math.round((basic+otherRecurring+benefits)*.003)"));
-  assert.ok(payroll.includes("cbhi=Math.round(Math.max(0,taxableIncome-paye-employeePension-employerPension-hazards-maternityEmployee-maternityEmployer)*.005)"));
+  assert.ok(payroll.includes("cbhi=Math.round(Math.max(0,gross-paye-employeePension-maternityEmployee)*.005)"));
 });
 
 test("PAYE estimator includes permanent, casual and secondary-employer classifications", () => {
@@ -95,6 +95,19 @@ test("Payroll headings and navigation react to the selected app language", () =>
   assert.ok(payroll.includes("host.dataset.lang!==lang()"));
   for (const key of ["maternityTitle","cbhiTitle","payeTitleReminder","maternityTitleReminder","cbhiTitleReminder"])
     assert.ok((payroll.match(new RegExp(key+':','g'))||[]).length>=3,key+" must be translated in all three languages");
+});
+
+test("CBHI uses employee net cash salary before CBHI and does not subtract employer contributions", () => {
+  assert.ok(workflows.includes("v_gross-v_paye-v_pension_employee-v_maternity_employee"));
+  assert.ok(workflows.includes("cash_gross_less_paye_employee_pension_and_maternity_contributions"));
+  assert.ok(!workflows.includes("v_taxable_income-v_paye-v_pension_employee-v_pension_employer-v_hazards-v_maternity_employee-v_maternity_employer"));
+  assert.ok(payroll.includes("Math.max(0,gross-paye-employeePension-maternityEmployee)*.005"));
+});
+
+test("RSSB employee registration reminder reflects the seven-day statutory period", () => {
+  assert.ok(payroll.includes("within 7 days after employment starts"));
+  assert.ok(payroll.includes("dans les 7 jours suivant le début de l’emploi"));
+  assert.ok(payroll.includes("due.setDate(due.getDate()+7)"));
 });
 
 test("Payroll workflow RPCs create, submit, approve, post and pay with server-side authorization", () => {
