@@ -72,10 +72,11 @@ begin
  where r.merchant_id=p_merchant_id
    and r.status in ('posted','partially_paid','paid')
    and r.period_start>=p_period_start and r.period_end<=p_period_end;
- select coalesce(sum(amount),0) into v_paid
- from public.payroll_statutory_payments
- where merchant_id=p_merchant_id and contribution_type=p_contribution_type
-   and period_start=p_period_start and period_end=p_period_end and status='recorded';
+ select coalesce(sum(p.amount),0) into v_paid
+ from public.payroll_statutory_payments p
+ join public.journal_entries j on j.id=p.journal_entry_id and j.merchant_id=p.merchant_id and j.voided=false
+ where p.merchant_id=p_merchant_id and p.contribution_type=p_contribution_type
+   and p.period_start=p_period_start and p.period_end=p_period_end and p.status='recorded';
  return query select v_expected,v_paid,greatest(0,v_expected-v_paid);
 end;
 $$;
@@ -149,10 +150,11 @@ begin
  where r.merchant_id=p_merchant_id
    and r.status in ('posted','partially_paid','paid')
    and r.period_start>=p_period_start and r.period_end<=p_period_end;
- select coalesce(sum(amount),0) into v_paid
- from public.payroll_statutory_payments
- where merchant_id=p_merchant_id and contribution_type=p_contribution_type
-   and period_start=p_period_start and period_end=p_period_end and status='recorded';
+ select coalesce(sum(p.amount),0) into v_paid
+ from public.payroll_statutory_payments p
+ join public.journal_entries j on j.id=p.journal_entry_id and j.merchant_id=p.merchant_id and j.voided=false
+ where p.merchant_id=p_merchant_id and p.contribution_type=p_contribution_type
+   and p.period_start=p_period_start and p.period_end=p_period_end and p.status='recorded';
  v_outstanding:=greatest(0,v_expected-v_paid);
  if v_expected<=0 then raise exception 'No posted payroll liability exists for the selected statutory period'; end if;
  if p_amount>v_outstanding then raise exception 'Payment exceeds outstanding statutory liability of % RWF',v_outstanding; end if;
