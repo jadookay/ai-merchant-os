@@ -7,6 +7,7 @@ const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const payroll = readFileSync(new URL("../payroll.js", import.meta.url), "utf8");
 const foundation = readFileSync(new URL("../supabase/migrations/20261125120000_rwanda_payroll_foundation.sql", import.meta.url), "utf8");
 const restrictions = readFileSync(new URL("../supabase/migrations/20261125123000_restrict_payroll_workflow_writes.sql", import.meta.url), "utf8");
+const futurePension = readFileSync(new URL("../supabase/migrations/20261125130000_rwanda_future_pension_rates.sql", import.meta.url), "utf8");
 
 test("Payroll is reachable from AIBOS Command Center navigation and hub", () => {
   assert.ok(html.includes("onclick=\"show('payroll')\">Payroll</button>"));
@@ -45,6 +46,12 @@ test("Rwanda PAYE and pension rules are effective-dated", () => {
   assert.ok(foundation.includes("'RSSB_PENSION'"));
   assert.ok(foundation.includes("'2025-01-01'"));
   assert.ok(foundation.includes("'RSSB_OCCUPATIONAL_HAZARDS'"));
+  for (const [date,rate] of [["2027-01-01","0.07"],["2028-01-01","0.08"],["2029-01-01","0.09"],["2030-01-01","0.10"]]) {
+    assert.ok(futurePension.includes(date));
+    assert.ok(futurePension.includes(rate));
+  }
+  assert.ok(payroll.includes("period>='2030-01' ? 0.20"));
+  assert.ok(payroll.includes("period>='2027-01' ? 0.14"));
 });
 
 test("payroll run, payslip item, salary payment and reminder writes are not exposed directly", () => {
