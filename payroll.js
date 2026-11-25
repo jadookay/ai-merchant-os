@@ -49,6 +49,7 @@
       <div class="card"><strong>Occupational Hazards</strong><div class="sub">2% employer contribution. Separate declaration and payment required from November 2026.</div></div>
     </div><div id="payrollRuleStatus" class="sub" style="margin-top:10px"></div><div class="sub" style="margin-top:8px">${t('verify')}</div></div>
   `;
+  host.dataset.lang=lang();
   const saveBtn=document.getElementById('payrollSave');
   saveBtn.addEventListener('click',saveEmployee);
   document.getElementById('payrollCalculate').addEventListener('click',calculate);
@@ -142,10 +143,9 @@
     }catch(e){panel.style.display='none'}
   }
   const oldShow=window.show;
-  if(typeof oldShow==='function')window.show=function(view,...args){oldShow(view,...args);if(view==='payroll'){loadEmployees();loadRules()}if(view==='dashboard')loadDashboardReminders()};
+  if(typeof oldShow==='function')window.show=function(view,...args){oldShow(view,...args);if(view==='payroll'){if(host.dataset.lang!==lang()){location.reload();return}loadEmployees();loadRules()}if(view==='dashboard')loadDashboardReminders()};
   const languageControl=document.getElementById('aibosLanguageSelect')||document.querySelector('#aibosLanguageSwitcher select');
   const refreshLanguage=()=>{translateHeader();if(document.getElementById('payroll')?.classList.contains('active'))location.reload()};
-  if(languageControl)languageControl.addEventListener('change',refreshLanguage);
   window.addEventListener('aibos:languagechange',refreshLanguage);
   window.aibosPayrollRefresh=()=>{loadEmployees();loadRules();loadDashboardReminders()};
   translateHeader();
