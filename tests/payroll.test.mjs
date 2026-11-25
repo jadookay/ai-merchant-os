@@ -76,6 +76,7 @@ test("Payroll headings and navigation react to the selected app language", () =>
   assert.ok(payroll.includes("translateHeader"));
   assert.ok(payroll.includes("aibos:languagechange"));
   assert.ok(payroll.includes("getElementById('aibosLanguageSelect')"));
+  assert.ok(payroll.includes("host.dataset.lang!==lang()"));
 });
 
 test("payroll JavaScript parses", () => {
