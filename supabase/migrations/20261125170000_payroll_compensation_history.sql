@@ -28,11 +28,17 @@ language plpgsql
 security definer
 set search_path=''
 as $$
+declare
+  v_changed boolean := false;
 begin
-  if tg_op='INSERT'
-     or old.base_salary is distinct from new.base_salary
-     or old.transport_allowance is distinct from new.transport_allowance
-     or old.other_recurring_earnings is distinct from new.other_recurring_earnings then
+  if tg_op='INSERT' then
+    v_changed:=true;
+  else
+    v_changed:=old.base_salary is distinct from new.base_salary
+      or old.transport_allowance is distinct from new.transport_allowance
+      or old.other_recurring_earnings is distinct from new.other_recurring_earnings;
+  end if;
+  if v_changed then
     insert into public.payroll_employee_compensation_history(
       merchant_id,employee_id,effective_from,base_salary,transport_allowance,
       other_recurring_earnings,change_reason,changed_by
