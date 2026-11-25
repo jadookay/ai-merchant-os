@@ -8,7 +8,10 @@ alter table public.payroll_employees
 alter table public.payroll_pay_items
   add column if not exists other_taxable_earnings numeric(18,2) not null default 0,
   add column if not exists casual_days_worked integer,
-  add column if not exists calculation_period date;
+  add column if not exists calculation_period date,
+  add column if not exists maternity_employee numeric(18,2) not null default 0,
+  add column if not exists maternity_employer numeric(18,2) not null default 0,
+  add column if not exists cbhi_employee numeric(18,2) not null default 0;
 
 alter table public.payroll_pay_runs
   add column if not exists amount_paid_total numeric(18,2) not null default 0;
@@ -31,9 +34,26 @@ cross join (values
  ('2210','Net salaries payable','liability','credit','current'),
  ('2220','PAYE payable','liability','credit','current'),
  ('2230','RSSB pension payable','liability','credit','current'),
- ('2240','RSSB occupational hazards payable','liability','credit','current')
+ ('2240','RSSB occupational hazards payable','liability','credit','current'),
+ ('2250','RSSB maternity benefits payable','liability','credit','current'),
+ ('2260','CBHI contributions payable','liability','credit','current')
 ) a(code,name,type,normal_balance,balance_sheet_class)
 on conflict (merchant_id,code) do nothing;
+
+insert into public.payroll_rule_sets(jurisdiction,rule_code,display_name,effective_from,configuration,source_url,verification_status)
+values
+ ('RW','MATERNITY_LEAVE','Maternity leave benefits contribution','2026-01-01',
+  '{"employee_rate":0.003,"employer_rate":0.003,"total_rate":0.006,"base":"gross_salary_excluding_transport_allowance","declaration_frequency":"monthly"}'::jsonb,
+  'https://www.rssb.rw/fileadmin/Occupational_Hazards/final_2019_english_rssb_booklet_9_0.pdf','verified'),
+ ('RW','CBHI','Community-based health insurance contribution','2026-02-23',
+  '{"employee_rate":0.005,"employer_rate":0,"base":"net_salary_after_paye_pension_and_maternity","declaration_frequency":"monthly"}'::jsonb,
+  'https://www.rra.gov.rw/en/domestic-tax-services/rssb-contributions/cbhi-contribution','verified')
+on conflict (jurisdiction,rule_code,effective_from) do nothing;
+
+alter table public.payroll_reminders drop constraint if exists payroll_reminders_reminder_type_check;
+alter table public.payroll_reminders add constraint payroll_reminders_reminder_type_check
+  check (reminder_type in ('prepare_payroll','approve_payroll','pay_salaries','paye_due','pension_due','occupational_hazards_due','maternity_due','cbhi_due','other_statutory_due'));
+
 
 create or replace function public.shericeri_create_payroll_run(
   p_merchant_id uuid,
@@ -56,6 +76,12 @@ declare
   v_pension_employee numeric(18,2);
   v_pension_employer numeric(18,2);
   v_hazards numeric(18,2);
+  v_maternity_employee numeric(18,2);
+  v_maternity_employer numeric(18,2);
+  v_cbhi numeric(18,2);
+  v_maternity_rate numeric(8,6);
+  v_cbhi_rate numeric(8,6);
+  v_maternity_base numeric(18,2);
   v_net numeric(18,2);
   v_cost numeric(18,2);
   v_other numeric(18,2);
@@ -143,14 +169,36 @@ begin
     -- Current RSSB Occupational Hazards basis is kept separate from pension;
     -- this initial rule uses basic salary, excluding transport allowance.
     v_hazards:=round((v_employee.base_salary+v_other)*0.02,2);
-    v_net:=round(v_gross-v_paye-v_pension_employee,2);
-    v_cost:=round(v_gross+v_pension_employer+v_hazards,2);
+    select coalesce((r.configuration->>'employee_rate')::numeric,0.003),
+           coalesce((r.configuration->>'employer_rate')::numeric,0.003)
+    into v_maternity_rate,v_maternity_employer
+    from public.payroll_rule_sets r
+    where r.jurisdiction='RW' and r.rule_code='MATERNITY_LEAVE'
+      and r.effective_from<=p_period_end
+      and (r.effective_to is null or r.effective_to>=p_period_end)
+    order by r.effective_from desc limit 1;
+    v_maternity_rate:=coalesce(v_maternity_rate,0.003);
+    v_maternity_base:=v_employee.base_salary+v_other;
+    v_maternity_employee:=round(v_maternity_base*v_maternity_rate,2);
+    v_maternity_employer:=round(v_maternity_base*coalesce(v_maternity_employer,0.003),2);
+    select coalesce((r.configuration->>'employee_rate')::numeric,0.005)
+    into v_cbhi_rate
+    from public.payroll_rule_sets r
+    where r.jurisdiction='RW' and r.rule_code='CBHI'
+      and r.effective_from<=p_period_end
+      and (r.effective_to is null or r.effective_to>=p_period_end)
+    order by r.effective_from desc limit 1;
+    v_cbhi_rate:=coalesce(v_cbhi_rate,0.005);
+    v_cbhi:=round(greatest(0,v_gross-v_paye-v_pension_employee-v_maternity_employee)*v_cbhi_rate,2);
+    v_net:=round(v_gross-v_paye-v_pension_employee-v_maternity_employee-v_cbhi,2);
+    v_cost:=round(v_gross+v_pension_employer+v_hazards+v_maternity_employer,2);
     if v_net<0 then raise exception 'Deductions exceed gross pay for employee %',v_employee.employee_number; end if;
 
     insert into public.payroll_pay_items(
       merchant_id,pay_run_id,employee_id,earnings,deductions,gross_pay,taxable_income,paye,
       pension_employee,pension_employer,occupational_hazards_employer,other_employee_deductions,
-      net_pay,employer_cost,calculation_snapshot,other_taxable_earnings,casual_days_worked,calculation_period,payslip_number
+      net_pay,employer_cost,calculation_snapshot,other_taxable_earnings,casual_days_worked,calculation_period,payslip_number,
+      maternity_employee,maternity_employer,cbhi_employee
     ) values (
       p_merchant_id,v_run_id,v_employee.id,
       jsonb_build_array(
@@ -160,7 +208,9 @@ begin
       ),
       jsonb_build_array(
         jsonb_build_object('type','PAYE','amount',v_paye),
-        jsonb_build_object('type','employee_pension','amount',v_pension_employee)
+        jsonb_build_object('type','employee_pension','amount',v_pension_employee),
+        jsonb_build_object('type','maternity_employee','amount',v_maternity_employee),
+        jsonb_build_object('type','cbhi_employee','amount',v_cbhi)
       ),
       v_gross,v_gross,v_paye,v_pension_employee,v_pension_employer,v_hazards,0,
       v_net,v_cost,
@@ -168,16 +218,19 @@ begin
         'paye_method',case when v_employee.employment_type='casual' then '15_percent_casual' when v_employee.employment_type='secondary_employer' then '30_percent_secondary' else 'progressive_monthly' end,
         'pension_employee_rate',v_pension_rate,'pension_employer_rate',v_pension_rate,
         'occupational_hazards_rate',0.02,'occupational_hazards_base','gross_remuneration_excluding_transport',
+        'maternity_employee_rate',v_maternity_rate,'maternity_employer_rate',0.003,'maternity_base','gross_salary_excluding_transport',
+        'cbhi_employee_rate',v_cbhi_rate,'cbhi_base','net_salary_after_paye_pension_and_maternity',
         'taxable_income_includes_transport',true),
       v_other,
       case when v_employee.employment_type='casual' then v_employee.casual_days_in_tax_period else null end,
       p_period_end,
-      'PS-'||trim(p_run_number)||'-'||v_employee.employee_number
+      'PS-'||trim(p_run_number)||'-'||v_employee.employee_number,
+      v_maternity_employee,v_maternity_employer,v_cbhi
     );
     v_count:=v_count+1;
     v_gross_total:=v_gross_total+v_gross;
-    v_deductions_total:=v_deductions_total+v_paye+v_pension_employee;
-    v_employer_total:=v_employer_total+v_pension_employer+v_hazards;
+    v_deductions_total:=v_deductions_total+v_paye+v_pension_employee+v_maternity_employee+v_cbhi;
+    v_employer_total:=v_employer_total+v_pension_employer+v_hazards+v_maternity_employer;
     v_net_total:=v_net_total+v_net;
   end loop;
 
@@ -233,8 +286,9 @@ as $$
 declare
  v_run public.payroll_pay_runs%rowtype;
  v_journal uuid;
- v_salary uuid; v_employer_exp uuid; v_net_payable uuid; v_paye_payable uuid; v_pension_payable uuid; v_oh_payable uuid;
+ v_salary uuid; v_employer_exp uuid; v_net_payable uuid; v_paye_payable uuid; v_pension_payable uuid; v_oh_payable uuid; v_maternity_payable uuid; v_cbhi_payable uuid;
  v_pension_emp numeric(18,2); v_pension_er numeric(18,2); v_oh numeric(18,2);
+ v_maternity_emp numeric(18,2); v_maternity_er numeric(18,2); v_cbhi numeric(18,2);
  v_lines jsonb;
 begin
  if not private.user_can_access_merchant(p_merchant_id,'manage_finance') then raise exception 'Finance posting permission is required'; end if;
@@ -251,22 +305,27 @@ begin
  select id into v_paye_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2220' and active and type='liability' and normal_balance='credit';
  select id into v_pension_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2230' and active and type='liability' and normal_balance='credit';
  select id into v_oh_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2240' and active and type='liability' and normal_balance='credit';
- if v_salary is null or v_employer_exp is null or v_net_payable is null or v_paye_payable is null or v_pension_payable is null or v_oh_payable is null then
+ select id into v_maternity_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2250' and active and type='liability' and normal_balance='credit';
+ select id into v_cbhi_payable from public.chart_of_accounts where merchant_id=p_merchant_id and code='2260' and active and type='liability' and normal_balance='credit';
+ if v_salary is null or v_employer_exp is null or v_net_payable is null or v_paye_payable is null or v_pension_payable is null or v_oh_payable is null or v_maternity_payable is null or v_cbhi_payable is null then
    raise exception 'Payroll chart-of-account mapping is incomplete; no journal was posted';
  end if;
- select coalesce(sum(pension_employee),0),coalesce(sum(pension_employer),0),coalesce(sum(occupational_hazards_employer),0)
- into v_pension_emp,v_pension_er,v_oh
+ select coalesce(sum(pension_employee),0),coalesce(sum(pension_employer),0),coalesce(sum(occupational_hazards_employer),0),
+        coalesce(sum(maternity_employee),0),coalesce(sum(maternity_employer),0),coalesce(sum(cbhi_employee),0)
+ into v_pension_emp,v_pension_er,v_oh,v_maternity_emp,v_maternity_er,v_cbhi
  from public.payroll_pay_items where pay_run_id=p_run_id and merchant_id=p_merchant_id;
  v_journal:=gen_random_uuid();
  v_lines:='[]'::jsonb;
  if v_run.gross_total>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_salary,'debit',v_run.gross_total,'credit',0,'memo','Gross salaries and wages')); end if;
- if v_pension_er+v_oh>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_employer_exp,'debit',v_pension_er+v_oh,'credit',0,'memo','Employer pension and occupational hazards')); end if;
+ if v_pension_er+v_oh+v_maternity_er>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_employer_exp,'debit',v_pension_er+v_oh+v_maternity_er,'credit',0,'memo','Employer pension, maternity and occupational hazards')); end if;
  if v_run.net_pay_total>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_net_payable,'debit',0,'credit',v_run.net_pay_total,'memo','Net salaries payable')); end if;
  if exists(select 1 from public.payroll_pay_items where pay_run_id=p_run_id and paye>0) then
    v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_paye_payable,'debit',0,'credit',(select sum(paye) from public.payroll_pay_items where pay_run_id=p_run_id),'memo','PAYE payable'));
  end if;
  if v_pension_emp+v_pension_er>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_pension_payable,'debit',0,'credit',v_pension_emp+v_pension_er,'memo','RSSB pension payable')); end if;
  if v_oh>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_oh_payable,'debit',0,'credit',v_oh,'memo','RSSB occupational hazards payable')); end if;
+ if v_maternity_emp+v_maternity_er>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_maternity_payable,'debit',0,'credit',v_maternity_emp+v_maternity_er,'memo','RSSB maternity benefits payable')); end if;
+ if v_cbhi>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_cbhi_payable,'debit',0,'credit',v_cbhi,'memo','CBHI employee contribution payable')); end if;
  insert into public.journal_entries(id,merchant_id,entry_date,description,source_type,source_id,created_by)
  values(v_journal,p_merchant_id,v_run.period_end,'Payroll accrual - '||v_run.run_number,'payroll_run',p_run_id,auth.uid());
  insert into public.journal_lines(merchant_id,journal_entry_id,account_id,debit,credit,memo)
