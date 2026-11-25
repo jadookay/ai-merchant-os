@@ -179,6 +179,9 @@ test("Taxable benefits in kind flow into PAYE and statutory contribution bases w
   assert.ok(compensationHistory.includes("taxable_benefits_in_kind"));
   assert.ok(payroll.includes("payrollCalcBenefits"));
   assert.ok(payroll.includes("payrollBenefits"));
+  assert.ok(payroll.includes("payrollCalcOther"));
+  assert.ok(payroll.includes("other_recurring_earnings:otherRecurring>0"));
+  assert.ok(compensationHistory.includes("old.taxable_benefits_in_kind is distinct from new.taxable_benefits_in_kind"));
   assert.ok(payroll.includes("taxableBenefits"));
 });
 
