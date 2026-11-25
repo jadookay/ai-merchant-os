@@ -131,6 +131,20 @@ test("Payroll chart-of-account mappings are validated and salary journals use de
   assert.ok(workflows.includes("'CBHI'"));
 });
 
+test("RRA PAYE filing frequency is monthly by default and quarterly only when eligible and elected", () => {
+  assert.ok(workflows.includes("create table if not exists public.payroll_employer_settings"));
+  assert.ok(workflows.includes("paye_frequency in ('monthly','quarterly')"));
+  assert.ok(workflows.includes("annual_turnover<200000000"));
+  assert.ok(workflows.includes("quarterly_election_confirmed"));
+  assert.ok(workflows.includes("private.user_can_access_merchant(merchant_id,'manage_payroll')"));
+  assert.ok(payroll.includes("frequency==='quarterly'&&(turnover===null||turnover>=200000000||!confirmed)"));
+  assert.ok(payroll.includes("settings?.paye_frequency==='quarterly'"));
+  assert.ok(payroll.includes("paye-quarterly-"));
+  assert.ok(payroll.includes("paye-monthly-"));
+  assert.ok(payroll.includes("monthlyRelevant"));
+  assert.ok(payroll.includes("quarterlyRelevant"));
+});
+
 test("payroll JavaScript parses", () => {
   assert.doesNotThrow(() => new Script(payroll, { filename: "payroll.js" }));
 });
