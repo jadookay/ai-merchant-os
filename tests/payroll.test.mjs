@@ -27,6 +27,8 @@ test("Rwanda payroll page is multilingual and keeps tax declarations and money t
   assert.ok(payroll.includes("aibosPayrollRunAction"));
   assert.ok(payroll.includes("aibosPayrollPayRun"));
   assert.ok(payroll.includes("aibosPayrollPayslips"));
+  assert.ok(payroll.includes("max=\"29\""));
+  assert.ok(payroll.includes("secondaryConfirm"));
   assert.ok(payroll.includes("maternityEmployee=Math.round(basic*.003)"));
   assert.ok(payroll.includes("cbhi=Math.round(Math.max(0,gross-paye-employeePension-maternityEmployee)*.005)"));
 });
@@ -108,6 +110,9 @@ test("Payroll workflow RPCs create, submit, approve, post and pay with server-si
   }
   assert.ok(workflows.includes("private.user_can_access_merchant(p_merchant_id,'manage_payroll')"));
   assert.ok(workflows.includes("private.user_can_access_merchant(p_merchant_id,'manage_finance')"));
+  assert.ok(workflows.includes("casual_days_in_tax_year between 1 and 29"));
+  assert.ok(workflows.includes("secondary_employer_confirmed"));
+  assert.ok(workflows.includes("less than 30 days of engagement during the tax year"));
   assert.ok(workflows.includes("status='approved'"));
   assert.ok(workflows.includes("source_type,source_id,created_by"));
   assert.ok(workflows.includes("payroll_run"));
