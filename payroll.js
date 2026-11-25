@@ -46,7 +46,7 @@
       <div><label>${t('period')}</label><input id="payrollCalcPeriod" type="month" value="${new Date().toISOString().slice(0,7)}"></div>
       <div><label>${t('basic')}</label><input id="payrollCalcBasic" type="number" min="0" value="300000"></div>
       <div><label>${t('transport')}</label><input id="payrollCalcTransport" type="number" min="0" value="0"></div>
-      <div><label>${t('otherRecurring')}</label><input id="payrollCalcOther' type="number" min="0" value="0"></div>
+      <div><label>${t('otherRecurring')}</label><input id="payrollCalcOther" type="number" min="0" value="0"></div>
       <div><label>${t('taxableBenefits')}</label><input id="payrollCalcBenefits" type="number" min="0" value="0"><div class="sub">${t('benefitHelp')}</div></div>
       <div style="display:flex;align-items:end"><button class="btn" id="payrollCalculate">${t('calc')}</button></div>
     </div><div id="payrollCalcResult" style="margin-top:14px"></div></div>
@@ -194,9 +194,9 @@
     const panel=document.getElementById('payrollRunDetails');if(!panel)return;
     panel.textContent=t('loading');
     try{
-      const {data,error}=await sb.from('payroll_employee_compensation_history').select('effective_from,base_salary,transport_allowance,taxable_benefits_in_kind,change_reason,changed_at').eq('merchant_id',state.merchant.id).eq('employee_id',id).order('effective_from',{ascending:false});
+      const {data,error}=await sb.from('payroll_employee_compensation_history').select('effective_from,base_salary,transport_allowance,other_recurring_earnings,taxable_benefits_in_kind,change_reason,changed_at').eq('merchant_id',state.merchant.id).eq('employee_id',id).order('effective_from',{ascending:false});
       if(error)throw error;
-      panel.innerHTML='<strong>'+t('compensationHistory')+'</strong><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>'+t('compensationEffective')+'</th><th>'+t('salary')+'</th><th>'+t('transport')+'</th><th>'+t('taxableBenefits')+'</th><th>'+t('compensationReason')+'</th></tr></thead><tbody>'+((data||[]).map(x=>'<tr><td>'+esc(x.effective_from)+'</td><td>'+money(x.base_salary)+'</td><td>'+money(x.transport_allowance)+'</td><td>'+esc(x.change_reason||'')+'</td></tr>').join('')||'<tr><td colspan="5">'+t('noHistory')+'</td></tr>')+'</tbody></table></div>';
+      panel.innerHTML='<strong>'+t('compensationHistory')+'</strong><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>'+t('compensationEffective')+'</th><th>'+t('salary')+'</th><th>'+t('transport')+'</th><th>'+t('otherRecurring')+'</th><th>'+t('taxableBenefits')+'</th><th>'+t('compensationReason')+'</th></tr></thead><tbody>'+((data||[]).map(x=>'<tr><td>'+esc(x.effective_from)+'</td><td>'+money(x.base_salary)+'</td><td>'+money(x.transport_allowance)+'</td><td>'+esc(x.change_reason||'')+'</td></tr>').join('')||'<tr><td colspan="6">'+t('noHistory')+'</td></tr>')+'</tbody></table></div>';
       panel.scrollIntoView({behavior:'smooth',block:'nearest'});
     }catch(e){panel.textContent='History unavailable: '+(e.message||String(e))}
   };
