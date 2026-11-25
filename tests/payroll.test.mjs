@@ -26,6 +26,8 @@ test("Rwanda payroll page is multilingual and keeps tax declarations and money t
   assert.ok(payroll.includes("aibosPayrollRunAction"));
   assert.ok(payroll.includes("aibosPayrollPayRun"));
   assert.ok(payroll.includes("aibosPayrollPayslips"));
+  assert.ok(payroll.includes("maternityEmployee=Math.round(basic*.003)"));
+  assert.ok(payroll.includes("cbhi=Math.round(Math.max(0,gross-paye-employeePension-maternityEmployee)*.005)"));
 });
 
 test("PAYE estimator includes permanent, casual and secondary-employer classifications", () => {
@@ -74,6 +76,10 @@ test("owner dashboard reminder generation is idempotent and dismissal does not m
   assert.ok(payroll.includes("reminder_type:'pay_salaries'"));
   assert.ok(payroll.includes("reminder_type:'approve_payroll'"));
   assert.ok(payroll.includes("reminder_type:'prepare_payroll'"));
+  assert.ok(payroll.includes("maternity_due"));
+  assert.ok(payroll.includes("cbhi_due"));
+  assert.ok(payroll.includes("t('maternityTitleReminder')"));
+  assert.ok(payroll.includes("t('cbhiTitleReminder')"));
   assert.ok(!payroll.includes("status:'paid'"));
 });
 
@@ -83,6 +89,8 @@ test("Payroll headings and navigation react to the selected app language", () =>
   assert.ok(payroll.includes("aibos:languagechange"));
   assert.ok(payroll.includes("getElementById('aibosLanguageSelect')"));
   assert.ok(payroll.includes("host.dataset.lang!==lang()"));
+  for (const key of ["maternityTitle","cbhiTitle","payeTitleReminder","maternityTitleReminder","cbhiTitleReminder"])
+    assert.ok((payroll.match(new RegExp(key+':','g'))||[]).length>=3,key+" must be translated in all three languages");
 });
 
 test("Payroll workflow RPCs create, submit, approve, post and pay with server-side authorization", () => {
@@ -115,6 +123,12 @@ test("Payroll chart-of-account mappings are validated and salary journals use de
   assert.ok(workflows.includes("type='liability' and normal_balance='credit'"));
   assert.ok(workflows.includes("type='asset' and normal_balance='debit'"));
   assert.ok(workflows.includes("no journal was posted"));
+  for (const code of ["2250","2260"]) assert.ok(workflows.includes("code='"+code+"'"));
+  assert.ok(workflows.includes("maternity_employee"));
+  assert.ok(workflows.includes("maternity_employer"));
+  assert.ok(workflows.includes("cbhi_employee"));
+  assert.ok(workflows.includes("'MATERNITY_LEAVE'"));
+  assert.ok(workflows.includes("'CBHI'"));
 });
 
 test("payroll JavaScript parses", () => {
