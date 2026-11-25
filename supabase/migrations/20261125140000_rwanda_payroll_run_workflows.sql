@@ -3,7 +3,8 @@
 
 alter table public.payroll_employees
   add column if not exists casual_days_in_tax_period integer,
-  add column if not exists casual_criteria_confirmed boolean not null default false;
+  add column if not exists casual_criteria_confirmed boolean not null default false,
+  add column if not exists secondary_employer_confirmed boolean not null default false;
 
 alter table public.payroll_pay_items
   add column if not exists other_taxable_earnings numeric(18,2) not null default 0,
@@ -174,6 +175,9 @@ begin
     v_gross:=round(v_employee.base_salary+v_employee.transport_allowance+v_other,2);
     if v_gross<0 then raise exception 'Invalid gross pay for employee %',v_employee.employee_number; end if;
 
+    if v_employee.employment_type='secondary_employer' and not v_employee.secondary_employer_confirmed then
+      raise exception 'Confirm that this is not the employee primary employer before applying the 30% PAYE rate';
+    end if;
     if v_employee.employment_type='casual' then
       if not v_employee.casual_criteria_confirmed
         or v_employee.casual_days_in_tax_period is null
