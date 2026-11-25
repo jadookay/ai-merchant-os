@@ -72,8 +72,8 @@ begin
   if coalesce(trim(p_run_number),'')='' or length(trim(p_run_number))>80 then
     raise exception 'A payroll run number is required';
   end if;
-  if p_period_start is null or p_period_end is null or p_pay_date is null or p_period_end<p_period_start then
-    raise exception 'Payroll period and pay date are invalid';
+  if p_period_start is null or p_period_end is null or p_pay_date is null or p_period_end<p_period_start or p_pay_date<p_period_end then
+    raise exception 'Payroll period and pay date are invalid; pay date cannot precede period end';
   end if;
   if exists(select 1 from public.payroll_pay_runs where merchant_id=p_merchant_id and run_number=trim(p_run_number)) then
     select id into v_run_id from public.payroll_pay_runs
@@ -142,7 +142,7 @@ begin
     v_pension_employer:=v_pension_employee;
     -- Current RSSB Occupational Hazards basis is kept separate from pension;
     -- this initial rule uses basic salary, excluding transport allowance.
-    v_hazards:=round(v_employee.base_salary*0.02,2);
+    v_hazards:=round((v_employee.base_salary+v_other)*0.02,2);
     v_net:=round(v_gross-v_paye-v_pension_employee,2);
     v_cost:=round(v_gross+v_pension_employer+v_hazards,2);
     if v_net<0 then raise exception 'Deductions exceed gross pay for employee %',v_employee.employee_number; end if;
@@ -167,7 +167,7 @@ begin
       jsonb_build_object('jurisdiction','RW','period_end',p_period_end,'employment_type',v_employee.employment_type,
         'paye_method',case when v_employee.employment_type='casual' then '15_percent_casual' when v_employee.employment_type='secondary_employer' then '30_percent_secondary' else 'progressive_monthly' end,
         'pension_employee_rate',v_pension_rate,'pension_employer_rate',v_pension_rate,
-        'occupational_hazards_rate',0.02,'occupational_hazards_base','basic_salary_excluding_transport',
+        'occupational_hazards_rate',0.02,'occupational_hazards_base','gross_remuneration_excluding_transport',
         'taxable_income_includes_transport',true),
       v_other,
       case when v_employee.employment_type='casual' then v_employee.casual_days_in_tax_period else null end,
