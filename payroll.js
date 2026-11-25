@@ -347,9 +347,9 @@
       await ensureRunReminders();
       const visibleUntil=new Date();visibleUntil.setDate(visibleUntil.getDate()+30);
       const horizon=visibleUntil.getFullYear()+'-'+String(visibleUntil.getMonth()+1).padStart(2,'0')+'-'+String(visibleUntil.getDate()).padStart(2,'0');
-      const {data,error}=await sb.from('payroll_reminders').select('id,title,message,due_on,remind_on,status').eq('merchant_id',state.merchant.id).eq('status','open').lte('remind_on',horizon).order('due_on').limit(10);
+      const {data,error}=await sb.from('payroll_reminders').select('id,title,message,due_on,remind_on,status').eq('merchant_id',state.merchant.id).eq('status','open').lte('remind_on',horizon).order('due_on').limit(15);
       if(error)throw error;
-      panel.innerHTML='<strong>'+t('reminders')+'</strong><div class="sub">'+(data&&data.length?data.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #ddd"><b>'+esc(x.title)+'</b> · '+esc(x.due_on)+'<div>'+esc(x.message)+'</div><button class="btn secondary" style="margin-top:5px" onclick="dismissPayrollReminder(\''+esc(x.id)+'\')">'+t('dismiss')+'</button></div>').join(''):t('noReminders'))+'</div>';
+      panel.innerHTML='<strong>'+t('reminders')+'</strong><div class="sub" style="max-height:420px;overflow:auto">'+(data&&data.length?data.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #ddd"><b>'+esc(x.title)+'</b> · '+esc(x.due_on)+'<div>'+esc(x.message)+'</div><button class="btn secondary" style="margin-top:5px" onclick="dismissPayrollReminder(\''+esc(x.id)+'\')">'+t('dismiss')+'</button></div>').join(''):t('noReminders'))+'</div>';
     }catch(e){panel.style.display='none'}
   }
   const oldShow=window.show;
