@@ -191,10 +191,11 @@ test("Employee compensation edits are audited and history is tenant-protected", 
   assert.ok(payroll.includes("aibosPayrollCompensationHistory"));
 });
 
-test("Employees without RSSB numbers receive eight-day registration reminders", () => {
+test("Employees without RSSB numbers receive seven-working-day registration reminders", () => {
   assert.ok(workflows.includes("rssb_registration_due"));
   assert.ok(payroll.includes("rssb-registration-"));
-  assert.ok(payroll.includes("due.setDate(due.getDate()+7)"));
+  assert.ok(payroll.includes("while(workdays<7)"));
+  assert.ok(payroll.includes("due.getDay()!==0&&due.getDay()!==6"));
   assert.ok(payroll.includes("rssbRegistrationTitle"));
   assert.ok(payroll.includes("if(employee.rssb_member_number)"));
 });
