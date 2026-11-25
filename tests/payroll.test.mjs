@@ -185,7 +185,9 @@ test("Taxable benefits in kind flow into PAYE and statutory contribution bases w
   assert.ok(workflows.includes("v_paye_rule_code:=case"));
   assert.ok(workflows.includes("'PAYE_CASUAL'"));
   assert.ok(workflows.includes("v_paye_rule->'bands'"));
-  assert.ok(workflows.includes("v_taxable_income-60000")===false);
+  assert.ok(foundation.includes('"to":60000'));
+  assert.ok(foundation.includes('"rate":0.15'));
+  assert.ok(foundation.includes('"flat_rate":0.30'));
   assert.ok(workflows.includes("v_pension_employee:=round(v_taxable_income*v_pension_rate,2)"));
   assert.ok(workflows.includes("cash_payment',false"));
   assert.ok(workflows.includes("'cash_gross_pay',v_gross"));
