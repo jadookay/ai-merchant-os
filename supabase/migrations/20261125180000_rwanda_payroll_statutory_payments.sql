@@ -42,7 +42,7 @@ begin
    or p_period_end<>(date_trunc('month',p_period_end)+interval '1 month - 1 day')::date then
    raise exception 'Select complete calendar month or quarter dates';
  end if;
- if p_contribution_type not in ('paye','pension','occupational_hazards','maternity','cbhi') then raise exception 'Unsupported statutory contribution type'; end if;
+ if p_contribution_type is null or p_contribution_type not in ('paye','pension','occupational_hazards','maternity','cbhi') then raise exception 'Unsupported statutory contribution type'; end if;
  v_month_span:=(extract(year from p_period_end)::integer*12+extract(month from p_period_end)::integer)
    -(extract(year from p_period_start)::integer*12+extract(month from p_period_start)::integer);
  select coalesce(paye_frequency,'monthly') into v_frequency from public.payroll_employer_settings where merchant_id=p_merchant_id;
@@ -101,9 +101,9 @@ declare
  v_period_key text;
  v_reminder_key text;
 begin
- if not private.user_can_access_merchant(p_merchant_id,'manage_finance') then raise exception 'Finance permission is required to record statutory payments'; end if;
- if p_payment_date is null or p_amount is null or p_amount<=0
-   or p_payment_method not in ('bank','mobile_money','cash')
+ if not private.user_can_access_merchant(p_merchant_id,'manage_finance') or not private.user_can_access_merchant(p_merchant_id,'manage_payroll') then raise exception 'Payroll and finance permissions are required to record statutory payments'; end if;
+ if p_contribution_type is null or p_period_start is null or p_period_end is null or p_payment_date is null or p_amount is null or p_amount<=0
+   or p_payment_method is null or p_payment_method not in ('bank','mobile_money','cash')
    or coalesce(trim(p_idempotency_key),'')='' then
    raise exception 'Payment date, positive amount, payment method and idempotency key are required';
  end if;
