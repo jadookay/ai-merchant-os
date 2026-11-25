@@ -111,10 +111,19 @@ declare
   v_taxable_income numeric(18,2);
   v_benefits numeric(18,2);
   v_paye numeric(18,2);
+  v_paye_rule jsonb;
+  v_paye_rule_code text;
+  v_paye_rule_effective_from date;
+  v_paye_band jsonb;
+  v_band_from numeric(18,2);
+  v_band_to numeric(18,2);
+  v_band_rate numeric(8,6);
+  v_paye_rate numeric(8,6);
   v_pension_rate numeric(8,6);
   v_pension_employee numeric(18,2);
   v_pension_employer numeric(18,2);
   v_hazards numeric(18,2);
+  v_hazards_rate numeric(8,6);
   v_maternity_employee numeric(18,2);
   v_maternity_employer numeric(18,2);
   v_cbhi numeric(18,2);
@@ -185,21 +194,40 @@ begin
     if v_employee.employment_type='secondary_employer' and not v_employee.secondary_employer_confirmed then
       raise exception 'Confirm that this is not the employee primary employer before applying the 30% PAYE rate';
     end if;
+    v_paye_rule_code:=case
+      when v_employee.employment_type='casual' then 'PAYE_CASUAL'
+      when v_employee.employment_type='secondary_employer' then 'PAYE_SECONDARY'
+      else 'PAYE_PERMANENT' end;
+    select r.configuration,r.effective_from into v_paye_rule,v_paye_rule_effective_from
+    from public.payroll_rule_sets r
+    where r.jurisdiction='RW' and r.rule_code=v_paye_rule_code
+      and r.verification_status='verified'
+      and r.effective_from<=p_period_end
+      and (r.effective_to is null or r.effective_to>=p_period_end)
+    order by r.effective_from desc limit 1;
+    if v_paye_rule is null then raise exception 'No verified effective PAYE rule is configured for %',v_paye_rule_code; end if;
     if v_employee.employment_type='casual' then
       if not v_employee.casual_criteria_confirmed
         or v_employee.casual_days_in_tax_year is null
         or v_employee.casual_days_in_tax_year<1
         or v_employee.casual_days_in_tax_year>=30 then
-        raise exception 'Casual employee % must have confirmed RRA eligibility and less than 30 days of engagement during the tax year and confirmed RRA eligibility',v_employee.employee_number;
+        raise exception 'Casual employee % must have confirmed RRA eligibility and less than 30 days of engagement during the tax year',v_employee.employee_number;
       end if;
-      v_paye:=round(greatest(0,v_taxable_income-60000)*0.15,2);
-    elsif v_employee.employment_type='secondary_employer' then
-      v_paye:=round(v_taxable_income*0.30,2);
+    end if;
+    if v_employee.employment_type='secondary_employer' then
+      v_paye_rate:=(v_paye_rule->>'flat_rate')::numeric;
+      if v_paye_rate is null then raise exception 'Secondary employer PAYE rule is missing its flat rate'; end if;
+      v_paye:=round(v_taxable_income*v_paye_rate,2);
     else
-      v_paye:=round(
-        greatest(0,least(v_taxable_income,100000)-60000)*0.10
-        + greatest(0,least(v_taxable_income,200000)-100000)*0.20
-        + greatest(0,v_taxable_income-200000)*0.30,2);
+      if jsonb_typeof(v_paye_rule->'bands')<>'array' then raise exception 'PAYE band configuration is invalid for %',v_paye_rule_code; end if;
+      v_paye:=0;
+      for v_paye_band in select value from jsonb_array_elements(v_paye_rule->'bands') loop
+        v_band_from:=coalesce((v_paye_band->>'from')::numeric,0);
+        v_band_to:=(v_paye_band->>'to')::numeric;
+        v_band_rate:=coalesce((v_paye_band->>'rate')::numeric,0);
+        v_paye:=v_paye+greatest(0,least(v_taxable_income,coalesce(v_band_to,v_taxable_income))-v_band_from)*v_band_rate;
+      end loop;
+      v_paye:=round(v_paye,2);
     end if;
 
     select coalesce((r.configuration->>'employee_rate')::numeric,0.06)
@@ -219,7 +247,15 @@ begin
     v_pension_employer:=v_pension_employee;
     -- Current RSSB Occupational Hazards basis is kept separate from pension;
     -- this rule uses gross remuneration excluding transport allowance, including taxable benefits.
-    v_hazards:=round((v_employee.base_salary+v_other+v_benefits)*0.02,2);
+    select (r.configuration->>'employer_rate')::numeric into v_hazards_rate
+    from public.payroll_rule_sets r
+    where r.jurisdiction='RW' and r.rule_code='RSSB_OCCUPATIONAL_HAZARDS'
+      and r.verification_status='verified'
+      and r.effective_from<=p_period_end
+      and (r.effective_to is null or r.effective_to>=p_period_end)
+    order by r.effective_from desc limit 1;
+    v_hazards_rate:=coalesce(v_hazards_rate,0.02);
+    v_hazards:=round((v_employee.base_salary+v_other+v_benefits)*v_hazards_rate,2);
     select coalesce((r.configuration->>'employee_rate')::numeric,0.003),
            coalesce((r.configuration->>'employer_rate')::numeric,0.003)
     into v_maternity_rate,v_maternity_employer
@@ -272,7 +308,9 @@ begin
         'occupational_hazards_rate',0.02,'occupational_hazards_base','gross_remuneration_excluding_transport',
         'maternity_employee_rate',v_maternity_rate,'maternity_employer_rate',0.003,'maternity_base','gross_salary_excluding_transport',
         'cbhi_employee_rate',v_cbhi_rate,'cbhi_base','gross_less_paye_total_pension_occupational_hazards_and_maternity_contributions',
-        'taxable_income_includes_transport',true,'taxable_benefits_in_kind',v_benefits,'cash_gross_pay',v_gross),
+        'taxable_income_includes_transport',true,'taxable_benefits_in_kind',v_benefits,'cash_gross_pay',v_gross,
+        'paye_rule_code',v_paye_rule_code,'paye_rule_effective_from',v_paye_rule_effective_from,
+        'occupational_hazards_rate',v_hazards_rate),
       v_other,
       case when v_employee.employment_type='casual' then v_employee.casual_days_in_tax_year else null end,
       p_period_end,
