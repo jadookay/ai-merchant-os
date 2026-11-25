@@ -198,7 +198,8 @@
       const confirmed=document.getElementById('payrollQuarterlyConfirm').checked;
       if(turnover!==null&&(!Number.isFinite(turnover)||turnover<0))throw new Error('Enter a valid annual turnover.');
       if(frequency==='quarterly'&&(turnover===null||turnover>=200000000||!confirmed))throw new Error('Quarterly PAYE is only available to eligible employers below RWF 200 million annual turnover who have elected/registered with RRA.');
-      const {error}=await sb.from('payroll_employer_settings').upsert({merchant_id:state.merchant.id,paye_frequency:frequency,annual_turnover:turnover,quarterly_election_confirmed:frequency==='quarterly'&&confirmed,updated_by:(await sb.auth.getUser()).data.user.id,updated_at:new Date().toISOString()},{onConflict:'merchant_id'});
+      const {data:userData,error:userError}=await sb.auth.getUser();if(userError)throw userError;if(!userData?.user)throw new Error('Please sign in again.');
+      const {error}=await sb.from('payroll_employer_settings').upsert({merchant_id:state.merchant.id,paye_frequency:frequency,annual_turnover:turnover,quarterly_election_confirmed:frequency==='quarterly'&&confirmed,updated_by:userData.user.id,updated_at:new Date().toISOString()},{onConflict:'merchant_id'});
       if(error)throw error;
       status.textContent=t('settingsSaved');
       await loadDashboardReminders();
@@ -218,7 +219,6 @@
       candidates.push({due:new Date(y,11,15),period:y+'-09 to '+y+'-11'});
     }
     candidates.sort((a,b)=>a.due-b.due);
-    const withinThirty=(d)=>Math.ceil((d.getTime()-new Date(todayKey+'T00:00:00').getTime())/86400000)<=30;
     const monthlyDue=[];
     for(let offset=-1;offset<=1;offset++)monthlyDue.push(new Date(now.getFullYear(),now.getMonth()+offset,15));
     const monthlyRelevant=[monthlyDue.filter(d=>fmt(d)<=todayKey).pop(),monthlyDue.find(d=>fmt(d)>todayKey)].filter(Boolean);
