@@ -2595,93 +2595,7 @@ function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.onload=()=>w.print();
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><script id="aibos-credit-pos-v1">
-(function(){
-const $=id=>document.getElementById(id);
-function addControls(){
- const form=document.querySelector('#sales .card .formgrid');
- if(form&&!$('salePaymentMethod'))form.insertAdjacentHTML('afterend',"<div class='formgrid section'><div><label>Payment method</label><select id='salePaymentMethod'><option value='cash'>Cash</option><option value='momo'>MoMo</option><option value='credit'>On credit</option></select></div><div><label>Receipt note (optional)</label><input id='saleReceiptNote' maxlength='180'></div><div id='saleCreditFields' style='display:none;grid-column:1/-1'><div class='formgrid'><div><label>Customer name</label><input id='saleCreditName'></div><div><label>Customer phone</label><input id='saleCreditPhone' type='tel' placeholder='+250...'></div><div><label>Payment due date</label><input id='saleCreditDue' type='date'></div><div><label>Amount due</label><input id='saleCreditAmount' readonly></div></div></div></div>");
- if($('salePaymentMethod'))$('salePaymentMethod').onchange=toggleCredit;
- const home=$('priorities')?.parentElement;
- if(home&&!$('aibosCreditReminders'))home.insertAdjacentHTML('afterend',"<div class='card section' id='aibosCreditReminders'><h2>Customer credit reminders</h2><div id='aibosCreditReminderList'></div></div>");
- const settings=document.querySelector('#settings .card .formgrid');
- if(settings&&!$('setShopPhone'))settings.insertAdjacentHTML('beforeend',"<div><label>Shop phone number (printed on receipts)</label><input id='setShopPhone' type='tel' placeholder='+250...'></div><div><label>POS receipt paper width</label><select id='setReceiptWidth'><option value='58mm'>58 mm thermal paper</option><option value='80mm'>80 mm thermal paper</option></select></div>");
-}
-function toggleCredit(){
- const on=$('salePaymentMethod')?.value==='credit';
- if($('saleCreditFields'))$('saleCreditFields').style.display=on?'block':'none';
- if(on&&!$('saleCreditDue').value){const d=new Date();d.setDate(d.getDate()+7);$('saleCreditDue').value=d.toISOString().slice(0,10);}
- updateAmount();
-}
-function updateAmount(){
- const n=(saleCart||[]).reduce((a,x)=>a+Number(x.qty||0)*Number(x.price||0),0)||(Number($('saleQty')?.value||0)*Number($('salePrice')?.value||0));
- if($('saleCreditAmount'))$('saleCreditAmount').value=n.toFixed(2);
-}
-const baseRender=render;
-render=function(){baseRender();addControls();if($('setShopPhone'))$('setShopPhone').value=state.merchant?.phone||'';if($('setReceiptWidth'))$('setReceiptWidth').value=state.merchant?.receipt_paper_width||'58mm';renderCreditReminders();updateAmount();};
-const baseSaveSettings=saveSettings;
-saveSettings=async function(){if(state.merchant){state.merchant.phone=$('setShopPhone')?.value.trim()||null;state.merchant.receipt_paper_width=$('setReceiptWidth')?.value||'58mm';}return baseSaveSettings();};
-const baseAdd=addSaleToCart;addSaleToCart=function(){const r=baseAdd();setTimeout(updateAmount,0);return r;};
-const baseRemove=removeSaleCartItem;removeSaleCartItem=function(i){const r=baseRemove(i);updateAmount();return r;};
-const baseClear=clearSaleCart;clearSaleCart=function(){const r=baseClear();updateAmount();return r;};
-recordSale=async function(){
- if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
- const method=$('salePaymentMethod')?.value||'cash',custId=$('saleCustomer')?.value||null,items=saleCart.length?saleCart:[{productId:$('saleProduct').value,qty:Number($('saleQty').value),price:Number($('salePrice').value)}],checked=[];
- for(const item of items){const p=product(item.productId);if(p?.deleted)return sheriToast('A product in this sale is inactive.','error');if(!p||!Number.isInteger(item.qty)||item.qty<1||!Number.isFinite(item.price)||item.price<0)return sheriToast('Check product, quantity and price.','error');const used=checked.filter(x=>x.productId===p.id).reduce((n,x)=>n+x.qty,0);if(used+item.qty>p.stock)return sheriToast('Not enough stock for '+p.name+'.','error');checked.push({...item,product:p});}
- const total=checked.reduce((n,x)=>n+x.qty*x.price,0),customer=(state.customers||[]).find(x=>x.id===custId)||null;
- const customerName=method==='credit'?String($('saleCreditName')?.value||customer?.name||'').trim():(customer?.name||''),customerPhone=method==='credit'?String($('saleCreditPhone')?.value||customer?.phone||'').trim():(customer?.phone||''),dueDate=method==='credit'?String($('saleCreditDue')?.value||''):null;
- if(method==='credit'&&(!customerName||!customerPhone||!dueDate))return sheriToast('Credit sales require customer name, phone number and due date.','error');
- if(method==='credit'&&dueDate<new Date().toISOString().slice(0,10))return sheriToast('Choose a due date that is today or later.','error');
- const transactionId=sheriUuid(),createdAt=sheriNow(),invoice='INV-'+String(state.merchant.shericeri_id||'AIBOS')+'-'+Date.now(),label=method==='momo'?'MoMo':method==='credit'?'On credit':'Cash';
- if(!confirm('Confirm '+label+' sale?\n'+checked.map(x=>x.qty+' × '+x.product.name+' — '+money(x.qty*x.price)).join('\n')+'\nTotal: '+money(total)+(method==='credit'?'\nCustomer: '+customerName+'\nDue: '+dueDate:'')))return;
- const rows=checked.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,product_id:x.product.id,product_name_snapshot:x.product.name,customer_id:custId,qty:x.qty,price:x.price,cost:x.product.cost,created_at:createdAt,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),payment_method:method,credit_due_date:dueDate,customer_name_snapshot:customerName||null,customer_phone_snapshot:customerPhone||null,receipt_note:$('saleReceiptNote')?.value.trim()||null}));
- checked.forEach(x=>{x.product.stock-=x.qty;});state.sales.push(...rows);
- window.__lastReceipt={business:state.merchant.name,shopPhone:state.merchant.phone||'',paperWidth:state.merchant.receipt_paper_width||'58mm',cashier:sheriCurrentActor(),invoice,createdAt,total,method:label,customerName,customerPhone,dueDate,note:$('saleReceiptNote')?.value.trim()||'',items:checked.map(x=>({name:x.product.name,qty:x.qty,price:x.price}))};
- if($('printReceiptBtn'))$('printReceiptBtn').disabled=false;saleCart=[];renderSaleCart();render();sheriToast('Sale captured. Saving securely…','warning');if(confirm('Print this POS receipt now?'))printLastReceipt();
- const stockChecks=[...new Map(checked.map(x=>[x.product.id,x.product])).values()].map(p=>({product_id:p.id,expected_server_stock:Number(p.stock||0)+checked.filter(x=>x.product.id===p.id).reduce((n,x)=>n+x.qty,0),local_stock:Number(p.stock||0),qty:checked.filter(x=>x.product.id===p.id).reduce((n,x)=>n+x.qty,0)}));
- try{await sheriSaveSnapshot();await sheriQueue({type:'sale_cart_upsert',records:rows,stockChecks});if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] sale sync',e));}
- catch(e){sheriToast('Sale is visible on this device, but saving or sync needs attention. Check Pending Sync.','error');}
-};
-printLastReceipt=function(){
- const r=window.__lastReceipt;if(!r?.items?.length)return sheriToast('No completed receipt is available yet.','warning');
- const width=r.paperWidth==='80mm'?'80mm':'58mm',inner=width==='80mm'?'76mm':'54mm',w=window.open('','_blank','width=420,height=720');
- if(!w)return sheriToast('Allow pop-ups to print the receipt.','warning');
- const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+x.qty+'</td><td style="text-align:right">'+money(x.price)+'</td><td style="text-align:right">'+money(x.qty*x.price)+'</td></tr>').join('');
- const dt=new Date(r.createdAt).toLocaleString('en-RW',{timeZone:'Africa/Kigali',hour12:false});
- w.document.write('<!doctype html><html><head><title>'+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>@page{size:'+width+' auto;margin:2mm}*{box-sizing:border-box}html,body{width:'+inner+';margin:0;padding:0;background:#fff;color:#000;font:10px/1.35 Arial}body{padding:1mm}h2,p{text-align:center;margin:3px 0}h2{font-size:14px}table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:6px}td,th{padding:3px 1px;border-bottom:1px dotted #aaa;font-size:9px;overflow-wrap:anywhere}.total{text-align:right;font-weight:bold;font-size:12px;margin-top:8px}.rule{border-top:1px dashed #000;margin:6px 0}</style></head><body><h2>'+esc(r.business)+'</h2>'+(r.shopPhone?'<p>Tel: '+esc(r.shopPhone)+'</p>':'')+'<p>SALES RECEIPT</p><div class="rule"></div><p>Receipt: '+esc(r.invoice)+'</p><p>Date: '+esc(dt)+'</p><p>Cashier: '+esc(r.cashier||'—')+'</p><p>Payment: '+esc(r.method)+'</p>'+(r.customerName?'<p>Customer: '+esc(r.customerName)+'</p>':'')+(r.customerPhone?'<p>Phone: '+esc(r.customerPhone)+'</p>':'')+'<div class="rule"></div><table><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">TOTAL: '+money(r.total)+'</div>'+(r.method==='On credit'?'<p>Amount due: '+money(r.total)+'</p><p>Due date: '+esc(r.dueDate||'')+'</p>':'')+(r.note?'<div class="rule"></div><p>Note: '+esc(r.note)+'</p>':'')+'<div class="rule"></div><p><b>Thank you for doing business with us!<br>Please come back!</b></p></body></html>');
- let printed=false;const doPrint=()=>{if(printed||w.closed)return;printed=true;w.focus();w.print();};w.onload=()=>setTimeout(doPrint,150);w.document.close();setTimeout(doPrint,700);
-};
-printSaleTransaction=function(transactionId){
- const rows=state.sales.filter(x=>(x.transaction_id||x.id)===transactionId);
- if(!rows.length)return sheriToast('Sale receipt not found.','warning');
- const first=rows[0],total=rows.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0);
- const previous=window.__lastReceipt;
- window.__lastReceipt={business:state.merchant?.name||'Business',shopPhone:state.merchant?.phone||'',paperWidth:state.merchant?.receipt_paper_width||'58mm',cashier:sheriRecordActor(first),invoice:first.invoice_number||transactionId,createdAt:first.created_at,total,method:first.payment_method==='credit'?'On credit':first.payment_method==='momo'?'MoMo':'Cash',customerName:first.customer_name_snapshot||'',customerPhone:first.customer_phone_snapshot||'',dueDate:first.credit_due_date||'',note:first.receipt_note||'',items:rows.map(x=>({name:x.product_name_snapshot||product(x.product_id)?.name||'Product',qty:x.qty,price:x.price}))};
- printLastReceipt();window.__lastReceipt=previous;
-};
-function creditRows(){
- const map=new Map();
- for(const s of state.sales||[]){if(s.voided||s.voided_at||s.payment_method!=='credit'||!s.transaction_id)continue;let g=map.get(s.transaction_id);if(!g){g={id:s.transaction_id,invoice:s.invoice_number||s.transaction_id,name:s.customer_name_snapshot||'Customer',phone:s.customer_phone_snapshot||'',due:s.credit_due_date||'',total:0};map.set(s.transaction_id,g);}g.total+=Number(s.qty||0)*Number(s.price||0);}
- return [...map.values()].map(g=>{g.paid=(state.payments||[]).filter(p=>p.direction==='receipt'&&p.source_type==='sale_invoice'&&p.source_id===g.id).reduce((n,p)=>n+Number(p.amount||0),0);g.balance=Math.max(0,g.total-g.paid);return g;}).filter(g=>g.balance>0.005);
-}
-function renderCreditReminders(){
- const host=$('aibosCreditReminderList');if(!host||!state.merchant)return;
- if(!(state.merchant.user_id===session?.user?.id||sheriCan('manage_finance'))){host.innerHTML='Owner and authorized finance managers only.';return;}
- const rows=creditRows(),today=new Date().toISOString().slice(0,10);
- host.innerHTML=rows.length?'<div class="sub">'+rows.length+' outstanding customer account(s)</div><div style="overflow-x:auto"><table class="table"><tr><th>Customer</th><th>Phone</th><th>Invoice</th><th>Balance</th><th>Due</th><th>Action</th></tr>'+rows.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.phone||'—')+'</td><td>'+esc(x.invoice)+'</td><td>'+money(x.balance)+'</td><td>'+(x.due&&x.due<today?'OVERDUE · ':'')+esc(x.due||'—')+'</td><td>'+(x.phone?'<a href="tel:'+esc(x.phone)+'">Call</a> ':'')+'<button class="btn small" onclick="aibosCollectCredit(&quot;'+esc(x.id)+'&quot;)">Record payment</button></td></tr>').join('')+'</table></div>':'<div class="sub">No outstanding customer credit balances.</div>';
-}
-window.aibosCollectCredit=async function(id){
- const x=creditRows().find(v=>v.id===id);if(!x)return sheriToast('This balance is already settled.','warning');
- const raw=prompt('Outstanding: '+money(x.balance)+'\nAmount received:');if(raw===null)return;const amount=Number(raw);
- if(!Number.isFinite(amount)||amount<=0||amount>x.balance+0.005)return sheriToast('Enter a valid amount not greater than the outstanding balance.','error');
- const method=String(prompt('Payment method: cash or momo','cash')||'').trim().toLowerCase();if(!['cash','momo'].includes(method))return sheriToast('Payment method must be cash or momo.','error');
- if(!navigator.onLine)return sheriToast('Customer repayments require an online connection.','error');
- try{const {data,error}=await sb.rpc('shericeri_record_customer_receipt',{p_payment_id:sheriUuid(),p_merchant_id:state.merchant.id,p_transaction_id:id,p_amount:amount,p_method:method,p_payment_date:new Date().toISOString().slice(0,10),p_reference:null,p_notes:'Customer credit repayment'});if(error)throw error;if(data?.ok!==true)throw new Error(data?.message||'Payment was not confirmed.');await sheriLoadAccountingSnapshot(state.merchant.id);render();sheriToast('Payment recorded. Accounts Receivable reduced.');}catch(e){sheriToast(e?.message||'Payment could not be recorded.','error');}
-};
-document.addEventListener('input',e=>{if(['saleQty','salePrice'].includes(e.target?.id))updateAmount();});
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addControls);else addControls();
-})();
-</script>
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p>
 </body></html>');
    w.document.close();
 }
@@ -10434,5 +10348,92 @@ html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body 
 @media(max-width:650px){html[lang] body #appRoot #sheriOfflineBar{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr)!important;gap:6px 7px!important;padding:8px!important;margin:0 0 10px!important}html[lang] body #appRoot #sheriOfflineBar>div:first-child{font-size:12px!important;line-height:1.25!important;gap:3px 5px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child{gap:4px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{flex:1 1 68px!important;min-height:34px!important;font-size:11px!important;padding:6px 5px!important}}
 @media(max-width:350px){html[lang] body #appRoot #sheriOfflineBar{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)!important;gap:5px!important;padding:7px!important}html[lang] body #appRoot #sheriOfflineBar>div:last-child>button,html[lang] body #appRoot #sheriOfflineBar>div:last-child>.btn,html[lang] body #appRoot #sheriOfflineBar>div:last-child>a,html[lang] body #appRoot #sheriOfflineBar>div:last-child>[role="button"]{font-size:10.5px!important;padding:5px 4px!important}}
 </style>
+<script id="aibos-credit-pos-v1">
+(function(){
+const $=id=>document.getElementById(id);
+function addControls(){
+ const form=document.querySelector('#sales .card .formgrid');
+ if(form&&!$('salePaymentMethod'))form.insertAdjacentHTML('afterend',"<div class='formgrid section'><div><label>Payment method</label><select id='salePaymentMethod'><option value='cash'>Cash</option><option value='momo'>MoMo</option><option value='credit'>On credit</option></select></div><div><label>Receipt note (optional)</label><input id='saleReceiptNote' maxlength='180'></div><div id='saleCreditFields' style='display:none;grid-column:1/-1'><div class='formgrid'><div><label>Customer name</label><input id='saleCreditName'></div><div><label>Customer phone</label><input id='saleCreditPhone' type='tel' placeholder='+250...'></div><div><label>Payment due date</label><input id='saleCreditDue' type='date'></div><div><label>Amount due</label><input id='saleCreditAmount' readonly></div></div></div></div>");
+ if($('salePaymentMethod'))$('salePaymentMethod').onchange=toggleCredit;
+ const home=$('priorities')?.parentElement;
+ if(home&&!$('aibosCreditReminders'))home.insertAdjacentHTML('afterend',"<div class='card section' id='aibosCreditReminders'><h2>Customer credit reminders</h2><div id='aibosCreditReminderList'></div></div>");
+ const settings=document.querySelector('#settings .card .formgrid');
+ if(settings&&!$('setShopPhone'))settings.insertAdjacentHTML('beforeend',"<div><label>Shop phone number (printed on receipts)</label><input id='setShopPhone' type='tel' placeholder='+250...'></div><div><label>POS receipt paper width</label><select id='setReceiptWidth'><option value='58mm'>58 mm thermal paper</option><option value='80mm'>80 mm thermal paper</option></select></div>");
+}
+function toggleCredit(){
+ const on=$('salePaymentMethod')?.value==='credit';
+ if($('saleCreditFields'))$('saleCreditFields').style.display=on?'block':'none';
+ if(on&&!$('saleCreditDue').value){const d=new Date();d.setDate(d.getDate()+7);$('saleCreditDue').value=d.toISOString().slice(0,10);}
+ updateAmount();
+}
+function updateAmount(){
+ const n=(saleCart||[]).reduce((a,x)=>a+Number(x.qty||0)*Number(x.price||0),0)||(Number($('saleQty')?.value||0)*Number($('salePrice')?.value||0));
+ if($('saleCreditAmount'))$('saleCreditAmount').value=n.toFixed(2);
+}
+const baseRender=render;
+render=function(){baseRender();addControls();if($('setShopPhone'))$('setShopPhone').value=state.merchant?.phone||'';if($('setReceiptWidth'))$('setReceiptWidth').value=state.merchant?.receipt_paper_width||'58mm';renderCreditReminders();updateAmount();};
+const baseSaveSettings=saveSettings;
+saveSettings=async function(){if(state.merchant){state.merchant.phone=$('setShopPhone')?.value.trim()||null;state.merchant.receipt_paper_width=$('setReceiptWidth')?.value||'58mm';}return baseSaveSettings();};
+const baseAdd=addSaleToCart;addSaleToCart=function(){const r=baseAdd();setTimeout(updateAmount,0);return r;};
+const baseRemove=removeSaleCartItem;removeSaleCartItem=function(i){const r=baseRemove(i);updateAmount();return r;};
+const baseClear=clearSaleCart;clearSaleCart=function(){const r=baseClear();updateAmount();return r;};
+recordSale=async function(){
+ if(!sheriCan('create_sale'))return sheriToast('You do not have permission to record sales.','error');
+ const method=$('salePaymentMethod')?.value||'cash',custId=$('saleCustomer')?.value||null,items=saleCart.length?saleCart:[{productId:$('saleProduct').value,qty:Number($('saleQty').value),price:Number($('salePrice').value)}],checked=[];
+ for(const item of items){const p=product(item.productId);if(p?.deleted)return sheriToast('A product in this sale is inactive.','error');if(!p||!Number.isInteger(item.qty)||item.qty<1||!Number.isFinite(item.price)||item.price<0)return sheriToast('Check product, quantity and price.','error');const used=checked.filter(x=>x.productId===p.id).reduce((n,x)=>n+x.qty,0);if(used+item.qty>p.stock)return sheriToast('Not enough stock for '+p.name+'.','error');checked.push({...item,product:p});}
+ const total=checked.reduce((n,x)=>n+x.qty*x.price,0),customer=(state.customers||[]).find(x=>x.id===custId)||null;
+ const customerName=method==='credit'?String($('saleCreditName')?.value||customer?.name||'').trim():(customer?.name||''),customerPhone=method==='credit'?String($('saleCreditPhone')?.value||customer?.phone||'').trim():(customer?.phone||''),dueDate=method==='credit'?String($('saleCreditDue')?.value||''):null;
+ if(method==='credit'&&(!customerName||!customerPhone||!dueDate))return sheriToast('Credit sales require customer name, phone number and due date.','error');
+ if(method==='credit'&&dueDate<new Date().toISOString().slice(0,10))return sheriToast('Choose a due date that is today or later.','error');
+ const transactionId=sheriUuid(),createdAt=sheriNow(),invoice='INV-'+String(state.merchant.shericeri_id||'AIBOS')+'-'+Date.now(),label=method==='momo'?'MoMo':method==='credit'?'On credit':'Cash';
+ if(!confirm('Confirm '+label+' sale?\n'+checked.map(x=>x.qty+' × '+x.product.name+' — '+money(x.qty*x.price)).join('\n')+'\nTotal: '+money(total)+(method==='credit'?'\nCustomer: '+customerName+'\nDue: '+dueDate:'')))return;
+ const rows=checked.map(x=>({id:sheriUuid(),merchant_id:state.merchant.id,transaction_id:transactionId,invoice_number:invoice,product_id:x.product.id,product_name_snapshot:x.product.name,customer_id:custId,qty:x.qty,price:x.price,cost:x.product.cost,created_at:createdAt,created_by:session?.user?.id||null,created_by_name:sheriCurrentActor(),payment_method:method,credit_due_date:dueDate,customer_name_snapshot:customerName||null,customer_phone_snapshot:customerPhone||null,receipt_note:$('saleReceiptNote')?.value.trim()||null}));
+ checked.forEach(x=>{x.product.stock-=x.qty;});state.sales.push(...rows);
+ window.__lastReceipt={business:state.merchant.name,shopPhone:state.merchant.phone||'',paperWidth:state.merchant.receipt_paper_width||'58mm',cashier:sheriCurrentActor(),invoice,createdAt,total,method:label,customerName,customerPhone,dueDate,note:$('saleReceiptNote')?.value.trim()||'',items:checked.map(x=>({name:x.product.name,qty:x.qty,price:x.price}))};
+ if($('printReceiptBtn'))$('printReceiptBtn').disabled=false;saleCart=[];renderSaleCart();render();sheriToast('Sale captured. Saving securely…','warning');if(confirm('Print this POS receipt now?'))printLastReceipt();
+ const stockChecks=[...new Map(checked.map(x=>[x.product.id,x.product])).values()].map(p=>({product_id:p.id,expected_server_stock:Number(p.stock||0)+checked.filter(x=>x.product.id===p.id).reduce((n,x)=>n+x.qty,0),local_stock:Number(p.stock||0),qty:checked.filter(x=>x.product.id===p.id).reduce((n,x)=>n+x.qty,0)}));
+ try{await sheriSaveSnapshot();await sheriQueue({type:'sale_cart_upsert',records:rows,stockChecks});if(navigator.onLine)Promise.resolve().then(()=>sheriSyncOutbox()).catch(e=>console.warn('[AIBOS] sale sync',e));}
+ catch(e){sheriToast('Sale is visible on this device, but saving or sync needs attention. Check Pending Sync.','error');}
+};
+printLastReceipt=function(){
+ const r=window.__lastReceipt;if(!r?.items?.length)return sheriToast('No completed receipt is available yet.','warning');
+ const width=r.paperWidth==='80mm'?'80mm':'58mm',inner=width==='80mm'?'76mm':'54mm',w=window.open('','_blank','width=420,height=720');
+ if(!w)return sheriToast('Allow pop-ups to print the receipt.','warning');
+ const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td style="text-align:right">'+x.qty+'</td><td style="text-align:right">'+money(x.price)+'</td><td style="text-align:right">'+money(x.qty*x.price)+'</td></tr>').join('');
+ const dt=new Date(r.createdAt).toLocaleString('en-RW',{timeZone:'Africa/Kigali',hour12:false});
+ w.document.write('<!doctype html><html><head><title>'+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>@page{size:'+width+' auto;margin:2mm}*{box-sizing:border-box}html,body{width:'+inner+';margin:0;padding:0;background:#fff;color:#000;font:10px/1.35 Arial}body{padding:1mm}h2,p{text-align:center;margin:3px 0}h2{font-size:14px}table{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:6px}td,th{padding:3px 1px;border-bottom:1px dotted #aaa;font-size:9px;overflow-wrap:anywhere}.total{text-align:right;font-weight:bold;font-size:12px;margin-top:8px}.rule{border-top:1px dashed #000;margin:6px 0}</style></head><body><h2>'+esc(r.business)+'</h2>'+(r.shopPhone?'<p>Tel: '+esc(r.shopPhone)+'</p>':'')+'<p>SALES RECEIPT</p><div class="rule"></div><p>Receipt: '+esc(r.invoice)+'</p><p>Date: '+esc(dt)+'</p><p>Cashier: '+esc(r.cashier||'—')+'</p><p>Payment: '+esc(r.method)+'</p>'+(r.customerName?'<p>Customer: '+esc(r.customerName)+'</p>':'')+(r.customerPhone?'<p>Phone: '+esc(r.customerPhone)+'</p>':'')+'<div class="rule"></div><table><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">TOTAL: '+money(r.total)+'</div>'+(r.method==='On credit'?'<p>Amount due: '+money(r.total)+'</p><p>Due date: '+esc(r.dueDate||'')+'</p>':'')+(r.note?'<div class="rule"></div><p>Note: '+esc(r.note)+'</p>':'')+'<div class="rule"></div><p><b>Thank you for doing business with us!<br>Please come back!</b></p></body></html>');
+ let printed=false;const doPrint=()=>{if(printed||w.closed)return;printed=true;w.focus();w.print();};w.onload=()=>setTimeout(doPrint,150);w.document.close();setTimeout(doPrint,700);
+};
+printSaleTransaction=function(transactionId){
+ const rows=state.sales.filter(x=>(x.transaction_id||x.id)===transactionId);
+ if(!rows.length)return sheriToast('Sale receipt not found.','warning');
+ const first=rows[0],total=rows.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0);
+ const previous=window.__lastReceipt;
+ window.__lastReceipt={business:state.merchant?.name||'Business',shopPhone:state.merchant?.phone||'',paperWidth:state.merchant?.receipt_paper_width||'58mm',cashier:sheriRecordActor(first),invoice:first.invoice_number||transactionId,createdAt:first.created_at,total,method:first.payment_method==='credit'?'On credit':first.payment_method==='momo'?'MoMo':'Cash',customerName:first.customer_name_snapshot||'',customerPhone:first.customer_phone_snapshot||'',dueDate:first.credit_due_date||'',note:first.receipt_note||'',items:rows.map(x=>({name:x.product_name_snapshot||product(x.product_id)?.name||'Product',qty:x.qty,price:x.price}))};
+ printLastReceipt();window.__lastReceipt=previous;
+};
+function creditRows(){
+ const map=new Map();
+ for(const s of state.sales||[]){if(s.voided||s.voided_at||s.payment_method!=='credit'||!s.transaction_id)continue;let g=map.get(s.transaction_id);if(!g){g={id:s.transaction_id,invoice:s.invoice_number||s.transaction_id,name:s.customer_name_snapshot||'Customer',phone:s.customer_phone_snapshot||'',due:s.credit_due_date||'',total:0};map.set(s.transaction_id,g);}g.total+=Number(s.qty||0)*Number(s.price||0);}
+ return [...map.values()].map(g=>{g.paid=(state.payments||[]).filter(p=>p.direction==='receipt'&&p.source_type==='sale_invoice'&&p.source_id===g.id).reduce((n,p)=>n+Number(p.amount||0),0);g.balance=Math.max(0,g.total-g.paid);return g;}).filter(g=>g.balance>0.005);
+}
+function renderCreditReminders(){
+ const host=$('aibosCreditReminderList');if(!host||!state.merchant)return;
+ if(!(state.merchant.user_id===session?.user?.id||sheriCan('manage_finance'))){host.innerHTML='Owner and authorized finance managers only.';return;}
+ const rows=creditRows(),today=new Date().toISOString().slice(0,10);
+ host.innerHTML=rows.length?'<div class="sub">'+rows.length+' outstanding customer account(s)</div><div style="overflow-x:auto"><table class="table"><tr><th>Customer</th><th>Phone</th><th>Invoice</th><th>Balance</th><th>Due</th><th>Action</th></tr>'+rows.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.phone||'—')+'</td><td>'+esc(x.invoice)+'</td><td>'+money(x.balance)+'</td><td>'+(x.due&&x.due<today?'OVERDUE · ':'')+esc(x.due||'—')+'</td><td>'+(x.phone?'<a href="tel:'+esc(x.phone)+'">Call</a> ':'')+'<button class="btn small" onclick="aibosCollectCredit(&quot;'+esc(x.id)+'&quot;)">Record payment</button></td></tr>').join('')+'</table></div>':'<div class="sub">No outstanding customer credit balances.</div>';
+}
+window.aibosCollectCredit=async function(id){
+ const x=creditRows().find(v=>v.id===id);if(!x)return sheriToast('This balance is already settled.','warning');
+ const raw=prompt('Outstanding: '+money(x.balance)+'\nAmount received:');if(raw===null)return;const amount=Number(raw);
+ if(!Number.isFinite(amount)||amount<=0||amount>x.balance+0.005)return sheriToast('Enter a valid amount not greater than the outstanding balance.','error');
+ const method=String(prompt('Payment method: cash or momo','cash')||'').trim().toLowerCase();if(!['cash','momo'].includes(method))return sheriToast('Payment method must be cash or momo.','error');
+ if(!navigator.onLine)return sheriToast('Customer repayments require an online connection.','error');
+ try{const {data,error}=await sb.rpc('shericeri_record_customer_receipt',{p_payment_id:sheriUuid(),p_merchant_id:state.merchant.id,p_transaction_id:id,p_amount:amount,p_method:method,p_payment_date:new Date().toISOString().slice(0,10),p_reference:null,p_notes:'Customer credit repayment'});if(error)throw error;if(data?.ok!==true)throw new Error(data?.message||'Payment was not confirmed.');await sheriLoadAccountingSnapshot(state.merchant.id);render();sheriToast('Payment recorded. Accounts Receivable reduced.');}catch(e){sheriToast(e?.message||'Payment could not be recorded.','error');}
+};
+document.addEventListener('input',e=>{if(['saleQty','salePrice'].includes(e.target?.id))updateAmount();});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',addControls);else addControls();
+})();
+</script>
 </body>
 </html>
