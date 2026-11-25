@@ -325,7 +325,7 @@
       if(!['draft','submitted'].includes(run.status))await closeOpen(run.id,'approve_payroll');
       if(run.status==='draft')reminders.push({merchant_id:state.merchant.id,pay_run_id:run.id,reminder_type:'prepare_payroll',title:t('prepareRunTitle')+' '+run.run_number,message:t('prepareRunMsg'),due_on:run.pay_date,remind_on:makeDate(5),status:'open',idempotency_key:'prepare-'+run.id});
       if(run.status==='submitted')reminders.push({merchant_id:state.merchant.id,pay_run_id:run.id,reminder_type:'approve_payroll',title:t('approveRunTitle')+' '+run.run_number,message:t('approveRunMsg'),due_on:run.pay_date,remind_on:makeDate(3),status:'open',idempotency_key:'approve-'+run.id});
-      if(['approved','posted','partially_paid'].includes(run.status)){
+      if(['posted','partially_paid'].includes(run.status)){
         const payKey='pay-salaries-'+run.id+'-'+Number(run.amount_paid_total||0).toFixed(2);
         const {error:staleError}=await sb.from('payroll_reminders').update({status:'completed',completed_at:new Date().toISOString()}).eq('merchant_id',state.merchant.id).eq('pay_run_id',run.id).eq('reminder_type','pay_salaries').eq('status','open').neq('idempotency_key',payKey);
         if(staleError)throw staleError;
