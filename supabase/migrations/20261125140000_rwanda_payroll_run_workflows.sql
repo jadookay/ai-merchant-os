@@ -142,6 +142,13 @@ begin
     return v_run_id;
   end if;
 
+  select id into v_run_id from public.payroll_pay_runs
+  where merchant_id=p_merchant_id and period_start=p_period_start and period_end=p_period_end and status<>'void'
+  for update;
+  if v_run_id is not null then
+    raise exception 'An active payroll run already exists for this pay period; use the existing run instead of creating a duplicate';
+  end if;
+
   insert into public.payroll_pay_runs(merchant_id,run_number,period_start,period_end,pay_date,status,created_by)
   values(p_merchant_id,trim(p_run_number),p_period_start,p_period_end,p_pay_date,'draft',v_uid)
   returning id into v_run_id;
