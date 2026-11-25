@@ -2,7 +2,7 @@
 -- Payroll posting is deliberately separate from sales/inventory/sync paths.
 
 alter table public.payroll_employees
-  add column if not exists casual_days_in_tax_period integer,
+  add column if not exists casual_days_in_tax_year integer,
   add column if not exists casual_criteria_confirmed boolean not null default false,
   add column if not exists secondary_employer_confirmed boolean not null default false;
 
@@ -18,7 +18,7 @@ alter table public.payroll_pay_runs
   add column if not exists amount_paid_total numeric(18,2) not null default 0;
 alter table public.payroll_employees
   add constraint payroll_employees_casual_days_range
-  check (casual_days_in_tax_period is null or casual_days_in_tax_period between 1 and 30);
+  check (casual_days_in_tax_year is null or casual_days_in_tax_year between 1 and 29);
 alter table public.payroll_pay_items
   add constraint payroll_pay_items_rwanda_contributions_nonnegative
   check (maternity_employee>=0 and maternity_employer>=0 and cbhi_employee>=0);
@@ -180,10 +180,10 @@ begin
     end if;
     if v_employee.employment_type='casual' then
       if not v_employee.casual_criteria_confirmed
-        or v_employee.casual_days_in_tax_period is null
-        or v_employee.casual_days_in_tax_period<1
-        or v_employee.casual_days_in_tax_period>30 then
-        raise exception 'Casual employee % must have confirmed RRA eligibility and 1-30 engagement days for this tax period',v_employee.employee_number;
+        or v_employee.casual_days_in_tax_year is null
+        or v_employee.casual_days_in_tax_year<1
+        or v_employee.casual_days_in_tax_year>=30 then
+        raise exception 'Casual employee % must have confirmed RRA eligibility and less than 30 days of engagement during the tax year and confirmed RRA eligibility',v_employee.employee_number;
       end if;
       v_paye:=round(v_gross*0.15,2);
     elsif v_employee.employment_type='secondary_employer' then
@@ -266,7 +266,7 @@ begin
         'cbhi_employee_rate',v_cbhi_rate,'cbhi_base','gross_less_paye_total_pension_occupational_hazards_and_maternity_contributions',
         'taxable_income_includes_transport',true),
       v_other,
-      case when v_employee.employment_type='casual' then v_employee.casual_days_in_tax_period else null end,
+      case when v_employee.employment_type='casual' then v_employee.casual_days_in_tax_year else null end,
       p_period_end,
       'PS-'||trim(p_run_number)||'-'||v_employee.employee_number,
       v_maternity_employee,v_maternity_employer,v_cbhi
