@@ -192,7 +192,7 @@ begin
         or v_employee.casual_days_in_tax_year>=30 then
         raise exception 'Casual employee % must have confirmed RRA eligibility and less than 30 days of engagement during the tax year and confirmed RRA eligibility',v_employee.employee_number;
       end if;
-      v_paye:=round(v_taxable_income*0.15,2);
+      v_paye:=round(greatest(0,v_taxable_income-60000)*0.15,2);
     elsif v_employee.employment_type='secondary_employer' then
       v_paye:=round(v_taxable_income*0.30,2);
     else
