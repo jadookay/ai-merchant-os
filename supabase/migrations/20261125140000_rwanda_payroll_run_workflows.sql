@@ -321,7 +321,7 @@ returns uuid language plpgsql security definer set search_path=''
 as $$
 declare v_status text;
 begin
- if not private.user_can_access_merchant(p_merchant_id,'manage_finance') then raise exception 'Finance approval permission is required'; end if;
+ if not private.user_can_access_merchant(p_merchant_id,'manage_finance') or not private.user_can_access_merchant(p_merchant_id,'manage_payroll') then raise exception 'Payroll and finance permissions are required for approval'; end if;
  select status into v_status from public.payroll_pay_runs where id=p_run_id and merchant_id=p_merchant_id for update;
  if not found then raise exception 'Payroll run not found'; end if;
  if v_status='approved' then return p_run_id; end if;
@@ -343,7 +343,7 @@ declare
  v_maternity_emp numeric(18,2); v_maternity_er numeric(18,2); v_cbhi numeric(18,2);
  v_lines jsonb;
 begin
- if not private.user_can_access_merchant(p_merchant_id,'manage_finance') then raise exception 'Finance posting permission is required'; end if;
+ if not private.user_can_access_merchant(p_merchant_id,'manage_finance') or not private.user_can_access_merchant(p_merchant_id,'manage_payroll') then raise exception 'Payroll and finance permissions are required for posting'; end if;
  select * into v_run from public.payroll_pay_runs where id=p_run_id and merchant_id=p_merchant_id for update;
  if not found then raise exception 'Payroll run not found'; end if;
  if v_run.status='posted' and v_run.journal_entry_id is not null then
@@ -411,7 +411,7 @@ declare
  v_journal uuid;
  v_outstanding numeric(18,2);
 begin
- if not private.user_can_access_merchant(p_merchant_id,'manage_finance') then raise exception 'Finance payment permission is required'; end if;
+ if not private.user_can_access_merchant(p_merchant_id,'manage_finance') or not private.user_can_access_merchant(p_merchant_id,'manage_payroll') then raise exception 'Payroll and finance permissions are required for salary payments'; end if;
  if p_amount is null or p_amount<=0 or p_payment_date is null or coalesce(trim(p_idempotency_key),'')='' then raise exception 'Payment amount, date and idempotency key are required'; end if;
  if p_payment_method not in ('bank','mobile_money','cash') then raise exception 'Unsupported salary payment method'; end if;
  perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_merchant_id::text||':payroll-payment:'||p_idempotency_key,0));
