@@ -278,7 +278,10 @@ begin
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
     if v_cbhi_rate is null then raise exception 'No verified effective CBHI contribution rule is configured for payroll period ending %',p_period_end; end if;
-    v_cbhi:=round(greatest(0,v_taxable_income-v_paye-v_pension_employee-v_pension_employer-v_hazards-v_maternity_employee-v_maternity_employer)*v_cbhi_rate,2);
+    -- CBHI is 0.5% of employee net salary. Use cash gross pay less
+    -- employee-side PAYE, pension and maternity deductions only; employer
+    -- contributions are never deducted from the employee's net salary.
+    v_cbhi:=round(greatest(0,v_gross-v_paye-v_pension_employee-v_maternity_employee)*v_cbhi_rate,2);
     v_net:=round(v_gross-v_paye-v_pension_employee-v_maternity_employee-v_cbhi,2);
     v_cost:=round(v_gross+v_pension_employer+v_hazards+v_maternity_employer,2);
     if v_net<0 then raise exception 'Deductions exceed gross pay for employee %',v_employee.employee_number; end if;
@@ -309,7 +312,7 @@ begin
         'pension_employee_rate',v_pension_rate,'pension_employer_rate',v_pension_rate,
         'occupational_hazards_rate',0.02,'occupational_hazards_base','gross_remuneration_excluding_transport',
         'maternity_employee_rate',v_maternity_rate,'maternity_employer_rate',0.003,'maternity_base','gross_salary_excluding_transport',
-        'cbhi_employee_rate',v_cbhi_rate,'cbhi_base','gross_less_paye_total_pension_occupational_hazards_and_maternity_contributions',
+        'cbhi_employee_rate',v_cbhi_rate,'cbhi_base','cash_gross_less_paye_employee_pension_and_maternity_contributions',
         'taxable_income_includes_transport',true,'taxable_benefits_in_kind',v_benefits,'cash_gross_pay',v_gross,
         'paye_rule_code',v_paye_rule_code,'paye_rule_effective_from',v_paye_rule_effective_from,
         'occupational_hazards_rate',v_hazards_rate),
