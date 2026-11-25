@@ -196,7 +196,7 @@ begin
     if v_gross<0 or v_benefits<0 then raise exception 'Invalid gross pay for employee %',v_employee.employee_number; end if;
 
     if v_employee.employment_type='secondary_employer' and not v_employee.secondary_employer_confirmed then
-      raise exception 'Confirm that this is not the employee primary employer before applying the 30% PAYE rate';
+      raise exception 'Confirm that this is not the employee primary employer before applying the 30%% PAYE rate';
     end if;
     v_paye_rule_code:=case
       when v_employee.employment_type='casual' then 'PAYE_CASUAL'
