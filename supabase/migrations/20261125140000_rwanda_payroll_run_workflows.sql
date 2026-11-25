@@ -28,10 +28,10 @@ from public.merchants m
 cross join (values
  ('6300','Salaries and wages expense','expense','debit',null::text),
  ('6310','Employer payroll contributions expense','expense','debit',null::text),
- ('2210','Net salaries payable','liability','credit','current_liability'),
- ('2220','PAYE payable','liability','credit','current_liability'),
- ('2230','RSSB pension payable','liability','credit','current_liability'),
- ('2240','RSSB occupational hazards payable','liability','credit','current_liability')
+ ('2210','Net salaries payable','liability','credit','current'),
+ ('2220','PAYE payable','liability','credit','current'),
+ ('2230','RSSB pension payable','liability','credit','current'),
+ ('2240','RSSB occupational hazards payable','liability','credit','current')
 ) a(code,name,type,normal_balance,balance_sheet_class)
 on conflict (merchant_id,code) do nothing;
 
@@ -177,6 +177,8 @@ begin
     v_net_total:=v_net_total+v_net;
   end loop;
 
+  if v_count=0 or v_gross_total<=0 then raise exception 'No eligible active employees with positive payroll were found for this period'; end if;
+
   update public.payroll_pay_runs
   set employee_count=v_count,gross_total=v_gross_total,
       employee_deductions_total=v_deductions_total,
@@ -252,10 +254,9 @@ begin
  into v_pension_emp,v_pension_er,v_oh
  from public.payroll_pay_items where pay_run_id=p_run_id and merchant_id=p_merchant_id;
  v_journal:=gen_random_uuid();
- v_lines:=jsonb_build_array(
-   jsonb_build_object('account_id',v_salary,'debit',v_run.gross_total,'credit',0,'memo','Gross salaries and wages'),
-   jsonb_build_object('account_id',v_employer_exp,'debit',v_pension_er+v_oh,'credit',0,'memo','Employer pension and occupational hazards')
- );
+ v_lines:='[]'::jsonb;
+ if v_run.gross_total>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_salary,'debit',v_run.gross_total,'credit',0,'memo','Gross salaries and wages')); end if;
+ if v_pension_er+v_oh>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_employer_exp,'debit',v_pension_er+v_oh,'credit',0,'memo','Employer pension and occupational hazards')); end if;
  if v_run.net_pay_total>0 then v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_net_payable,'debit',0,'credit',v_run.net_pay_total,'memo','Net salaries payable')); end if;
  if exists(select 1 from public.payroll_pay_items where pay_run_id=p_run_id and paye>0) then
    v_lines:=v_lines||jsonb_build_array(jsonb_build_object('account_id',v_paye_payable,'debit',0,'credit',(select sum(paye) from public.payroll_pay_items where pay_run_id=p_run_id),'memo','PAYE payable'));
