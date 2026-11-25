@@ -234,6 +234,7 @@ begin
     into v_pension_rate
     from public.payroll_rule_sets r
     where r.jurisdiction='RW' and r.rule_code='RSSB_PENSION'
+      and r.verification_status='verified'
       and r.effective_from<=p_period_end
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
@@ -256,6 +257,7 @@ begin
     into v_maternity_rate,v_maternity_employer
     from public.payroll_rule_sets r
     where r.jurisdiction='RW' and r.rule_code='MATERNITY_LEAVE'
+      and r.verification_status='verified'
       and r.effective_from<=p_period_end
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
@@ -267,6 +269,7 @@ begin
     into v_cbhi_rate
     from public.payroll_rule_sets r
     where r.jurisdiction='RW' and r.rule_code='CBHI'
+      and r.verification_status='verified'
       and r.effective_from<=p_period_end
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
