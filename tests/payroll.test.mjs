@@ -138,6 +138,15 @@ test("Payroll chart-of-account mappings are validated and salary journals use de
   assert.ok(workflows.includes("'CBHI'"));
 });
 
+test("Payroll uses verified effective-dated PAYE and Occupational Hazards rules", () => {
+  assert.ok(workflows.includes("r.verification_status='verified'"));
+  assert.ok(workflows.includes("r.effective_from<=p_period_end"));
+  assert.ok(workflows.includes("r.rule_code=v_paye_rule_code"));
+  assert.ok(workflows.includes("v_paye_rule_effective_from"));
+  assert.ok(workflows.includes("v_hazards_rate"));
+  assert.ok(workflows.includes("r.rule_code='RSSB_OCCUPATIONAL_HAZARDS'"));
+});
+
 test("RRA PAYE filing frequency is monthly by default and quarterly only when eligible and elected", () => {
   assert.ok(workflows.includes("create table if not exists public.payroll_employer_settings"));
   assert.ok(workflows.includes("paye_frequency in ('monthly','quarterly')"));
@@ -173,7 +182,10 @@ test("Employees without RSSB numbers receive eight-day registration reminders", 
 test("Taxable benefits in kind flow into PAYE and statutory contribution bases without being paid as cash", () => {
   assert.ok(workflows.includes("taxable_benefits_in_kind"));
   assert.ok(workflows.includes("v_taxable_income:=round(v_gross+v_benefits,2)"));
-  assert.ok(workflows.includes("v_paye:=round(greatest(0,v_taxable_income-60000)*0.15,2)"));
+  assert.ok(workflows.includes("v_paye_rule_code:=case"));
+  assert.ok(workflows.includes("'PAYE_CASUAL'"));
+  assert.ok(workflows.includes("v_paye_rule->'bands'"));
+  assert.ok(workflows.includes("v_taxable_income-60000")===false);
   assert.ok(workflows.includes("v_pension_employee:=round(v_taxable_income*v_pension_rate,2)"));
   assert.ok(workflows.includes("cash_payment',false"));
   assert.ok(workflows.includes("'cash_gross_pay',v_gross"));
