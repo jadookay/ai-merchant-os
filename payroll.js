@@ -103,6 +103,26 @@
     const {error}=await sb.from('payroll_reminders').upsert(rows,{onConflict:'merchant_id,idempotency_key',ignoreDuplicates:true});
     if(error)throw error;
   }
+  async function ensureRunReminders(){
+    if(!state.merchant||!sb)return;
+    const {data:runs,error}=await sb.from('payroll_pay_runs').select('id,run_number,pay_date,status,net_pay_total').eq('merchant_id',state.merchant.id).in('status',['draft','submitted','approved','posted','partially_paid','paid']);
+    if(error)throw error;
+    const reminders=[];
+    for(const run of runs||[]){
+      const payDate=new Date(run.pay_date+'T00:00:00');
+      const makeDate=days=>{const d=new Date(payDate);d.setDate(d.getDate()-days);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+      if(run.status==='paid'){
+        await sb.from('payroll_reminders').update({status:'completed',completed_at:new Date().toISOString()}).eq('merchant_id',state.merchant.id).eq('pay_run_id',run.id).eq('status','open');
+        continue;
+      }
+      if(run.status!=='draft')await sb.from('payroll_reminders').update({status:'completed',completed_at:new Date().toISOString()}).eq('merchant_id',state.merchant.id).eq('pay_run_id',run.id).eq('reminder_type','prepare_payroll').eq('status','open');
+      if(!['draft','submitted'].includes(run.status))await sb.from('payroll_reminders').update({status:'completed',completed_at:new Date().toISOString()}).eq('merchant_id',state.merchant.id).eq('pay_run_id',run.id).eq('reminder_type','approve_payroll').eq('status','open');
+      if(run.status==='draft')reminders.push({merchant_id:state.merchant.id,pay_run_id:run.id,reminder_type:'prepare_payroll',title:'Prepare payroll run '+run.run_number,message:'Review employee earnings and deductions before the payroll approval stage.',due_on:run.pay_date,remind_on:makeDate(5),status:'open',idempotency_key:'prepare-'+run.id});
+      if(run.status==='submitted')reminders.push({merchant_id:state.merchant.id,pay_run_id:run.id,reminder_type:'approve_payroll',title:'Approve payroll run '+run.run_number,message:'Review and approve the payroll before its scheduled pay date.',due_on:run.pay_date,remind_on:makeDate(3),status:'open',idempotency_key:'approve-'+run.id});
+      if(['approved','posted','partially_paid'].includes(run.status))reminders.push({merchant_id:state.merchant.id,pay_run_id:run.id,reminder_type:'pay_salaries',title:'Pay salaries for run '+run.run_number,message:'Salary payments totaling '+money(run.net_pay_total)+' are due on '+run.pay_date+'. Record payment only after it has actually been made.',due_on:run.pay_date,remind_on:run.pay_date,status:'open',idempotency_key:'pay-salaries-'+run.id});
+    }
+    if(reminders.length){const {error:writeError}=await sb.from('payroll_reminders').upsert(reminders,{onConflict:'merchant_id,idempotency_key',ignoreDuplicates:true});if(writeError)throw writeError}
+  }
   window.dismissPayrollReminder=async function(id){
     try{const {error}=await sb.from('payroll_reminders').update({status:'dismissed'}).eq('id',id).eq('merchant_id',state.merchant.id);if(error)throw error;loadDashboardReminders()}catch(e){alert('Could not dismiss reminder: '+(e.message||String(e)))}
   };
@@ -112,6 +132,7 @@
     if(!panel){panel=document.createElement('div');panel.id='payrollDashboardReminders';panel.className='card';const top=dashboard.querySelector('.top');if(top)top.insertAdjacentElement('afterend',panel);else dashboard.prepend(panel)}
     try{
       await ensureStatutoryReminders();
+      await ensureRunReminders();
       const visibleUntil=new Date();visibleUntil.setDate(visibleUntil.getDate()+30);
       const horizon=visibleUntil.getFullYear()+'-'+String(visibleUntil.getMonth()+1).padStart(2,'0')+'-'+String(visibleUntil.getDate()).padStart(2,'0');
       const {data,error}=await sb.from('payroll_reminders').select('id,title,message,due_on,remind_on,status').eq('merchant_id',state.merchant.id).eq('status','open').lte('remind_on',horizon).order('due_on').limit(10);
