@@ -32,6 +32,9 @@ alter table public.payroll_payments
 create unique index if not exists payroll_payments_idempotency_unique
   on public.payroll_payments(merchant_id,idempotency_key)
   where idempotency_key is not null;
+create unique index if not exists payroll_runs_one_active_period
+  on public.payroll_pay_runs(merchant_id,period_start,period_end)
+  where status<>'void';
 
 -- Add dedicated payroll ledger accounts without changing existing account mappings.
 insert into public.chart_of_accounts(merchant_id,code,name,type,normal_balance,active,balance_sheet_class)
