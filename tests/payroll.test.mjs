@@ -95,7 +95,7 @@ test("Payroll workflow RPCs create, submit, approve, post and pay with server-si
   ]) {
     assert.ok(workflows.includes("function public."+fn));
     assert.ok(workflows.includes("revoke all on function public."+fn));
-    assert.ok(workflows.includes("grant execute on function public."+fn+" to authenticated"));
+    assert.match(workflows,new RegExp("grant execute on function public\\."+fn+"\\([^;]+\\) to authenticated"));
   }
   assert.ok(workflows.includes("private.user_can_access_merchant(p_merchant_id,'manage_payroll')"));
   assert.ok(workflows.includes("private.user_can_access_merchant(p_merchant_id,'manage_finance')"));
