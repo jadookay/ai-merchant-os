@@ -90,6 +90,9 @@ test("owner dashboard reminder generation is idempotent and dismissal does not m
 test("Payroll headings and navigation react to the selected app language", () => {
   assert.ok(payroll.includes("pageTitle"));
   assert.ok(payroll.includes("translateHeader"));
+  assert.ok(payroll.includes("hubTitle:'👥 Imishahara'"));
+  assert.ok(payroll.includes("hubTitle:'👥 Paie'"));
+  assert.ok(payroll.includes("#businessOS .aibos-command-grid button"));
   assert.ok(payroll.includes("aibos:languagechange"));
   assert.ok(payroll.includes("getElementById('aibosLanguageSelect')"));
   assert.ok(payroll.includes("host.dataset.lang!==lang()"));
