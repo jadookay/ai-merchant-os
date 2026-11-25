@@ -92,7 +92,7 @@
       const {data,error}=await sb.from('payroll_pay_runs').select('id,run_number,period_start,period_end,pay_date,status,employee_count,gross_total,employee_deductions_total,employer_contributions_total,net_pay_total,amount_paid_total').eq('merchant_id',state.merchant.id).order('created_at',{ascending:false}).limit(20);
       if(error)throw error;
       if(!data||!data.length){el.textContent=t('noRuns');return}
-      el.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>'+t('runNumber')+'</th><th>'+t('period')+'</th><th>'+t('status')+'</th><th>'+t('grossTotal')+'</th><th>'+t('netTotal')+'</th><th>'+t('actions')+'</th></tr></thead><tbody>'+data.map(r=>{
+      el.innerHTML='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>'+t('runNumber')+'</th><th>'+t('period')+'</th><th>'+t('status')+'</th><th>'+t('grossTotal')+'</th><th>'+t('employerCost')+'</th><th>'+t('netTotal')+'</th><th>'+t('actions')+'</th></tr></thead><tbody>'+data.map(r=>{
         let action='';
         if(r.status==='draft')action='<button class="btn" onclick="aibosPayrollRunAction(\''+r.id+'\',\'submit\')">'+t('submit')+'</button>';
         if(r.status==='submitted')action='<button class="btn" onclick="aibosPayrollRunAction(\''+r.id+'\',\'approve\')">'+t('approve')+'</button>';
@@ -144,9 +144,9 @@
     const panel=document.getElementById('payrollRunDetails');if(!panel)return;
     panel.textContent=t('loading');
     try{
-      const {data,error}=await sb.from('payroll_pay_items').select('id,payslip_number,gross_pay,taxable_income,paye,pension_employee,pension_employer,occupational_hazards_employer,maternity_employee,maternity_employer,cbhi_employee,taxable_benefits_in_kind,net_pay,employer_cost,payroll_employees(legal_name,employee_number)').eq('merchant_id',state.merchant.id).eq('pay_run_id',id).order('created_at');
+      const {data,error}=await sb.from('payroll_pay_items').select('id,payslip_number,gross_pay,taxable_income,paye,pension_employee,pension_employer,occupational_hazards_employer,maternity_employee,maternity_employer,cbhi_employee,taxable_benefits_in_kind,other_taxable_earnings,net_pay,employer_cost,payroll_employees(legal_name,employee_number)').eq('merchant_id',state.merchant.id).eq('pay_run_id',id).order('created_at');
       if(error)throw error;
-      panel.innerHTML='<strong>'+t('viewItems')+'</strong><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>'+t('name')+'</th><th>'+t('gross')+'</th><th>'+t('taxableBenefits')+'</th><th>'+t('paye')+'</th><th>'+t('empPension')+'</th><th>'+t('empMaternity')+'</th><th>'+t('cbhiDeduct')+'</th><th>'+t('net')+'</th></tr></thead><tbody>'+(data||[]).map(x=>'<tr><td><strong>'+esc(x.payroll_employees?.legal_name||'')+'</strong><div class="sub">'+esc(x.payslip_number||'')+'</div></td><td>'+money(x.gross_pay)+'</td><td>'+money(x.paye)+'</td><td>'+money(x.pension_employee)+'</td><td><strong>'+money(x.net_pay)+'</strong></td></tr>').join('')+'</tbody></table></div>';
+      panel.innerHTML='<strong>'+t('viewItems')+'</strong><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse"><thead><tr><th>'+t('name')+'</th><th>'+t('gross')+'</th><th>'+t('otherRecurring')+'</th><th>'+t('taxableBenefits')+'</th><th>'+t('paye')+'</th><th>'+t('empPension')+'</th><th>'+t('empMaternity')+'</th><th>'+t('cbhiDeduct')+'</th><th>'+t('net')+'</th></tr></thead><tbody>'+(data||[]).map(x=>'<tr><td><strong>'+esc(x.payroll_employees?.legal_name||'')+'</strong><div class="sub">'+esc(x.payslip_number||'')+'</div></td><td>'+money(x.gross_pay)+'</td><td>'+money(x.paye)+'</td><td>'+money(x.pension_employee)+'</td><td><strong>'+money(x.net_pay)+'</strong></td></tr>').join('')+'</tbody></table></div>';
       panel.scrollIntoView({behavior:'smooth',block:'nearest'});
     }catch(e){panel.textContent='Payslips unavailable: '+(e.message||String(e))}
   };
