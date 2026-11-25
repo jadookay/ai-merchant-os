@@ -114,7 +114,7 @@ test("Payroll chart-of-account mappings are validated and salary journals use de
   assert.ok(workflows.includes("type='expense' and normal_balance='debit'"));
   assert.ok(workflows.includes("type='liability' and normal_balance='credit'"));
   assert.ok(workflows.includes("type='asset' and normal_balance='debit'"));
-  assert.ok(workflows.includes("No journal was posted"));
+  assert.ok(workflows.includes("no journal was posted"));
 });
 
 test("payroll JavaScript parses", () => {
