@@ -627,7 +627,7 @@ test("isolated preview supports payment methods, customer credit details, remind
     "salePaymentMethod", "value='cash'", "value='momo'", "value='credit'",
     "saleCreditName", "saleCreditPhone", "saleCreditDue", "saleCreditAmount",
     "renderCreditReminders", "aibosCollectCredit",
-    "sheri_record_customer_receipt", "sale_invoice"
+    "shericeri_record_customer_receipt", "sale_invoice"
   ]) assert.ok(previewHtml.includes(value), "Missing customer-credit workflow: "+value);
 });
 
@@ -644,7 +644,7 @@ test("credit-sale migration preserves default cash behavior and reclassifies MoM
   const creditPosMigration = readFileSync(new URL("../supabase/migrations/20261125190000_customer_credit_sales_and_pos_receipts.sql", import.meta.url), "utf8");
   for (const value of [
     "payment_method text not null default 'cash'",
-    "code='1020'", "code='1100'", "sale_payment_reclass",
+    "then '1020'", "else '1100'", "sale_payment_reclass",
     "zz_sales_payment_reclass_after_insert",
     "zz_sales_payment_reclass_void_after_update",
     "create or replace function public.shericeri_record_customer_receipt",
