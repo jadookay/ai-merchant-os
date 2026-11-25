@@ -144,6 +144,12 @@ test("Payroll uses verified effective-dated PAYE and Occupational Hazards rules"
   assert.ok(workflows.includes("r.rule_code=v_paye_rule_code"));
   assert.ok(workflows.includes("v_paye_rule_effective_from"));
   assert.ok(workflows.includes("v_hazards_rate"));
+  assert.ok(workflows.includes("No verified effective RSSB pension rule"));
+  assert.ok(workflows.includes("No verified effective Occupational Hazards rule"));
+  assert.ok(workflows.includes("No verified effective maternity contribution rule"));
+  assert.ok(workflows.includes("No verified effective CBHI contribution rule"));
+  assert.ok(workflows.includes("PAYE band configuration is invalid"));
+  assert.ok(workflows.includes("A payroll run must cover one complete calendar month"));
   assert.ok(workflows.includes("r.rule_code='RSSB_OCCUPATIONAL_HAZARDS'"));
 });
 
