@@ -29,8 +29,8 @@ test("Rwanda payroll page is multilingual and keeps tax declarations and money t
   assert.ok(payroll.includes("aibosPayrollPayslips"));
   assert.ok(payroll.includes("max=\"29\""));
   assert.ok(payroll.includes("secondaryConfirm"));
-  assert.ok(payroll.includes("maternityEmployee=Math.round(basic*.003)"));
-  assert.ok(payroll.includes("cbhi=Math.round(Math.max(0,gross-paye-employeePension-maternityEmployee)*.005)"));
+  assert.ok(payroll.includes("maternityEmployee=Math.round((basic+otherRecurring+benefits)*.003)"));
+  assert.ok(payroll.includes("cbhi=Math.round(Math.max(0,taxableIncome-paye-employeePension-employerPension-hazards-maternityEmployee-maternityEmployer)*.005)"));
 });
 
 test("PAYE estimator includes permanent, casual and secondary-employer classifications", () => {
@@ -155,7 +155,7 @@ test("Employee compensation edits are audited and history is tenant-protected", 
   assert.ok(compensationHistory.includes("payroll_employee_compensation_history"));
   assert.ok(compensationHistory.includes("enable row level security"));
   assert.ok(compensationHistory.includes("private.user_can_access_merchant(merchant_id,'manage_payroll')"));
-  assert.ok(compensationHistory.includes("after insert or update of base_salary,transport_allowance,other_recurring_earnings"));
+  assert.ok(compensationHistory.includes("after insert or update of base_salary,transport_allowance,taxable_benefits_in_kind,other_recurring_earnings"));
   assert.ok(compensationHistory.includes("Initial compensation record"));
   assert.ok(payroll.includes("aibosPayrollEditEmployee"));
   assert.ok(payroll.includes("aibosPayrollCompensationHistory"));
