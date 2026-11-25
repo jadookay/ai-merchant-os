@@ -86,14 +86,35 @@
     const el=document.getElementById('payrollRuleStatus');if(!el)return;
     try{const {data,error}=await sb.from('payroll_rule_sets').select('rule_code,effective_from,verification_status').eq('jurisdiction','RW').order('effective_from',{ascending:false});if(error)throw error;el.textContent=t('source')+': '+(data||[]).filter(x=>x.verification_status==='verified').map(x=>x.rule_code+' '+x.effective_from).join(' · ')}catch(e){el.textContent='Statutory rules will load after the payroll database migration is deployed.'}
   }
+  async function ensureStatutoryReminders(){
+    if(!state.merchant||!sb)return;
+    const now=new Date(),due=new Date(now.getFullYear(),now.getMonth()+(now.getDate()>15?1:0),15);
+    const dueOn=due.getFullYear()+'-'+String(due.getMonth()+1).padStart(2,'0')+'-15';
+    const remind=new Date(due);remind.setDate(remind.getDate()-5);
+    const remindOn=remind.getFullYear()+'-'+String(remind.getMonth()+1).padStart(2,'0')+'-'+String(remind.getDate()).padStart(2,'0');
+    const period=due.getFullYear()+'-'+String(due.getMonth()+1).padStart(2,'0');
+    const rows=[
+      ['paye_due','PAYE declaration and payment','Prepare and submit the PAYE declaration and payment to RRA by the 15th.','paye'],
+      ['pension_due','RSSB Pension contribution','Declare and pay Pension (12%) separately by the 15th.','pension'],
+      ['occupational_hazards_due','RSSB Occupational Hazards contribution','Declare and pay Occupational Hazards (2%) separately by the 15th.','occupational-hazards']
+    ].map(x=>({merchant_id:state.merchant.id,reminder_type:x[0],title:x[1],message:x[2],due_on:dueOn,remind_on:remindOn,status:'open',idempotency_key:x[3]+'-'+period}));
+    const {error}=await sb.from('payroll_reminders').upsert(rows,{onConflict:'merchant_id,idempotency_key',ignoreDuplicates:true});
+    if(error)throw error;
+  }
+  window.dismissPayrollReminder=async function(id){
+    try{const {error}=await sb.from('payroll_reminders').update({status:'dismissed'}).eq('id',id).eq('merchant_id',state.merchant.id);if(error)throw error;loadDashboardReminders()}catch(e){alert('Could not dismiss reminder: '+(e.message||String(e)))}
+  };
   async function loadDashboardReminders(){
     const dashboard=document.getElementById('dashboard');if(!dashboard||!state.merchant||!sb)return;
     let panel=document.getElementById('payrollDashboardReminders');
     if(!panel){panel=document.createElement('div');panel.id='payrollDashboardReminders';panel.className='card';const top=dashboard.querySelector('.top');if(top)top.insertAdjacentElement('afterend',panel);else dashboard.prepend(panel)}
     try{
-      const {data,error}=await sb.from('payroll_reminders').select('id,title,message,due_on,remind_on,status').eq('merchant_id',state.merchant.id).eq('status','open').lte('remind_on',today()).order('due_on').limit(10);
+      await ensureStatutoryReminders();
+      const visibleUntil=new Date();visibleUntil.setDate(visibleUntil.getDate()+30);
+      const horizon=visibleUntil.getFullYear()+'-'+String(visibleUntil.getMonth()+1).padStart(2,'0')+'-'+String(visibleUntil.getDate()).padStart(2,'0');
+      const {data,error}=await sb.from('payroll_reminders').select('id,title,message,due_on,remind_on,status').eq('merchant_id',state.merchant.id).eq('status','open').lte('remind_on',horizon).order('due_on').limit(10);
       if(error)throw error;
-      panel.innerHTML='<strong>'+t('reminders')+'</strong><div class="sub">'+(data&&data.length?data.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #ddd"><b>'+esc(x.title)+'</b> · '+esc(x.due_on)+'<div>'+esc(x.message)+'</div></div>').join(''):t('noReminders'))+'</div>';
+      panel.innerHTML='<strong>'+t('reminders')+'</strong><div class="sub">'+(data&&data.length?data.map(x=>'<div style="padding:8px 0;border-bottom:1px solid #ddd"><b>'+esc(x.title)+'</b> · '+esc(x.due_on)+'<div>'+esc(x.message)+'</div><button class="btn secondary" style="margin-top:5px" onclick="dismissPayrollReminder(\''+esc(x.id)+'\')">Dismiss reminder</button></div>').join(''):t('noReminders'))+'</div>';
     }catch(e){panel.style.display='none'}
   }
   const oldShow=window.show;
