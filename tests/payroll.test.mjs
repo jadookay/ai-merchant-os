@@ -63,7 +63,7 @@ test("Rwanda PAYE and pension rules are effective-dated", () => {
   }
   assert.ok(payroll.includes("period>='2030-01' ? 0.20"));
   assert.ok(payroll.includes("period>='2027-01' ? 0.14"));
-  assert.match(payroll, /type==='casual'\)return Math\.round\(g\*\.15\)/);
+  assert.match(payroll, /type==='casual'\)return Math\.round\(Math\.max\(0,g-60000\)\*\.15\)/);
 });
 
 test("payroll run, payslip item, salary payment and reminder writes are not exposed directly", () => {
