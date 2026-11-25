@@ -233,7 +233,7 @@ begin
       and (r.effective_to is null or r.effective_to>=p_period_end)
     order by r.effective_from desc limit 1;
     v_cbhi_rate:=coalesce(v_cbhi_rate,0.005);
-    v_cbhi:=round(greatest(0,v_gross-v_paye-v_pension_employee-v_maternity_employee)*v_cbhi_rate,2);
+    v_cbhi:=round(greatest(0,v_gross-v_paye-v_pension_employee-v_pension_employer-v_hazards-v_maternity_employee-v_maternity_employer)*v_cbhi_rate,2);
     v_net:=round(v_gross-v_paye-v_pension_employee-v_maternity_employee-v_cbhi,2);
     v_cost:=round(v_gross+v_pension_employer+v_hazards+v_maternity_employer,2);
     if v_net<0 then raise exception 'Deductions exceed gross pay for employee %',v_employee.employee_number; end if;
@@ -263,7 +263,7 @@ begin
         'pension_employee_rate',v_pension_rate,'pension_employer_rate',v_pension_rate,
         'occupational_hazards_rate',0.02,'occupational_hazards_base','gross_remuneration_excluding_transport',
         'maternity_employee_rate',v_maternity_rate,'maternity_employer_rate',0.003,'maternity_base','gross_salary_excluding_transport',
-        'cbhi_employee_rate',v_cbhi_rate,'cbhi_base','net_salary_after_paye_pension_and_maternity',
+        'cbhi_employee_rate',v_cbhi_rate,'cbhi_base','gross_less_paye_total_pension_occupational_hazards_and_maternity_contributions',
         'taxable_income_includes_transport',true),
       v_other,
       case when v_employee.employment_type='casual' then v_employee.casual_days_in_tax_period else null end,
