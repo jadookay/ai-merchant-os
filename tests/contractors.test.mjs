@@ -39,8 +39,8 @@ test("contractor accounting schema is tenant-scoped and uses balanced payable an
 });
 
 test("preview worker cache is versioned without changing the sync wake-up path",()=>{
- assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v85"));
- assert.ok(worker.includes("const RELEASE='V14.4.85'"));
+ assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v86"));
+ assert.ok(worker.includes("const RELEASE='V14.4.86'"));
  assert.ok(worker.includes("shericeri-outbox-sync"));
 });
 
