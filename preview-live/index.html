@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.83 isolated POS payment-method reporting">
+<meta name="app-version" content="V14.4.84 isolated POS payment-method controls">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -497,6 +497,18 @@ window.ensurePdfJs=async function(){
       <div><label>Quantity</label><input id="saleQty" type="number" min="1" value="1"></div>
       <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="salePrice" type="number" min="0" step="0.01"></div>
       <div><label>Customer (optional)</label><select id="saleCustomer"><option value="">— Anonymous —</option></select></div>
+    </div>
+    <div id="aibosPosPaymentControls" class="formgrid section" style="margin-top:12px">
+      <div><label for="salePaymentMethod">Payment method</label><select id="salePaymentMethod"><option value="cash">Cash</option><option value="momo">MoMo</option><option value="credit">On credit</option></select></div>
+      <div><label for="saleReceiptNote">Receipt note (optional)</label><input id="saleReceiptNote" maxlength="180"></div>
+      <div id="saleCreditFields" style="display:none;grid-column:1/-1">
+        <div class="formgrid">
+          <div><label for="saleCreditName">Customer name</label><input id="saleCreditName"></div>
+          <div><label for="saleCreditPhone">Customer phone</label><input id="saleCreditPhone" type="tel" placeholder="+250..."></div>
+          <div><label for="saleCreditDue">Payment due date</label><input id="saleCreditDue" type="date"></div>
+          <div><label for="saleCreditAmount">Amount due</label><input id="saleCreditAmount" readonly></div>
+        </div>
+      </div>
     </div>
     <div class="actions" style="margin-top:14px"><button class="btn secondary" onclick="addSaleToCart()">＋ Add to cart</button><button class="btn secondary" onclick="focusSaleProduct()">＋ Add more products</button><button class="btn" onclick="recordSale()">Confirm sale</button><button class="btn secondary" onclick="startVoice()">🎙 Voice entry</button></div>
     <div id="voiceStatus" class="sub" style="margin-top:8px"></div>
@@ -10446,6 +10458,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 </script>
 <script src="payroll.js?v=1"></script>
 <script src="contractors.js?v=1"></script>
-<script src="pos-payment-summary.js?v=1"></script>
+<script src="pos-payment-summary.js?v=2"></script>
 </body>
 </html>
