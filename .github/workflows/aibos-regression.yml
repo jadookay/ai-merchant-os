@@ -15,4 +15,4 @@ jobs:
         with:
           node-version: 22
       - name: Run static regression tests
-        run: node --test tests/aibos-regression.test.mjs tests/index-inline-js-syntax.test.mjs tests/payroll.test.mjs tests/contractors.test.mjs tests/pos-payment-summary.test.mjs
+        run: node --test tests/aibos-regression.test.mjs tests/index-inline-js-syntax.test.mjs tests/payroll.test.mjs tests/contractors.test.mjs tests/pos-payment-summary.test.mjs tests/full-legal-name.test.mjs tests/phone-auth.test.mjs tests/preview-baseline.test.mjs
