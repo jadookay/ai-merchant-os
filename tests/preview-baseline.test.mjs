@@ -186,7 +186,7 @@ test("classified cash flow is translated in English, French and Kinyarwanda",()=
 });
 
 test("Income Statement separates other income and stock write-offs without changing profit",()=>{
- const wrapper=block('<script id="aibos-ifrs-presentation-v1">','</script>');
+ const wrapper=block('<script id="aibos-ifrs-statements-v1">','</script>');
  for(const marker of ["sourceAccountTotal('inventory_adjustment','6000'","const otherIncomeAccounts=accounts.filter(a=>a.type==='income'&&!['4000','4050'].includes(String(a.code)))","moneyRow('Inventory write-offs / stock losses'","const net=periodIncome-periodCogs-operatingExpenses-inventoryWriteOffs-taxExpense","balance_sheet_class==='current'","balance_sheet_class==='non_current'"])
   assert.ok(wrapper.includes(marker),"Missing IFRS statement treatment "+marker);
  for(const label of ["Autres produits","Ayandi mafaranga yinjijwe","Sorties et pertes de stock","Ibicuruzwa byakuwe mu bubiko n’igihombo cyabyo","Actifs courants","Umutungo w’igihe gito","Passifs courants","Imyenda y’igihe gito"])
