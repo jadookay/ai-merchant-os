@@ -2577,7 +2577,7 @@ function dailyProfitTrend(windowDays=7){
 let sheriViewHistory=[];let sheriCurrentView='dashboard';
 function sheriEnsureViewBack(v){if(v==='dashboard')return;const view=document.getElementById(v),top=view?.querySelector('.top');if(!top||top.querySelector('.view-back'))return;const back=document.createElement('button');back.type='button';back.className='btn small secondary view-back';back.textContent='← Back';back.setAttribute('aria-label','Go back to previous page');back.onclick=sheriGoBack;top.insertBefore(back,top.firstChild);}
 function sheriGoBack(){const previous=sheriViewHistory.pop()||'dashboard';show(previous,true);}
-function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');const commandViews=['customers','suppliersPurchases','expenses','reports','money','advisor','forecast','adjustments','businessInsight','payroll','contractors'];document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v||(b.dataset.view==='businessOS'&&commandViews.includes(v))));if(v!=='businessOS'){const sn=document.getElementById('aibosCommandSubnav'),cb=document.querySelector('[data-nav-command-center=\"1\"]');sn?.classList.remove('open');cb?.setAttribute('aria-expanded','false')}sheriCurrentView=v;sheriEnsureViewBack(v);render();if(v==='shericeri'){sheriRestoreTranscript();sheriObserveTranscript()}}
+function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');const commandViews=['customers','suppliersPurchases','expenses','reports','money','advisor','forecast','adjustments','businessInsight','payroll','contractors'];document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v||(b.dataset.view==='businessOS'&&commandViews.includes(v))));if(v!=='businessOS'){const sn=document.getElementById('aibosCommandSubnav'),cb=document.querySelector('[data-nav-command-center=\"1\"]');sn?.classList.remove('open');cb?.setAttribute('aria-expanded','false')}sheriCurrentView=v;sheriEnsureViewBack(v);if(!sheriDeferBackgroundRender())render();if(v==='shericeri'){sheriRestoreTranscript();sheriObserveTranscript()}}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
 
 function sheriRecentActivitiesHtml(){
@@ -9130,7 +9130,7 @@ input[aria-invalid="true"]{border-color:#dc2626!important;box-shadow:0 0 0 2px #
     const entries=state.journalEntries||[],lines=state.journalLines||[];
     const adjustmentIds=new Set(entries.filter(e=>e.source_type===sourceType).flatMap(e=>[e.id,e.source_id].filter(Boolean)));
     const accountsById=new Map((state.accounts||[]).map(a=>[a.id,a]));
-    const reversed=new Set(entries.filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction'].includes(e.source_type)).map(e=>e.source_id));
+    const reversed=new Set(entries.filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void'].includes(e.source_type)).map(e=>e.source_id));
     const entriesById=new Map(entries.map(e=>[e.id,e]));
     let total=0;
     for(const line of lines){
