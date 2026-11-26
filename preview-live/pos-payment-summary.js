@@ -1,4 +1,4 @@
-/* AIBOS isolated POS payment-method controls and sales breakdown. */
+/* AIBOS V14.4.85 isolated POS payment-method controls and sales breakdown. */
 (function(){
   'use strict';
   const $=id=>document.getElementById(id);
