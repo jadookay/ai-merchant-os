@@ -21,7 +21,7 @@ function block(start,end){
  return html.slice(a,b);
 }
 
-test("isolated preview is versioned V14.4.93 and retains every preview-only extension",()=>{
+test("isolated preview is versioned V14.4.94 and retains every preview-only extension",()=>{
  assert.ok(html.includes('name="app-version" content="V14.4.94 isolated full-feature reconciliation"'));
  assert.ok(html.includes("hicvgrkltwkqhnioakcg.supabase.co"));
  assert.ok(!html.includes("bhtodxjhgucgwarpaqzy"));
@@ -121,7 +121,7 @@ test("payroll, contractors and Cash/MoMo/Credit reporting remain independently l
 
 function evaluateCashFlow(fixture,startDate,endDate){
  const start=html.indexOf("function accCashFlowForPeriod(");
- const end=html.indexOf("\\nfunction renderReports()",start);
+ const end=html.indexOf("function renderReports()",start);
  assert.ok(start>=0&&end>start,"Classified cash flow calculation must exist");
  const source=html.slice(start,end).trim();
  const calculate=new Script("("+source+")").runInNewContext({state:fixture});
