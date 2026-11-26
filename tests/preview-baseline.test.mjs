@@ -13,6 +13,7 @@ const payroll=readFileSync(new URL("../preview-live/payroll.js",import.meta.url)
 const payrollWorkflow=readFileSync(new URL("../supabase/migrations/20261125140000_rwanda_payroll_run_workflows.sql",import.meta.url),"utf8");
 const contractors=readFileSync(new URL("../preview-live/contractors.js",import.meta.url),"utf8");
 const payments=readFileSync(new URL("../preview-live/pos-payment-summary.js",import.meta.url),"utf8");
+const quickService=readFileSync(new URL("../preview-live/edge-functions/quick-service/index.ts",import.meta.url),"utf8");
 
 function block(start,end){
  const a=html.indexOf(start),b=html.indexOf(end,a+start.length);
@@ -21,9 +22,11 @@ function block(start,end){
 }
 
 test("isolated preview is versioned V14.4.93 and retains every preview-only extension",()=>{
- assert.ok(html.includes('name="app-version" content="V14.4.93 isolated full-feature reconciliation"'));
- assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v93"));
- assert.ok(worker.includes("const RELEASE='V14.4.93'"));
+ assert.ok(html.includes('name="app-version" content="V14.4.94 isolated full-feature reconciliation"'));
+ assert.ok(html.includes("hicvgrkltwkqhnioakcg.supabase.co"));
+ assert.ok(!html.includes("bhtodxjhgucgwarpaqzy"));
+ assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v94"));
+ assert.ok(worker.includes("const RELEASE='V14.4.94'"));
  for(const path of ['src="payroll.js?v=1"','src="contractors.js?v=1"','src="pos-payment-summary.js?v=1"'])
   assert.ok(html.includes(path), "Missing preview module "+path);
 });
@@ -113,6 +116,111 @@ test("payroll, contractors and Cash/MoMo/Credit reporting remain independently l
  assert.ok(contractors.includes("shericeri_record_contractor_wht_remittance"));
  assert.ok(payments.includes("salePaymentMethod"));
  assert.ok(payments.includes("daily")&&payments.includes("weekly")&&payments.includes("monthly")&&payments.includes("custom"));
+});
+
+
+function evaluateCashFlow(fixture,startDate,endDate){
+ const start=html.indexOf("function accCashFlowForPeriod(");
+ const end=html.indexOf("\\nfunction renderReports()",start);
+ assert.ok(start>=0&&end>start,"Classified cash flow calculation must exist");
+ const source=html.slice(start,end).trim();
+ const calculate=new Script("("+source+")").runInNewContext({state:fixture});
+ return calculate(startDate,endDate);
+}
+
+test("classified cash flow separates operating, investing, financing and unclassified movements",()=>{
+ const accounts=[
+  {id:"cash",code:"1000",type:"asset",balance_sheet_class:"current"},
+  {id:"bank",code:"1010",type:"asset",balance_sheet_class:"current"},
+  {id:"sales",code:"4000",type:"income",balance_sheet_class:"not_applicable"},
+  {id:"expense",code:"6000",type:"expense",balance_sheet_class:"not_applicable"},
+  {id:"inventory",code:"1200",type:"asset",balance_sheet_class:"current"},
+  {id:"ppe",code:"1500",type:"asset",balance_sheet_class:"non_current"},
+  {id:"equity",code:"3000",type:"equity",balance_sheet_class:"not_applicable"},
+  {id:"loan",code:"2300",type:"liability",balance_sheet_class:"non_current"},
+  {id:"other",code:"2200",type:"liability",balance_sheet_class:null}
+ ];
+ const entries=[],lines=[];
+ const add=(id,date,source_type,source_id,parts,voided=false)=>{
+  entries.push({id,entry_date:date,source_type,source_id,voided});
+  for(const [account_id,debit,credit] of parts)lines.push({journal_entry_id:id,account_id,debit,credit});
+ };
+ add("opening-sale","2026-10-31","sale","opening-sale-source",[["cash",500,0],["sales",0,500]]);
+ add("sale","2026-11-02","sale","sale-source",[["cash",1000,0],["sales",0,1000]]);
+ add("expense","2026-11-03","expense","expense-source",[["expense",250,0],["cash",0,250]]);
+ add("asset-buy","2026-11-04","purchase","asset-buy-source",[["ppe",500,0],["cash",0,500]]);
+ add("asset-sale","2026-11-05","asset-disposal","asset-sale-source",[["cash",150,0],["ppe",0,150]]);
+ add("capital","2026-11-06","capital","capital-source",[["cash",800,0],["equity",0,800]]);
+ add("loan","2026-11-07","loan","loan-source",[["cash",2000,0],["loan",0,2000]]);
+ add("unclassified","2026-11-08","other","other-source",[["cash",300,0],["other",0,300]]);
+ add("cash-transfer","2026-11-09","transfer","transfer-source",[["bank",100,0],["cash",0,100]]);
+ add("voided-purchase","2026-11-10","purchase","purchase-source",[["inventory",400,0],["cash",0,400]],true);
+ add("purchase-reversal","2026-11-10","purchase_void","purchase-source",[["cash",400,0],["inventory",0,400]]);
+ add("unreversed-voided-sale","2026-11-11","sale","voided-sale-source",[["cash",200,0],["sales",0,200]],true);
+ const result=evaluateCashFlow({accounts,bankAccounts:[],journalEntries:entries,journalLines:lines},"2026-11-01","2026-11-30");
+ assert.equal(result.operating.inflows,1400);
+ assert.equal(result.operating.outflows,650);
+ assert.equal(result.operating.net,750);
+ assert.equal(result.investing.inflows,150);
+ assert.equal(result.investing.outflows,500);
+ assert.equal(result.investing.net,-350);
+ assert.equal(result.financing.inflows,2800);
+ assert.equal(result.financing.outflows,0);
+ assert.equal(result.financing.net,2800);
+ assert.equal(result.unclassified.inflows,300);
+ assert.equal(result.unclassified.outflows,0);
+ assert.equal(result.inflows,4650);
+ assert.equal(result.outflows,1150);
+ assert.equal(result.net,3500);
+ assert.equal(result.opening,500);
+ assert.equal(result.closing,4000);
+ assert.equal(result.reconciliationDifference,0);
+});
+
+test("classified cash flow is translated in English, French and Kinyarwanda",()=>{
+ for(const label of ["Operating activities","Activités opérationnelles","Ibikorwa bisanzwe by’ubucuruzi","Investing activities","Activités d’investissement","Ibikorwa by’ishoramari","Financing activities","Activités de financement","Ibikorwa byo kubona no kwishyura inkunga n’imyenda","Unclassified cash flows","Flux de trésorerie non classés","Amafaranga atarashyirwa mu byiciro","Net change in cash and cash equivalents","Variation nette de la trésorerie et des équivalents","Impinduka rusange mu mafaranga n’ibihwanye na yo"])
+  assert.ok(html.includes(label),"Missing cash-flow label "+label);
+ for(const marker of ["cashFlow.operating.inflows","cashFlow.investing.inflows","cashFlow.financing.inflows","cashFlow.unclassified.inflows","cashFlowClassificationNotice"])
+  assert.ok(html.includes(marker),"Missing classified cash-flow output "+marker);
+ assert.ok(!html.includes("Direct cash movement summary (unclassified)"));
+});
+
+test("Income Statement separates other income and stock write-offs without changing profit",()=>{
+ const wrapper=block('<script id="aibos-ifrs-presentation-v1">','</script>');
+ for(const marker of ["sourceAccountTotal('inventory_adjustment','6000'","const otherIncomeAccounts=accounts.filter(a=>a.type==='income'&&!['4000','4050'].includes(String(a.code)))","moneyRow('Inventory write-offs / stock losses'","const net=periodIncome-periodCogs-operatingExpenses-inventoryWriteOffs-taxExpense","balance_sheet_class==='current'","balance_sheet_class==='non_current'"])
+  assert.ok(wrapper.includes(marker),"Missing IFRS statement treatment "+marker);
+ for(const label of ["Autres produits","Ayandi mafaranga yinjijwe","Sorties et pertes de stock","Ibicuruzwa byakuwe mu bubiko n’igihombo cyabyo","Actifs courants","Umutungo w’igihe gito","Passifs courants","Imyenda y’igihe gito"])
+  assert.ok(wrapper.includes(label),"Missing translated statement label "+label);
+ assert.ok(wrapper.includes("sheriLocalizedAccountName(a)"));
+});
+
+test("AI Business Insight produces a complete selected-language report with a local fallback",()=>{
+ assert.ok(html.includes("function buildOSBusinessInsightContext()"));
+ assert.ok(html.includes("function osLocalBusinessReview"));
+ assert.ok(html.includes("function osRenderInsight"));
+ assert.ok(html.includes("sb.functions.invoke('quick-service'"));
+ assert.ok(html.includes("business_insight"));
+ assert.ok(quickService.includes('if (mode === "business_insight")'));
+ assert.ok(quickService.includes("8–10 substantial, connected paragraphs"));
+ assert.ok(quickService.includes("max_tokens: 2800"));
+ assert.ok(quickService.includes("max_tokens: 3600"));
+ assert.ok(quickService.includes("finish_reason"));
+ assert.ok(quickService.includes("Use the selected language throughout the entire report."));
+});
+
+test("Shericeri opens as a dedicated page, persists transcript locally and exposes diagnostics to signed-in users",()=>{
+ assert.ok(html.includes("function sheriTranscriptStorageKey()"));
+ assert.ok(html.includes("function sheriPersistTranscript()"));
+ assert.ok(html.includes("function sheriRestoreTranscript()"));
+ assert.ok(html.includes("function sheriObserveTranscript()"));
+ assert.ok(html.includes("new MutationObserver"));
+ assert.ok(html.includes("localStorage.setItem"));
+ assert.ok(html.includes("if(v==='shericeri'){sheriRestoreTranscript();sheriObserveTranscript()}"));
+ const launch=block("function launchShericeri(){","function stopShericeriHero()");
+ assert.ok(launch.includes("show('shericeri')"));
+ assert.doesNotMatch(launch,/startShericeriLoop|startShericeri\\(/);
+ assert.ok(html.includes("function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id;}"));
+ assert.ok(!html.includes("SHERI_DEVELOPER_USER_IDS.has(session.user.id)"));
 });
 
 test("all isolated preview inline JavaScript blocks parse",()=>{
