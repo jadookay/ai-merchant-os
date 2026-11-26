@@ -9,9 +9,9 @@ const worker=readFileSync(new URL("../preview-live/shericeri_v14_4_aibos_sync_sw
 
 test("isolated Sell screen loads the payment-method recovery and summary module",()=>{
   assert.ok(html.includes('src="pos-payment-summary.js?v=1"'));
-  assert.ok(html.includes('V14.4.93 isolated full-feature reconciliation'));
-  assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v93"));
-  assert.ok(worker.includes("const RELEASE='V14.4.93'"));
+  assert.ok(html.includes('V14.4.94 isolated full-feature reconciliation'));
+  assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v94"));
+  assert.ok(worker.includes("const RELEASE='V14.4.94'"));
 });
 
 test("POS payment module parses and supports English, French and Kinyarwanda",()=>{
