@@ -2581,14 +2581,25 @@ function render(){
   if(codeEl)codeEl.textContent=state.merchant.shericeri_id||'(assigned when your business profile is synced)';
 }
 function fillSelects(){
+  const saleSelect=document.getElementById('saleProduct');
+  const previouslySelectedProduct=saleSelect?.value||'';
   const products=activeProducts().slice().sort((a,b)=>Number(!!b.favorite)-Number(!!a.favorite)||a.name.localeCompare(b.name));
-  document.getElementById('saleProduct').innerHTML=products.map(p=>`<option value="${p.id}">${p.favorite?'★ ':''}${esc(p.name)} (stock ${p.stock})</option>`).join('');
-  const p=product(document.getElementById('saleProduct').value);
+  saleSelect.innerHTML=products.map(p=>`<option value="${p.id}">${p.favorite?'★ ':''}${esc(p.name)} (stock ${p.stock})</option>`).join('');
+  // Re-rendering the app must not silently reset the in-progress POS selection.
+  if(previouslySelectedProduct&&products.some(p=>String(p.id)===String(previouslySelectedProduct)))saleSelect.value=previouslySelectedProduct;
+  const p=product(saleSelect.value);
   if(p)document.getElementById('salePrice').value=p.sell;
   const custSel=document.getElementById('saleCustomer');
   if(custSel)custSel.innerHTML='<option value="">— Anonymous —</option>'+activeCustomers().map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
 }
-document.getElementById('saleProduct').onchange=()=>{const p=product(document.getElementById('saleProduct').value);document.getElementById('salePrice').value=p?p.sell:''}
+document.getElementById('saleProduct').addEventListener('change',event=>{
+  // Keep product selection local to the Sell form; never let it bubble into
+  // unrelated app-level navigation or delegated view handlers.
+  event.stopPropagation();
+  const select=event.currentTarget,selectedId=select.value,p=product(selectedId);
+  document.getElementById('salePrice').value=p?p.sell:'';
+  window.__aibosPosSelectedProductId=selectedId;
+});
 if(document.getElementById('osPurchaseProduct'))document.getElementById('osPurchaseProduct').onchange=()=>{const p=product(document.getElementById('osPurchaseProduct').value);document.getElementById('osPurchaseCost').value=p?p.cost:''}
 
 // ── Sales ────────────────────────────────────────────────────────────────
