@@ -89,7 +89,7 @@
     const methods=['cash','momo','credit'].map(k=>({key:k,count:0,total:0}));
     for(const row of grouped.values()){const item=methods.find(x=>x.key===row.method);item.count++;item.total+=row.total;}
     const allCount=grouped.size,allTotal=methods.reduce((n,x)=>n+x.total,0);
-    const outstanding=typeof creditRows==='function'?creditRows().reduce((n,x)=>n+Number(x.balance||0),0):null;
+    const credit=new Map();for(const s of (state?.sales||[])){if(s.voided||s.voided_at||s.payment_method!=='credit')continue;const id=s.transaction_id||s.id;credit.set(id,(credit.get(id)||0)+Number(s.qty||0)*Number(s.price||0));}const paid=(state?.payments||[]).filter(p=>p.direction==='receipt'&&p.source_type==='sale_invoice').reduce((n,p)=>n+Number(p.amount||0),0);const outstanding=[...credit.entries()].reduce((n,[id,total])=>n+Math.max(0,total-(state?.payments||[]).filter(p=>p.direction==='receipt'&&p.source_type==='sale_invoice'&&p.source_id===id).reduce((a,p)=>a+Number(p.amount||0),0)),0);
     host.innerHTML='<table class="table"><thead><tr><th>'+tr('methodCol')+'</th><th>'+tr('transactions')+'</th><th>'+tr('total')+'</th></tr></thead><tbody>'+methods.map(x=>'<tr><td><b>'+tr(x.key)+'</b></td><td>'+x.count+'</td><td>'+fmt(x.total)+'</td></tr>').join('')+'<tr><th>'+tr('allTotal')+'</th><th>'+allCount+'</th><th>'+fmt(allTotal)+'</th></tr></tbody></table>'+(outstanding===null?'':'<div class="sub" style="margin-top:8px">'+tr('outstanding')+': <b>'+fmt(outstanding)+'</b></div>')+'<div class="sub" style="margin-top:6px">'+from+' — '+to+'</div>';
     if(!allCount)host.insertAdjacentHTML('beforeend','<div class="sub" style="margin-top:8px">'+tr('empty')+'</div>');
   }
