@@ -9,7 +9,7 @@
  const lang=()=>{const e=document.getElementById('aibosLanguageSelect')||document.querySelector('#aibosLanguageSwitcher select');const v=String(e?.value||document.documentElement.lang||'en').toLowerCase();return v.startsWith('rw')||v.startsWith('ki')?'rw':v.startsWith('fr')?'fr':'en'};
  const t=k=>(L[lang()]||L.en)[k]||L.en[k]||k,$=id=>document.getElementById(id);
  const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const fmt=n=>Math.round(Number(n)||0).toLocaleString('en-RW')+' RWF',today=()=>new Date().toISOString().slice(0,10);
+ const fmt=n=>Math.round(Number(n)||0).toLocaleString('en-RW')+' RWF',today=()=>sheriLocalDateKey(new Date()),previousMonth=()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-1);return d.toISOString().slice(0,7)};
  let data={contractors:[],invoices:[],payments:[],remittances:[]};
  function guard(){if(!state.merchant||!sheriCan('manage_finance'))throw new Error(t('permission'))}
  function shell(){host.innerHTML=`
@@ -52,7 +52,7 @@
  function settle(id){const x=data.invoices.find(v=>v.id===id);if(!x)return;const bal=Number(x.gross_amount)-Number(x.gross_settled),raw=prompt('Gross invoice balance: '+fmt(bal)+'\nGross amount to settle:');if(raw===null)return;const amount=Number(raw);
  if(!Number.isFinite(amount)||amount<=0||amount>bal+0.005)return sheriToast('Enter a valid gross settlement amount.','error');
  const method=String(prompt('Payment method: bank, mobile_money or cash','bank')||'').trim();if(!['bank','mobile_money','cash'].includes(method))return sheriToast('Unsupported payment method.','error');
- const ref=prompt('Payment reference (optional):')||null,wht=Math.round(amount*Number(x.withholding_rate));if(!confirm('Gross settlement: '+fmt(amount)+'\nWHT withheld: '+fmt(wht)+'\nNet transfer: '+fmt(amount-wht)))return;
+ const ref=prompt('Payment reference (optional):')||null,wht=Math.round(amount*Number(x.withholding_rate)*100)/100;if(!confirm('Gross settlement: '+fmt(amount)+'\nWHT withheld: '+fmt(wht)+'\nNet transfer: '+fmt(amount-wht)))return;
  sb.rpc('shericeri_record_contractor_payment',{p_merchant_id:state.merchant.id,p_invoice_id:id,p_payment_date:today(),p_gross_amount:amount,p_payment_method:method,p_reference:ref,p_idempotency_key:sheriUuid()}).then(({error})=>{if(error)throw error;sheriToast(t('paymentSaved'));return load()}).catch(e=>sheriToast(t('failed')+(e.message||e),'error'))}
  function draw(){const active=data.contractors.filter(x=>x.status==='active'),out=data.invoices.filter(x=>x.status!=='void').reduce((n,x)=>n+Number(x.gross_amount)-Number(x.gross_settled),0),held=data.payments.reduce((n,x)=>n+Number(x.withholding_amount),0),paid=data.remittances.reduce((n,x)=>n+Number(x.amount),0);
  const due=active.filter(x=>x.engagement_type==='subcontractor'&&!x.rra_notified_on&&new Date(x.contract_start+'T00:00:00')<=new Date(Date.now()+15*86400000)).length;
