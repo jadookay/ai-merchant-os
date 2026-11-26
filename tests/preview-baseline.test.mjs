@@ -223,6 +223,33 @@ test("Shericeri opens as a dedicated page, persists transcript locally and expos
  assert.ok(!html.includes("SHERI_DEVELOPER_USER_IDS.has(session.user.id)"));
 });
 
+
+test("More and Suppliers & Purchases views are unique and localized",()=>{
+ assert.equal((html.match(/id="records"/g)||[]).length,1);
+ assert.equal((html.match(/id="suppliersPurchases"/g)||[]).length,1);
+ const more=block('<section id="records"','</section>');
+ const suppliers=block('<section id="suppliersPurchases"','</section>');
+ assert.equal((more.match(/show\('suppliersPurchases'\)/g)||[]).length,1);
+ assert.ok(more.includes("<h1>More</h1>"));
+ assert.ok(suppliers.length>100);
+ assert.ok(html.includes("'customers, suppliers, reports and business settings.':'Abakiriya, abaranguza, raporo n’igenamiterere ry’ubucuruzi.'"));
+ assert.ok(html.includes("'suppliers & purchases':'Abaranguza n’ibyaguzwe'"));
+ assert.ok(html.includes("fr:['Clients','Fournisseurs & achats'"));
+});
+
+test("accounting source integrity and exact deletion reversals remain in the isolated build",()=>{
+ for(const marker of [
+  "function accLedgerIntegrity(",
+  "Duplicate active journal postings exist for the same source",
+  "Deleted expense has no exact accounting reversal",
+  "Deleted cash movement has no exact accounting reversal",
+  "expense_delete",
+  "cash_entry_delete",
+  "accUniqueTaxRates",
+  "direction:type==='customer_receipt'||type==='other_income'?'receipt':'payment'"
+ ])assert.ok(html.includes(marker),"Missing accounting-integrity safeguard "+marker);
+});
+
 test("all isolated preview inline JavaScript blocks parse",()=>{
  const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)];
  let parsed=0;
