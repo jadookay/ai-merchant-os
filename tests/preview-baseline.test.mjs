@@ -9,6 +9,7 @@ const teamAccess=readFileSync(new URL("../supabase/functions/team-access/index.t
 const legalMigration=readFileSync(new URL("../supabase/migrations/20261123120000_require_full_legal_name_for_auth_users.sql",import.meta.url),"utf8");
 const costMigration=readFileSync(new URL("../supabase/migrations/20261124150000_product_cost_correction.sql",import.meta.url),"utf8");
 const payroll=readFileSync(new URL("../preview-live/payroll.js",import.meta.url),"utf8");
+const payrollWorkflow=readFileSync(new URL("../supabase/migrations/20261125140000_rwanda_payroll_run_workflows.sql",import.meta.url),"utf8");
 const contractors=readFileSync(new URL("../preview-live/contractors.js",import.meta.url),"utf8");
 const payments=readFileSync(new URL("../preview-live/pos-payment-summary.js",import.meta.url),"utf8");
 
@@ -103,7 +104,7 @@ test("inventory table layout remains readable on narrow screens",()=>{
 test("payroll, contractors and Cash/MoMo/Credit reporting remain independently localized",()=>{
  for(const source of [payroll,contractors,payments])
   for(const language of ["en:{","rw:{","fr:{"])assert.ok(source.includes(language),"Missing "+language);
- assert.ok(payroll.includes("A payroll run must cover one complete calendar month"));
+ assert.ok(payrollWorkflow.includes("A payroll run must cover one complete calendar month"));
  assert.ok(payroll.includes("casualConfirm"));
  assert.ok(contractors.includes("rssb_self_managed"));
  assert.ok(contractors.includes("shericeri_record_contractor_wht_remittance"));
