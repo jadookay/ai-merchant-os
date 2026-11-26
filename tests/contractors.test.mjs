@@ -16,7 +16,7 @@ test("contractor module is reachable from isolated navigation and Command Center
  assert.ok(html.includes('id="contractorsAppHost"'));
  assert.ok(html.includes("'businessInsight','payroll','contractors'"));
  assert.ok(html.includes('src="contractors.js?v=1"'));
- assert.ok(html.includes('V14.4.84 isolated POS payment-method controls'));
+ assert.ok(html.includes('V14.4.85 isolated POS payment-method controls'));
 });
 
 test("contractor module JavaScript parses and supports all three app languages",()=>{
@@ -39,8 +39,8 @@ test("contractor accounting schema is tenant-scoped and uses balanced payable an
 });
 
 test("preview worker cache is versioned without changing the sync wake-up path",()=>{
- assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v84"));
- assert.ok(worker.includes("const RELEASE='V14.4.84'"));
+ assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v85"));
+ assert.ok(worker.includes("const RELEASE='V14.4.85'"));
  assert.ok(worker.includes("shericeri-outbox-sync"));
 });
 

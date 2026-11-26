@@ -8,10 +8,10 @@ const module=readFileSync(new URL("../preview-live/pos-payment-summary.js",impor
 const worker=readFileSync(new URL("../preview-live/shericeri_v14_4_aibos_sync_sw.js",import.meta.url),"utf8");
 
 test("isolated Sell screen loads the payment-method recovery and summary module",()=>{
-  assert.ok(html.includes('src="pos-payment-summary.js?v=2"'));
-  assert.ok(html.includes('V14.4.84 isolated POS payment-method controls'));
-  assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v84"));
-  assert.ok(worker.includes("const RELEASE='V14.4.84'"));
+  assert.ok(html.includes('src="pos-payment-summary.js?v=3"'));
+  assert.ok(html.includes('V14.4.85 isolated POS payment-method controls'));
+  assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v85"));
+  assert.ok(worker.includes("const RELEASE='V14.4.85'"));
 });
 
 test("POS payment module parses and supports English, French and Kinyarwanda",()=>{
@@ -46,4 +46,10 @@ test("actual sale confirmation persists the selected payment method and credit d
   const handler=html.slice(start,end);
   for(const value of ["$('salePaymentMethod')","payment_method:method","credit_due_date:dueDate","customer_name_snapshot:customerName","customer_phone_snapshot:customerPhone","receipt_note:","await sheriSaveSnapshot()","await sheriQueue({type:'sale_cart_upsert',records:rows,stockChecks})"])
     assert.ok(handler.includes(value),"Sale confirmation missing: "+value);
+});
+
+test("Sell payment selector is force-visible with a clear instruction before confirming",()=>{
+ assert.ok(html.includes("CHOOSE PAYMENT METHOD BEFORE CONFIRMING SALE"));
+ assert.ok(html.includes("display:grid!important"));
+ assert.ok(html.includes('aria-label="Choose payment method"'));
 });

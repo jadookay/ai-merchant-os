@@ -339,10 +339,10 @@ test("the production application shell uses V14.4.92", () => {
   assert.ok(serviceWorker.includes("const RELEASE='V14.4.92'"));
 });
 
-test("the preview application shell is bumped to V14.4.84 without changing production", () => {
-  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v84"));
-  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.84'"));
-  assert.ok(previewHtml.includes("V14.4.84"));
+test("the preview application shell is bumped to V14.4.85 without changing production", () => {
+  assert.ok(previewServiceWorker.includes("shericeri-preview-v14.4-aibos-sync-v85"));
+  assert.ok(previewServiceWorker.includes("const RELEASE='V14.4.85'"));
+  assert.ok(previewHtml.includes("V14.4.85"));
 });
 
 test("supplier bills post to the selected inventory, operating expense, service or other asset account", () => {
