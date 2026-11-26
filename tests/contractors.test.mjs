@@ -16,7 +16,7 @@ test("contractor module is reachable from isolated navigation and Command Center
  assert.ok(html.includes('id="contractorsAppHost"'));
  assert.ok(html.includes("'businessInsight','payroll','contractors'"));
  assert.ok(html.includes('src="contractors.js?v=1"'));
- assert.ok(html.includes('V14.4.84 isolated payment controls and contractors'));
+ assert.ok(html.includes('V14.4.84 isolated POS payment-method controls'));
 });
 
 test("contractor module JavaScript parses and supports all three app languages",()=>{
