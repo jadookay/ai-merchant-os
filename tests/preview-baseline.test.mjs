@@ -218,7 +218,7 @@ test("Shericeri opens as a dedicated page, persists transcript locally and expos
  assert.ok(html.includes("if(v==='shericeri'){sheriRestoreTranscript();sheriObserveTranscript()}"));
  const launch=block("function launchShericeri(){","function stopShericeriHero()");
  assert.ok(launch.includes("show('shericeri')"));
- assert.doesNotMatch(launch,/startShericeriLoop|startShericeri\\(/);
+ assert.doesNotMatch(launch,/startShericeriLoop|startShericeri\(/);
  assert.ok(html.includes("function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id;}"));
  assert.ok(!html.includes("SHERI_DEVELOPER_USER_IDS.has(session.user.id)"));
 });
