@@ -8,6 +8,7 @@ const worker=readFileSync(new URL("../preview-live/shericeri_v14_4_aibos_sync_sw
 const teamAccess=readFileSync(new URL("../supabase/functions/team-access/index.ts",import.meta.url),"utf8");
 const legalMigration=readFileSync(new URL("../supabase/migrations/20261123120000_require_full_legal_name_for_auth_users.sql",import.meta.url),"utf8");
 const costMigration=readFileSync(new URL("../supabase/migrations/20261124150000_product_cost_correction.sql",import.meta.url),"utf8");
+const costGrantMigration=readFileSync(new URL("../supabase/migrations/20261126113000_restrict_anon_product_cost_correction.sql",import.meta.url),"utf8");
 const payroll=readFileSync(new URL("../preview-live/payroll.js",import.meta.url),"utf8");
 const payrollWorkflow=readFileSync(new URL("../supabase/migrations/20261125140000_rwanda_payroll_run_workflows.sql",import.meta.url),"utf8");
 const contractors=readFileSync(new URL("../preview-live/contractors.js",import.meta.url),"utf8");
@@ -93,6 +94,8 @@ test("product cost corrections update the ledger atomically and never bypass fin
  assert.ok(costMigration.includes("source_type='product_cost_correction'"));
  assert.ok(costMigration.includes("INSERT INTO public.journal_lines"));
  assert.ok(costMigration.includes("SET search_path = ''"));
+ assert.ok(costGrantMigration.includes("FROM PUBLIC, anon"));
+ assert.ok(costGrantMigration.includes("TO authenticated"));
 });
 
 test("inventory table layout remains readable on narrow screens",()=>{
