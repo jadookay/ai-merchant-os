@@ -7,6 +7,8 @@ const html=readFileSync(new URL("../preview-live/index.html",import.meta.url),"u
 const module=readFileSync(new URL("../preview-live/contractors.js",import.meta.url),"utf8");
 const migration=readFileSync(new URL("../supabase/migrations/20261126083000_rwanda_contractors_consultants.sql",import.meta.url),"utf8");
 const worker=readFileSync(new URL("../preview-live/shericeri_v14_4_aibos_sync_sw.js",import.meta.url),"utf8");
+const rraMigration=readFileSync(new URL("../supabase/migrations/20261126090000_contractor_rra_notification_tracking.sql",import.meta.url),"utf8");
+const whtLockMigration=readFileSync(new URL("../supabase/migrations/20261126091000_contractor_wht_period_lock.sql",import.meta.url),"utf8");
 
 test("contractor module is reachable from isolated navigation and Command Center",()=>{
  assert.ok(html.includes("show('contractors')"));
@@ -40,4 +42,13 @@ test("preview worker cache is versioned without changing the sync wake-up path",
  assert.ok(worker.includes("shericeri-preview-v14.4-aibos-sync-v82"));
  assert.ok(worker.includes("const RELEASE='V14.4.82'"));
  assert.ok(worker.includes("shericeri-outbox-sync"));
+});
+
+test("subcontractor RRA notices and WHT remittance periods are safely tracked",()=>{
+ assert.ok(module.includes("shericeri_mark_contractor_rra_notified"));
+ assert.ok(module.includes("data-rra-id"));
+ assert.ok(rraMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_finance')"));
+ assert.ok(rraMigration.includes("p_notified_on<p_start"));
+ assert.ok(whtLockMigration.includes("pg_advisory_xact_lock"));
+ assert.ok(whtLockMigration.includes("contractor-wht:"));
 });
