@@ -48,7 +48,7 @@ test("subcontractor RRA notices and WHT remittance periods are safely tracked",(
  assert.ok(module.includes("shericeri_mark_contractor_rra_notified"));
  assert.ok(module.includes("data-rra-id"));
  assert.ok(rraMigration.includes("private.user_can_access_merchant(p_merchant_id,'manage_finance')"));
- assert.ok(rraMigration.includes("p_notified_on<p_start"));
+ assert.ok(rraMigration.includes("p_notified_on<v_start"));
  assert.ok(whtLockMigration.includes("pg_advisory_xact_lock"));
  assert.ok(whtLockMigration.includes("contractor-wht:"));
 });
