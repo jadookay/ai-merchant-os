@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.93 isolated full-feature reconciliation">
+<meta name="app-version" content="V14.4.94 isolated full-feature reconciliation">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -2577,7 +2577,7 @@ function dailyProfitTrend(windowDays=7){
 let sheriViewHistory=[];let sheriCurrentView='dashboard';
 function sheriEnsureViewBack(v){if(v==='dashboard')return;const view=document.getElementById(v),top=view?.querySelector('.top');if(!top||top.querySelector('.view-back'))return;const back=document.createElement('button');back.type='button';back.className='btn small secondary view-back';back.textContent='← Back';back.setAttribute('aria-label','Go back to previous page');back.onclick=sheriGoBack;top.insertBefore(back,top.firstChild);}
 function sheriGoBack(){const previous=sheriViewHistory.pop()||'dashboard';show(previous,true);}
-function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');const commandViews=['customers','suppliersPurchases','expenses','reports','money','advisor','forecast','adjustments','businessInsight','payroll','contractors'];document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v||(b.dataset.view==='businessOS'&&commandViews.includes(v))));if(v!=='businessOS'){const sn=document.getElementById('aibosCommandSubnav'),cb=document.querySelector('[data-nav-command-center=\"1\"]');sn?.classList.remove('open');cb?.setAttribute('aria-expanded','false')}sheriCurrentView=v;sheriEnsureViewBack(v);render()}
+function show(v,fromBack=false){if(!document.getElementById(v))return;if(!fromBack&&sheriCurrentView&&sheriCurrentView!==v)sheriViewHistory.push(sheriCurrentView);document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(v).classList.add('active');const commandViews=['customers','suppliersPurchases','expenses','reports','money','advisor','forecast','adjustments','businessInsight','payroll','contractors'];document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v||(b.dataset.view==='businessOS'&&commandViews.includes(v))));if(v!=='businessOS'){const sn=document.getElementById('aibosCommandSubnav'),cb=document.querySelector('[data-nav-command-center=\"1\"]');sn?.classList.remove('open');cb?.setAttribute('aria-expanded','false')}sheriCurrentView=v;sheriEnsureViewBack(v);render();if(v==='shericeri'){sheriRestoreTranscript();sheriObserveTranscript()}}
 document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>show(b.dataset.view));
 
 function sheriRecentActivitiesHtml(){
@@ -2679,6 +2679,128 @@ function printLastReceipt(){
 #inventoryTable .table th:nth-child(3),#inventoryTable .table td:nth-child(3){min-width:190px}
 #inventoryTable .table td:nth-child(2),#inventoryTable .table td:nth-child(3){overflow-wrap:anywhere;white-space:normal}
 </style>
+<script id="aibos-ifrs-presentation-v1">
+(function(){
+  if(typeof window.renderReports!=='function'||window.renderReports.__ifrsPresentationWrapped)return;
+  const original=window.renderReports;
+  const labelMap={"Current assets":["Actifs courants","Umutungo w’igihe gito"],"Total current assets":["Total des actifs courants","Umutungo w’igihe gito wose"],"Non-current assets":["Actifs non courants","Umutungo w’igihe kirekire"],"Total non-current assets":["Total des actifs non courants","Umutungo w’igihe kirekire wose"],"Unclassified assets":["Actifs non classés","Umutungo utarashyizwe mu byiciro"],"Total unclassified assets":["Total des actifs non classés","Umutungo utarashyizwe mu byiciro wose"],"Total assets":["Total des actifs","Umutungo wose"],"Current liabilities":["Passifs courants","Imyenda y’igihe gito"],"Total current liabilities":["Total des passifs courants","Imyenda y’igihe gito yose"],"Non-current liabilities":["Passifs non courants","Imyenda y’igihe kirekire"],"Total non-current liabilities":["Total des passifs non courants","Imyenda y’igihe kirekire yose"],"Unclassified liabilities":["Passifs non classés","Imyenda itarashyizwe mu byiciro"],"Total unclassified liabilities":["Total des passifs non classés","Imyenda itarashyizwe mu byiciro yose"],"Total liabilities":["Total des passifs","Imyenda yose"],"Equity":["Capitaux propres","Imari shingiro"],"Retained earnings / current period profit":["Résultats non distribués / résultat de la période","Inyungu zasigaye / inyungu y’iki gihe"],"Total equity":["Total des capitaux propres","Imari shingiro yose"],"Total liabilities and equity":["Total des passifs et des capitaux propres","Imyenda n’imari shingiro byose hamwe"],"Revenue":["Chiffre d’affaires","Amafaranga yinjijwe mu igurisha"],"Total revenue":["Total du chiffre d’affaires","Amafaranga yose yinjijwe mu igurisha"],"Cost of sales":["Coût des ventes","Ikiguzi cy’ibyagurishijwe"],"Total cost of sales":["Total du coût des ventes","Ikiguzi cy’ibyagurishijwe cyose"],"Gross profit":["Marge brute","Inyungu mbumbe"],"Inventory write-offs / stock losses":["Sorties et pertes de stock","Ibicuruzwa byakuwe mu bubiko n’igihombo cyabyo"],"Other income":["Autres produits","Ayandi mafaranga yinjijwe"],"Total other income":["Total des autres produits","Ayandi mafaranga yose yinjijwe"],"Operating expenses":["Charges d’exploitation","Amafaranga akoreshwa mu bikorwa"],"Total operating expenses":["Total des charges d’exploitation","Amafaranga yose akoreshwa mu bikorwa"],"Profit before tax":["Résultat avant impôt","Inyungu mbere y’imisoro"],"Income tax expense":["Charge d’impôt sur le revenu","Ikiguzi cy’umusoro ku nyungu"],"Total income tax expense":["Total de la charge d’impôt sur le revenu","Ikiguzi cy’umusoro ku nyungu cyose"],"Profit for the period":["Résultat de la période","Inyungu y’iki gihe"]};
+  const labelText=label=>{const t=labelMap[label];return t?sheriLocalized(label,t[0],t[1]):label};
+  const moneyRow=(label,value,cls='')=>'<div class="row '+cls+'"><span>'+labelText(label)+'</span><b>'+money(value)+'</b></div>';
+  const section=(label,rows,totalLabel,total)=>'<div class="row statement-section-row"><span>'+labelText(label)+'</span><b></b></div>'+rows+moneyRow(totalLabel,total,'statement-total-row');
+  function accountRows(accounts,balances,naturalSide){
+    return accounts.filter(a=>Math.abs(Number(balances?.[a.code]||0))>0.005).map(a=>{
+      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
+      const side=String(a.normal_balance||defaultSide).toLowerCase();
+      const value=Number(balances[a.code]||0)*(side===naturalSide?1:-1);
+      return moneyRow(esc(sheriLocalizedAccountName(a))+' <small>('+esc(a.code)+')</small>',value);
+    }).join('');
+  }
+  function totalRows(accounts,balances,naturalSide){
+    return accounts.reduce((sum,a)=>{
+      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
+      const side=String(a.normal_balance||defaultSide).toLowerCase();
+      const value=Number(balances?.[a.code]||0);
+      return sum+(side===naturalSide?value:-value);
+    },0);
+  }
+  function accountRowsAdjusted(accounts,balances,naturalSide,adjustments={}){
+    return accounts.map(a=>{
+      const defaultSide=['liability','equity','income'].includes(a.type)?'credit':'debit';
+      const side=String(a.normal_balance||defaultSide).toLowerCase();
+      const raw=Number(balances?.[a.code]||0);
+      const value=(side===naturalSide?raw:-raw)-Number(adjustments[a.code]||0);
+      return Math.abs(value)>0.005?moneyRow(esc(sheriLocalizedAccountName(a))+' <small>('+esc(a.code)+')</small>',value):'';
+    }).join('');
+  }
+  function sourceAccountTotal(sourceType,accountCode,startDate,endDate){
+    const entries=state.journalEntries||[],lines=state.journalLines||[];
+    const adjustmentIds=new Set(entries.filter(e=>e.source_type===sourceType).flatMap(e=>[e.id,e.source_id].filter(Boolean)));
+    const accountsById=new Map((state.accounts||[]).map(a=>[a.id,a]));
+    const reversed=new Set(entries.filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction'].includes(e.source_type)).map(e=>e.source_id));
+    const entriesById=new Map(entries.map(e=>[e.id,e]));
+    let total=0;
+    for(const line of lines){
+      const entry=entriesById.get(line.journal_entry_id);
+      if(!entry||!(entry.source_type===sourceType||(entry.source_type==='accounting_correction'&&adjustmentIds.has(entry.source_id))))continue;
+      if(entry.voided&&!reversed.has(entry.id)&&!reversed.has(entry.source_id))continue;
+      const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
+      if(endDate&&date>endDate)continue;
+      if(startDate&&date<startDate)continue;
+      if(accountsById.get(line.account_id)?.code!==accountCode)continue;
+      total+=Number(line.debit||0)-Number(line.credit||0);
+    }
+    return total;
+  }
+  const wrapped=function(){
+    original.apply(this,arguments);
+    try{
+      if(!Array.isArray(state.accounts)||!state.accounts.length||!Array.isArray(state.journalEntries))return;
+      const end=sheriReportEnd||sheriLocalDateKey(new Date()),start=sheriReportStart||'';
+      const bs=accReportTotals(null,end),period=accReportTotals(start,end),accounts=state.accounts;
+      const assetsList=accounts.filter(a=>a.type==='asset'),liabList=accounts.filter(a=>a.type==='liability'),equityList=accounts.filter(a=>a.type==='equity');
+      // Statement classification is account metadata, never inferred from account-code ranges.
+      const currentAssets=assetsList.filter(a=>a.balance_sheet_class==='current');
+      const nonCurrentAssets=assetsList.filter(a=>a.balance_sheet_class==='non_current');
+      const unclassifiedAssets=assetsList.filter(a=>!['current','non_current','not_applicable'].includes(a.balance_sheet_class));
+      const currentLiabs=liabList.filter(a=>a.balance_sheet_class==='current');
+      const nonCurrentLiabs=liabList.filter(a=>a.balance_sheet_class==='non_current');
+      const unclassifiedLiabs=liabList.filter(a=>!['current','non_current','not_applicable'].includes(a.balance_sheet_class));
+      const currentAssetsTotal=totalRows(currentAssets,bs,'debit'),nonCurrentAssetsTotal=totalRows(nonCurrentAssets,bs,'debit'),unclassifiedAssetsTotal=totalRows(unclassifiedAssets,bs,'debit');
+      const currentLiabsTotal=totalRows(currentLiabs,bs,'credit'),nonCurrentLiabsTotal=totalRows(nonCurrentLiabs,bs,'credit'),unclassifiedLiabsTotal=totalRows(unclassifiedLiabs,bs,'credit');
+      const assets=accStatementTotal('asset',bs,'debit'),liabilities=accStatementTotal('liability',bs,'credit');
+      const cumulative=accStatementTotal('income',bs,'credit')-accStatementTotal('cogs',bs,'debit')-accStatementTotal('expense',bs,'debit');
+      const equity=accStatementTotal('equity',bs,'credit')+cumulative;
+      const periodIncome=accStatementTotal('income',period,'credit'),periodCogs=accStatementTotal('cogs',period,'debit');
+      const salesIncomeAccounts=accounts.filter(a=>['4000','4050'].includes(String(a.code)));
+      const otherIncomeAccounts=accounts.filter(a=>a.type==='income'&&!['4000','4050'].includes(String(a.code)));
+      const salesRevenue=totalRows(salesIncomeAccounts,period,'credit'),otherIncome=totalRows(otherIncomeAccounts,period,'credit');
+      const expenseAccounts=accounts.filter(a=>a.type==='expense'),operatingAccounts=expenseAccounts.filter(a=>String(a.code)!=='6100'),taxAccounts=expenseAccounts.filter(a=>String(a.code)==='6100');
+      const inventoryWriteOffs=sourceAccountTotal('inventory_adjustment','6000',start,end);
+      const operatingExpenses=totalRows(operatingAccounts,period,'debit')-inventoryWriteOffs,taxExpense=totalRows(taxAccounts,period,'debit');
+      const net=periodIncome-periodCogs-operatingExpenses-inventoryWriteOffs-taxExpense,pretax=net+taxExpense;
+      const plEl=document.getElementById('accPL'),bsEl=document.getElementById('accBS');
+      const prefix=el=>(el?.innerHTML||'').match(/^(.*?)(?=<div class="row")/s)?.[1]||'';
+      const periodText='<div class="statement-period"><span>'+sheriLocalized('For the period ended','Pour la période close le','Igihe cyarangiye ku')+'</span> '+esc(end)+(start?' (from '+esc(start)+')':'')+' · '+esc(state.merchant?.currency||'')+'</div>';
+      const asAt='<div class="statement-period"><span>'+sheriLocalized('As at','Au','Kugeza ku')+'</span> '+esc(end)+' · '+esc(state.merchant?.currency||'')+'</div>';
+      if(bsEl){
+        const rowsCurrentAssets=accountRows(currentAssets,bs,'debit'),rowsNonCurrentAssets=accountRows(nonCurrentAssets,bs,'debit'),rowsUnclassifiedAssets=accountRows(unclassifiedAssets,bs,'debit');
+        const rowsCurrentLiab=accountRows(currentLiabs,bs,'credit'),rowsNonCurrentLiab=accountRows(nonCurrentLiabs,bs,'credit'),rowsUnclassifiedLiab=accountRows(unclassifiedLiabs,bs,'credit'),rowsEquity=accountRows(equityList,bs,'credit');
+        const unclassifiedTotal=unclassifiedAssetsTotal+unclassifiedLiabsTotal;
+        const unclassifiedNotice=(Math.abs(unclassifiedTotal)>0.005)?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+sheriLocalized('Some balance-sheet accounts have not been classified as current or non-current. Their balances are shown separately and must be classified before relying on the current/non-current subtotals.','Certains comptes du bilan ne sont pas classés en courant ou non courant. Leurs soldes sont présentés séparément et doivent être classés avant de se fier aux sous-totaux.','Konti zimwe zo ku rupapuro rw’umutungo n’imyenda ntizashyizwe mu byiciro by’igihe gito cyangwa kirekire. Zerekanwa ukwazo kandi zigomba gushyirwa mu byiciro mbere yo kwishingikiriza ku mibare yazo.')+'</div>':'';
+        const notices=prefix(bsEl);
+        bsEl.innerHTML=notices+'<div class="row statement-section-row"><span>'+sheriLocalized('Statement of financial position','État de la situation financière','Imiterere y’umutungo n’imyenda')+'</span><b></b></div>'+asAt+unclassifiedNotice+
+          section('Current assets',rowsCurrentAssets,'Total current assets',currentAssetsTotal)+
+          section('Non-current assets',rowsNonCurrentAssets,'Total non-current assets',nonCurrentAssetsTotal)+
+          section('Unclassified assets',rowsUnclassifiedAssets,'Total unclassified assets',unclassifiedAssetsTotal)+
+          moneyRow('Total assets',assets,'statement-total-row')+
+          section('Current liabilities',rowsCurrentLiab,'Total current liabilities',currentLiabsTotal)+
+          section('Non-current liabilities',rowsNonCurrentLiab,'Total non-current liabilities',nonCurrentLiabsTotal)+
+          section('Unclassified liabilities',rowsUnclassifiedLiab,'Total unclassified liabilities',unclassifiedLiabsTotal)+
+          moneyRow('Total liabilities',liabilities,'statement-total-row')+
+          section('Equity',rowsEquity+moneyRow('Retained earnings / current period profit',cumulative),'Total equity',equity)+
+          moneyRow('Total liabilities and equity',liabilities+equity,'statement-total-row')+
+          '<div class="sub" style="margin-top:8px">'+sheriLocalized('Assets = liabilities + equity. '+(Math.abs(assets-liabilities-equity)<=0.005?'The statement balances.':'Difference: '+money(assets-liabilities-equity)+'. The statement is not reconciled.'),'Actifs = passifs + capitaux propres. '+(Math.abs(assets-liabilities-equity)<=0.005?'Le bilan est équilibré.':'Écart : '+money(assets-liabilities-equity)+'. Le bilan n’est pas rapproché.'),'Umutungo = imyenda + imari shingiro. '+(Math.abs(assets-liabilities-equity)<=0.005?'Imiterere y’umutungo n’imyenda irahuye.':'Itandukaniro: '+money(assets-liabilities-equity)+'. Imiterere y’umutungo n’imyenda ntirahuye.'))+'</div><div class="sub" style="margin-top:8px">'+sheriLocalized('IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions and tax.','Présentation inspirée des IFRS à partir des soldes comptabilisés. Une conformité complète aux IFRS exige également des dossiers complets et des méthodes adaptées pour les charges à payer, les amortissements, les dépréciations, les provisions et les impôts.','Imiterere ishingiye ku mabwiriza ya IFRS ikoresha amafaranga yanditswe mu bitabo by’ibaruramari. Gukurikiza IFRS byuzuye bisaba inyandiko zuzuye n’amabwiriza akwiye ku mafaranga agomba kwishyurwa, igabanyuka ry’agaciro k’umutungo, ibigenerwa ibyago n’imisoro.')+'</div>';
+      }
+      if(plEl){
+        const cogsAccounts=accounts.filter(a=>a.type==='cogs');
+        const incomeRows=accountRows(salesIncomeAccounts,period,'credit'),otherIncomeRows=accountRows(otherIncomeAccounts,period,'credit'),cogsRows=accountRows(cogsAccounts,period,'debit');
+        const opRows=accountRowsAdjusted(operatingAccounts,period,'debit',{'6000':inventoryWriteOffs}),taxRows=accountRows(taxAccounts,period,'debit');
+        plEl.innerHTML=prefix(plEl)+'<div class="row statement-section-row"><span>'+sheriLocalized('Statement of profit or loss','État du résultat','Raporo y’inyungu cyangwa igihombo')+'</span><b></b></div>'+periodText+
+          section('Revenue',incomeRows,'Total revenue',salesRevenue)+
+          section('Cost of sales',cogsRows,'Total cost of sales',periodCogs)+
+          moneyRow('Gross profit',salesRevenue-periodCogs,'statement-total-row')+
+          (Math.abs(inventoryWriteOffs)>0.005?moneyRow('Inventory write-offs / stock losses',inventoryWriteOffs):'')+
+          section('Other income',otherIncomeRows,'Total other income',otherIncome)+
+          section('Operating expenses',opRows,'Total operating expenses',operatingExpenses)+
+          moneyRow('Profit before tax',pretax,'statement-total-row')+
+          section('Income tax expense',taxRows,'Total income tax expense',taxExpense)+
+          moneyRow('Profit for the period',net,'statement-total-row')+'<div class="sub" style="margin-top:8px">'+sheriLocalized('IFRS-style presentation using posted ledger balances. Full IFRS compliance also requires complete records and appropriate policies for accruals, depreciation, impairment, provisions, tax and current/non-current classification.','Présentation inspirée des IFRS à partir des soldes comptabilisés. Une conformité complète aux IFRS exige aussi des dossiers complets et des méthodes adaptées pour les charges à payer, les amortissements, les dépréciations, les provisions, les impôts et la classification courant/non courant.','Imiterere ishingiye kuri IFRS ikoresha inyandiko z’ibaruramari. Gukurikiza IFRS byuzuye bisaba inyandiko zuzuye n’amabwiriza akwiye ku mafaranga agomba kwishyurwa, igabanyuka ry’agaciro k’umutungo, ibigenerwa ibyago, imisoro no gushyira konti mu byiciro by’igihe gito cyangwa kirekire.')+'</div>';
+      }
+    }catch(e){console.warn('[AIBOS IFRS statement presentation]',e)}
+  };
+  wrapped.__ifrsPresentationWrapped=true;window.renderReports=wrapped;
+})()
+</script>
 </body></html>');
    w.document.close();
 }
@@ -3973,7 +4095,7 @@ let sheriDiagMeterTimer=null;
 let sheriDiagAnalyser=null;
 
 const SHERI_DEVELOPER_USER_IDS=new Set(['05b3bf21-2267-480b-a3d2-426b4f95271a']);
-function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id&&SHERI_DEVELOPER_USER_IDS.has(session.user.id);}
+function sheriCanUseVoiceDiagnostics(){return !!session?.user?.id;}
 function sheriUpdateVoiceDiagnosticsAccess(){const b=document.getElementById('sheriVoiceDiagnosticButton');if(b)b.style.display=sheriCanUseVoiceDiagnostics()?'inline-flex':'none';if(!sheriCanUseVoiceDiagnostics()){const p=document.getElementById('sheriDiagnostic');if(p)p.style.display='none';}}
 function toggleShericeriDiagnostic(){
   if(!sheriCanUseVoiceDiagnostics())return;
@@ -4446,7 +4568,7 @@ function hideSheriHero(){
   hero.classList.remove('show-img','listening');
   setTimeout(()=>hero.classList.remove('active'),350);
 }
-function launchShericeri(){toggleShericeri()}
+function launchShericeri(){show('shericeri')}
 function stopShericeriHero(){stopShericeri()}
 function heroShericeriTalk(){
   // The full-screen hero intentionally sits above the page mic button.
@@ -5141,6 +5263,49 @@ function sheriCommitAssistantHistory(turnId,answer){
 function sheriHistorySnapshot(){
   return shericeriHistory.map(m=>({role:m.role,content:m.content}));
 }
+
+// Full Shericeri transcript, separated by signed-in user and merchant.
+// Only text is retained; microphone recordings are never saved.
+let sheriTranscriptObserver=null,sheriTranscriptSaveTimer=null;
+function sheriTranscriptStorageKey(){
+  const merchantId=state?.merchant?.id,userId=session?.user?.id;
+  return merchantId&&userId?`aibos:shericeri:transcript:${merchantId}:${userId}`:null;
+}
+function sheriPersistTranscript(){
+  const key=sheriTranscriptStorageKey(),box=document.getElementById('shericeriMessages');
+  if(!key||!box)return;
+  try{
+    const rows=[...box.children].filter(el=>el.classList.contains('msg')).map(el=>({role:el.classList.contains('me')?'user':'assistant',content:String(el.textContent||'').trim()})).filter(x=>x.content);
+    localStorage.setItem(key,JSON.stringify(rows));
+  }catch(err){console.warn('[Shericeri transcript] Local save unavailable:',err)}
+}
+function sheriRestoreTranscript(){
+  const key=sheriTranscriptStorageKey(),box=document.getElementById('shericeriMessages');
+  if(!box)return;
+  // Clear the previous account's visible transcript before restoring this account's copy.
+  box.replaceChildren();
+  if(!key)return;
+  try{
+    const rows=JSON.parse(localStorage.getItem(key)||'[]');
+    if(Array.isArray(rows))rows.forEach(row=>{
+      if(!row||!['user','assistant'].includes(row.role)||typeof row.content!=='string'||!row.content.trim())return;
+      const el=document.createElement('div');el.className='msg '+(row.role==='user'?'me':'ai');el.textContent=row.content;box.appendChild(el);
+    });
+    if(!box.children.length){const welcome=document.createElement('div');welcome.className='msg ai';welcome.textContent=sheriTapGreeting();box.appendChild(welcome);}
+    box.scrollTop=box.scrollHeight;
+  }catch(err){console.warn('[Shericeri transcript] Could not restore local transcript:',err);const welcome=document.createElement('div');welcome.className='msg ai';welcome.textContent=sheriTapGreeting();box.appendChild(welcome);}
+}
+function sheriObserveTranscript(){
+  const box=document.getElementById('shericeriMessages');if(!box||sheriTranscriptObserver)return;
+  sheriTranscriptObserver=new MutationObserver(()=>{
+    if(sheriTranscriptSaveTimer)clearTimeout(sheriTranscriptSaveTimer);
+    sheriTranscriptSaveTimer=setTimeout(sheriPersistTranscript,350);
+  });
+  sheriTranscriptObserver.observe(box,{childList:true,subtree:true,characterData:true});
+  window.addEventListener('pagehide',sheriPersistTranscript);
+  sheriPersistTranscript();
+}
+
 
 // ── Speaking queue: lets her start talking on the first finished sentence
 // while the rest of a streamed reply is still arriving ──────────────────
@@ -5980,10 +6145,89 @@ function renderBusinessOS(){
   document.getElementById('osForecastReport').innerHTML=`<div class="row"><span>30-day revenue run-rate</span><b>${money(f.revenue)}</b></div><div class="row"><span>30-day expense run-rate</span><b>${money(f.expenses)}</b></div><div class="row"><span>30-day operating run-rate</span><b>${money(f.profit)}</b></div><div class="row"><span>Current inventory at cost</span><b>${money(f.inventory)}</b></div><div style="margin-top:12px">${osLocalInsights().slice(0,3).map(x=>`<div style="margin-top:7px">• ${esc(x)}</div>`).join('')}</div><div class="sub" style="margin-top:10px">Forecasts are simple run-rate estimates from recorded data, not guarantees.</div>`;
   const cats=categoryBreakdown();const supplierSpend=ss.map(x=>({name:x.name,spend:osSupplierSpend(x.id)})).filter(x=>x.spend>0).sort((a,b)=>b.spend-a.spend).slice(0,8);document.getElementById('osReports').innerHTML=`<div class="grid2"><div><h3>Sales by category</h3>${cats.length?`<table class="table"><tr><th>Category</th><th>Revenue</th><th>Profit</th></tr>${cats.map(x=>`<tr><td>${esc(x.cat)}</td><td>${money(x.revenue)}</td><td>${money(x.profit)}</td></tr>`).join('')}</table>`:'<div class="empty">No sales yet.</div>'}</div><div><h3>Supplier spend</h3>${supplierSpend.length?`<table class="table"><tr><th>Supplier</th><th>Spend</th></tr>${supplierSpend.map(x=>`<tr><td>${esc(x.name)}</td><td>${money(x.spend)}</td></tr>`).join('')}</table>`:'<div class="empty">No supplier purchases yet.</div>'}</div></div><div style="margin-top:16px"><h3>Customer intelligence</h3><div>${activeCustomers().length} customers • ${repeatCustomerCount()} repeat customers • ${money(osInventoryValue())} inventory at cost.</div></div>`;
 }
+function buildOSBusinessInsightContext(){
+  const a=sheriAiAccessScope(),now=new Date(),d30=new Date(now.getTime()-30*86400000),d60=new Date(now.getTime()-60*86400000);
+  const sales=(state.sales||[]).filter(x=>!x.voided),expenses=(state.expenses||[]).filter(x=>!x.deleted),cash=state.cashEntries||[];
+  const products=a.inventory?activeProducts():[],suppliers=a.suppliers?osActiveSuppliers():[],purchases=a.suppliers?(state.purchases||[]).filter(x=>x.status!=='ordered'):[];
+  const trackedCustomers=a.customers?activeCustomers():[],recent=sales.filter(x=>new Date(x.created_at||0)>=d30),prior=sales.filter(x=>new Date(x.created_at||0)>=d60&&new Date(x.created_at||0)<d30);
+  const byExpense={};expenses.forEach(x=>{const k=String(x.category||x.description||'Uncategorised');byExpense[k]=(byExpense[k]||0)+Number(x.amount||0)});
+  const cashIn=cash.filter(x=>x.kind==='income').reduce((n,x)=>n+Number(x.amount||0),0),cashOut=cash.filter(x=>x.kind==='expense').reduce((n,x)=>n+Number(x.amount||0),0);
+  const low=products.filter(p=>Number(p.stock||0)<=Number(p.reorder||0));
+  const expiry=products.filter(p=>p.expiry_date).map(p=>({name:p.name,date:p.expiry_date,daysRemaining:Math.ceil((new Date(p.expiry_date+'T00:00:00')-new Date(now.toISOString().slice(0,10)+'T00:00:00'))/86400000)})).filter(p=>p.daysRemaining<=30).sort((x,y)=>x.daysRemaining-y.daysRemaining);
+  return {
+    asOf:now.toISOString(),merchant:{name:state.merchant?.name||'Business',category:state.merchant?.category||null,country:merchantCountry(),currency:merchantCurrency()},
+    access:{sales:a.sales,customers:a.customers,inventory:a.inventory,inventoryCosts:a.inventoryCosts,suppliers:a.suppliers,expenses:a.expenses,finance:a.finance},
+    dataCoverage:{sales:a.sales?sales.length:null,customers:a.customers?trackedCustomers.length:null,products:a.inventory?products.length:null,suppliers:a.suppliers?suppliers.length:null,purchases:a.suppliers?purchases.length:null,expenses:a.expenses?expenses.length:null,cashMovements:a.finance?cash.length:null},
+    sales:a.sales?{revenue:revenue(),transactionCount:sales.length,revenueLast30Days:recent.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0),revenuePrevious30Days:prior.reduce((n,x)=>n+Number(x.qty||0)*Number(x.price||0),0),topProducts:bestProducts().slice(0,8).map(p=>({name:p.name,revenue:p.rev,estimatedProfit:a.finance?p.profit:null})),recentTransactions:sales.slice().sort((x,y)=>String(y.created_at||'').localeCompare(String(x.created_at||''))).slice(0,20).map(x=>({date:x.created_at,product:x.product_name_snapshot||product(x.product_id)?.name||'Product',quantity:x.qty,unitPrice:x.price,total:Number(x.qty||0)*Number(x.price||0)}))}:null,
+    customers:a.customers?{activeCount:trackedCustomers.length,repeatCustomerCount:repeatCustomerCount(),topCustomers:topCustomers(5).map(x=>({name:x.name,revenue:a.finance?x.revenue:null,visits:x.visits}))}:null,
+    inventory:a.inventory?{productCount:products.length,inventoryValueAtCost:a.inventoryCosts?osInventoryValue():null,lowStockCount:low.length,lowStockItems:low.slice(0,30).map(p=>({name:p.name,quantity:p.stock,reorderLevel:p.reorder})),expiryAttention:expiry.slice(0,30),products:products.slice(0,60).map(p=>({name:p.name,quantity:p.stock,reorderLevel:p.reorder,sellingPrice:p.sell,cost:a.inventoryCosts?p.cost:null,expiryDate:p.expiry_date||null}))}:null,
+    suppliers:a.suppliers?{supplierCount:suppliers.length,totalPurchases:a.finance?osPurchasesTotal():null,suppliers:suppliers.map(s=>({name:s.name,spend:a.finance?osSupplierSpend(s.id):null,purchaseCount:purchases.filter(p=>p.supplier_id===s.id).length})),recentPurchases:purchases.slice().sort((x,y)=>String(y.purchased_at||'').localeCompare(String(x.purchased_at||''))).slice(0,30).map(x=>({date:x.purchased_at,supplier:suppliers.find(s=>s.id===x.supplier_id)?.name||'Unassigned',product:x.product_name_snapshot||product(x.product_id)?.name||'Product',quantity:x.qty,total:a.finance?Number(x.total||Number(x.qty||0)*Number(x.unit_cost||0)):null,status:x.status}))}:null,
+    expenses:a.expenses?{total:totalExpenses(),count:expenses.length,byCategory:Object.entries(byExpense).map(([category,amount])=>({category,amount})),recent:expenses.slice().sort((x,y)=>String(y.created_at||'').localeCompare(String(x.created_at||''))).slice(0,20).map(x=>({date:x.created_at,category:x.category||x.description,amount:Number(x.amount||0)}))}:null,
+    cashFlow:a.finance?{recordedCashIn:cashIn,recordedCashOut:cashOut,netRecordedCashMovement:cashIn-cashOut,movementCount:cash.length,transfersExcluded:true,limitation:'Manual cash entries only; not a complete cash-flow statement. Ledger receipts and payments may be recorded separately.',recent:cash.slice().sort((x,y)=>String(y.occurred_at||'').localeCompare(String(x.occurred_at||''))).slice(0,20).map(x=>({date:x.occurred_at,kind:x.kind,amount:Number(x.amount||0),description:x.description||''}))}:null,
+    profitability:a.finance?{revenue:revenue(),costOfGoodsSold:cogs(),grossProfit:revenue()-cogs(),operatingExpenses:totalExpenses(),estimatedNetProfit:profit(),inventoryValueAtCost:a.inventoryCosts?osInventoryValue():null}:null,
+    forecast30:a.finance?osForecast30():null,
+    limitations:['Use only records available to this account.','Manual cash movements are not a complete IAS 7 cash-flow statement.','Operational profit is an estimate unless reconciled to the accounting ledger.']
+  };
+}
+function osRenderInsight(title,answer){
+  const box=document.getElementById('osAIInsight');if(!box)return;
+  const paragraphs=String(answer||'').trim().split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean);
+  box.innerHTML='<h3>'+esc(title)+'</h3>'+paragraphs.map(p=>'<p style="line-height:1.75;margin:0 0 14px;white-space:pre-wrap">'+esc(p).replace(/\n/g,'<br>')+'</p>').join('');
+}
+function osLocalBusinessReview(c,lang){
+  const fmt=n=>n==null?(lang==='rw'?'ntiboneka':lang==='fr'?'indisponible':'not available'):money(Number(n||0)),s=c.sales||{},u=c.customers||{},i=c.inventory||{},v=c.suppliers||{},e=c.expenses||{},f=c.cashFlow||{},p=c.profitability||{};
+  const unavailable=lang==='rw'?'ntiboneka':lang==='fr'?'indisponible':'not available',low=c.inventory?((i.lowStockItems||[]).map(x=>x.name+' ('+x.quantity+')').join(', ')||'none identified'):unavailable,top=c.sales?((s.topProducts||[]).slice(0,3).map(x=>x.name).join(', ')||'not enough product-level sales data'):unavailable,best=(v.suppliers||[]).slice().sort((x,y)=>(y.spend||0)-(x.spend||0))[0],supplier=!c.suppliers?unavailable:best?best.name+' ('+fmt(best.spend)+')':'no supplier spend attributed';
+  const pct=s.revenuePrevious30Days?((s.revenueLast30Days-s.revenuePrevious30Days)/s.revenuePrevious30Days*100):null,trend=pct==null?'not enough comparable history':(pct>=0?'up ':'down ')+Math.abs(pct).toFixed(1)+'%';
+  const data=lang==='rw'?[
+    'Iri suzuma ry’ubucuruzi bwa '+c.merchant.name+' rishingiye ku makuru yanditswe kugeza ku wa '+new Date(c.asOf).toLocaleDateString('rw-RW')+'. Ni incamake y’ibiri mu bubiko bw’amakuru; aho amakuru atuzuye cyangwa uburenganzira bwo kuyabona butariho, turabigaragaza aho gukeka.',
+    'Ibyagurishijwe: amafaranga y’igurisha yanditswe ni '+fmt(s.revenue)+', mu nshuro '+(s.transactionCount??'ntiziboneka')+'. Mu minsi 30 ishize hinjiye '+fmt(s.revenueLast30Days)+', ugereranyije n’iminsi 30 yabanje igurisha riri '+trend+'. Ibicuruzwa byinjije menshi ni '+top+'. Ibi bigaragaza ibicuruzwa bikwiye gukurikiranwa, ariko reba n’umubare wagurishijwe n’ibiciro kugira ngo umenye impamvu y’ihinduka.',
+    'Abakiriya: abakiriya banditswe ku giti cyabo ni '+(u.activeCount??'ntiboneka')+', muri bo abagaruka kugura ni '+(u.repeatCustomerCount??'ntiboneka')+'. Ibi bifasha kureba uko abakiriya bagaruka, ariko igurisha ritandikwaho umukiriya rigabanya ubushobozi bwo gupima inshuro bagura n’agaciro kabo mu gihe kirekire.',
+    'Ububiko: hari ibicuruzwa '+(i.productCount??'ntiboneka')+' bikora, agaciro kabyo hashingiwe ku giciro cyabiguze ni '+fmt(i.inventoryValueAtCost)+'. Ibicuruzwa '+(i.lowStockCount??'ntiboneka')+' biri ku mubare wo kongera cyangwa munsi yawo: '+low+'. Reba n’ibyegereje kurangiza igihe. Banza ugenzure ububiko nyabwo mbere yo gutumiza byinshi kugira ngo wirinde kubura ibicuruzwa cyangwa kugura ibirenze ibikenewe.',
+    'Abaranguza n’ibyaguzwe: abaranguza bakora ni '+(v.supplierCount??'ntiboneka')+', ibyaguzwe byose hamwe ni '+fmt(v.totalPurchases)+'. Uwaranguje ibyaguzwe bifite agaciro kanini ni '+supplier+'. Gereranya ibiciro, igihe cyo kukugezaho ibicuruzwa, ubwiza n’amasezerano yo kwishyura kugira ngo ugabanye kwishingikiriza ku muntu umwe.',
+    'Amafaranga yakoreshejwe: amafaranga yanditswe ni '+fmt(e.total)+' mu nyandiko '+(e.count??'ntiziboneka')+'. Suzuma ibyiciro by’amafaranga n’ayisubiramo buri gihe kugira ngo utandukanye ay’ingenzi n’ashobora kugabanywa. Amafaranga atanditswe cyangwa yanditswe mu cyiciro kitari cyo ntashobora kugaragara muri iri suzuma.',
+    'Uko amafaranga yinjira n’asohoka: inyandiko z’amafaranga yinjijwe ni '+fmt(f.recordedCashIn)+', ayasohotse ni '+fmt(f.recordedCashOut)+', hasigayeho impinduka ya '+fmt(f.netRecordedCashMovement)+'. Ihererekanya ntiribariwemo. Iyi ni incamake y’amafaranga yanditswe mu ntoki gusa, si raporo yuzuye y’imigendekere y’amafaranga; gereranya na banki, ubwishyu n’amadeni y’abakiriya.',
+    'Inyungu: amafaranga y’igurisha ni '+fmt(p.revenue)+', ikiguzi cy’ibicuruzwa byagurishijwe ni '+fmt(p.costOfGoodsSold)+', inyungu mbere y’andi mafaranga ni '+fmt(p.grossProfit)+', amafaranga yakoreshejwe ni '+fmt(p.operatingExpenses)+', naho inyungu isigara igereranijwe ni '+fmt(p.estimatedNetProfit)+'. Iyi mibare igereranijwe igomba kugereranywa n’igitabo cy’ibaruramari mbere yo gufata icyemezo gikomeye.',
+    'Ibyago n’amahirwe: ibyihutirwa ni kongera ibicuruzwa biri hafi gushira, kugenzura ibyarangiza igihe, gukurikirana abakiriya bagaruka, kugenzura ibiciro by’abaranguza no guhuza amafaranga yanditswe na banki. Amahirwe arimo kugenera abakiriya bagaruka poromosiyo, kongera inyungu ku bicuruzwa bikunzwe no kugabanya kugura byihutirwa. Amakuru ahari ntahagije ngo yemeze uko isoko rizitwara mu gihe kizaza.'
+  ]:lang==='fr'?[
+    'Cette revue de '+c.merchant.name+' repose sur les données enregistrées jusqu’au '+new Date(c.asOf).toLocaleDateString('fr-FR')+'. Elle décrit les informations accessibles dans le compte. Les données manquantes ou non autorisées sont signalées plutôt que supposées.',
+    'Ventes : le chiffre d’affaires enregistré est de '+fmt(s.revenue)+' sur '+(s.transactionCount??'un nombre indisponible')+' transactions. Le chiffre d’affaires des 30 derniers jours est de '+fmt(s.revenueLast30Days)+' et la comparaison avec les 30 jours précédents indique '+trend+'. Les principaux produits sont '+top+'. Examinez les quantités et les prix avant de conclure à une tendance durable.',
+    'Clients : '+(u.activeCount??'nombre indisponible')+' clients sont suivis individuellement, dont '+(u.repeatCustomerCount??'nombre indisponible')+' clients récurrents. Les ventes anonymes ou non associées à un client limitent toutefois l’analyse de la fréquence d’achat et de la valeur vie client.',
+    'Stocks : '+(i.productCount??'nombre indisponible')+' produits actifs sont suivis et leur valeur au coût est de '+fmt(i.inventoryValueAtCost)+'. '+(i.lowStockCount??'nombre indisponible')+' produits sont au seuil ou sous le seuil de réapprovisionnement : '+low+'. Vérifiez également les dates d’expiration et les quantités physiques avant toute commande importante.',
+    'Fournisseurs et achats : '+(v.supplierCount??'nombre indisponible')+' fournisseurs actifs sont enregistrés et les achats totalisent '+fmt(v.totalPurchases)+'. Le fournisseur auquel le plus de dépenses sont attribuées est '+supplier+'. Comparez les prix, les délais, la qualité et les conditions de paiement afin de limiter la dépendance et les ruptures.',
+    'Dépenses : les dépenses enregistrées totalisent '+fmt(e.total)+' sur '+(e.count??'un nombre indisponible')+' écritures. Examinez les catégories et les coûts récurrents pour distinguer les charges essentielles des dépenses évitables. Les opérations non enregistrées ne peuvent pas être évaluées.',
+    'Trésorerie : les mouvements saisis manuellement montrent des entrées de '+fmt(f.recordedCashIn)+', des sorties de '+fmt(f.recordedCashOut)+' et un mouvement net de '+fmt(f.netRecordedCashMovement)+'. Les transferts sont exclus. Ce résumé ne constitue pas un état complet des flux de trésorerie ; rapprochez-le des comptes bancaires, des paiements et des créances.',
+    'Rentabilité : le chiffre d’affaires est de '+fmt(p.revenue)+', le coût des marchandises vendues de '+fmt(p.costOfGoodsSold)+', la marge brute de '+fmt(p.grossProfit)+', les dépenses opérationnelles de '+fmt(p.operatingExpenses)+' et le bénéfice opérationnel estimé de '+fmt(p.estimatedNetProfit)+'. Ce résultat doit être rapproché du grand livre avant toute décision financière importante.',
+    'Risques et possibilités : les priorités sont de réapprovisionner les produits à faible stock, contrôler les dates d’expiration, suivre les clients récurrents, surveiller les coûts fournisseurs et rapprocher la trésorerie. Les possibilités incluent des offres ciblées, l’amélioration des marges des produits performants et la réduction des achats urgents. Les données ne suffisent pas à confirmer la demande future.'
+  ]:[
+    'This review of '+c.merchant.name+' is based on records available as of '+new Date(c.asOf).toLocaleDateString('en-GB')+'. It describes the information accessible in this account and identifies gaps rather than guessing where records are missing.',
+    'Sales: recorded revenue is '+fmt(s.revenue)+' across '+(s.transactionCount??'an unavailable number of')+' active transactions. Revenue over the last 30 days is '+fmt(s.revenueLast30Days)+', compared with the previous 30 days '+trend+'. Leading recorded products include '+top+'. Review both sales quantities and prices before treating this as a lasting trend.',
+    'Customers: '+(u.activeCount??'an unavailable number of')+' customers are individually tracked, including '+(u.repeatCustomerCount??'an unavailable number of')+' repeat customers. Anonymous or unlinked sales limit the ability to measure purchase frequency, retention and customer lifetime value accurately.',
+    'Inventory: '+(i.productCount??'an unavailable number of')+' active products are recorded, with inventory value at cost of '+fmt(i.inventoryValueAtCost)+'. '+(i.lowStockCount??'an unavailable number of')+' products are at or below reorder levels: '+low+'. Review approaching expiry dates and verify physical quantities before placing large replenishment orders.',
+    'Suppliers and purchasing: '+(v.supplierCount??'an unavailable number of')+' active suppliers are recorded, and recorded purchases total '+fmt(v.totalPurchases)+'. The supplier with the highest attributed spend is '+supplier+'. Compare prices, delivery reliability, product quality and payment terms to reduce dependency and supply disruption risk.',
+    'Expenses: active recorded expenses total '+fmt(e.total)+' across '+(e.count??'an unavailable number of')+' entries. Review categories and recurring costs to separate essential operating expenses from avoidable spending. Unrecorded transactions cannot be evaluated.',
+    'Cash flow: manually recorded cash movements show inflows of '+fmt(f.recordedCashIn)+', outflows of '+fmt(f.recordedCashOut)+' and net movement of '+fmt(f.netRecordedCashMovement)+'. Transfers are excluded. This is not a complete cash-flow statement; reconcile it with bank accounts, payments and receivables.',
+    'Profitability: recorded revenue is '+fmt(p.revenue)+', cost of goods sold is '+fmt(p.costOfGoodsSold)+', gross profit is '+fmt(p.grossProfit)+', operating expenses are '+fmt(p.operatingExpenses)+', and estimated operating net profit is '+fmt(p.estimatedNetProfit)+'. Reconcile this estimate to the accounting ledger before significant financial decisions.',
+    'Risks and opportunities: immediate priorities are to replenish low-stock products, review expiry dates, follow repeat customers, monitor supplier costs and reconcile cash movements. Opportunities include targeted offers to returning customers, improving margins on strong-selling products and reducing emergency purchases. Current records are not sufficient to prove future demand.'
+  ];
+  return data.join('\n\n');
+}
 async function generateOSInsight(){
-  const box=document.getElementById('osAIInsight');if(!box)return;box.style.display='block';box.innerHTML='<b>Analyzing business insight…</b>';const local=osLocalInsights();
-  if(!navigator.onLine||advisorAvailable===false){box.innerHTML='<b>Offline intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>');return}
-  try{const today=new Date();const expiryAttention=sheriAiAccessScope().inventory?activeProducts().filter(p=>p.expiry_date).map(p=>({name:p.name,expiryDate:p.expiry_date,barcode:p.barcode||null,daysRemaining:Math.ceil((new Date(p.expiry_date+'T00:00:00')-new Date(today.toISOString().slice(0,10)+'T00:00:00'))/86400000)})).filter(p=>p.daysRemaining<=30).sort((a,b)=>a.daysRemaining-b.daysRemaining):[];const context={merchantName:state.merchant.name,merchantCategory:state.merchant.category,country:merchantCountry(),currency:merchantCurrency(),revenue:sheriAiAccessScope().finance?revenue():null,cogs:sheriAiAccessScope().finance?cogs():null,expenses:sheriAiAccessScope().expenses?totalExpenses():null,profit:sheriAiAccessScope().finance?profit():null,inventoryValue:sheriAiAccessScope().inventoryCosts?osInventoryValue():null,supplierSpend:sheriAiAccessScope().finance?osPurchasesTotal():null,cashNet:sheriAiAccessScope().finance?osCashNet():null,salesCount:sheriAiAccessScope().sales?state.sales.filter(s=>!s.voided).length:null,customerCount:sheriAiAccessScope().customers?activeCustomers().length:null,repeatCustomers:sheriAiAccessScope().customers?repeatCustomerCount():null,lowStock:sheriAiAccessScope().inventory?activeProducts().filter(p=>p.stock<=p.reorder).map(p=>({name:p.name,stock:p.stock,reorder:p.reorder})):[],expiryAttention,topProducts:sheriAiAccessScope().sales?bestProducts().slice(0,5).map(p=>({name:p.name,revenue:p.rev,profit:sheriAiAccessScope().finance?p.profit:null})):[],suppliers:sheriAiAccessScope().suppliers?osActiveSuppliers().map(s=>({name:s.name,spend:sheriAiAccessScope().finance?osSupplierSpend(s.id):null})):[],purchases:sheriAiAccessScope().suppliers?state.purchases.filter(x=>!x.voided_at).slice(0,20).map(x=>({supplierId:x.supplier_id,total:sheriAiAccessScope().finance?x.total||x.qty*x.unit_cost:null,status:x.status})):[],forecast30:sheriAiAccessScope().finance?osForecast30():null};const {data,error}=await sb.functions.invoke('quick-service',{body:{question:'Give me the three most useful business decisions I should consider now, based strictly on my recorded business data. Mention risks and opportunities. Keep it practical.',context,language:window.AIBOS_I18N?.getLanguage?.()||'en'}});if(error||!data?.answer)throw error||new Error('No AI answer');box.innerHTML='<b>AI intelligence</b><br>'+esc(data.answer).replace(/\n/g,'<br>');await sheriQueueMemory('insight',data.answer.slice(0,1800))}catch(e){box.innerHTML='<b>Local intelligence</b><br>'+local.map(x=>`• ${esc(x)}`).join('<br>')+'<div class="sub" style="margin-top:8px">Cloud AI was unavailable, so the app used its offline analysis.</div>';const hub=document.getElementById('aibosHubInsight');if(hub)hub.innerHTML=local.slice(0,2).map(x=>`• ${esc(x)}`).join('<br>')}
+  const box=document.getElementById('osAIInsight');if(!box)return;
+  box.style.display='block';box.innerHTML='<b>Analyzing your complete business review…</b>';
+  const language=window.AIBOS_I18N?.getLanguage?.()||'en',context=buildOSBusinessInsightContext();
+  const title=language==='rw'?'Isuzuma rusange ry’ubucuruzi':language==='fr'?'Revue générale de l’entreprise':'General business review';
+  if(!navigator.onLine||advisorAvailable===false){osRenderInsight(title,osLocalBusinessReview(context,language));return}
+  try{
+    const {data,error}=await sb.functions.invoke('quick-service',{body:{mode:'business_insight',question:'Prepare a complete current business review covering sales, customers, inventory, suppliers and purchasing, expenses, cash flow, profitability, risks and opportunities. Write connected, substantial full paragraphs with transitions, not bullet points or a short summary. Use all available records accurately, explain implications, distinguish facts from estimates, identify gaps, and conclude with prioritized practical actions. Never invent data.',context,language}});
+    if(error||!data?.answer)throw error||new Error('The business review service returned no report.');
+    osRenderInsight(title,data.answer);
+    if(data.complete===false){const note=language==='rw'?'Iri suzuma rishobora kuba rituzuye. Ongera ugerageze.':language==='fr'?'Cette analyse peut être incomplète. Relancez la génération.':'This review may be incomplete. Please regenerate it.';box.insertAdjacentHTML('beforeend','<p class="sub" role="status">'+esc(note)+'</p>')}
+    await sheriQueueMemory('insight',data.answer.slice(0,1800));
+  }catch(err){
+    console.error('[AI Business Insight]',err);osRenderInsight(title,osLocalBusinessReview(context,language));
+    const note=language==='rw'?'Isesengura rya AI ryo kuri internet ntiryabonetse. Ibyavuzwe bishingiye ku makuru abitswe.':language==='fr'?'L’analyse IA en ligne est indisponible. Le rapport repose sur les données enregistrées.':'The online AI review is unavailable. This review uses recorded business data only.';
+    box.insertAdjacentHTML('beforeend','<p class="sub" role="status">'+esc(note)+'</p>');
+  }
 }
 
 
@@ -6780,14 +7024,37 @@ async function exportStatement(id,title,kind){
 }
 function accCashFlowForPeriod(startDate,endDate){
   const cashIds=new Set((state.accounts||[]).filter(a=>['1000','1010','1020'].includes(String(a.code))||(state.bankAccounts||[]).some(b=>b.account_id===a.id)).map(a=>a.id));
-  const entries=new Map((state.journalEntries||[]).map(e=>[e.id,e]));
+  const accounts=new Map((state.accounts||[]).map(a=>[a.id,a]));
   const reversedEntries=new Set((state.journalEntries||[]).filter(e=>!e.voided&&['sale_void','sale_cogs_void','accounting_correction','purchase_void'].includes(e.source_type)).map(e=>e.source_id));
   const linesByEntry=new Map();
   for(const line of state.journalLines||[]){
     if(!linesByEntry.has(line.journal_entry_id))linesByEntry.set(line.journal_entry_id,[]);
     linesByEntry.get(line.journal_entry_id).push(line);
   }
-  let inflows=0,outflows=0,opening=0,closing=0;
+  const flows={
+    operating:{inflows:0,outflows:0,net:0},
+    investing:{inflows:0,outflows:0,net:0},
+    financing:{inflows:0,outflows:0,net:0},
+    unclassified:{inflows:0,outflows:0,net:0}
+  };
+  let opening=0,closing=0;
+  const classifyAccount=account=>{
+    if(!account)return 'unclassified';
+    const type=String(account.type||'').toLowerCase();
+    const balanceClass=String(account.balance_sheet_class||'').toLowerCase();
+    if(['income','other_income','cogs','expense'].includes(type))return 'operating';
+    if(type==='equity')return 'financing';
+    if(type==='asset'||type==='liability'){
+      if(balanceClass==='current')return 'operating';
+      if(balanceClass==='non_current')return type==='asset'?'investing':'financing';
+    }
+    return 'unclassified';
+  };
+  const addFlow=(classification,amount)=>{
+    const bucket=flows[classification]||flows.unclassified;
+    if(amount>0.005)bucket.inflows+=amount;
+    else if(amount< -0.005)bucket.outflows+=Math.abs(amount);
+  };
   for(const entry of state.journalEntries||[]){
     if(entry.voided&&!reversedEntries.has(entry.id)&&!reversedEntries.has(entry.source_id))continue;
     const date=String(entry.entry_date||entry.created_at||'').slice(0,10);
@@ -6800,13 +7067,26 @@ function accCashFlowForPeriod(startDate,endDate){
     if(startDate&&date<startDate)opening+=cashChange;
     if(!endDate||date<=endDate)closing+=cashChange;
     const inRange=(!startDate||date>=startDate)&&(!endDate||date<=endDate);
-    // Ignore transfers between cash-equivalent accounts: they change neither
-    // total cash nor cash flow, even though one cash account is debited and another credited.
-    const hasNonCashCounterpart=lines.some(line=>!cashIds.has(line.account_id));
-    if(inRange&&hasNonCashCounterpart){if(cashChange>0)inflows+=cashChange;else if(cashChange<0)outflows-=cashChange;}
+    if(!inRange)continue;
+    // Classify each non-cash counterpart independently. This handles compound
+    // entries and keeps transfers between cash-equivalent accounts out of cash flow.
+    const counterpartLines=lines.filter(line=>!cashIds.has(line.account_id));
+    let allocatedCashChange=0;
+    for(const line of counterpartLines){
+      const counterpartCashChange=Number(line.credit||0)-Number(line.debit||0);
+      if(Math.abs(counterpartCashChange)<=0.005)continue;
+      addFlow(classifyAccount(accounts.get(line.account_id)),counterpartCashChange);
+      allocatedCashChange+=counterpartCashChange;
+    }
+    // Any unmatched cash movement remains visible as unclassified; never silently drop it.
+    const unallocated=cashChange-allocatedCashChange;
+    if(Math.abs(unallocated)>0.005)addFlow('unclassified',unallocated);
   }
+  for(const bucket of Object.values(flows))bucket.net=bucket.inflows-bucket.outflows;
+  const inflows=Object.values(flows).reduce((sum,bucket)=>sum+bucket.inflows,0);
+  const outflows=Object.values(flows).reduce((sum,bucket)=>sum+bucket.outflows,0);
   const net=inflows-outflows;
-  return{inflows,outflows,net,opening,closing,reconciliationDifference:opening+net-closing};
+  return{...flows,inflows,outflows,net,opening,closing,reconciliationDifference:opening+net-closing};
 }
 function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!document.getElementById('reports'))return;const reportStart=sheriReportStart,reportEnd=sheriReportEnd||sheriLocalDateKey(new Date());
   // If the accounting migration is not installed yet, never present zeroes when
@@ -6857,7 +7137,8 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
   const cashFlow=accCashFlowForPeriod(reportStart,reportEnd);
   const cashFlowNotice=Math.abs(cashFlow.reconciliationDifference)>0.005?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">'+sheriLocalized('Cash and cash equivalents do not reconcile. Difference: '+money(cashFlow.reconciliationDifference)+'. Review cash and bank journal lines before relying on these statements.','La trésorerie et les équivalents de trésorerie ne concordent pas. Écart : '+money(cashFlow.reconciliationDifference)+'. Vérifiez les écritures de caisse et de banque avant de vous fier à ces états.','Amafaranga ari mu bubiko na banki ntahura. Itandukaniro: '+money(cashFlow.reconciliationDifference)+'. Banza ugenzure inyandiko za cash na banki.')+'</div>':'';
   const statementNotice=integrityNotice+pendingLedgerNotice+inventoryReconciliationNotice+trialBalanceNotice+balanceNotice+cashFlowNotice+refreshNotice+syncNotice+serverSnapshotNotice;
-  const statementsVerified=integrity.invalidCount===0&&inventoryReconciliationApplicable&&Math.abs(inventoryDifference)<=0.005&&Math.abs(trialBalanceDifference)<=0.005&&Math.abs(balanceDifference)<=0.005&&Math.abs(cashFlow.reconciliationDifference)<=0.005&&!sheriAccountingRefreshError&&!syncPending&&accServerSnapshotAuthoritative===true;document.getElementById('reportMetrics').innerHTML=(statementNotice?'<div style="grid-column:1/-1">'+statementNotice+'</div>':'')+[[sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha'),money(salesRevenue),''],['Net profit',money(net),net>=0?'good':'bad'],['Assets',money(assets),''],['Liabilities',money(liab),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');document.getElementById('accPL').innerHTML=statementNotice+`<div class="row"><span>${sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha')}</span><b>${money(salesRevenue)}</b></div><div class="row"><span>COGS</span><b>${money(cogs)}</b></div><div class="row"><span>Gross profit</span><b>${money(salesRevenue-cogs)}</b></div><div class="row"><span>${sheriLocalized('Other income','Autres produits','Ayandi mafaranga yinjijwe')}</span><b>${money(otherIncome)}</b></div><div class="row"><span>${sheriLocalized('Operating expenses','Charges d’exploitation','Amafaranga akoreshwa mu bikorwa')}</span><b>${money(exp)}</b></div><div class="row"><span>${sheriLocalized('Profit before tax','Bénéfice avant impôt','Inyungu mbere y’imisoro')}</span><b>${money(profitBeforeTax)}</b></div><div class="row"><span>${sheriLocalized('Income tax expense','Charge d’impôt sur le revenu','Ikiguzi cy’umusoro ku nyungu')}</span><b>${money(taxExpense)}</b></div><div class="row"><span>${sheriLocalized('Net profit','Bénéfice net','Inyungu nyakuri')}</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Overdue receivables: ${money((state.invoices||[]).filter(x=>x.due_date<accToday()&&accInvoiceStatus(x)!=='paid').reduce((s,x)=>s+x.total-accInvoicePaid(x),0))} • Overdue payables: ${money((state.bills||[]).filter(x=>x.due_date<accToday()&&accBillStatus(x)!=='paid').reduce((s,x)=>s+x.total-accBillPaid(x),0))}</div>`;document.getElementById('accBS').innerHTML=statementNotice+`<div class="row"><span>Total assets</span><b>${money(assets)}</b></div><div class="row"><span>${sheriLocalized('Inventory per product records','Stock selon les fiches produits','Ububiko nk’uko bwanditswe mu bicuruzwa')}</span><b>${inventoryReconciliationApplicable?money(inventorySubledgerValue):sheriLocalized('Not available for historical date','Non disponible à cette date historique','Ntibiboneka ku itariki yashize')}</b></div><div class="row"><span>${sheriLocalized('Inventory control account (1200)','Compte de stock (1200)','Konti y’ububiko (1200)')}</span><b>${money(inventoryLedgerBalance)}</b></div><div class="row"><span>${sheriLocalized('Inventory valuation difference','Écart de valorisation du stock','Itandukaniro ry’agaciro k’ububiko')}</span><b>${inventoryReconciliationApplicable?money(inventoryDifference):'—'}</b></div><div class="row"><span>Total liabilities</span><b>${money(liab)}</b></div><div class="row"><span>Tax payable (included in liabilities)</span><b>${money(bs['2100']||0)}</b></div><div class="row"><span>Input tax receivable (included in assets)</span><b>${money(bs['2110']||0)}</b></div><div class="row"><span>Equity incl. current profit</span><b>${money(equity)}</b></div><div class="sub" style="margin-top:8px">${statementsVerified?sheriLocalized('✓ Financial statements are verified.','✓ Les états financiers sont vérifiés.','✓ Raporo z’imari zigenzuwe neza.'):'⚠ '+sheriLocalized('Financial statements are NOT verified. Check journal integrity, inventory reconciliation, Trial Balance and server refresh before relying on these figures.','Les états financiers ne sont PAS vérifiés. Vérifiez le journal, le rapprochement des stocks, la balance générale et l’actualisation du serveur avant de vous fier à ces chiffres.','Raporo z’imari NTIZIRAGENZURWA. Banza ugenzure inyandiko z’ibaruramari, ihuzwa ry’ububiko, igereranya ry’amadeni n’inguzanyo, n’ivugururwa rya seriveri.')}</div>`;document.getElementById('accCF').innerHTML=statementNotice+`<div class="sub">${sheriLocalized("Direct cash movement summary (unclassified). Inflows and outflows use the net movement across cash, bank and mobile-money accounts. Transfers between cash-equivalent accounts are excluded. This is not yet a classified operating, investing and financing cash flow statement.","Résumé non classé des mouvements de trésorerie. Les entrées et sorties utilisent le mouvement net des comptes de caisse, bancaires et de mobile money. Les transferts entre équivalents de trésorerie sont exclus. Il ne s’agit pas encore d’un tableau classé entre activités opérationnelles, d’investissement et de financement.","Incamake y’ihinduka ry’amafaranga itarashyirwa mu byiciro. Amafaranga yinjiye n’ayagiye abarwa hashingiwe ku mpinduka rusange kuri konti za cash, banki na mobile money. Ihererekanya hagati ya konti z’amafaranga ntiribarebwa. Iyi si raporo yuzuye itandukanya ibikorwa bisanzwe, ishoramari n’inkunga cyangwa igishoro.")}</div><div class="row"><span>Opening cash and cash equivalents</span><b>${money(cashFlow.opening)}</b></div><div class="row"><span>Cash inflows in period</span><b>${money(cashFlow.inflows)}</b></div><div class="row"><span>Cash outflows in period</span><b>${money(cashFlow.outflows)}</b></div><div class="row"><span>Net cash flow in period</span><b>${money(cashFlow.net)}</b></div><div class="row"><span>Closing cash and cash equivalents</span><b>${money(cashFlow.closing)}</b></div><div class="sub" style="margin-top:8px">${Math.abs(cashFlow.reconciliationDifference)<=0.005?'✓ Cash movement reconciles.':'⚠ Cash movement does not reconcile. Difference: '+money(cashFlow.reconciliationDifference)}</div>`;const tbRows=[];let tbDebits=0,tbCredits=0;for(const a of (state.accounts||[])){const normalSide=String(a.normal_balance||(['liability','equity','income'].includes(a.type)?'credit':'debit')).toLowerCase(),balance=Number(bs[a.code]||0);if(Math.abs(balance)<=0.005)continue;const debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance),credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance);tbDebits+=debit;tbCredits+=credit;tbRows.push('<tr><td>'+esc(a.code)+'</td><td>'+esc(a.name)+'</td><td>'+money(debit)+'</td><td>'+money(credit)+'</td></tr>')}const tbDifference=tbDebits-tbCredits;document.getElementById('accTB').innerHTML=tbRows.length?'<table class="table"><thead><tr><th>Code</th><th>Account</th><th>Debit</th><th>Credit</th></tr></thead><tbody>'+tbRows.join('')+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+money(tbDebits)+'</th><th>'+money(tbCredits)+'</th></tr></tfoot></table><div class="sub" style="margin-top:8px">'+(Math.abs(tbDifference)<=0.005?'✓ Debits and credits balance.':'⚠ Trial Balance difference: '+money(tbDifference)+'. Review the General Ledger before relying on these figures.')+'</div>':'<div class="empty">No posted account balances exist for this reporting date yet.</div>';const gl=(state.journalEntries||[]).filter(e=>sheriDateInReportRange(e.entry_date||e.created_at)).slice().sort((a,b)=>String(b.created_at||b.entry_date).localeCompare(String(a.created_at||a.entry_date))).slice(0,30);document.getElementById('accGL').innerHTML=gl.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr>${gl.map(e=>{const ls=accLinesForEntry(e.id);return ls.map(l=>`<tr><td>${esc(e.entry_date)}</td><td>${esc(e.description)} — ${esc(accAccount(l.account_id)?.name||'')}</td><td>${l.debit?money(l.debit):''}</td><td>${l.credit?money(l.credit):''}</td></tr>`).join('')}).join('')}</table>`:'<div class="empty">No journal entries yet.</div>';document.getElementById('accAudit').innerHTML=state.auditLog.length?`<table class="table"><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Reason</th><th>Details</th></tr>${state.auditLog.filter(x=>sheriDateInReportRange(x.created_at)).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,20).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audit events yet.</div>';}
+  const cashFlowClassificationNotice=(cashFlow.unclassified.inflows+cashFlow.unclassified.outflows)>0.005?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+sheriLocalized('Some cash movements are linked to accounts without a cash-flow classification. Review those account classifications before relying on category totals.','Certains mouvements de trésorerie sont liés à des comptes sans classification des flux. Vérifiez la classification de ces comptes avant de vous fier aux totaux par catégorie.','Hari amafaranga yagiye cyangwa yinjiye anyuze kuri konti zitarashyirwa mu byiciro by’imigendekere y’amafaranga. Banza uzishyire mu byiciro mbere yo kwishingikiriza ku mibare rusange.')+'</div>':'';
+  const statementsVerified=integrity.invalidCount===0&&inventoryReconciliationApplicable&&Math.abs(inventoryDifference)<=0.005&&Math.abs(trialBalanceDifference)<=0.005&&Math.abs(balanceDifference)<=0.005&&(cashFlow.unclassified.inflows+cashFlow.unclassified.outflows)<=0.005&&Math.abs(cashFlow.reconciliationDifference)<=0.005&&!sheriAccountingRefreshError&&!syncPending&&accServerSnapshotAuthoritative===true;document.getElementById('reportMetrics').innerHTML=(statementNotice?'<div style="grid-column:1/-1">'+statementNotice+'</div>':'')+[[sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha'),money(salesRevenue),''],['Net profit',money(net),net>=0?'good':'bad'],['Assets',money(assets),''],['Liabilities',money(liab),'']].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="metric ${x[2]||''}">${x[1]}</div></div>`).join('');document.getElementById('accPL').innerHTML=statementNotice+`<div class="row"><span>${sheriLocalized('Net sales revenue','Chiffre d’affaires net','Amafaranga yinjijwe mu igurisha')}</span><b>${money(salesRevenue)}</b></div><div class="row"><span>COGS</span><b>${money(cogs)}</b></div><div class="row"><span>Gross profit</span><b>${money(salesRevenue-cogs)}</b></div><div class="row"><span>${sheriLocalized('Other income','Autres produits','Ayandi mafaranga yinjijwe')}</span><b>${money(otherIncome)}</b></div><div class="row"><span>${sheriLocalized('Operating expenses','Charges d’exploitation','Amafaranga akoreshwa mu bikorwa')}</span><b>${money(exp)}</b></div><div class="row"><span>${sheriLocalized('Profit before tax','Bénéfice avant impôt','Inyungu mbere y’imisoro')}</span><b>${money(profitBeforeTax)}</b></div><div class="row"><span>${sheriLocalized('Income tax expense','Charge d’impôt sur le revenu','Ikiguzi cy’umusoro ku nyungu')}</span><b>${money(taxExpense)}</b></div><div class="row"><span>${sheriLocalized('Net profit','Bénéfice net','Inyungu nyakuri')}</span><b>${money(net)}</b></div><div class="sub" style="margin-top:10px">Overdue receivables: ${money((state.invoices||[]).filter(x=>x.due_date<accToday()&&accInvoiceStatus(x)!=='paid').reduce((s,x)=>s+x.total-accInvoicePaid(x),0))} • Overdue payables: ${money((state.bills||[]).filter(x=>x.due_date<accToday()&&accBillStatus(x)!=='paid').reduce((s,x)=>s+x.total-accBillPaid(x),0))}</div>`;document.getElementById('accBS').innerHTML=statementNotice+`<div class="row"><span>Total assets</span><b>${money(assets)}</b></div><div class="row"><span>${sheriLocalized('Inventory per product records','Stock selon les fiches produits','Ububiko nk’uko bwanditswe mu bicuruzwa')}</span><b>${inventoryReconciliationApplicable?money(inventorySubledgerValue):sheriLocalized('Not available for historical date','Non disponible à cette date historique','Ntibiboneka ku itariki yashize')}</b></div><div class="row"><span>${sheriLocalized('Inventory control account (1200)','Compte de stock (1200)','Konti y’ububiko (1200)')}</span><b>${money(inventoryLedgerBalance)}</b></div><div class="row"><span>${sheriLocalized('Inventory valuation difference','Écart de valorisation du stock','Itandukaniro ry’agaciro k’ububiko')}</span><b>${inventoryReconciliationApplicable?money(inventoryDifference):'—'}</b></div><div class="row"><span>Total liabilities</span><b>${money(liab)}</b></div><div class="row"><span>Tax payable (included in liabilities)</span><b>${money(bs['2100']||0)}</b></div><div class="row"><span>Input tax receivable (included in assets)</span><b>${money(bs['2110']||0)}</b></div><div class="row"><span>Equity incl. current profit</span><b>${money(equity)}</b></div><div class="sub" style="margin-top:8px">${statementsVerified?sheriLocalized('✓ Financial statements are verified.','✓ Les états financiers sont vérifiés.','✓ Raporo z’imari zigenzuwe neza.'):'⚠ '+sheriLocalized('Financial statements are NOT verified. Check journal integrity, inventory reconciliation, Trial Balance and server refresh before relying on these figures.','Les états financiers ne sont PAS vérifiés. Vérifiez le journal, le rapprochement des stocks, la balance générale et l’actualisation du serveur avant de vous fier à ces chiffres.','Raporo z’imari NTIZIRAGENZURWA. Banza ugenzure inyandiko z’ibaruramari, ihuzwa ry’ububiko, igereranya ry’amadeni n’inguzanyo, n’ivugururwa rya seriveri.')}</div>`;document.getElementById('accCF').innerHTML=statementNotice+cashFlowClassificationNotice+`<div class="sub">${sheriLocalized("Cash flows are classified using the account on the other side of each journal entry. Current assets and liabilities, income, cost of sales and expenses are operating; non-current assets are investing; equity and non-current liabilities are financing. Transfers between cash-equivalent accounts are excluded.","Les flux de trésorerie sont classés selon le compte en contrepartie de chaque écriture. Les actifs et passifs courants, les produits, le coût des ventes et les charges relèvent des activités opérationnelles ; les actifs non courants relèvent de l’investissement ; les capitaux propres et les passifs non courants relèvent du financement. Les transferts entre équivalents de trésorerie sont exclus.","Imigendekere y’amafaranga ishyirwa mu byiciro hakurikijwe konti ihanganye n’iya cash muri buri nyandiko y’ibaruramari. Umutungo n’imyenda by’igihe gito, amafaranga yinjiye, ikiguzi cy’ibyagurishijwe n’amafaranga akoreshwa biri mu bikorwa bisanzwe; umutungo w’igihe kirekire uri mu ishoramari; imari shingiro n’imyenda y’igihe kirekire biri mu bikorwa byo gushaka igishoro. Ihererekanya hagati ya konti z’amafaranga ntiribarwa.")}</div><div class="row"><b>${sheriLocalized('Operating activities','Activités opérationnelles','Ibikorwa bisanzwe by’ubucuruzi')}</b></div><div class="row"><span>${sheriLocalized('Operating cash inflows','Entrées de trésorerie opérationnelles','Amafaranga yinjiye mu bikorwa bisanzwe by’ubucuruzi')}</span><b>${money(cashFlow.operating.inflows)}</b></div><div class="row"><span>${sheriLocalized('Operating cash outflows','Sorties de trésorerie opérationnelles','Amafaranga yasohotse mu bikorwa bisanzwe by’ubucuruzi')}</span><b>${money(cashFlow.operating.outflows)}</b></div><div class="row"><span>${sheriLocalized('Net cash from operating activities','Flux net des activités opérationnelles','Amafaranga asigaye mu bikorwa bisanzwe by’ubucuruzi')}</span><b>${money(cashFlow.operating.net)}</b></div><div class="row"><b>${sheriLocalized('Investing activities','Activités d’investissement','Ibikorwa by’ishoramari')}</b></div><div class="row"><span>${sheriLocalized('Investing cash inflows','Entrées de trésorerie d’investissement','Amafaranga yinjiye mu bikorwa by’ishoramari')}</span><b>${money(cashFlow.investing.inflows)}</b></div><div class="row"><span>${sheriLocalized('Investing cash outflows','Sorties de trésorerie d’investissement','Amafaranga yasohotse mu bikorwa by’ishoramari')}</span><b>${money(cashFlow.investing.outflows)}</b></div><div class="row"><span>${sheriLocalized('Net cash from investing activities','Flux net des activités d’investissement','Amafaranga asigaye mu bikorwa by’ishoramari')}</span><b>${money(cashFlow.investing.net)}</b></div><div class="row"><b>${sheriLocalized('Financing activities','Activités de financement','Ibikorwa byo kubona no kwishyura inkunga n’imyenda')}</b></div><div class="row"><span>${sheriLocalized('Financing cash inflows','Entrées de trésorerie de financement','Amafaranga yinjiye avuye mu nkunga n’imyenda')}</span><b>${money(cashFlow.financing.inflows)}</b></div><div class="row"><span>${sheriLocalized('Financing cash outflows','Sorties de trésorerie de financement','Amafaranga yasohotse mu kwishyura inkunga n’imyenda')}</span><b>${money(cashFlow.financing.outflows)}</b></div><div class="row"><span>${sheriLocalized('Net cash from financing activities','Flux net des activités de financement','Amafaranga asigaye mu bikorwa byo kubona no kwishyura inkunga n’imyenda')}</span><b>${money(cashFlow.financing.net)}</b></div><div class="row"><b>${sheriLocalized('Unclassified cash flows','Flux de trésorerie non classés','Amafaranga atarashyirwa mu byiciro')}</b></div><div class="row"><span>${sheriLocalized('Unclassified cash inflows','Entrées de trésorerie non classées','Amafaranga yinjiye atarashyirwa mu byiciro')}</span><b>${money(cashFlow.unclassified.inflows)}</b></div><div class="row"><span>${sheriLocalized('Unclassified cash outflows','Sorties de trésorerie non classées','Amafaranga yasohotse atarashyirwa mu byiciro')}</span><b>${money(cashFlow.unclassified.outflows)}</b></div><div class="row"><span>${sheriLocalized('Opening cash and cash equivalents','Trésorerie et équivalents à l’ouverture','Amafaranga n’ibihwanye na yo byari bihari igihe hatangira')}</span><b>${money(cashFlow.opening)}</b></div><div class="row"><span>${sheriLocalized('Total cash inflows','Total des entrées de trésorerie','Amafaranga yose yinjiye')}</span><b>${money(cashFlow.inflows)}</b></div><div class="row"><span>${sheriLocalized('Total cash outflows','Total des sorties de trésorerie','Amafaranga yose yasohotse')}</span><b>${money(cashFlow.outflows)}</b></div><div class="row"><span>${sheriLocalized('Net change in cash and cash equivalents','Variation nette de la trésorerie et des équivalents','Impinduka rusange mu mafaranga n’ibihwanye na yo')}</span><b>${money(cashFlow.net)}</b></div><div class="row"><span>${sheriLocalized('Closing cash and cash equivalents','Trésorerie et équivalents à la clôture','Amafaranga n’ibihwanye na yo bisigaye igihe kirangiye')}</span><b>${money(cashFlow.closing)}</b></div><div class="sub" style="margin-top:8px">${Math.abs(cashFlow.reconciliationDifference)<=0.005?sheriLocalized('✓ Cash movement reconciles.','✓ Les mouvements de trésorerie sont rapprochés.','✓ Amafaranga yinjiye n’asohotse arahura.'):'⚠ '+sheriLocalized('Cash movement does not reconcile. Difference:','Les mouvements de trésorerie ne concordent pas. Écart :','Imigendekere y’amafaranga ntihuye. Itandukaniro:')+' '+money(cashFlow.reconciliationDifference)}</div>`;const tbRows=[];let tbDebits=0,tbCredits=0;for(const a of (state.accounts||[])){const normalSide=String(a.normal_balance||(['liability','equity','income'].includes(a.type)?'credit':'debit')).toLowerCase(),balance=Number(bs[a.code]||0);if(Math.abs(balance)<=0.005)continue;const debit=normalSide==='debit'?Math.max(0,balance):Math.max(0,-balance),credit=normalSide==='credit'?Math.max(0,balance):Math.max(0,-balance);tbDebits+=debit;tbCredits+=credit;tbRows.push('<tr><td>'+esc(a.code)+'</td><td>'+esc(a.name)+'</td><td>'+money(debit)+'</td><td>'+money(credit)+'</td></tr>')}const tbDifference=tbDebits-tbCredits;document.getElementById('accTB').innerHTML=tbRows.length?'<table class="table"><thead><tr><th>Code</th><th>Account</th><th>Debit</th><th>Credit</th></tr></thead><tbody>'+tbRows.join('')+'</tbody><tfoot><tr><th colspan="2">Total</th><th>'+money(tbDebits)+'</th><th>'+money(tbCredits)+'</th></tr></tfoot></table><div class="sub" style="margin-top:8px">'+(Math.abs(tbDifference)<=0.005?'✓ Debits and credits balance.':'⚠ Trial Balance difference: '+money(tbDifference)+'. Review the General Ledger before relying on these figures.')+'</div>':'<div class="empty">No posted account balances exist for this reporting date yet.</div>';const gl=(state.journalEntries||[]).filter(e=>sheriDateInReportRange(e.entry_date||e.created_at)).slice().sort((a,b)=>String(b.created_at||b.entry_date).localeCompare(String(a.created_at||a.entry_date))).slice(0,30);document.getElementById('accGL').innerHTML=gl.length?`<table class="table"><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th></tr>${gl.map(e=>{const ls=accLinesForEntry(e.id);return ls.map(l=>`<tr><td>${esc(e.entry_date)}</td><td>${esc(e.description)} — ${esc(accAccount(l.account_id)?.name||'')}</td><td>${l.debit?money(l.debit):''}</td><td>${l.credit?money(l.credit):''}</td></tr>`).join('')}).join('')}</table>`:'<div class="empty">No journal entries yet.</div>';document.getElementById('accAudit').innerHTML=state.auditLog.length?`<table class="table"><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Reason</th><th>Details</th></tr>${state.auditLog.filter(x=>sheriDateInReportRange(x.created_at)).slice().sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,20).map(x=>`<tr><td>${new Date(x.created_at).toLocaleString()}</td><td>${esc(x.details?.actor_name||x.actor_user_id||'Owner')}</td><td>${esc(x.action)}</td><td>${esc(x.entity_type)}</td><td>${esc(x.reason||x.details?.reason||'—')}</td><td>${esc(JSON.stringify(x.details||{}))}</td></tr>`).join('')}</table>`:'<div class="empty">No audit events yet.</div>';}
 // POS sale revenue and COGS are posted atomically by the database sales trigger.
 // Do not create a second client-side journal batch for the same sale.
 const _v14_1_recordSale=recordSale;recordSale=async function(){const before=state.sales.length;await _v14_1_recordSale();const created=state.sales.slice(before);for(const s of created){const total=Number(s.qty||0)*Number(s.price||0),cogs=Number(s.qty||0)*Number(s.cost||0);try{await accAudit('create','sale',s.id,{total,cogs,invoice_number:s.invoice_number||null,transaction_id:s.transaction_id||null})}catch(e){console.warn('[Sheri audit] sale audit event could not be queued',e)}}render()};
