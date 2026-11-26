@@ -8,7 +8,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AI Business OS (AIBOS)</title>
-<meta name="app-version" content="V14.4.83 isolated POS payment-method reporting">
+<meta name="app-version" content="V14.4.93 isolated full-feature reconciliation">
 <link rel="preconnect" href="https://api.pindo.io" crossorigin>
 <link rel="dns-prefetch" href="//api.pindo.io">
 <script>
@@ -277,7 +277,7 @@ window.ensurePdfJs=async function(){
 <body>
 <div id="aibos-preview-environment-banner" role="status" style="position:sticky;top:0;z-index:10000;background:#7f1d1d;color:#fff;text-align:center;padding:9px 12px;font:700 12px/1.4 system-ui,sans-serif;letter-spacing:.02em">ISOLATED AIBOS PREVIEW · TEST DATA ONLY · NOT PRODUCTION</div>
 
-<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS (AIBOS)</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" type="button" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" type="button" onclick="switchAuthMode('signup')">Create account</button><button id="authTabStaff" type="button" onclick="switchAuthMode('staff')">Staff PIN</button></div><label class="auth-remember-row" for="keepMeLoggedIn"><input id="keepMeLoggedIn" type="checkbox" checked><span>Keep me logged in on this device</span></label><div id="signinPanel" class="auth-panel active"><label>Email</label><input id="authEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('authPassword',this)">View PW</button></div><button id="authSignInBtn" class="btn" type="button" style="width:100%;margin-top:14px">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="staffPanel" class="auth-panel"><label>Business account ID</label><input id="staffMerchantCode" inputmode="numeric" maxlength="6" pattern="[0-9]{1,6}" placeholder="6-digit business ID"><label style="margin-top:10px">Full name, phone or email</label><input id="staffIdentifier" autocomplete="username" placeholder="Your full name, phone or email"><label style="margin-top:10px">PIN (6–8 digits)</label><div class="auth-field"><input id="staffPin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter your PIN"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('staffPin',this)">View PW</button></div><button class="btn" type="button" style="width:100%;margin-top:14px" onclick="signInWithTeamPin()">Sign in as team member</button><div class="field-help">Forgot your PIN? Ask your Owner, Admin or an authorized Manager to reset it securely. Do not share your PIN with anyone.</div></div><div id="signupPanel" class="auth-panel"><label>Full name</label><input id="signupFullName" type="text" autocomplete="name" maxlength="120" required placeholder="Enter your full name"><label>Email</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn2" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn2" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div><div class="field-help" style="margin-top:12px">Email confirmation may be required before first sign-in. If the message does not arrive, check spam or resend it.</div><button class="text-btn" type="button" style="margin-top:4px" onclick="resendSignupConfirmation()">Resend confirmation email</button><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPasswordConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div>
+<div id="authScreen" class="auth-wrap"><div class="auth-card"><div class="brand">AI Business OS (AIBOS)</div><h1 class="auth-title" id="authTitle">Welcome back</h1><p class="sub" id="authSubtitle">Sign in to access your business workspace.</p><div class="auth-tabs"><button id="authTabSignIn" class="active" type="button" onclick="switchAuthMode('signin')">Sign in</button><button id="authTabSignUp" type="button" onclick="switchAuthMode('signup')">Create account</button><button id="authTabStaff" type="button" onclick="switchAuthMode('staff')">Staff PIN</button></div><label class="auth-remember-row" for="keepMeLoggedIn"><input id="keepMeLoggedIn" type="checkbox" checked><span>Keep me logged in on this device</span></label><div id="signinPanel" class="auth-panel active"><label>Phone number or email</label><input id="authEmail" type="text" autocomplete="username" inputmode="tel" placeholder="+250... or you@example.com"><div class="auth-field"><label>Password</label><input id="authPassword" type="password" autocomplete="current-password" placeholder="Your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('authPassword',this)">View PW</button></div><button id="authSignInBtn" class="btn" type="button" style="width:100%;margin-top:14px">Sign in</button><div class="auth-links"><button class="text-btn" onclick="showForgotPassword()">Forgot password?</button><button class="text-btn" onclick="showForgotEmail()">Forgot email?</button></div><div class="auth-divider">or continue with</div><div class="oauth-grid"><button id="authGoogleBtn" class="oauth-btn" type="button">G&nbsp; Google</button><button id="appleOAuthBtn" class="oauth-btn" onclick="signInOAuth('apple')"> Apple</button></div></div><div id="staffPanel" class="auth-panel"><label>Business account ID</label><input id="staffMerchantCode" inputmode="numeric" maxlength="6" pattern="[0-9]{1,6}" placeholder="6-digit business ID"><label style="margin-top:10px">Phone number</label><input id="staffIdentifier" type="tel" inputmode="tel" autocomplete="tel" placeholder="+250..."><label style="margin-top:10px">PIN (6–8 digits)</label><div class="auth-field"><input id="staffPin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="Enter your PIN"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('staffPin',this)">View PW</button></div><button class="btn" type="button" style="width:100%;margin-top:14px" onclick="signInWithTeamPin()">Sign in as team member</button><div class="field-help">Forgot your PIN? Ask your Owner, Admin or an authorized Manager to reset it securely. Do not share your PIN with anyone.</div></div><div id="signupPanel" class="auth-panel"><label>Full legal name</label><input id="signupFullName" type="text" autocomplete="name" minlength="3" maxlength="120" required placeholder="As shown on your official ID"><div class="field-help">Enter your full legal name as it appears on your official identification document. Use at least two name parts.</div><label>Phone number</label><input id="signupPhone" type="tel" autocomplete="tel" inputmode="tel" required placeholder="+250..."><label>Email (optional)</label><input id="signupEmail" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com"><div class="auth-field"><label>Password</label><input id="signupPassword" type="password" autocomplete="new-password" placeholder="At least 8 characters"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm password</label><input id="signupConfirm" type="password" autocomplete="new-password" placeholder="Repeat your password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('signupConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="handleSignUp()">Create account</button><div class="field-help" style="margin-top:12px">Testing mode: owner phone + password accounts use a private internal email alias. No Supabase Phone provider, Twilio SID, Auth Token, or SMS is used. Email is optional.</div><div class="field-help" style="margin-top:12px">For testing, turn OFF Confirm email under Supabase Auth → Providers → Email so registration returns a session immediately. This does not verify ownership of the phone number.</div><div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center"><span class="sub" style="display:block;margin-bottom:7px">Already have an account?</span><button class="btn secondary" type="button" onclick="switchAuthMode('signin')">← Back to sign in</button></div></div><div id="verifyPhonePanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Verify your phone number</h2><p class="sub">We sent a 6-digit verification code to <strong id="verifyPhoneDisplay"></strong>.</p><label>Enter the 6-digit code</label><input id="signupOtp" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456"><button class="btn" style="width:100%;margin-top:14px" type="button" onclick="verifyOwnerPhoneOtp()">Verify phone number</button><button class="text-btn" style="margin-top:10px" type="button" onclick="resendOwnerPhoneOtp()">Resend code</button><button class="text-btn" style="margin-top:10px" type="button" onclick="switchAuthMode('signup')">← Back to account details</button></div><div id="forgotPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Reset your password</h2><p class="sub">Enter the email on your account and we’ll send a secure recovery link.</p><label>Email</label><input id="resetEmail" type="email" autocomplete="email" placeholder="you@example.com"><button class="btn" style="width:100%;margin-top:14px" onclick="sendPasswordReset()">Send recovery link</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="resetPasswordPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Choose a new password</h2><p class="sub">Create a new password for your account.</p><div class="auth-field"><label>New password</label><input id="newPassword" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPassword',this)">View PW</button></div><div class="auth-field"><label>Confirm new password</label><input id="newPasswordConfirm" type="password" autocomplete="new-password"><button class="pw-toggle" type="button" aria-label="View password" aria-pressed="false" onclick="togglePassword('newPasswordConfirm',this)">View PW</button></div><button class="btn" style="width:100%;margin-top:14px" onclick="updateRecoveredPassword()">Set new password</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="forgotEmailPanel" class="auth-panel"><h2 style="font-size:18px;margin:4px 0 6px">Forgot your email?</h2><p class="sub">For security, Shericeri will not reveal an account email in the browser. First check your password manager or saved browser accounts. If you still cannot identify it, submit a recovery request using your business details.</p><div class="field-help" style="margin-top:10px">Support can verify the request against your business record. This form does not reveal the stored account email.</div><label style="margin-top:12px">Business name</label><input id="recoveryBusinessName" autocomplete="organization" placeholder="Your registered business name"><label style="margin-top:10px">TIN <span class="sub">(optional)</span></label><input id="recoveryTin" inputmode="numeric" placeholder="TIN if you registered one"><label style="margin-top:10px">Country</label><select id="recoveryCountry"></select><label style="margin-top:10px">Shericeri ID <span class="sub">(optional)</span></label><input id="recoveryMerchantCode" placeholder="If you know it"><label style="margin-top:10px">Reachable contact</label><input id="recoveryContact" autocomplete="email" placeholder="Phone or alternate email where support can reach you"><button class="btn" style="width:100%;margin-top:14px" onclick="submitBusinessRecovery()">Submit recovery request</button><button class="text-btn" style="margin-top:10px" onclick="switchAuthMode('signin')">← Back to sign in</button></div><div id="sheriTurnstileWrap" style="margin-top:12px;display:none"><div id="sheriTurnstile"></div><div class="field-help">Security check required by Supabase Auth.</div></div><div id="authStatus" class="sub auth-status" role="status" aria-live="polite"></div></div></div>
 <script>
 /* SHERI AUTH SAFETY NET — deliberately independent of the main application boot. */
 (function(){
@@ -822,7 +822,7 @@ window.ensurePdfJs=async function(){
     </div>
     <div class="sub" style="margin-top:10px">Deleted products stay in your sales history but disappear from the inventory list and sale form.</div>
   </div>
-  <div class="card section" id="teamAccessCard" style="display:none"><h2>Team access & responsibilities</h2><p class="sub">Create individual logins and assign each employee only the responsibilities and access they need.</p><div class="formgrid"><div><label>Full name</label><input id="teamFullName" placeholder="Employee full name"></div><div><label>Username (optional)</label><input id="teamUsername" placeholder="Unique username"></div><div><label>Email</label><input id="teamEmail" type="email" placeholder="name@example.com"></div><div><label>Phone</label><input id="teamPhone" type="tel" placeholder="+250..."></div><div><label>PIN (6–8 digits)</label><input id="teamPin" type="password" inputmode="numeric" maxlength="8"></div><div><label>Role</label><select id="teamRole"><option value="cashier">Cashier</option><option value="inventory">Inventory officer</option><option value="accountant">Accountant</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="custom">Custom</option></select></div><div style="grid-column:1/-1"><label>Responsibilities</label><input id="teamResponsibility" placeholder="e.g. Morning shift, stock receiving, daily cash close"></div></div><div class="formgrid" style="margin-top:12px"><label><input type="checkbox" id="teamSales" checked style="width:auto"> View and record sales</label><label><input type="checkbox" id="teamSalesManage" style="width:auto"> Edit / void / delete sales</label><label><input type="checkbox" id="teamInventory" style="width:auto"> View and manage inventory</label><label><input type="checkbox" id="teamInventoryCosts" style="width:auto"> View inventory valuation and COGS</label><label><input type="checkbox" id="teamExpenses" style="width:auto"> View and manage expenses</label><label><input type="checkbox" id="teamReports" style="width:auto"> View financial reports</label><label><input type="checkbox" id="teamFinance" style="width:auto"> Manage accounting and finance</label><label><input type="checkbox" id="teamCustomers" style="width:auto"> Manage customers</label><label><input type="checkbox" id="teamSuppliers" style="width:auto"> Manage suppliers and purchases</label><label><input type="checkbox" id="teamAudit" style="width:auto"> View audit trail</label><label><input type="checkbox" id="teamManage" style="width:auto"> Manage team access</label></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="createTeamMember()">＋ Add team member</button><button class="btn secondary" onclick="loadTeamMembers(true)">Refresh team</button></div><div id="teamStatus" class="sub" style="margin-top:8px"></div><div id="teamMembersTable" style="overflow-x:auto;margin-top:12px"></div><div style="margin-top:16px"><h3>Signed-in devices</h3><p class="sub">Revoke an individual staff session. Revoked devices are denied on their next server request.</p><div id="teamDevicesTable" style="overflow-x:auto"></div></div></div>
+  <div class="card section" id="teamAccessCard" style="display:none"><h2>Team access & responsibilities</h2><p class="sub">Create individual logins and assign each employee only the responsibilities and access they need.</p><div class="formgrid"><div><label>Full legal name</label><input id="teamFullName" minlength="3" maxlength="120" required placeholder="As shown on the employee’s official ID"><div class="field-help">Enter the employee’s full legal name exactly as it appears on official identification. Use at least two name parts.</div></div><div><label>Username (optional)</label><input id="teamUsername" placeholder="Unique username"></div><div><label>Email (optional)</label><input id="teamEmail" type="email" placeholder="name@example.com"></div><div><label>Phone number (required)</label><input id="teamPhone" type="tel" required inputmode="tel" placeholder="+250..."></div><div><label>PIN (6–8 digits)</label><input id="teamPin" type="password" inputmode="numeric" maxlength="8"></div><div><label>Role</label><select id="teamRole"><option value="cashier">Cashier</option><option value="inventory">Inventory officer</option><option value="accountant">Accountant</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="custom">Custom</option></select></div><div style="grid-column:1/-1"><label>Responsibilities</label><input id="teamResponsibility" placeholder="e.g. Morning shift, stock receiving, daily cash close"></div></div><div class="formgrid" style="margin-top:12px"><label><input type="checkbox" id="teamSales" checked style="width:auto"> View and record sales</label><label><input type="checkbox" id="teamSalesManage" style="width:auto"> Edit / void / delete sales</label><label><input type="checkbox" id="teamInventory" style="width:auto"> View and manage inventory</label><label><input type="checkbox" id="teamInventoryCosts" style="width:auto"> View inventory valuation and COGS</label><label><input type="checkbox" id="teamExpenses" style="width:auto"> View and manage expenses</label><label><input type="checkbox" id="teamReports" style="width:auto"> View financial reports</label><label><input type="checkbox" id="teamFinance" style="width:auto"> Manage accounting and finance</label><label><input type="checkbox" id="teamCustomers" style="width:auto"> Manage customers</label><label><input type="checkbox" id="teamSuppliers" style="width:auto"> Manage suppliers and purchases</label><label><input type="checkbox" id="teamAudit" style="width:auto"> View audit trail</label><label><input type="checkbox" id="teamManage" style="width:auto"> Manage team access</label></div><div class="actions" style="margin-top:12px"><button class="btn" onclick="createTeamMember()">＋ Add team member</button><button class="btn secondary" onclick="loadTeamMembers(true)">Refresh team</button></div><div id="teamStatus" class="sub" style="margin-top:8px"></div><div id="teamMembersTable" style="overflow-x:auto;margin-top:12px"></div><div style="margin-top:16px"><h3>Signed-in devices</h3><p class="sub">Revoke an individual staff session. Revoked devices are denied on their next server request.</p><div id="teamDevicesTable" style="overflow-x:auto"></div></div></div>
   <div class="footer">AI Business OS (AIBOS) • Supabase + Groq backend • Not a financial or lending decision engine.</div>
 </section>
 </main>
@@ -1304,7 +1304,9 @@ function sheriSyncErrorInfo(err){
   const message=String(err?.message||err||'Sync failed').slice(0,240);
   const status=Number(err?.status||err?.code||0)||0;
   const lower=message.toLowerCase();
-  const permanent=status>=400&&status<500&&![401,408,409,425,429].includes(status) || /permission denied|row-level security|violates .*constraint|invalid input syntax|does not exist/.test(lower);
+  // Database integrity failures cannot be repaired by replaying the same
+  // operation. Keep them visible for review instead of retrying every minute.
+  const permanent=status>=400&&status<500&&![401,408,409,425,429].includes(status) || /permission denied|row-level security|violates .*constraint|invalid input syntax|does not exist|aibos integrity|opening stock requires exactly one active opening inventory journal/.test(lower);
   return {message,status,permanent};
 }
 function sheriSyncDelayMs(attempts){return Math.min(60000,Math.max(5000,5000*Math.pow(2,Math.min(Number(attempts)||0,4))))}
@@ -1430,9 +1432,10 @@ async function sheriSyncVoidSale(op){
 }
 async function sheriSyncProductOperation(op){
   const record=sheriServerRecord(op.record);
-  // Product status reasons belong in audit_log, never in products columns.
-  delete record.status_reason;
-  delete record.updated_by; // Not a products table column; actor attribution is in audit_log.
+  // Product metadata writes must never create stock implicitly. All stock
+  // quantities are applied by the audited stock RPC, which also posts the
+  // matching inventory journal in the same transaction.
+  const productInsertRecord={...record,stock:0};
   if(sheriCan('manage_team')){
     const {data:existing,error:findError}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
     if(findError)throw findError;
@@ -1441,30 +1444,29 @@ async function sheriSyncProductOperation(op){
       const {stock,...metadata}=record;
       const {error}=await sb.from('products').update(metadata).eq('id',record.id);if(error)throw error;
     }else{
-      const {error}=await sb.from('products').insert(record);if(error)throw error;
+      const {error}=await sb.from('products').insert(productInsertRecord);if(error)throw error;
     }
     return;
   }
   const {data,error}=await sb.from('products').select('id').eq('id',record.id).maybeSingle();
   if(error)throw error;
   if(data)return; // Non-managers may create a product, but never overwrite an existing one.
-  const {error:insertError}=await sb.from('products').insert(record);if(insertError)throw insertError;
+  const {error:insertError}=await sb.from('products').insert(productInsertRecord);if(insertError)throw insertError;
 }
 async function sheriEnsurePurchaseDependencies(op){
   const record=sheriServerRecord(op.record),merchantId=record.merchant_id;
   const productId=op.productId||record.product_id;
-  let {data:serverProduct,error:productError}=await sb.from('products').select('id,merchant_id,deleted').eq('id',productId).maybeSingle();
+  let {data:serverProduct,error:productError}=await sb.from('products').select('id,merchant_id').eq('id',productId).maybeSingle();
   if(productError)throw productError;
   if(serverProduct&&serverProduct.merchant_id!==merchantId)throw new Error('The selected product belongs to another business. The purchase was not posted.');
-  if(serverProduct?.deleted)throw new Error('This product is inactive. Reactivate it before recording a purchase.');
   if(!serverProduct){
     const queued=await sheriGetAll('outbox');
     const pending=queued.find(x=>x.op?.type==='product_upsert'&&x.op.record?.id===productId);
     const local=product(productId),source=pending?.op?.record||local;
     if(!source)throw new Error('Purchase is waiting for its product to sync. No purchase or stock change was posted.');
-    if(source.deleted)throw new Error('This product is inactive. Reactivate it before recording a purchase.');
-    const serverStock=Number(pending?.op?.record?.stock??op.expectedServerStock??local?.stock??0);
-    await sheriSyncProductOperation({record:{...source,merchant_id:merchantId,stock:serverStock}});
+    // A missing product is created at zero stock. The purchase receipt RPC
+    // applies the quantity and weighted-average cost atomically afterward.
+    await sheriSyncProductOperation({record:{...source,merchant_id:merchantId,stock:0}});
     const verify=await sb.from('products').select('id').eq('id',productId).eq('merchant_id',merchantId).maybeSingle();
     if(verify.error)throw verify.error;
     if(!verify.data)throw new Error('Purchase is waiting for its product to sync. No purchase or stock change was posted.');
@@ -1530,22 +1532,32 @@ async function sheriSyncPurchaseOperation(op){
     .eq('id',purchaseRecord.id).eq('merchant_id',purchaseRecord.merchant_id).maybeSingle();
   if(verifyError)throw verifyError;
   if(!confirmed)throw new Error('Purchase sync was acknowledged but the purchase record is missing. It remains queued for safe retry and review.');
-  if(confirmed.status==='received'){
-    const {data:movement,error:movementError}=await sb.from('inventory_movements')
-      .select('id').eq('merchant_id',purchaseRecord.merchant_id)
-      .eq('source_id',purchaseRecord.id).eq('movement_type','purchase_receipt').limit(1).maybeSingle();
-    if(movementError)throw movementError;
-    if(!movement||confirmed.stock_applied!==true)throw new Error('Purchase record exists but its stock receipt is incomplete. The operation remains queued for review.');
+  // The purchase RPC runs as the trusted transaction boundary and verifies
+  // the receipt movement internally before returning ok:true (including safe
+  // idempotent retries). Do not query inventory_movements from the client:
+  // authenticated users intentionally have no direct table access.
+  if(confirmed.status==='received'&&confirmed.stock_applied!==true){
+    throw new Error('Purchase record exists but the server has not confirmed its stock receipt. The operation remains queued for review.');
   }
 }
 function sheriOutboxPriority(op){return ({merchant_upsert:0,product_upsert:1,supplier_upsert:1,customer_upsert:1,inventory_adjustment:2,purchase_upsert:3,sale_cart_upsert:4,sale_upsert:4})[op?.type]??5;}
 async function sheriUnblockSchemaRepairedOperations(){
   const queued=await sheriGetAll('outbox');
-  const candidates=queued.filter(item=>item.blocked&&(
-    (/created_by|status_reason/i.test(String(item.last_error||''))&&/schema cache|column/i.test(String(item.last_error||''))&&['product_upsert','supplier_upsert'].includes(item.op?.type))||
-    (item.op?.type==='inventory_adjustment'&&/product not found/i.test(String(item.last_error||''))&&(state.products||[]).some(p=>p.id===item.op.product_id))||
-    (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(String(item.last_error||'')))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)))
-  ));
+  const canManageInventory=sheriCan('manage_inventory');
+  const canManageFinance=sheriCan('manage_finance');
+  const candidates=queued.filter(item=>{
+    if(!item.blocked)return false;
+    const errorText=String(item.last_error||'');
+    const openingIntegrity=/aibos integrity|opening stock requires exactly one active opening inventory journal/i.test(errorText);
+    const permissionFailure=/row-level security|permission denied|not authorized|requires finance permission/i.test(errorText);
+    const productRetry=['product_upsert'].includes(item.op?.type)&&!item.retry_recovered_v88&&canManageInventory&&(openingIntegrity||permissionFailure);
+    const stockRetry=item.op?.type==='inventory_adjustment'&&!item.retry_recovered_v88&&canManageInventory&&
+      (item.op?.movement_type!=='opening_balance'||canManageFinance)&&(openingIntegrity||permissionFailure);
+    return productRetry||stockRetry||
+      (/created_by/i.test(errorText)&&/schema cache|column/i.test(errorText)&&['product_upsert','supplier_upsert'].includes(item.op?.type))||
+      (item.op?.type==='inventory_adjustment'&&/product not found/i.test(errorText)&&(state.products||[]).some(p=>p.id===item.op.product_id))||
+      (item.op?.type==='purchase_upsert'&&(/supplier does not belong|product (was )?not found/i.test(errorText))&&(state.products||[]).some(p=>p.id===(item.op.productId||item.op.record?.product_id))&&(!item.op.record?.supplier_id||(state.suppliers||[]).some(x=>x.id===item.op.record.supplier_id)));
+  });
   const settingsRetries=queued.filter(item=>item.blocked&&item.op?.type==='accounting_settings_upsert'&&
     item.op.record?.merchant_id===state.merchant?.id&&!item.accounting_settings_rls_retry&&
     /row-level security|permission denied/i.test(String(item.last_error||'')));
@@ -1559,7 +1571,7 @@ async function sheriUnblockSchemaRepairedOperations(){
   ]);
   if(products.error||suppliers.error)return;
   for(const item of candidates){
-    await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,recovered_at:sheriNow()});
+    await sheriPut('outbox',item.key,{...item,blocked:false,next_retry_at:null,last_status:null,last_error:null,retry_recovered_v88:true,recovered_at:sheriNow()});
   }
 }
 async function sheriSyncAccountingSettingsOperation(op){
@@ -1750,8 +1762,8 @@ async function sheriSyncOutbox(){
 
 function sheriOnlineEvents(){
   window.addEventListener('online',()=>{sheriSetConnectivity('online','Connection restored — syncing…');sherriSyncKick()});
-  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
-  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri focus refresh]',e));});
+  window.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&navigator.onLine){sherriSyncKick();if(state.merchant?.id)loadAll(true).then(()=>{sheriRenderAfterServerRefresh()}).catch(e=>console.warn('[Shericeri foreground refresh]',e));}});
+  window.addEventListener('focus',()=>{if(navigator.onLine&&state.merchant?.id)loadAll(true).then(()=>{sheriRenderAfterServerRefresh()}).catch(e=>console.warn('[Shericeri focus refresh]',e));});
   window.addEventListener('offline',()=>{sheriSetConnectivity('offline','Changes will be saved on this device and synced later.')});
 }
 if('serviceWorker' in navigator){
@@ -1993,87 +2005,138 @@ async function sheriGetCaptchaToken(){
 }
 function friendlyAuthError(error){const m=String(error?.message||error||'Authentication failed.'),x=m.toLowerCase();if(x.includes('invalid login credentials')||x.includes('invalid login'))return 'Incorrect email or password. If you do not have an account yet, choose Create account.';if(x.includes('email not confirmed'))return 'Your email is not confirmed yet. Check your inbox or resend the confirmation email.';if(x.includes('user already registered')||x.includes('email_exists')||x.includes('email address already exists'))return 'This email is already registered. Sign in instead, or use Forgot password.';if(x.includes('unsupported provider')||x.includes('provider is not enabled'))return 'This social sign-in is not enabled in the Shericeri Supabase project yet. Enable the provider in Supabase Auth, then try again.';if(x.includes('otp_expired')||x.includes('otp expired')||x.includes('expired'))return 'That recovery link has expired or has already been used. Request a new password-reset link.';return m}
 function normalizeAuthEmail(v){return String(v||'').trim().toLowerCase()}
-function markSignupExistingEmail(message){const el=document.getElementById('signupEmail');if(el)el.setAttribute('aria-invalid','true');setAuthStatus(message,true)}
+function sheriNormalizeAuthPhone(value){
+  const raw=String(value||'').trim();
+  if(!raw)return null;
+  const digits=raw.replace(/[^0-9]/g,'');
+  let phone='';
+  if(raw.startsWith('+'))phone='+'+digits;
+  else if(digits.startsWith('00'))phone='+'+digits.slice(2);
+  else if(digits.startsWith('250'))phone='+'+digits;
+  else if(digits.startsWith('0')&&digits.length===10)phone='+250'+digits.slice(1);
+  else if(digits.length===9)phone='+250'+digits;
+  return /^\+[1-9]\d{7,14}$/.test(phone)?phone:null;
+}
+function sheriPhoneLoginEmail(phone){
+  const normalized=sheriNormalizeAuthPhone(phone);
+  if(!normalized)throw new Error('Enter a valid phone number.');
+  return 'p'+normalized.slice(1)+'@phone-login.shericeri.test';
+}
+function sheriNormalizeFullLegalName(value){
+  const name=String(value??'').normalize('NFC').trim().replace(/\s+/gu,' ');
+  if(name.length<3||name.length>120)return null;
+  const parts=name.split(' ');
+  const partPattern=/^\p{L}(?:[\p{L}\p{M}]|['’.-][\p{L}\p{M}])*\.?$/u;
+  return parts.length>=2&&parts.every(part=>partPattern.test(part))?name:null;
+}
+
+function markSignupExistingEmail(message){const el=document.getElementById('signupPhone');if(el)el.setAttribute('aria-invalid','true');setAuthStatus(message,true)}
 async function handleSignUp(){
   if(!sb)await sheriInitSupabase();
   if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
-  const full_name=String(document.getElementById('signupFullName')?.value||'').trim().replace(/\\s+/g,' '),email=normalizeAuthEmail(document.getElementById('signupEmail').value),password=document.getElementById('signupPassword').value,confirm=document.getElementById('signupConfirm').value;
-  document.getElementById('signupFullName').value=full_name;
+  const full_name=sheriNormalizeFullLegalName(document.getElementById('signupFullName')?.value);
+  const phone=sheriNormalizeAuthPhone(document.getElementById('signupPhone')?.value);
+  const email=normalizeAuthEmail(document.getElementById('signupEmail')?.value);
+  const password=document.getElementById('signupPassword').value;
+  const confirm=document.getElementById('signupConfirm').value;
+  document.getElementById('signupFullName').value=full_name||'';
+  document.getElementById('signupPhone').value=phone||'';
   document.getElementById('signupEmail').value=email;
-  if(!full_name||full_name.length<2||full_name.length>120)return setAuthStatus('Enter your full name (2–120 characters).',true);
-  if(!email||!password||!confirm)return setAuthStatus('Enter your email, password and password confirmation.',true);
+  if(!full_name)return setAuthStatus('Enter your full legal name as it appears on your official identification document. Use at least two name parts.',true);
+  if(!phone)return setAuthStatus('Enter a valid phone number in international format, such as +25078… .',true);
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return setAuthStatus('Enter a valid optional email address.',true);
+  if(!password||!confirm)return setAuthStatus('Enter your password and password confirmation.',true);
   if(password.length<8)return setAuthStatus('Use a password with at least 8 characters.',true);
   if(password!==confirm)return setAuthStatus('Passwords do not match.',true);
   if(!navigator.onLine)return setAuthStatus('Creating an account requires internet. After first sign-in, your business workspace can continue offline.',true);
   try{
-    sheriTurnstileBusy=true;
-    setAuthStatus('Creating account…');
-    let result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,data:{full_name}}}),12000,'Account creation timed out');
+    sheriTurnstileBusy=true;setAuthStatus('Creating account…');
+    const loginEmail=sheriPhoneLoginEmail(phone);
+    const options={data:{full_name,contact_phone:phone,contact_email:email||null,auth_method:'phone_password_test'}};
+    let result=await sheriWithTimeout(sb.auth.signUp({email:loginEmail,password,options}),12000,'Account creation timed out');
     let {data,error}=result;
-    if(error && /captcha|turnstile|challenge/i.test(String(error?.message||''))){
+    if(error&&/captcha|turnstile|challenge/i.test(String(error?.message||''))){
       setAuthStatus('Security verification required…');
       const captchaToken=await sheriWithTimeout(sheriGetCaptchaToken(),9000,'Security check timed out');
-      result=await sheriWithTimeout(sb.auth.signUp({email,password,options:{emailRedirectTo:SHERI_AUTH_REDIRECT,captchaToken,data:{full_name}}}),12000,'Verified account creation timed out');
+      result=await sheriWithTimeout(sb.auth.signUp({email:loginEmail,password,options:{...options,captchaToken}}),12000,'Verified account creation timed out');
       ({data,error}=result);
     }
     if(error)return markSignupExistingEmail(friendlyAuthError(error));
     const returnedUser=data?.user,identities=Array.isArray(returnedUser?.identities)?returnedUser.identities:[];
-    if(returnedUser&&identities.length===0&&!data?.session)return markSignupExistingEmail('This email is already associated with an account. Please use Sign in or Forgot password instead.');
-    if(data.session){
-      setAuthStatus('Account created. Let’s set up your business…');
-      await onAuthed(data.session);
-    }else{
-      setAuthStatus('Account created. Check your email and confirm it before signing in. If it does not arrive, check spam and resend the confirmation.');
-    }
+    if(returnedUser&&identities.length===0&&!data?.session)return markSignupExistingEmail('This phone number already has a testing account. Sign in with your phone number and password.');
+    if(data.session){setAuthStatus('Account created. Let’s set up your business…');await onAuthed(data.session);}
+    else setAuthStatus('Supabase created the account but did not return a session. For this no-SMS testing mode, turn OFF Confirm email under Supabase Auth → Providers → Email, then retry with a new phone number.');
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}
   finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
-async function resendSignupConfirmation(){if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);const email=normalizeAuthEmail(document.getElementById('signupEmail')?.value);if(!email)return setAuthStatus('Enter the email you used to create the account.',true);if(!navigator.onLine)return setAuthStatus('Resending the confirmation email requires internet.',true);try{sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');const captchaToken=await sheriGetCaptchaToken();const {error}=await sb.auth.resend({type:'signup',email,options:{captchaToken}});if(error)throw error;setAuthStatus('Confirmation email sent again. Check your inbox and spam.')}catch(e){setAuthStatus(friendlyAuthError(e),true)}finally{sheriTurnstileBusy=false;sheriTurnstileReset()}}
+async function resendOwnerPhoneOtp(){
+  if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
+  const phone=sheriPendingSignupPhone||sheriNormalizeAuthPhone(document.getElementById('signupPhone')?.value);
+  if(!phone)return setAuthStatus('Enter the phone number used to create the account.',true);
+  if(!navigator.onLine)return setAuthStatus('Resending the SMS code requires internet.',true);
+  try{
+    sheriTurnstileBusy=true;setAuthStatus('Complete the security check…');
+    const captchaToken=await sheriGetCaptchaToken();
+    const {error}=await sb.auth.resend({type:'signup',phone,options:{captchaToken}});
+    if(error)throw error;
+    setAuthStatus('A new verification code was sent to '+phone+'.');
+  }catch(e){setAuthStatus(friendlyAuthError(e),true)}
+  finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
+}
+async function verifyOwnerPhoneOtp(){
+  if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
+  const phone=sheriPendingSignupPhone,token=String(document.getElementById('signupOtp')?.value||'').trim();
+  if(!phone)return setAuthStatus('Create your account first, then verify your phone number.',true);
+  if(!/^\d{6}$/.test(token))return setAuthStatus('Enter the 6-digit SMS verification code.',true);
+  if(!navigator.onLine)return setAuthStatus('Phone verification requires internet.',true);
+  try{
+    sheriTurnstileBusy=true;setAuthStatus('Verifying your phone number…');
+    const {data,error}=await sb.auth.verifyOtp({phone,token,type:'sms'});
+    if(error)throw error;
+    if(!data?.session)throw new Error('Phone verification succeeded but no sign-in session was returned. Please sign in with your phone number and password.');
+    sheriPendingSignupPhone='';setAuthStatus('Phone verified. Loading your business…');await onAuthed(data.session);
+  }catch(e){setAuthStatus(friendlyAuthError(e),true)}
+  finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
+}
+
 async function handleSignIn(){
   if(!sb)await sheriInitSupabase();
   if(sheriTurnstileBusy)return setAuthStatus('Please wait for the current security check to finish.',true);
-  const email=normalizeAuthEmail(document.getElementById('authEmail').value);
+  const identifier=String(document.getElementById('authEmail').value||'').trim();
   const password=document.getElementById('authPassword').value;
-  document.getElementById('authEmail').value=email;
-  if(!email||!password)return setAuthStatus('Enter your email and password.',true);
+  const isPhone=!identifier.includes('@');
+  const phone=isPhone?sheriNormalizeAuthPhone(identifier):null;
+  const email=isPhone?null:normalizeAuthEmail(identifier);
+  if(!identifier||!password)return setAuthStatus('Enter your phone number or email and password.',true);
+  if(isPhone&&!phone)return setAuthStatus('Enter a valid phone number in international format, such as +25078… .',true);
   if(!navigator.onLine)return setAuthStatus('You are offline. Reconnect to sign in, or use an already active saved session.',true);
   try{
     sheriTurnstileBusy=true;
     setAuthStatus('Signing in…');
-    // First attempt the actual Auth request immediately. CAPTCHA must never
-    // sit in front of the login request or make the button appear frozen.
-    let authResult=await sheriWithTimeout(
-      sb.auth.signInWithPassword({email,password}),
-      10000,
-      'Sign-in request timed out'
-    );
+    const credentials=isPhone?{email:sheriPhoneLoginEmail(phone),password}:{email,password};
+    let authResult=await sheriWithTimeout(sb.auth.signInWithPassword(credentials),10000,'Sign-in request timed out');
     let {data,error}=authResult;
-    // If this project enforces CAPTCHA for password sign-in, obtain a token
-    // only after Supabase explicitly asks for it, then retry once.
-    if(error && /captcha|turnstile|challenge/i.test(String(error?.message||''))){
+    // Backward compatibility: existing accounts created with native Supabase phone auth.
+    if(isPhone&&error&&/invalid login credentials|invalid login/i.test(String(error.message||''))){
+      authResult=await sheriWithTimeout(sb.auth.signInWithPassword({phone,password}),10000,'Legacy phone sign-in request timed out');
+      ({data,error}=authResult);
+    }
+    if(error&&/captcha|turnstile|challenge/i.test(String(error?.message||''))){
       setAuthStatus('Security verification required…');
       const captchaToken=await sheriWithTimeout(sheriGetCaptchaToken(),9000,'Security check timed out');
-      authResult=await sheriWithTimeout(
-        sb.auth.signInWithPassword({email,password,options:{captchaToken}}),
-        10000,
-        'Verified sign-in request timed out'
-      );
+      authResult=await sheriWithTimeout(sb.auth.signInWithPassword({...credentials,options:{captchaToken}}),10000,'Verified sign-in request timed out');
       ({data,error}=authResult);
     }
     if(error)return setAuthStatus(friendlyAuthError(error),true);
-    if(data?.session){
-      setAuthStatus('Signed in. Loading your business…');
-      // Do not depend on SIGNED_IN firing after this request. Supabase has
-      // already returned a valid session, so take the user into the app now.
-      await onAuthed(data.session);
-    }else{
-      setAuthStatus('Authentication completed. Loading your business…');
-    }
+    if(data?.session){setAuthStatus('Signed in. Loading your business…');await onAuthed(data.session);}
+    else setAuthStatus('Authentication completed. Loading your business…');
   }catch(e){setAuthStatus(friendlyAuthError(e),true)}
   finally{sheriTurnstileBusy=false;sheriTurnstileReset()}
 }
 async function probeAuthProviders(){return null}
 async function signInOAuth(provider){
+  const signupPanel=document.getElementById('signupPanel');
+  if(signupPanel?.classList.contains('active'))return setAuthStatus('New owner accounts must use email registration so the full legal name can be recorded. Google/Apple sign-in remains available for existing accounts.',true);
   if(!sb)await sheriInitSupabase();
   if(!navigator.onLine)return setAuthStatus('Social sign-in requires internet.',true);
   if(provider!=='google'&&provider!=='apple')return setAuthStatus('Unsupported social sign-in provider.',true);
@@ -2140,7 +2203,15 @@ function sheriStopMerchantRealtime(){
   sheriRealtimeChannel=null;sheriRealtimeMerchantId=null;
 }
 function sheriDeferBackgroundRender(){
-  return !!document.getElementById('accRepairDialog')||sheriCurrentView==='reports';
+  // A ledger repair dialog owns the report DOM while it is open.
+  return !!document.getElementById('accRepairDialog');
+}
+function sheriRenderAfterServerRefresh(){
+  if(sheriDeferBackgroundRender())return;
+  // Keep the report controls in place, but refresh the figures from the newly
+  // loaded server snapshot. Previously this view was deferred indefinitely.
+  if(sheriCurrentView==='reports'&&typeof renderReports==='function'){renderReports();return;}
+  render();
 }
 function sheriSubscribeMerchantRealtime(merchantId){
   if(!sb||!merchantId||!session?.access_token)return;
@@ -2156,7 +2227,7 @@ function sheriSubscribeMerchantRealtime(merchantId){
     sheriRealtimeRefreshTimer=setTimeout(()=>{
       sheriRealtimeRefreshTimer=null;
       if(state.merchant?.id!==merchantId||!session?.access_token)return;
-      loadAll(true).then(()=>{if(!sheriDeferBackgroundRender())render()}).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
+      loadAll(true).then(()=>{sheriRenderAfterServerRefresh()}).catch(e=>console.warn('[Shericeri realtime] refresh failed',e));
     },220);
   };
   for(const table of tables){
@@ -2206,7 +2277,7 @@ async function onAuthed(sess){
     document.getElementById('appRoot').style.display='';
     render();
     sheriSubscribeMerchantRealtime(state.merchant.id);
-    sheriWithTimeout(loadAll(true),9000,'Business data refresh timed out').then(()=>render()).catch(e=>{
+    loadAll(true).then(()=>render()).catch(e=>{
       console.warn('[Shericeri login] background data refresh failed',e);
       const n=document.getElementById('shericeriNotice');
       if(n)n.textContent='Signed in. Using saved business data while the server reconnects.';
@@ -2598,7 +2669,17 @@ function printLastReceipt(){
   const r=window.__lastReceipt;if(!r?.items?.length){sheriToast('No completed receipt is available yet.','warning');return}const w=window.open('','_blank','width=420,height=680');if(!w){sheriToast('Allow pop-ups to print the receipt.','warning');return}
   const rows=r.items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+x.qty+'</td><td>'+money(x.price)+'</td><td>'+money(x.qty*x.price)+'</td></tr>').join('');
   w.onload=()=>w.print();
-  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p></body></html>');
+  w.document.write('<!doctype html><html><head><title>Receipt '+esc(r.invoice)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px Arial;padding:18px;color:#111}h2,p{text-align:center;margin:5px}table{width:100%;border-collapse:collapse;margin-top:18px}td,th{padding:7px 3px;border-bottom:1px solid #ddd;text-align:left;font-size:12px}.total{text-align:right;font-weight:bold;margin-top:16px}</style></head><body><h2>'+esc(r.business)+'</h2><p>Sales receipt</p><p>'+esc(r.invoice)+'</p><p>'+esc(new Date(r.createdAt).toLocaleString())+'</p><table><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr>'+rows+'</table><div class="total">Total: '+money(r.total)+'</div><p style="margin-top:24px">Thank you for your business</p><style id="aibos-inventory-table-fit-v1">
+/* Give product names and headings room; on narrow screens scroll the table,
+   rather than squeezing every column until names become unreadable. */
+#inventoryTable{width:100%;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
+#inventoryTable .table{width:100%;min-width:1120px;table-layout:auto}
+#inventoryTable .table th{white-space:nowrap}
+#inventoryTable .table th:nth-child(2),#inventoryTable .table td:nth-child(2){min-width:230px}
+#inventoryTable .table th:nth-child(3),#inventoryTable .table td:nth-child(3){min-width:190px}
+#inventoryTable .table td:nth-child(2),#inventoryTable .table td:nth-child(3){overflow-wrap:anywhere;white-space:normal}
+</style>
+</body></html>');
    w.document.close();
 }
 
@@ -2882,19 +2963,31 @@ function cancelProductEdit(){document.getElementById('addProduct').style.display
 async function saveProduct(){
   if(!sheriCan('manage_inventory'))return sheriToast('You do not have permission to add or edit products.','error');
   const name=pName.value.trim(),cat=pCat.value,cost=+pCost.value,sell=+pSell.value,stock=+pStock.value,reorder=+pReorder.value,barcode=pBarcode.value.trim()||null,expiry_date=pExpiry.value||null;
-  if(!name||!Number.isFinite(cost)||cost<0||!Number.isFinite(sell)||sell<=0||!Number.isFinite(stock)||stock<0||!Number.isFinite(reorder)||reorder<0)return alert('Enter a product name, a positive selling price, and valid non-negative cost and stock values.');
-  const isEditing=!!editingProductId;if(isEditing&&!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can edit existing products.','error');let editReason=null;if(isEditing){editReason=prompt('Reason for editing this product (required):');if(!editReason||!editReason.trim())return sheriToast('A reason is required to edit a product.','error');}
+  if(!name||!Number.isFinite(cost)||cost<0||!Number.isFinite(sell)||sell<=0||!Number.isInteger(stock)||stock<0||!Number.isInteger(reorder)||reorder<0)return sheriToast(sheriLocalized('Enter a product name, a positive selling price, non-negative unit cost, and whole-number stock and reorder quantities.','Saisissez un nom de produit, un prix de vente positif, un coût unitaire non négatif et des quantités entières pour le stock et le seuil de réapprovisionnement.','Andika izina ry’igicuruzwa, igiciro cyo kugurisha kirenze zeru, ikiguzi kitari munsi ya zeru, n’imibare yuzuye y’ububiko n’umubare wo kongera ibicuruzwa.'),'error');
+  const isEditing=!!editingProductId;if(!isEditing&&stock>0&&cost<=0)return sheriToast(sheriLocalized('Opening stock needs a positive unit cost so its inventory value can be recorded.','Le stock initial doit avoir un coût unitaire positif afin que sa valeur soit comptabilisée.','Ububiko bw’ibanze bugomba kugira ikiguzi cya kimwe kirenze zeru kugira ngo agaciro kabwo kabarurwe.'),'error');if(!isEditing&&stock>0&&accPeriodLocked(sheriNow().slice(0,10)))return sheriToast(sheriLocalized('The current accounting period is locked. Unlock it before recording opening stock.','La période comptable actuelle est verrouillée. Déverrouillez-la avant d’enregistrer le stock initial.','Igihe cy’ibaruramari kirafunze. Banza ugifungure mbere yo kwandika ububiko bw’ibanze.'),'error');if(!isEditing&&stock>0&&!sheriCan('manage_finance'))return sheriToast(sheriLocalized('Opening stock requires finance permission because it creates an Inventory / Owner Equity journal. You can still create the product with zero stock and record a supplier purchase.','Le stock initial nécessite une autorisation financière, car il crée une écriture Stock / Capitaux propres. Vous pouvez créer le produit avec un stock nul puis enregistrer un achat fournisseur.','Ububiko bw’ibanze busaba uburenganzira bw’imari kuko buteza inyandiko ya Konti y’ububiko / Igishoro cya nyir’ubucuruzi. Ushobora gukora igicuruzwa gifite ububiko bwa zeru, hanyuma ukandika ibyo waguze ku muhereza.'),'error');if(isEditing&&!sheriCan('manage_team'))return sheriToast('Only a Manager, Admin or Owner can edit existing products.','error');let editReason=null;if(isEditing){editReason=prompt('Reason for editing this product (required):');if(!editReason||!editReason.trim())return sheriToast('A reason is required to edit a product.','error');}
   if(!confirm((isEditing?'Update':'Save')+' product?\\n'+name+'\\nCost: '+money(cost)+' · Selling price: '+money(sell)+'\\nStock: '+stock+' · Reorder level: '+reorder))return;
   const now=sheriNow();
-  let openingStockProduct=null;
+  let openingStockProduct=null,productCostCorrection=null;
   if(editingProductId){
     const p=product(editingProductId); if(!p)return;
-    const previousStock=Number(p.stock||0),stockDelta=(stock||0)-previousStock;
+    const previousStock=Number(p.stock||0),previousCost=Number(p.cost||0),stockDelta=(stock||0)-previousStock,costChanged=Math.abs(cost-previousCost)>0.0000001;
+    if(costChanged&&previousStock>0){
+      if(!sheriCan('manage_finance'))return sheriToast(sheriLocalized('Changing unit cost for stock on hand requires Finance permission so the inventory correction can be journaled.','La modification du coût unitaire du stock disponible nécessite l’autorisation Finance afin de comptabiliser la correction.','Guhindura ikiguzi cy’igicuruzwa kiri mu bubiko bisaba uburenganzira bw’Imari kugira ngo ihinduka ryandikwe mu bitabo.'),'error');
+      if(!navigator.onLine)return sheriToast(sheriLocalized('Connect to the internet before correcting unit cost for stock on hand. No cost or ledger value was changed.','Connectez-vous à Internet avant de corriger le coût unitaire du stock disponible. Aucun coût ni solde comptable n’a été modifié.','Huza na interineti mbere yo gukosora ikiguzi cy’ibicuruzwa biri mu bubiko. Nta kiguzi cyangwa agaciro ko mu bitabo byahinduwe.'),'error');
+      const correctionSourceId=sheriUuid();
+      const {data:correction,error:correctionError}=await sb.rpc('shericeri_correct_product_cost',{
+        p_merchant_id:state.merchant.id,p_product_id:p.id,p_expected_cost:previousCost,p_new_cost:cost,
+        p_reason:editReason.trim(),p_source_id:correctionSourceId,p_entry_date:now.slice(0,10)
+      });
+      if(correctionError)return sheriToast(sheriLocalized('The cost correction was not completed: ','La correction du coût n’a pas été effectuée : ','Gukosora ikiguzi ntibyakozwe: ')+String(correctionError.message||correctionError),'error');
+      if(correction?.ok!==true)return sheriToast(sheriLocalized('The cost correction was not confirmed by the server. The product was not updated.','Le serveur n’a pas confirmé la correction du coût. Le produit n’a pas été modifié.','Seriveri ntiyemeje ihinduka ry’ikiguzi. Igicuruzwa nticyahinduwe.'),'error');
+      productCostCorrection={old_cost:previousCost,new_cost:cost,stock:previousStock,inventory_delta:Number(correction.inventory_delta||0),journal_entry_id:correction.journal_entry_id||null};
+    }
     Object.assign(p,{name,cat,cost,sell,stock:previousStock,reorder:reorder||0,barcode,expiry_date,updated_at:now});
     await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     await sheriQueue({type:'product_upsert',record:{...p}});
     if(stockDelta!==0){
-      await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:previousStock,quantity_delta:stockDelta,reason:editReason.trim(),movement_type:'adjustment',source_id:sheriUuid()});
+      await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:previousStock,quantity_delta:stockDelta,reason:editReason.trim(),movement_type:'adjustment',source_id:sheriUuid(),entry_date:sheriNow().slice(0,10)});
       p.stock=stock||0;await sheriPut('products',p.id,{merchant_id:state.merchant.id,record:{...p}});
     }
   }else{
@@ -2905,12 +2998,12 @@ async function saveProduct(){
     // Create the product at zero stock on the server, then apply opening stock
     // through the audited RPC so inventory_movements records the opening balance.
     await sheriQueue({type:'product_upsert',record:{...p,stock:0}});
-    if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:0,quantity_delta:initialStock,reason:'Initial stock entry',movement_type:'opening_balance',source_id:sheriUuid()});
+    if(initialStock>0)await sheriQueue({type:'inventory_adjustment',merchant_id:state.merchant.id,product_id:p.id,expected_stock:0,quantity_delta:initialStock,reason:'Initial stock entry',movement_type:'opening_balance',source_id:sheriUuid(),entry_date:now.slice(0,10)});
   }
-  let openingWarning='';if(openingStockProduct&&openingStockProduct.stock>0&&openingStockProduct.cost>0){if(sheriCan('manage_finance')){try{await accEnsureBase();const inv=accAccountCode('1200'),equity=accAccountCode('3000'),value=openingStockProduct.stock*openingStockProduct.cost;await accPostEntry({date:now.slice(0,10),description:'Opening inventory '+name,sourceType:'product_opening_stock',sourceId:openingStockProduct.id,lines:[{accountId:inv.id,debit:value},{accountId:equity.id,credit:value}]});}catch(err){openingWarning=' Opening stock was saved but its accounting entry needs attention: '+(err?.message||String(err));console.warn('[Sheri accounting] opening inventory posting failed',err);}}else openingWarning=' Inventory quantity is recorded; a finance manager must post the opening stock value.';}
-  if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name});
+  // The opening-balance inventory RPC now creates the matching Inventory / Owner Equity journal in the same database transaction as the stock movement.
+  if(isEditing)await accAudit('edit','product',editingProductId,{reason:editReason.trim(),name,...(productCostCorrection?{cost_correction:productCostCorrection}:{} )});
   if(navigator.onLine)sherriSyncKick();
-  document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast((isEditing?'Product updated.':'Product saved.')+openingWarning,openingWarning?'warning':'success');
+  document.getElementById('addProduct').style.display='none';clearProductForm();render();sheriToast(isEditing?'Product updated.':'Product saved.','success');
 }
 async function deleteProduct(id){
   if(!sheriCan('manage_team')||!sheriCan('manage_inventory'))return sheriToast('Only a Manager, Admin or Owner with inventory access can delete products.','error');
@@ -3459,7 +3552,7 @@ async function editTeamMember(id){
   ['view_sales','View sales'],['create_sale','Record sales'],['manage_sales','Edit / void sales'],
   ['view_inventory','View inventory'],['manage_inventory','Manage inventory'],['view_inventory_costs','View inventory costs'],
   ['view_expenses','View expenses'],['manage_expenses','Manage expenses'],
-  ['view_financial_reports','View financial reports'],['manage_finance','Manage accounting and finance'],
+  ['view_financial_reports','View financial reports'],['manage_finance','Manage accounting and finance'],['manage_payroll','Manage payroll and employee records'],
   ['view_customers','View customers'],['manage_customers','Manage customers'],
   ['view_suppliers','View suppliers'],['manage_suppliers','Manage suppliers'],
   ['view_audit_log','View audit trail'],['manage_team','Manage team access']
@@ -3470,7 +3563,7 @@ async function editTeamMember(id){
  modal.innerHTML=`<div class="card" style="width:min(680px,100%);max-height:92vh;overflow:auto;background:white">
   <div class="top"><div><h2>Edit team access</h2><div class="sub">${esc(m.full_name)} · Changes apply on the next server request</div></div><button class="btn secondary" type="button" onclick="closeTeamMemberEdit()">Close</button></div>
   <div class="formgrid" style="grid-template-columns:1fr 1fr">
-   <div><label>Full name</label><input id="teamEditName" value="${esc(m.full_name)}"></div>
+   <div><label>Full legal name</label><input id="teamEditName" minlength="3" maxlength="120" value="${esc(m.full_name)}" placeholder="As shown on official ID"><div class="field-help">Use at least two name parts. Existing names can remain unchanged while updating access.</div></div>
    <div><label>Role</label><select id="teamEditRole"><option value="cashier">Cashier</option><option value="inventory">Inventory</option><option value="accountant">Accountant</option><option value="manager">Manager</option><option value="admin">Admin</option><option value="custom">Custom</option></select></div>
    <div><label>Email</label><input id="teamEditEmail" type="email" value="${esc(m.email||'')}" placeholder="Optional"></div>
    <div><label>Phone (international format)</label><input id="teamEditPhone" value="${esc(m.phone||'')}" placeholder="+250…"></div>
@@ -3488,14 +3581,13 @@ async function editTeamMember(id){
  </div>`;
  document.body.appendChild(modal);
  const role=document.getElementById('teamEditRole');if(role)role.value=m.role||'cashier';
-}
-async function saveTeamMemberEdit(id){
+}async function saveTeamMemberEdit(id){
  const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
  const get=id=>document.getElementById(id)?.value?.trim()||'';
- const full_name=get('teamEditName'),email=get('teamEditEmail'),phone=get('teamEditPhone'),username=get('teamEditUsername'),role=get('teamEditRole'),responsibility=get('teamEditResponsibility');
+ const full_name_raw=get('teamEditName'),full_name=sheriNormalizeFullLegalName(full_name_raw)||(full_name_raw===String(m.full_name||'').trim()?full_name_raw:''),email=get('teamEditEmail'),phone=get('teamEditPhone'),username=get('teamEditUsername'),role=get('teamEditRole'),responsibility=get('teamEditResponsibility');
  const permissions={};
  document.querySelectorAll('.team-edit-permission:checked').forEach(el=>permissions[el.value]=true);
- if(!full_name||full_name.length<2)return sheriToast('Enter the staff member’s full name.','error');
+ if(!full_name)return sheriToast('Enter the staff member’s full legal name (at least two name parts).','error');if(!full_name||full_name.length<2)return sheriToast('Enter the staff member’s full name.','error');
  if(!email&&!phone)return sheriToast('Keep at least one login method: email or phone.','error');
  if(role==='manager'){permissions.manage_team=true;permissions.manage_sales=true;permissions.view_audit_log=true;}
  const status=document.getElementById('teamEditStatus');if(status)status.textContent='Updating staff access…';
@@ -3506,8 +3598,7 @@ async function saveTeamMemberEdit(id){
   const teamStatus=document.getElementById('teamStatus');if(teamStatus)teamStatus.textContent='Staff access updated. Permission changes take effect on the next data request.';
   await loadTeamMembers(true);
  }catch(e){if(status)status.textContent=e?.message||'Could not update team access.';}
-}
-async function resetTeamMemberPin(id){
+}async function resetTeamMemberPin(id){
  const m=(state.teamMembers||[]).find(x=>x.id===id);if(!m)return;
  if(!sheriCan('manage_team'))return sheriToast('Only an authorized Manager, Admin or Owner can reset a staff PIN.','error');
  const pin=prompt('Set a new 6–8 digit PIN for '+m.full_name+':');
@@ -3536,8 +3627,7 @@ async function toggleTeamMemberStatus(id){
   const statusEl=document.getElementById('teamStatus');if(statusEl)statusEl.textContent=m.full_name+' is now '+status+'.';
  }catch(e){const statusEl=document.getElementById('teamStatus');if(statusEl)statusEl.textContent=e?.message||'Could not update staff status.';}
 }
-async function createTeamMember(){const status=document.getElementById('teamStatus');try{const full_name=document.getElementById('teamFullName').value.trim(),username=document.getElementById('teamUsername').value.trim(),email=document.getElementById('teamEmail').value.trim(),phone=document.getElementById('teamPhone').value.trim(),pin=document.getElementById('teamPin').value.trim(),role=document.getElementById('teamRole').value,responsibility=document.getElementById('teamResponsibility').value.trim();if(!full_name||(!email&&!phone)||!/^\d{6,8}$/.test(pin))throw new Error('Enter a name, email or phone, and a 6–8 digit PIN.');const sales=document.getElementById('teamSales').checked,inventory=document.getElementById('teamInventory').checked,expenses=document.getElementById('teamExpenses').checked,reports=document.getElementById('teamReports').checked,finance=document.getElementById('teamFinance').checked,customers=document.getElementById('teamCustomers').checked,suppliers=document.getElementById('teamSuppliers').checked,audit=document.getElementById('teamAudit').checked;const permissions={view_sales:sales,create_sale:sales,manage_sales:role==='manager'||document.getElementById('teamSalesManage').checked,view_inventory:sales||inventory,manage_inventory:inventory,view_inventory_costs:document.getElementById('teamInventoryCosts').checked,view_expenses:expenses,manage_expenses:expenses,view_financial_reports:reports,manage_finance:finance,view_customers:customers,manage_customers:customers,view_suppliers:suppliers,manage_suppliers:suppliers,view_audit_log:role==='manager'||audit,manage_team:role==='manager'||document.getElementById('teamManage').checked};status.textContent='Creating secure team login…';const {data,error}=await sb.functions.invoke('team-access',{body:{action:'create_member',merchant_id:state.merchant.id,full_name,username,email,phone,pin,role,permissions,responsibility}});if(error||!data?.ok)throw await sheriTeamFunctionError(error,data,'Could not create member.');status.textContent=data.reused_existing_auth_user?'Existing account linked to this business. The employee can use their existing email and the new staff PIN.':'Team member created. They can sign in using their name, phone or email and PIN.';['teamFullName','teamUsername','teamEmail','teamPhone','teamPin','teamResponsibility'].forEach(id=>document.getElementById(id).value='');await loadTeamMembers(true)}catch(e){status.textContent=e?.message||'Could not create team member.'}}
-async function signInWithTeamPin(){try{if(!sb)await sheriInitSupabase();const merchant_code=document.getElementById('staffMerchantCode').value.trim(),identifier=document.getElementById('staffIdentifier').value.trim(),pin=document.getElementById('staffPin').value.trim();if(!/^\d{1,6}$/.test(merchant_code)||!identifier||pin.length<6||pin.length>8||!/^[0-9]+$/.test(pin))return setAuthStatus('Enter your 1–6 digit business ID, name, phone or email, and a 6–8 digit PIN.',true);setAuthStatus('Verifying team access…');const {data,error}=await sb.functions.invoke('team-access',{body:{action:'login_with_pin',merchant_code,identifier,pin}});if(error||!data?.token_hash)throw error||new Error(data?.error||'Sign-in failed');const credentials={token_hash:data.token_hash,type:'email'};const {data:authData,error:authError}=await sb.auth.verifyOtp(credentials);if(authError)throw authError;if(!authData?.session)throw new Error('Secure session could not be established.');window.__teamLoginMerchantId=data.merchant_id;setAuthStatus('Signed in. Loading your workspace…');await onAuthed(authData.session)}catch(e){setAuthStatus(e?.message||'Team sign-in failed.',true)}}
+async function createTeamMember(){const status=document.getElementById('teamStatus');try{const full_name=sheriNormalizeFullLegalName(document.getElementById('teamFullName').value),username=document.getElementById('teamUsername').value.trim(),email=document.getElementById('teamEmail').value.trim(),phone=sheriNormalizeAuthPhone(document.getElementById('teamPhone').value),pin=document.getElementById('teamPin').value.trim(),role=document.getElementById('teamRole').value,responsibility=document.getElementById('teamResponsibility').value.trim();if(!full_name)throw new Error('Enter the staff member’s full legal name as shown on official identification (at least two name parts).');if(!phone)throw new Error('A valid staff phone number is required. Use +250… or an international number.');if(!/^\d{6,8}$/.test(pin))throw new Error('Enter a 6–8 digit staff PIN.');const sales=document.getElementById('teamSales').checked,inventory=document.getElementById('teamInventory').checked,expenses=document.getElementById('teamExpenses').checked,reports=document.getElementById('teamReports').checked,finance=document.getElementById('teamFinance').checked,customers=document.getElementById('teamCustomers').checked,suppliers=document.getElementById('teamSuppliers').checked,audit=document.getElementById('teamAudit').checked;const permissions={view_sales:sales,create_sale:sales,manage_sales:role==='manager'||document.getElementById('teamSalesManage').checked,view_inventory:sales||inventory,manage_inventory:inventory,view_inventory_costs:document.getElementById('teamInventoryCosts').checked,view_expenses:expenses,manage_expenses:expenses,view_financial_reports:reports,manage_finance:finance,view_customers:customers,manage_customers:customers,view_suppliers:suppliers,manage_suppliers:suppliers,view_audit_log:role==='manager'||audit,manage_team:role==='manager'||document.getElementById('teamManage').checked};status.textContent='Creating secure team login…';const {data,error}=await sb.functions.invoke('team-access',{body:{action:'create_member',merchant_id:state.merchant.id,full_name,username,email,phone,pin,role,permissions,responsibility}});if(error||!data?.ok)throw await sheriTeamFunctionError(error,data,'Could not create member.');status.textContent=data.reused_existing_auth_user?'Existing account linked to this business. The employee can use their existing phone number and the new staff PIN.':'Team member created. They can sign in using their phone number and PIN.';['teamFullName','teamUsername','teamEmail','teamPhone','teamPin','teamResponsibility'].forEach(id=>document.getElementById(id).value='');await loadTeamMembers(true)}catch(e){status.textContent=e?.message||'Could not create team member.'}}async function signInWithTeamPin(){try{if(!sb)await sheriInitSupabase();const merchant_code=document.getElementById('staffMerchantCode').value.trim(),phone=sheriNormalizeAuthPhone(document.getElementById('staffIdentifier').value),pin=document.getElementById('staffPin').value.trim();if(!/^\d{1,6}$/.test(merchant_code)||!phone||pin.length<6||pin.length>8||!/^[0-9]+$/.test(pin))return setAuthStatus('Enter your business ID, valid phone number and 6–8 digit PIN.',true);setAuthStatus('Verifying team access…');const {data,error}=await sb.functions.invoke('team-access',{body:{action:'login_with_pin',merchant_code,identifier:phone,pin}});if(error||!data?.token_hash)throw error||new Error(data?.error||'Sign-in failed');const credentials={token_hash:data.token_hash,type:'email'};const {data:authData,error:authError}=await sb.auth.verifyOtp(credentials);if(authError)throw authError;if(!authData?.session)throw new Error('Secure session could not be established.');window.__teamLoginMerchantId=data.merchant_id;setAuthStatus('Signed in. Loading your workspace…');await onAuthed(authData.session)}catch(e){setAuthStatus(e?.message||'Team sign-in failed.',true)}}
 async function saveSettings(){const name=document.getElementById('setName').value.trim()||'Merchant',category=document.getElementById('setCat').value,tin=document.getElementById('setTin').value.trim()||null,fiscalYear=document.getElementById('setFiscalYear').value||null,country=document.getElementById('setCountry').value,currency=document.getElementById('setCurrency').value;if(!country||!currency)return alert('Country and currency are required.');const oldCurrency=state.merchant.currency||'RWF';Object.assign(state.merchant,{name,category,tin,fiscal_year:fiscalYear?Number(fiscalYear):null,country,currency,updated_at:sheriNow()});await sheriSaveSnapshot();await sheriQueue({type:'merchant_upsert',record:{...state.merchant}});if(navigator.onLine)await sheriSyncOutbox();render();alert(oldCurrency!==currency?'Settings saved. Existing numeric amounts were not converted; the new currency is now used for display and new transactions.':(navigator.onLine?'Settings saved.':'Settings saved offline — they will sync automatically.'));}
 async function seedDemoData(){
   if(!confirm('Add sample products so you can test the app? This will not remove existing data.'))return;
@@ -6756,7 +6846,7 @@ function renderReports(){sheriHideInternalAccountingUi();if(!state.merchant||!do
   const cumulativeNet=accStatementTotal('income',bs,'credit')-accStatementTotal('cogs',bs,'debit')-accStatementTotal('expense',bs,'debit');
   const equity=accStatementTotal('equity',bs,'credit')+cumulativeNet;
   const balanceDifference=assets-(liab+equity);
-  const inventoryReconciliationNotice=!inventoryReconciliationApplicable?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+sheriLocalized('Historical inventory valuation is not available for this report end date. Current product stock cannot be compared with a historical ledger balance, so these statements are NOT fully verified.','La valorisation historique du stock n’est pas disponible pour cette date de rapport. Le stock actuel ne peut pas être comparé à un solde comptable historique ; ces états ne sont donc PAS entièrement vérifiés.','Agaciro k’ububiko ko ku itariki yashize ntikaboneka. Ububiko bw’ubu ntibushobora kugereranywa na konti yo mu gihe cyashize; izi raporo NTIZIRAGENZURWA neza.')+'</div>':Math.abs(inventoryDifference)>0.005?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">'+sheriLocalized('Inventory valuation does not reconcile: product stock × saved unit cost is '+money(inventorySubledgerValue)+'; inventory control account 1200 is '+money(inventoryLedgerBalance)+'; difference is '+money(inventoryDifference)+'. Do not rely on these statements until reconciled.','La valorisation du stock ne concorde pas : quantité en stock × coût unitaire enregistré = '+money(inventorySubledgerValue)+' ; compte de stock 1200 = '+money(inventoryLedgerBalance)+' ; écart = '+money(inventoryDifference)+'. Ne vous fiez pas à ces états avant rapprochement.','Agaciro k’ububiko ntikaringaniye: ingano iri mu bubiko × igiciro cy’igura cyanditse = '+money(inventorySubledgerValue)+'; konti y’ububiko 1200 = '+money(inventoryLedgerBalance)+'; itandukaniro = '+money(inventoryDifference)+'. Ntukishingikirize kuri izi raporo mbere yo kubihuza.')+'</div>':'';
+  const inventoryReconciliationNotice=!inventoryReconciliationApplicable?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+sheriLocalized('Historical inventory valuation is not available for this report end date. Current product stock cannot be compared with a historical ledger balance, so these statements are NOT fully verified.','La valorisation historique du stock n’est pas disponible pour cette date de rapport. Le stock actuel ne peut pas être comparé à un solde comptable historique ; ces états ne sont donc PAS entièrement vérifiés.','Agaciro k’ububiko ko ku itariki yashize ntikaboneka. Ububiko bw’ubu ntibushobora kugereranywa na konti yo mu gihe cyashize; izi raporo NTIZIRAGENZURWA neza.')+'</div>':accServerSnapshotAuthoritative!==true?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">'+sheriLocalized('Inventory valuation has not yet been verified against a complete server ledger snapshot. Cached figures are provisional; refresh is still in progress or incomplete.','La valorisation du stock n’a pas encore été vérifiée à partir d’un instantané comptable complet du serveur. Les chiffres en cache sont provisoires ; actualisation en cours ou incomplète.','Agaciro k’ububiko ntikaragenzurwa hakoreshejwe amakuru yuzuye yo kuri seriveri. Imibare ibitswe muri cache ni iy’agateganyo; kuvugurura biracyakomeje cyangwa ntibyuzuye.')+'</div>':Math.abs(inventoryDifference)>0.005?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">'+sheriLocalized('Inventory valuation does not reconcile: product stock × saved unit cost is '+money(inventorySubledgerValue)+'; inventory control account 1200 is '+money(inventoryLedgerBalance)+'; difference is '+money(inventoryDifference)+'. Do not rely on these statements until reconciled.','La valorisation du stock ne concorde pas : quantité en stock × coût unitaire enregistré = '+money(inventorySubledgerValue)+' ; compte de stock 1200 = '+money(inventoryLedgerBalance)+' ; écart = '+money(inventoryDifference)+'. Ne vous fiez pas à ces états avant rapprochement.','Agaciro k’ububiko ntikaringaniye: ingano iri mu bubiko × igiciro cy’igura cyanditse = '+money(inventorySubledgerValue)+'; konti y’ububiko 1200 = '+money(inventoryLedgerBalance)+'; itandukaniro = '+money(inventoryDifference)+'. Ntukishingikirize kuri izi raporo mbere yo kubihuza.')+'</div>':'';
   const trialBalanceDifference=(state.accounts||[]).reduce((sum,a)=>{const normalSide=String(a.normal_balance||(['liability','equity','income'].includes(a.type)?'credit':'debit')).toLowerCase(),balance=Number(bs[a.code]||0);return sum+(normalSide==='debit'?balance:-balance)},0);
   const trialBalanceNotice=Math.abs(trialBalanceDifference)>0.005?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #dc2626;border-radius:8px;color:#991b1b;background:#fef2f2">'+sheriLocalized('Trial Balance is out of balance by '+money(trialBalanceDifference)+'.','La balance générale présente un écart de '+money(trialBalanceDifference)+'.','Igereranya ry’amadeni n’inguzanyo ntiringaniye; ikinyuranyo ni '+money(trialBalanceDifference)+'.')+'</div>':'';
   const refreshNotice=sheriAccountingRefreshError?'<div class="sub" style="margin:8px 0;padding:9px;border:1px solid #d97706;border-radius:8px;color:#92400e;background:#fffbeb">The latest server ledger refresh was incomplete. These figures may be cached and are NOT verified. '+esc(sheriAccountingRefreshError)+'</div>':'';
