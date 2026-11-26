@@ -498,8 +498,9 @@ window.ensurePdfJs=async function(){
       <div><label>Selling price / unit (<span data-currency-label>RWF</span>)</label><input id="salePrice" type="number" min="0" step="0.01"></div>
       <div><label>Customer (optional)</label><select id="saleCustomer"><option value="">— Anonymous —</option></select></div>
     </div>
-    <div id="aibosPosPaymentControls" class="formgrid section" style="margin-top:12px">
-      <div><label for="salePaymentMethod">Payment method</label><select id="salePaymentMethod"><option value="cash">Cash</option><option value="momo">MoMo</option><option value="credit">On credit</option></select></div>
+    <div id="aibosPosPaymentControls" class="formgrid section" role="group" aria-label="Choose payment method" style="display:grid!important;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:16px;padding:16px;border:2px solid var(--accent);border-radius:12px;background:var(--card);visibility:visible!important;opacity:1!important">
+      <div style="grid-column:1/-1;font-weight:800;font-size:15px">CHOOSE PAYMENT METHOD BEFORE CONFIRMING SALE</div>
+      <div><label for="salePaymentMethod" style="font-weight:800">Payment method *</label><select id="salePaymentMethod" required aria-required="true" style="display:block!important;width:100%;min-height:44px;visibility:visible!important;opacity:1!important"><option value="cash">Cash</option><option value="momo">MoMo</option><option value="credit">On credit</option></select></div>
       <div><label for="saleReceiptNote">Receipt note (optional)</label><input id="saleReceiptNote" maxlength="180"></div>
       <div id="saleCreditFields" style="display:none;grid-column:1/-1">
         <div class="formgrid">
@@ -10458,6 +10459,6 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 </script>
 <script src="payroll.js?v=1"></script>
 <script src="contractors.js?v=1"></script>
-<script src="pos-payment-summary.js?v=2"></script>
+<script src="pos-payment-summary.js?v=3"></script>
 </body>
 </html>
